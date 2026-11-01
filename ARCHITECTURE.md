@@ -751,3 +751,21 @@ two dedicated compatibility targets were deleted. Current Python source count
 is 154. The remaining gate adapter only resolves and dispatches the native cost
 phase; the wider governance and session migration is still open. See
 `docs/native-claims.md` and `docs/ledger.md` for command contracts and limits.
+
+The next working-tree milestone adds bounded catalog-driven native memory
+ingestion with pinned embedding recipes, immutable mapped generations, streaming
+incremental reuse and reader-safe collection. Native status append and session
+close now connect status, claims and explicit memory sync without interpreter
+dispatch. The native workspace runtime matrix supplies opt-in finite probes,
+strict receipt evaluation and evidence reconciliation. The superseded status,
+session-close, session-preamble and workspace runtime Python adapters and their
+dedicated compatibility targets are deleted; shared compatibility checks remain.
+See [native memory and lifecycle contracts](docs/native-memory-ingestion.md).
+Review tightened receipt validation, missing-root preflight and rejection of
+dangling generation pointers before session mutations. Working-tree
+release suites passed 2,204 tests with 39 optional tests ignored; 91 selected
+compatibility checks also passed. The installed-layout fixture now stages the
+fresh native extension instead of inheriting an older shared-venv dependency.
+The workspace embedding mock reuses the bounded complete-request HTTP fixture;
+100 consecutive repetitions passed after replacing its unbounded accept/read loop.
+Canonical committed-tree receipts are still pending for this milestone.

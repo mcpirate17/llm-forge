@@ -54,8 +54,10 @@ mod route;
 use forge::session_brief;
 mod session_end;
 use forge::session_policy;
+mod session_close_cli;
 mod session_preamble;
 mod session_start;
+mod session_status_cli;
 mod status;
 mod subagent_stop;
 mod subagent_transcript;
@@ -67,6 +69,7 @@ mod tasks;
 mod telemetry;
 mod tool_quiet;
 mod workspace_hygiene;
+mod workspace_runtime;
 mod write_targets;
 
 use clap::{Parser, Subcommand};
@@ -89,6 +92,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Check native workspace runtime behavior with bounded, opt-in live probes.
+    WorkspaceRuntime(workspace_runtime::RuntimeArgs),
     /// Create, release, touch and inspect structured repository ownership claims.
     Claim(claims::ClaimArgs),
     /// Compile and query immutable native workspace-memory snapshots.
@@ -202,6 +207,10 @@ enum Command {
 
 #[derive(Subcommand)]
 enum SessionCommand {
+    /// Retire a session with explicit claim release and native memory refresh.
+    Close(session_close_cli::CloseArgs),
+    /// Append one bounded coordination entry and refresh active state.
+    Append(session_status_cli::AppendArgs),
     /// Read a bounded task brief from policy, claims, inbox and explicit indexes.
     Brief(session_brief::BriefArgs),
     /// Append a native journal from a SessionEnd JSON payload on stdin.
@@ -319,6 +328,9 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::WorkspaceRuntime(args) => {
+            command_exit("workspace-runtime", workspace_runtime::run(args), 2)
+        }
         Command::Claim(args) => command_exit("claim", claims::run(args).map(|()| 0), 2),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
         Command::Mcp(args) => command_exit("MCP configuration", mcp_setup::run(args), 2),
@@ -399,6 +411,12 @@ fn main() -> ExitCode {
             }
         },
         Command::Session { action } => match action {
+            SessionCommand::Close(args) => {
+                command_exit("session close", session_close_cli::run(args), 2)
+            }
+            SessionCommand::Append(args) => {
+                command_exit("session append", session_status_cli::run(args), 2)
+            }
             SessionCommand::Brief(args) => {
                 command_exit("session brief", session_brief::run(args), 2)
             }

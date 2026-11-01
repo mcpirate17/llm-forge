@@ -26,6 +26,7 @@ pub fn dispatch(operation: &str, input: &Value) -> Result<Value, String> {
         "hook_program_cases" => checks::hook_program_cases(input),
         "hook_program_verdict" => checks::hook_program_verdict(input),
         "check_graph_evidence" => checks::check_graph_evidence(input),
+        "check_graph_payload" => checks::check_graph_payload(input),
         "check_embedding" => checks::check_embedding(input),
         "check_retrievers" => checks::check_retrievers(input),
         "check_active_state" => checks::check_active_state(input),

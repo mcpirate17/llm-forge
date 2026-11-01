@@ -175,6 +175,25 @@ pub fn notes_db(root: &Path) -> Result<std::path::PathBuf, String> {
     Ok(root.join(configured(root, &mut None, *spec)?.0))
 }
 
+/// Memory catalog path and whether the host explicitly selected it.
+pub fn memory_sources(root: &Path) -> Result<(PathBuf, bool), String> {
+    let spec = PATHS
+        .iter()
+        .find(|spec| spec.key == "memory_sources")
+        .expect("declared path");
+    let (relative, explicit) = configured(root, &mut None, *spec)?;
+    Ok((root.join(relative), explicit))
+}
+
+/// The host's configured notes directory, including its environment override.
+pub fn notes_root(root: &Path) -> Result<PathBuf, String> {
+    let spec = PATHS
+        .iter()
+        .find(|spec| spec.key == "notes_root")
+        .expect("declared path");
+    Ok(root.join(configured(root, &mut None, *spec)?.0))
+}
+
 fn nonempty_string(value: &Value, label: &str) -> Result<String, String> {
     let raw = value
         .as_str()

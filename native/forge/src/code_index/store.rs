@@ -1,11 +1,11 @@
 use super::{file_hash, immutable_file, validate_hash};
+use crate::file_lock::{owned as lock, try_owned as try_lock, Lease};
 use crate::harness::state;
 use anyhow::{ensure, Context, Result};
 use conductor_native::vector_index::{Config, Space};
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File, OpenOptions, Permissions};
-use std::os::fd::AsRawFd;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::fs::{self, File};
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ impl Store {
     pub fn create(root: &Path) -> Result<Self> {
         ensure!(root.is_absolute(), "index directory must be absolute");
         match fs::DirBuilder::new().mode(0o700).create(root) {
-            Ok(()) => {}
+            Ok(()) => File::open(root.parent().context("index root parent")?)?.sync_all()?,
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
             Err(e) => return Err(e.into()),
         }
@@ -160,13 +160,13 @@ impl Store {
 pub(crate) struct Pinned {
     pub manifest: Manifest,
     pub path: PathBuf,
-    _lease: File,
+    _lease: Lease,
 }
 pub(crate) struct Staging {
     store: Store,
     pub path: PathBuf,
     pub id: String,
-    _builder: File,
+    _builder: Lease,
     published: bool,
 }
 impl Staging {
@@ -240,49 +240,7 @@ fn validate_id(id: &str) -> Result<()> {
     );
     Ok(())
 }
-fn try_lock(path: &Path, exclusive: bool) -> Result<Option<File>> {
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
-        .open(path)?;
-    let meta = file.metadata()?;
-    ensure!(
-        meta.is_file()
-            && meta.nlink() == 1
-            && meta.uid() == unsafe { libc::geteuid() }
-            && meta.mode() & 0o077 == 0,
-        "invalid index lock inode"
-    );
-    if unsafe {
-        libc::flock(
-            file.as_raw_fd(),
-            libc::LOCK_NB
-                | if exclusive {
-                    libc::LOCK_EX
-                } else {
-                    libc::LOCK_SH
-                },
-        )
-    } != 0
-    {
-        let error = std::io::Error::last_os_error();
-        if error.kind() == std::io::ErrorKind::WouldBlock {
-            return Ok(None);
-        }
-        return Err(error.into());
-    }
-    Ok(Some(file))
-}
-fn lock(path: &Path, exclusive: bool) -> Result<File> {
-    try_lock(path, exclusive)?.context("index publication, builder, or generation is busy; retry")
-}
-
 pub(crate) fn seal(path: &Path) -> Result<()> {
-    fs::set_permissions(path, Permissions::from_mode(0o400))?;
-    immutable_file(path)?.sync_all()?;
+    crate::state_publish::seal_file(path)?;
     Ok(())
 }

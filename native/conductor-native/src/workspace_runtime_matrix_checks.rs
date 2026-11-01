@@ -168,7 +168,7 @@ pub(super) fn hook_program_cases(_input: &Value) -> Result<Value, String> {
         {"name":"safe-read-allow","payload":{"tool_name":"Read",
             "tool_input":{"file_path":"README.md"}},"expect_deny":false},
         {"name":"handoff-allow","payload":{"tool_name":"Bash",
-            "tool_input":{"command":"python -m conductor.handoff append --owner x --title y --body z"}},
+            "tool_input":{"command":"forge session append --host . --owner x --title y --body z"}},
             "expect_deny":false}
     ]))
 }
@@ -246,6 +246,25 @@ fn graph_valid(payload: &Value) -> bool {
         && positive_int(trace.get("broker_calls"))
         && trace.get("dimension") == dimension
         && trace.get("paid") == payload.get("paid")
+}
+
+/// Evaluate an already bounded and parsed snapshot supplied by the caller.
+pub(super) fn check_graph_payload(input: &Value) -> Result<Value, String> {
+    if !input.is_object() {
+        return Err("graph evidence must be an object".to_owned());
+    }
+    let valid = graph_valid(input);
+    Ok(cell(
+        "graph-semantic-runtime",
+        if valid { "PASS" } else { "FAIL-CLOSED" },
+        if valid {
+            "fingerprint-bound semantic graph query covered the live graph"
+        } else {
+            "graph fallback or mismatch"
+        }
+        .to_owned(),
+        input.clone(),
+    ))
 }
 
 pub(super) fn check_graph_evidence(input: &Value) -> Result<Value, String> {

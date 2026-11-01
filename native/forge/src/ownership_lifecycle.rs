@@ -198,6 +198,93 @@ pub fn release(repo: &Path, id: &str, owner: &str) -> Result<bool> {
     publish(repo, &claims)?;
     Ok(true)
 }
+
+#[derive(Debug)]
+pub struct ReleaseMany {
+    pub released: Vec<String>,
+    /// Publication occurred, but a durability or activity cleanup step failed.
+    pub followup_error: Option<String>,
+}
+
+/// Validate the whole selection under one lease and publish one replacement.
+pub fn release_many(
+    repo: &Path,
+    ids: &[String],
+    owner: &str,
+    all_owner: bool,
+) -> Result<ReleaseMany> {
+    ensure!(!owner.trim().is_empty(), "claim owner is required");
+    ensure!(
+        !(all_owner && !ids.is_empty()),
+        "claim IDs and all-owner selection are exclusive"
+    );
+    ensure!(all_owner || !ids.is_empty(), "no claim release selection");
+    let selected: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
+    ensure!(selected.len() == ids.len(), "duplicate claim IDs");
+    let _lease = acquire(repo, Duration::from_secs(30))?;
+    let (claims, _) = ownership::load_claims(repo)?;
+    for id in &selected {
+        let claim = claims
+            .iter()
+            .find(|claim| claim.claim_id == *id)
+            .with_context(|| format!("claim {id} does not exist"))?;
+        ensure!(
+            claim.owner.to_lowercase() == owner.trim().to_lowercase(),
+            "claim {id} is owned by {:?}, not {owner:?}",
+            claim.owner
+        );
+    }
+    let mut released = Vec::new();
+    let mut retained = Vec::new();
+    for claim in claims {
+        if selected.contains(claim.claim_id.as_str())
+            || (all_owner && claim.owner.to_lowercase() == owner.trim().to_lowercase())
+        {
+            released.push(claim.claim_id);
+        } else {
+            retained.push(claim);
+        }
+    }
+    if released.is_empty() {
+        return Ok(ReleaseMany {
+            released,
+            followup_error: None,
+        });
+    }
+    let path = ownership::checked_claim_path(repo, "ownership-claims.json")?
+        .context("repository has no Git common directory")?;
+    let payload =
+        json!({"schema_version":1,"claims":retained.iter().map(fields).collect::<Vec<_>>()});
+    let bytes = serde_json::to_vec_pretty(&payload)?;
+    if let Err(error) = crate::state_publish::publish(&path, &bytes) {
+        if crate::bounded_file::read(&path, 1024 * 1024).is_ok_and(|actual| actual == bytes) {
+            return Ok(ReleaseMany {
+                released,
+                followup_error: Some(format!("claims published but durability failed: {error}")),
+            });
+        }
+        bail!("claim publication failed; publication outcome may be uncertain: {error}");
+    }
+    let cleanup = (|| -> Result<()> {
+        let mut seen = ownership::load_activity(repo)?;
+        let retained_ids: BTreeSet<_> = retained
+            .iter()
+            .map(|claim| claim.claim_id.as_str())
+            .collect();
+        let before = seen.len();
+        seen.retain(|id, _| retained_ids.contains(id.as_str()));
+        if seen.len() != before {
+            ownership::write_activity(repo, &seen)?;
+        }
+        Ok(())
+    })();
+    Ok(ReleaseMany {
+        released,
+        followup_error: cleanup
+            .err()
+            .map(|error| format!("claim activity cleanup failed after release: {error:#}")),
+    })
+}
 pub fn touch(repo: &Path, id: &str, owner: &str) -> Result<bool> {
     let _lease = acquire(repo, Duration::from_secs(30))?;
     let (claims, _) = ownership::load_claims(repo)?;

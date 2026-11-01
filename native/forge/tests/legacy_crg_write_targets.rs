@@ -82,7 +82,7 @@ fn shell_syntax_preserves_real_targets_and_ignores_heredoc_data() {
         );
     }
     let quoted_mention = concat!(
-        "python -m conductor.handoff append --title t --body \"line one\n",
+        "forge session append --host . --owner fixture --title t --body \"line one\n",
         "mentions python3 - <<EOF\n",
         "and continues\" && echo done > out.txt"
     );

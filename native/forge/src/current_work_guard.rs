@@ -23,7 +23,7 @@ const DENY_HINT: &str = "Use `python -m conductor.kb_retrieve query ...` and \
 `python -m conductor.memory_index query ...` to read workspace context. \
 Write findings to research/notes/<topic>.md, then \
 `python -m conductor.memory_index index`. Short status: \
-`python -m conductor.handoff append --owner <you> --title '...' --body '...'` \
+`forge session append --host <repo> --owner <you> --title '...' --body '...'` \
 (max 12 lines).";
 
 const TEST_SUFFIXES: [&str; 14] = [

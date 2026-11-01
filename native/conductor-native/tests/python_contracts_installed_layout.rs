@@ -41,6 +41,23 @@ fn install_site(site: &Path) {
         "uv pip install failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    // --no-deps must not pick up a stale native dependency from the host venv.
+    // Cargo emits the cdylib beside this integration binary in the same profile.
+    let extension = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join(format!(
+            "{}conductor_native{}",
+            std::env::consts::DLL_PREFIX,
+            std::env::consts::DLL_SUFFIX
+        ));
+    fs::copy(&extension, site.join("conductor_native.so")).unwrap_or_else(|error| {
+        panic!(
+            "stage tested native extension {}: {error}",
+            extension.display()
+        )
+    });
 }
 
 fn fake_host(root: &Path) -> PathBuf {
@@ -97,6 +114,11 @@ fn run(module_args: &[&str], cwd: &Path, site: &Path) -> Output {
 fn assert_no_site_leak(result: &Output, site: &Path, label: &str) -> String {
     let stdout = String::from_utf8(result.stdout.clone()).unwrap();
     let stderr = String::from_utf8(result.stderr.clone()).unwrap();
+    assert!(
+        result.status.success(),
+        "{label} exited {:?}\nstdout:\n{stdout}\nstderr:\n{stderr}",
+        result.status.code()
+    );
     let site = site.to_string_lossy();
     for (stream_name, stream) in [("stdout", stdout.as_str()), ("stderr", stderr.as_str())] {
         for line in stream.lines() {
@@ -106,11 +128,6 @@ fn assert_no_site_leak(result: &Output, site: &Path, label: &str) -> String {
             );
         }
     }
-    assert!(
-        result.status.success(),
-        "{label} exited {:?}\nstdout:\n{stdout}\nstderr:\n{stderr}",
-        result.status.code()
-    );
     stdout
 }
 
@@ -122,10 +139,6 @@ fn installed_layout_resolves_host_not_site() {
     install_site(&site);
     let host = fake_host(case.root());
     let started = Instant::now();
-
-    let preamble = run(&["conductor.session_preamble", "text"], &host, &site);
-    let output = assert_no_site_leak(&preamble, &site, "session_preamble");
-    assert!(output.contains("INSTALLED-LAYOUT-FAKE-HOST-MISSION"));
 
     let dump = run(&["conductor.active_state", "dump"], &host, &site);
     assert_no_site_leak(&dump, &site, "active_state dump");

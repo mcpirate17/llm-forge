@@ -97,7 +97,7 @@
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-bash-echo-mention-allowed": null,
@@ -105,7 +105,7 @@
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-bash-grep-pattern-before-target-denied": null,
@@ -113,21 +113,21 @@
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-bash-mv-current-work-denied": {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-bash-sed-current-work-denied": {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-bash-unrelated-command-allowed": null,
@@ -135,7 +135,7 @@
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: Edit cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: Edit cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-edit-other-file-allowed": null,
@@ -143,7 +143,7 @@
   "guard-grok-protocol-allowed": null,
   "guard-grok-protocol-denied": {
     "decision": "deny",
-    "reason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+    "reason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
   },
   "guard-local-ai-runtime-off-shell-echo-allowed": null,
   "guard-local-ai-runtime-on-plain-command-allowed": null,
@@ -158,35 +158,35 @@
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: NotebookEdit cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: NotebookEdit cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-read-current-work-denied": {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: Read cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: Read cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-run-shell-command-alias-current-work-denied": {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-shell-tool-alias-denied": {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: direct shell access to .current_work.md is unsupported. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "guard-write-current-work-denied": {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
       "permissionDecision": "deny",
-      "permissionDecisionReason": "BLOCKED: Write cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `python -m conductor.handoff append --owner <you> --title '...' --body '...'` (max 12 lines)."
+      "permissionDecisionReason": "BLOCKED: Write cannot access .current_work.md directly. Use `python -m conductor.kb_retrieve query ...` and `python -m conductor.memory_index query ...` to read workspace context. Write findings to research/notes/<topic>.md, then `python -m conductor.memory_index index`. Short status: `forge session append --host <repo> --owner <you> --title '...' --body '...'` (max 12 lines)."
     }
   },
   "refresh-combined-multiple-failures-and-warnings": {

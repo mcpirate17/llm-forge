@@ -36,11 +36,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from conductor.project_paths import host_root
 
 LEDGER_PATH = Path("conductor/gate_rollout_ledger.json")
 LEDGER_SCHEMA_VERSION = 1
@@ -237,23 +241,32 @@ def set_ruleset_required_checks(
 
 
 def append_handoff(title: str, body: str) -> None:
-    """Record an automatic demotion where the next agent will read it."""
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "conductor.handoff",
-            "append",
-            "--owner",
-            "gate-rollout",
-            "--title",
-            title,
-            "--body",
-            body,
-        ],
-        check=False,
-        capture_output=True,
+    """Record a demotion through native status append, reporting partial failure."""
+    from conductor._native import resolve_forge_binary_native
+
+    host = host_root()
+    binary = resolve_forge_binary_native(
+        str(host), sys.executable, os.environ.get("FORGE_BIN"), shutil.which("forge")
     )
+    if binary is None:
+        raise RolloutError("demotion already applied; no native forge binary for status append")
+    try:
+        completed = subprocess.run(
+            [str(binary), "session", "append", "--host", str(host),
+             "--owner", "gate-rollout", "--title", title, "--body", body],
+            cwd=host,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RolloutError(f"demotion already applied; native status append did not complete: {exc}") from exc
+    if completed.returncode:
+        raise RolloutError(
+            f"demotion already applied; native status append exited {completed.returncode}: "
+            f"{completed.stderr.strip()}"
+        )
 
 
 # ---------------------------------------------------------------------------

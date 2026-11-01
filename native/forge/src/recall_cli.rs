@@ -13,6 +13,15 @@ pub struct MemoryArgs {
 }
 #[derive(Subcommand)]
 enum Action {
+    /// Ingest catalog sources through a pinned local model into an atomic generation.
+    Ingest(crate::memory_ingest_cli::IngestArgs),
+    /// Embed a search query against the selected native generation.
+    Search(crate::memory_ingest_cli::SearchArgs),
+    /// Verify and show a complete native memory generation.
+    Inspect {
+        #[arg(long)]
+        store: PathBuf,
+    },
     /// Explicitly compile JSONL to a checksummed immutable mapped snapshot.
     Build {
         #[arg(long)]
@@ -44,6 +53,11 @@ enum Action {
 }
 pub fn run(args: MemoryArgs) -> Result<u8> {
     let value = match args.action {
+        Action::Ingest(args) => serde_json::to_value(crate::memory_ingest_cli::ingest(args)?)?,
+        Action::Search(args) => crate::memory_ingest_cli::search(args)?,
+        Action::Inspect { store } => {
+            serde_json::to_value(crate::memory_store::Store::open(&store)?.pin()?.manifest)?
+        }
         Action::Build { source, output } => {
             let output = output.unwrap_or_else(|| sidecar_path(&source));
             memory_index_sidecar::build_sidecar(&source, &output).map_err(anyhow::Error::msg)?;

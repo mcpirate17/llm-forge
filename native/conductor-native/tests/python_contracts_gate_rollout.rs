@@ -12,6 +12,7 @@ use gate_support::{buffer_text, capture, clear_buffer, isolated_case};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyCFunction, PyDict, PyList, PyModule};
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 use support::{module, path, text, AttrPatch};
 
@@ -470,6 +471,123 @@ fn a_failed_gh_call_names_the_command_and_carries_its_stderr() {
         assert!(message.contains("gh api repos/o/r/rulesets/1"));
         assert!(message.contains("HTTP 404: Not Found"));
         assert!(!message.ends_with(' '));
+    });
+}
+
+fn status_location(
+    py: Python<'_>,
+    subject: &Bound<'_, PyModule>,
+    root: &std::path::Path,
+) -> (AttrPatch, AttrPatch) {
+    let root = root.to_owned();
+    let expected_host = root.to_str().unwrap().to_owned();
+    let host = PyCFunction::new_closure(py, None, None, move |args, _| -> PyResult<Py<PyAny>> {
+        assert!(args.is_empty());
+        Ok(path(args.py(), &root).unbind())
+    })
+    .unwrap();
+    let host_patch = AttrPatch::replace(subject.as_any(), "host_root", host.as_any());
+    let resolve_host = expected_host;
+    let resolver =
+        PyCFunction::new_closure(py, None, None, move |args, _| -> PyResult<Py<PyAny>> {
+            assert_eq!(args.len(), 4);
+            assert_eq!(args.get_item(0)?.extract::<String>()?, resolve_host);
+            Ok("/fixture/native/forge"
+                .into_pyobject(args.py())?
+                .into_any()
+                .unbind())
+        })
+        .unwrap();
+    let native = module(py, "conductor._native");
+    let resolver_patch = AttrPatch::replace(
+        native.as_any(),
+        "resolve_forge_binary_native",
+        resolver.as_any(),
+    );
+    (host_patch, resolver_patch)
+}
+
+#[test]
+fn demotion_status_uses_native_host_dispatch_and_surfaces_every_nonzero_exit() {
+    let case = isolated_case();
+    Python::attach(|py| {
+        let subject = rollout(py);
+        let expected_host = case.root().to_str().unwrap().to_owned();
+        let (_host, _resolver) = status_location(py, &subject, case.root());
+        let code = Arc::new(AtomicI32::new(0));
+        let returned = code.clone();
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let captured = calls.clone();
+        let subprocess = subject.getattr("subprocess").unwrap();
+        let callback =
+            PyCFunction::new_closure(py, None, None, move |args, kwargs| -> PyResult<Py<PyAny>> {
+                let kwargs = kwargs.expect("native dispatch keyword arguments");
+                assert_eq!(kwargs.get_item("timeout")?.unwrap().extract::<u32>()?, 30);
+                assert!(kwargs.get_item("text")?.unwrap().extract::<bool>()?);
+                assert!(kwargs
+                    .get_item("capture_output")?
+                    .unwrap()
+                    .extract::<bool>()?);
+                let argv = args.get_item(0)?.extract::<Vec<String>>()?;
+                assert_eq!(text(&kwargs.get_item("cwd")?.unwrap()), argv[4]);
+                captured.lock().unwrap().push(argv);
+                let code = returned.load(Ordering::Relaxed);
+                Ok(completed(
+                    args.py(),
+                    code,
+                    "fixture status heading",
+                    if code == 3 {
+                        ".current_work.md written, but active state refresh failed"
+                    } else {
+                        "fixture refusal"
+                    },
+                )
+                .unbind())
+            })
+            .unwrap();
+        let _run = AttrPatch::replace(subprocess.as_any(), "run", callback.as_any());
+        for exit in [0, 3, 2] {
+            code.store(exit, Ordering::Relaxed);
+            let result = subject
+                .getattr("append_handoff")
+                .unwrap()
+                .call1(("status title", "status body"));
+            if exit == 0 {
+                result.unwrap();
+            } else {
+                let error = result.unwrap_err();
+                assert!(error
+                    .matches(py, &subject.getattr("RolloutError").unwrap())
+                    .unwrap());
+                let message = text(error.value(py));
+                assert!(message.contains("demotion already applied"));
+                assert!(message.contains(&format!("exited {exit}")));
+                if exit == 3 {
+                    assert!(message.contains("written, but"));
+                }
+            }
+        }
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 3);
+        for argv in calls.iter() {
+            assert_eq!(
+                argv,
+                &[
+                    "/fixture/native/forge",
+                    "session",
+                    "append",
+                    "--host",
+                    &expected_host,
+                    "--owner",
+                    "gate-rollout",
+                    "--title",
+                    "status title",
+                    "--body",
+                    "status body"
+                ]
+            );
+        }
+        assert!(!case.root().join(".current_work.md").exists());
     });
 }
 

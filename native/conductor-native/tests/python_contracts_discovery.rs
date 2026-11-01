@@ -609,11 +609,18 @@ fn production_sources_select_nonconvention_and_reexport_contracts() {
         [
             "python_contracts_active_state",
             "python_contracts_installed_layout",
-            "python_contracts_session_preamble",
         ]
     );
-    let close = plan(&root, &["src/conductor/session_close.py".to_owned()]).unwrap();
-    assert_eq!(close.targets, ["python_contracts_session_close"]);
+    for retired in [
+        "handoff.py",
+        "session_close.py",
+        "session_preamble.py",
+        "workspace_runtime_matrix.py",
+        "workspace_runtime_support.py",
+    ] {
+        let selected = plan(&root, &[format!("src/conductor/{retired}")]).unwrap();
+        assert!(selected.targets.is_empty(), "retired adapter: {retired}");
+    }
     let graph = plan(&root, &["src/conductor/graph_context.py".to_owned()]).unwrap();
     assert!(graph
         .targets
@@ -706,7 +713,6 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_baseline_merge",
             "python_contracts_branch_policy_native",
             "python_contracts_crg_mcp_probe",
-            "python_contracts_handoff",
             "python_contracts_import_ablation",
             "python_contracts_ledger_calibrate",
             "python_contracts_local_clerk",

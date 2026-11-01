@@ -95,7 +95,7 @@ fn denies_direct_write_even_when_short() {
     Python::attach(|py| {
         let reason = evaluate(py, json!({"tool_name":"Write","tool_input":{"file_path":current_work(&case),"content":"short status"}})).unwrap();
         assert!(reason.contains("BLOCKED"));
-        assert!(reason.contains("conductor.handoff"));
+        assert!(reason.contains("forge session append"));
     });
 }
 
@@ -123,7 +123,7 @@ fn allows_safe_shell_mentions_and_bounded_utilities() {
         for command in [
             "echo '.current_work.md is a compatibility log'",
             "rg -n '\\.current_work\\.md' README.md",
-            "python -m conductor.handoff append --owner codex --title x --body y",
+            "forge session append --host . --owner codex --title x --body y",
             "python -m conductor.active_state update",
         ] {
             assert_eq!(shell(py, command), None, "{command}");

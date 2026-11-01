@@ -97,16 +97,23 @@ pub fn server(replies: Vec<Reply>) -> (String, JoinHandle<Requests>) {
 }
 fn read_request(input: &mut BufReader<TcpStream>) -> (String, Vec<u8>) {
     let mut line = String::new();
-    input.read_line(&mut line).unwrap();
+    assert!(
+        input.read_line(&mut line).unwrap() > 0,
+        "request closed before start line"
+    );
     let first = line.clone();
     let mut length = 0;
-    loop {
+    for header in 0..=128 {
         line.clear();
-        input.read_line(&mut line).unwrap();
+        assert!(
+            input.read_line(&mut line).unwrap() > 0,
+            "request closed before headers completed"
+        );
         assert!(line.len() <= 4096);
         if line == "\r\n" {
             break;
         }
+        assert!(header < 128, "request header count exceeded");
         if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
             length = value.trim().parse::<usize>().unwrap();
         }

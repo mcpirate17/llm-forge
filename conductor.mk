@@ -50,9 +50,8 @@ CONDUCTOR_REPORTS_DIR ?= reports
 	test-conductor-native test-slop-core test-forge forge-build
 
 # ── Governance: candidate review, claims, sessions ──────────────────────
-# All of these wrap conductor.candidate_review.cli / conductor.session_close,
-# which already take --repo (default ".") -- passed explicitly here so the
-# target works when make is invoked from somewhere other than CONDUCTOR_HOST_ROOT.
+# Candidate review uses its existing adapter; claims and session close run
+# through native Forge. Host roots are explicit for callers outside the checkout.
 
 governance-check:  ## Run the exact candidate-index fast review
 	$(PYTHON) -m conductor.candidate_review.cli review --repo "$(CONDUCTOR_HOST_ROOT)" \
@@ -119,13 +118,16 @@ governance-claims:  ## Show active claims, one line each (CLAIM_PATH="a b" filte
 governance-claims-json:  ## Show the full machine-readable claim store (active and expired)
 	"$(FORGE)" claim list --repo "$(CONDUCTOR_HOST_ROOT)"
 
-governance-close-session:  ## Atomically close session: release claims, append handoff, update state
-	@test -n "$(OWNER)" || { echo "Set OWNER='<agent>' (optional: SESSION_TITLE, SESSION_BODY, CLAIM_ID)"; exit 2; }
-	$(PYTHON) -m conductor.session_close --repo "$(CONDUCTOR_HOST_ROOT)" \
+SESSION_CLOSE_ARGS ?=
+
+governance-close-session:  ## Close with explicit claim scope and memory configuration
+	@test -n "$(OWNER)" || { echo "Set OWNER='<agent>' (SESSION_CLOSE_ARGS must supply memory settings or --no-memory-index)"; exit 2; }
+	"$(FORGE)" session close --host "$(CONDUCTOR_HOST_ROOT)" \
 		--owner "$(OWNER)" \
 		$(if $(SESSION_TITLE),--title "$(SESSION_TITLE)",) \
 		$(if $(SESSION_BODY),--body "$(SESSION_BODY)",) \
-		$(if $(CLAIM_ID),--claim-id "$(CLAIM_ID)",)
+		$(if $(CLAIM_ID),--claim-id "$(CLAIM_ID)",) \
+		$(SESSION_CLOSE_ARGS)
 
 # ── Slop: tier-1 equivalence probing ────────────────────────────────────
 

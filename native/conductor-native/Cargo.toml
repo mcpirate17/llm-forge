@@ -366,10 +366,6 @@ name = "python_contracts_guardrail_duplicates"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_handoff"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_hot_loop_scan"
 required-features = ["python-compat-tests"]
 
@@ -670,15 +666,7 @@ name = "python_contracts_sandbox"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_session_close"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_session_policy"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_session_preamble"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -719,26 +707,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_workspace_hygiene"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_runtime_clerk"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_runtime_cli"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_runtime_core"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_runtime_matrix"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_runtime_support"
 required-features = ["python-compat-tests"]
 
 [[test]]

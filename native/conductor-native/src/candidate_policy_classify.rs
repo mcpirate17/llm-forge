@@ -35,7 +35,7 @@ fn class_end(pattern: &[char], start: usize) -> Option<usize> {
     (end..pattern.len()).find(|&index| pattern[index] == ']')
 }
 
-pub(crate) fn glob_match(path: &str, pattern: &str) -> bool {
+pub fn glob_match(path: &str, pattern: &str) -> bool {
     let p: Vec<char> = pattern.chars().collect();
     let s: Vec<char> = path.chars().collect();
     let mut current = vec![false; s.len() + 1];
