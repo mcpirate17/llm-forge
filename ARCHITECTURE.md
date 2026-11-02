@@ -1214,11 +1214,11 @@ wrapper, preserving current-path selection and refusing ambiguous or missing
 inputs. The [file-input contract](docs/native-candidate-review.md#native-file-selection-and-cppcheck-inputs)
 defines the remaining legacy metadata bridge and explicit no-file skip.
 
-Full review orchestration, cache integration, evidence and waiver verification,
-test-engine migration, review-integrated reporting and attestation remain. The existing Python
-command runner still has these callers and has not been deleted prematurely;
-117 Python source files remain under `src/`. The native migration goal stays
-active until those consumers are replaced and their interpreted code is removed.
+Full review orchestration, evidence/waiver admission, test execution and complete
+receipts remain; 115 Python source files still have consumers under `src/`.
+Native [isolated tasks](docs/native-execution.md#isolated-tasks-and-automatic-discard)
+add automatic private-snapshot discard on failure and retained outputs on success.
+The native migration goal remains active until all remaining callers are replaced.
 
 Cargo audit evaluates pinned offline evidence directly with native RustSec,
 including exact crates.io checksum and yanked-state coverage. Its Python command
@@ -1246,5 +1246,5 @@ Automated checks and previews hand off the executable from a successful isolated
 Cargo install. This remains correct when Cargo target configuration changes its
 compiler output directory. Preview regressions exercise split packages, a host
 triple, unchanged-cache reuse, same-length source edits and an obsolete binary.
-The standalone test command uses its own installation prefix; optional verified
-fixtures may compile on demand. See [native local checks](docs/local-checks.md).
+Legacy contract registries use an explicit native feature and retain their own
+test matrix outside default core builds. See [native local checks](docs/local-checks.md).

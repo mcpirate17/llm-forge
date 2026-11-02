@@ -190,16 +190,35 @@ impl Snapshot {
     }
 
     /// Explicit cleanup lets callers refuse success when a private snapshot remains.
-    pub fn discard(mut self) -> Result<()> {
-        self.verify_staging()?;
-        self.destination.parent.remove_dir_all(&self.staging)?;
+    pub fn discard(self) -> Result<()> {
+        self.discard_using(|parent, name| parent.remove_dir_all(name))
+    }
+
+    fn discard_using(
+        mut self,
+        remove: impl FnOnce(&Dir, &std::ffi::OsStr) -> std::io::Result<()>,
+    ) -> Result<()> {
+        // Explicit discard reports failures without a second destructive Drop
+        // attempt; retain any remaining staging state for recovery.
         self.keep = true;
+        self.verify_staging()?;
+        remove(&self.destination.parent, &self.staging)?;
         Ok(())
     }
 
     /// Preserve an unpublished private snapshot after incomplete process cleanup.
     /// The retained path is recovery evidence; it is never a successful result.
-    pub(crate) fn retain_for_recovery(mut self) -> Result<Report> {
+    pub(crate) fn retain_for_recovery(self) -> Result<Report> {
+        self.retain_owned()
+    }
+
+    /// Preserve a completed task's owned workspace. The tree OID describes
+    /// only its preimage; callers must separately bind selected output bytes.
+    pub(crate) fn retain_task_output(self) -> Result<Report> {
+        self.retain_owned()
+    }
+
+    fn retain_owned(mut self) -> Result<Report> {
         self.keep = true;
         self.verify_staging()?;
         self.report.output = self.path();

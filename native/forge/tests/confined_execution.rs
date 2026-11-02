@@ -244,6 +244,110 @@ struct Finalized {
     group_gone: bool,
     child_dead: bool,
 }
+
+struct OutcomeProbe(std::sync::mpsc::Sender<confined_execution::FinishState>);
+impl confined_execution::Resources for OutcomeProbe {
+    fn arm(&mut self) {}
+    fn finish(self: Box<Self>, _: bool) -> anyhow::Result<()> {
+        anyhow::bail!("outcome-aware finalizer was bypassed")
+    }
+    fn finish_with_state(
+        self: Box<Self>,
+        state: confined_execution::FinishState,
+    ) -> anyhow::Result<()> {
+        self.0.send(state)?;
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn finalizer_receives_exit_status_after_cleanup() {
+    for (code, success) in [("0", true), ("7", false)] {
+        let host = support::Host::new();
+        let (plan, group, path) = prepared(&host, support::task_worker(), &["exit", code]);
+        let (send, receive) = std::sync::mpsc::channel();
+        let report = tokio::time::timeout(
+            Duration::from_secs(8),
+            confined_execution::start_with_resources(
+                plan,
+                group,
+                limits(),
+                Box::new(OutcomeProbe(send)),
+            )
+            .unwrap()
+            .wait(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let state = receive.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert!(state.cleanup_safe);
+        assert!(!path.exists());
+        assert_eq!(state.outcome, report.outcome);
+        assert_eq!(state.exit_code, report.exit_code);
+        assert_eq!(state.succeeded(), success);
+    }
+}
+
+struct FinalizerBarrier {
+    entered: tokio::sync::oneshot::Sender<confined_execution::FinishState>,
+    release: std::sync::mpsc::Receiver<()>,
+}
+impl confined_execution::Resources for FinalizerBarrier {
+    fn arm(&mut self) {}
+    fn finish(self: Box<Self>, _: bool) -> anyhow::Result<()> {
+        anyhow::bail!("outcome-aware finalizer was bypassed")
+    }
+    fn finish_with_state(
+        self: Box<Self>,
+        state: confined_execution::FinishState,
+    ) -> anyhow::Result<()> {
+        self.entered
+            .send(state)
+            .map_err(|_| anyhow::anyhow!("finalizer observer dropped"))?;
+        self.release
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|error| anyhow::anyhow!("finalizer barrier: {error}"))?;
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn cancellation_after_finalizer_entry_does_not_relabel_fixed_exit() {
+    let host = support::Host::new();
+    let (plan, group, path) = prepared(&host, support::task_worker(), &["exit", "0"]);
+    let (entered, receive) = tokio::sync::oneshot::channel();
+    let (release, barrier) = std::sync::mpsc::channel();
+    let execution = confined_execution::start_with_resources(
+        plan,
+        group,
+        limits(),
+        Box::new(FinalizerBarrier {
+            entered,
+            release: barrier,
+        }),
+    )
+    .unwrap();
+    let state = tokio::time::timeout(Duration::from_secs(5), receive)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(state.outcome, Outcome::Exited);
+    assert_eq!(state.exit_code, Some(0));
+    assert!(state.cleanup_safe && !path.exists());
+    execution.cancellation().cancel().unwrap();
+    release.send(()).unwrap();
+    let report = tokio::time::timeout(Duration::from_secs(5), execution.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.outcome, Outcome::Exited);
+    assert_eq!(report.exit_code, Some(0));
+    assert!(report.cleanup_complete);
+    assert!(report.errors.is_empty());
+}
 struct LifecycleProbe {
     armed: bool,
     group: PathBuf,

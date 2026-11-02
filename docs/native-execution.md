@@ -102,6 +102,52 @@ observed limits and any aggregate budget across sessions. Creating a sibling
 cgroup does not automatically preserve an aggregate limit on the caller's former
 leaf group. No GPU memory isolation is claimed.
 
+## Isolated tasks and automatic discard
+
+`forge task run-isolated` runs a command against a private, bounded Git snapshot:
+
+```sh
+forge task run-isolated --repo /path/to/repo --tree FULL_TREE_OID \
+  --grants /private/operator-grants.json --artifact build/result.bin \
+  --execute -- build-tool argument
+```
+
+Omit `--execute` for admission preview: the snapshot and sandbox are prepared and
+discarded without starting a process or creating a cgroup. The tree must be a
+complete Git SHA-1 tree OID; gitlinks and unsafe snapshot paths are refused.
+Use the same explicit [operator grants](native-candidate-review.md) as candidate
+execution: executable aliases, read capabilities, private scratch parent,
+delegated cgroup, environment and resource ceilings. Linux confinement is
+mandatory. This action does not open or mutate the task journal.
+
+The full private snapshot and runtime are writable. `--artifact` selects files
+for output evidence; it does not restrict which private files a command can
+change. The live repository and its index remain read-only inputs, and no output
+is automatically published into them. After verified process, descendant and
+pipe cleanup, failure, timeout or cancellation discards the owned workspace and
+records `rolled_back_by_discard`. This supplies automatic rollback for the
+isolated task's private changes, without restoring over live user edits.
+
+A clean zero exit retains the workspace for review. Selected artifacts must be
+regular files opened without following symlinks, at most 256 files, 32 MiB each
+and 128 MiB total. The receipt records their byte lengths and SHA-256 hashes,
+source root, preimage tree and grants digest. The tree identifies the preimage;
+unselected output is not hashed. An empty selection records no artifact hashes.
+
+The independent execution owner finalizes even when its waiter is dropped.
+Cancellation observed before finalization wins over normal exit; cancellation
+after finalization begins cannot undo retention. The CLI reports an observed
+signal separately and exits unsuccessfully even if retention already began.
+Cleanup uncertainty or unsafe output reports incomplete and preserves remaining
+owned state where possible. A failed removal can have deleted some private files.
+
+Receipts are staged, synced and published without replacement outside the
+child-writable workspace. A parent-directory sync error can leave a visible
+receipt while the owner reports incomplete; consume both the final report and
+receipt. These records are recovery evidence, not approval or crash-durability
+proof for task output. Abrupt runtime shutdown, SIGKILL and hostile same-UID
+changes to operator-owned parents remain outside normal completion guarantees.
+
 ## Validation
 
 Tests ran on Linux 7.0.0-38-generic with Landlock ABI 8 and Rust 1.98.0. Ordinary
@@ -114,6 +160,15 @@ process-count enforcement, and detached-descendant cleanup. They are ignored by
 default because they require an operator-selected delegation. No namespace,
 AppArmor or other host policy was modified. These are targeted behavioral tests,
 not a formal security proof or the complete repository delivery gate.
+
+Isolated-task validation explicitly enabled eight task-owner cases, thirteen
+confined-owner cases, three isolated-task CLI cases and ten existing candidate
+CLI cases. They cover binary artifact retention and receipt hashes, nonzero
+exit, timeout, dropped waiters, the finalization/cancellation boundary, bounded
+artifact reads and incomplete cleanup. Native unit tests also inject discard
+failure and receipt collisions. These sandbox cases require
+`FORGE_TEST_CGROUP_PARENT`; the dropped-waiter case additionally uses a prebuilt
+native worker through `FORGE_TEST_TASK_WORKER`.
 
 The kernel contracts are documented in [Landlock](https://docs.kernel.org/userspace-api/landlock.html),
 [seccomp notification](https://man7.org/linux/man-pages/man2/seccomp_unotify.2.html),

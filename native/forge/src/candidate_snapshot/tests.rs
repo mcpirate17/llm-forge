@@ -6,6 +6,24 @@ struct Fixture {
     root: PathBuf,
     repository: Repository,
 }
+
+#[test]
+fn explicit_discard_failure_does_not_retry_destructive_drop() {
+    let fixture = Fixture::new();
+    let tree = fixture.tree(&[("sentinel", b"keep", 0o100644)]);
+    let snapshot = Snapshot::create(
+        &fixture.source(),
+        &tree,
+        &fixture.output(),
+        Limits::default(),
+    )
+    .unwrap();
+    let path = snapshot.path();
+    let result =
+        snapshot.discard_using(|_, _| Err(std::io::Error::other("injected discard failure")));
+    assert!(result.is_err());
+    assert_eq!(std::fs::read(path.join("sentinel")).unwrap(), b"keep");
+}
 impl Fixture {
     fn new() -> Self {
         let root = std::env::temp_dir().join(crate::native_id::new("forge-snapshot-test").unwrap());

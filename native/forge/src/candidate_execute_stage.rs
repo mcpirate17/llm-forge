@@ -123,10 +123,9 @@ async fn await_report(
         report = &mut wait => report,
         received = interrupted => {
             let wake = cancel.cancel();
-            let mut report = wait.await?;
+            let report = wait.await?;
             received.with_context(|| format!("stage interrupt observation; cleanup: {}",report.errors.join("; ")))?;
             wake.with_context(|| format!("stage cancellation; cleanup: {}",report.errors.join("; ")))?;
-            if report.outcome==confined_execution::Outcome::Exited { report.outcome=confined_execution::Outcome::Cancelled; }
             Ok(report)
         }
     }

@@ -25,6 +25,24 @@ static EXECUTIONS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(32
 pub trait Resources: Send + 'static {
     fn arm(&mut self);
     fn finish(self: Box<Self>, cleanup_safe: bool) -> Result<()>;
+    /// The owner fixes the disposition before calling this method. Existing
+    /// resource implementations retain their cleanup-only behavior by default.
+    fn finish_with_state(self: Box<Self>, state: FinishState) -> Result<()> {
+        self.finish(state.cleanup_safe)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FinishState {
+    pub cleanup_safe: bool,
+    pub outcome: Outcome,
+    pub exit_code: Option<i32>,
+}
+
+impl FinishState {
+    pub fn succeeded(self) -> bool {
+        self.cleanup_safe && self.outcome == Outcome::Exited && self.exit_code == Some(0)
+    }
 }
 struct NoResources;
 impl Resources for NoResources {
@@ -182,11 +200,22 @@ pub fn start_with_resources(
         let _admission = admission;
         let started = Instant::now();
         resources.arm();
-        let mut report = run(plan, group, input, limits, cancel).await;
-        let safe = report.cleanup_complete;
+        let mut report = run(plan, group, input, limits, cancel.clone()).await;
+        // A cancellation observed before this point wins over normal exit.
+        // After this point finalization owns the disposition and is irreversible.
+        if cancel.is_cancelled() && report.outcome == Outcome::Exited {
+            report.outcome = Outcome::Cancelled;
+        }
+        let state = FinishState {
+            cleanup_safe: report.cleanup_complete,
+            outcome: report.outcome,
+            exit_code: report.exit_code,
+        };
         let completion = tokio::task::spawn_blocking(move || {
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| resources.finish(safe)))
-                .map_err(|_| anyhow::anyhow!("execution resource cleanup panicked"))?
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                resources.finish_with_state(state)
+            }))
+            .map_err(|_| anyhow::anyhow!("execution resource cleanup panicked"))?
         })
         .await
         .context("execution resource cleanup task failed")

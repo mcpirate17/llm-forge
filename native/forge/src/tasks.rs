@@ -46,6 +46,8 @@ enum TaskCommand {
     Cancel(OwnedArgs),
     /// Run the stored argv with a deadline, bounded logs, and lease heartbeats.
     Run(RunArgs),
+    /// Preview or run an independently confined Git-tree task; no journal mutation.
+    RunIsolated(forge::candidate_isolated_task::IsolatedArgs),
 }
 
 #[derive(Args)]
@@ -237,17 +239,25 @@ fn readonly(action: &TaskCommand, host: &Path) -> Result<Option<serde_json::Valu
 }
 
 pub fn run(args: TaskArgs) -> Result<u8> {
+    let action = match args.action {
+        TaskCommand::RunIsolated(args) => {
+            let (output, code) = forge::candidate_isolated_task::run(args)?;
+            println!("{}", serde_json::to_string(&output)?);
+            return Ok(code);
+        }
+        action => action,
+    };
     let host = args.host.canonicalize().context("resolving --host")?;
     ensure!(host.is_dir(), "--host must be a directory");
-    if let Some(output) = readonly(&args.action, &host)? {
+    if let Some(output) = readonly(&action, &host)? {
         println!("{}", serde_json::to_string(&output)?);
         return Ok(0);
     }
     let mut store = Store::open(&host, true)?.context("opening task store")?;
-    if let TaskCommand::Run(run) = args.action {
+    if let TaskCommand::Run(run) = action {
         return crate::task_run::run(&host, &mut store, run);
     }
-    let task = change(args.action, &host, &mut store)?;
+    let task = change(action, &host, &mut store)?;
     println!("{}", serde_json::to_string(&task)?);
     Ok(0)
 }

@@ -2,6 +2,8 @@
 //! state for recovery; operator-controlled scratch ancestors remain trusted.
 #[path = "candidate_execution_grants.rs"]
 mod grants;
+#[path = "isolated_task.rs"]
+pub(crate) mod isolated_task;
 #[path = "candidate_execution_private_git.rs"]
 mod private_git;
 use crate::{

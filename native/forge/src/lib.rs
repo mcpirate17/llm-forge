@@ -40,6 +40,7 @@ mod candidate_execution_workspace;
 mod candidate_inputs;
 #[cfg(target_os = "linux")]
 mod candidate_installed;
+pub mod candidate_isolated_task;
 #[cfg(target_os = "linux")]
 pub mod candidate_plan;
 #[cfg(target_os = "linux")]
