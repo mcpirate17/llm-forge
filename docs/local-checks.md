@@ -78,6 +78,15 @@ registry assertion too. The separate `native-contract-registry` local-check step
 runs that same target; native Clippy includes the feature. The gate's forbidden
 `PYO3_PYTHON` remains in force.
 
+The registry matrix uses a dedicated `contract-registry` child of the selected
+conductor-native Cargo target directory: `native/conductor-native/target` by
+default, or the explicit `CARGO_TARGET_DIR` when set. Its first run builds a
+separate release cache; subsequent unchanged runs can reuse that cache without
+replacing the default suite's unqualified `cdylib`/`rlib` outputs. Both
+`make test` and the local-check matrix step use this same isolated directory.
+This changes cache placement only; release settings and test coverage remain
+unchanged. No cache population or measured speedup is implied.
+
 Default native features remain `source-analysis,vector-search`; default Forge
 builds do not compile the embedded legacy contract registry. The optional native
 `contract-registry` feature enables it. `python` automatically enables that

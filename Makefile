@@ -57,6 +57,8 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
 # An operator may select a different explicit prefix via INSTALL_ROOT.
 INSTALL_ROOT ?= $(CURDIR)/target/install
 FORGE_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/forge/target)
+# Keep the registry feature matrix out of the default cdylib/rlib output paths.
+CONTRACT_REGISTRY_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/conductor-native/target)/contract-registry
 NATIVE_ENV = CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 RUSTUP_TOOLCHAIN=1.98.0 PYO3_PYTHON=/nonexistent/forbidden-python
 
 build:  ## Build the release executable and its native core libraries
@@ -77,7 +79,7 @@ test: test-install  ## Run all default native release tests without interpreter 
 # This native feature matrix retains all 33 discovery cases and the library's
 # Slop-consumer registry assertion; it never enables python/python-compat-tests.
 test-contract-registry:  ## Check embedded contract discovery without Python
-	$(NATIVE_ENV) cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite,contract-registry --lib --test python_contracts_discovery
+	$(NATIVE_ENV) cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite,contract-registry --lib --test python_contracts_discovery --target-dir "$(CONTRACT_REGISTRY_TARGET_ROOT)"
 
 native: build  ## Build native Forge; test fixtures compile natively on demand
 
@@ -159,8 +161,7 @@ baseline-pmd:  ## Record current PMD-CPD duplicate pairs as the baseline (needs 
 
 baseline-complexity:  ## Record current complexity blocks as the ratchet baseline
 	@# REPO_ROOT is the true host root; baseline and scan path are src-relative.
-	$(UV) run python -m conductor.radon_complexity refresh-baseline \
-		--baseline src/conductor/radon_complexity_baseline.json --path src
+	$(FORGE) complexity refresh-baseline --path src
 
 baseline-vulture:  ## Record an empty justified-findings allowlist for vulture (see script docstring)
 	$(UV) run python -m conductor.candidate_review.vulture_baseline_init \

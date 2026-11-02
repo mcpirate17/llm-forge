@@ -33,13 +33,6 @@ dependencies = [
   "pylint>=3.3,<5",
   "astroid>=3.3,<5",
   "pyyaml>=6.0",
-  # conductor/radon_complexity.py imports radon.complexity at call time, and the
-  # complexity ratchet runs in candidate_policy.toml's pre-commit profile -- so it is
-  # on the commit path, not merely the audit path. The host declares it for exactly
-  # this reason (pyproject.toml); omitting it here is the same KB-CI-01 shape one
-  # level down: every developer venv carries it, so a standalone install is the only
-  # place the omission is visible.
-  "radon>=6.0.1",
   # conductor/candidate_review/vulture_audit.py shells out to the `vulture` binary
   # and raises VultureAuditError (fail-closed, not a skip) when it is missing from
   # PATH. That module ships inside src/conductor and is reachable from the

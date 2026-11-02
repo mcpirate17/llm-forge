@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.88"
+version = "0.1.89"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -528,15 +528,7 @@ name = "python_contracts_project_paths"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_radon_complexity"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_receipt_scope"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_receipt_verify"
 required-features = ["python-compat-tests"]
 
 [[test]]

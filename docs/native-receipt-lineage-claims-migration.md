@@ -1,5 +1,10 @@
 # Receipt, lineage, and claims-view contract migration
 
+Current receipt CLI migration: the receipt-verifier row/case map below is a
+historical PyO3 milestone. Its interpreter-free replacement and exact target
+retirement are documented in [Native mutation receipt CLI](native-mutation-receipt-cli-migration.md).
+The lineage and claims-view contracts described here remain separate.
+
 These three shipped host-tool contracts are now Rust-owned PyO3 tests. They invoke production Python modules and their native bindings; they do not import `test_*.py` or `conftest.py`, and no replacement Python implementation was added. Original pytest baseline: **29 passed in 0.20s** with CUDA hidden and bytecode/cache writes disabled.
 
 | Original module | Rust target | Expanded cases |

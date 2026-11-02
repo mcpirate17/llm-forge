@@ -206,6 +206,13 @@ pub fn resolve(root: &Path) -> Result<Vec<(String, bool)>, String> {
         .collect()
 }
 
+/// Complexity baseline, preserving full ProjectPaths validation and precedence.
+/// Unlike an explicit CLI flag, configured paths remain root-relative.
+pub fn radon_baseline(root: &Path) -> Result<PathBuf, String> {
+    let values = resolve(root)?;
+    Ok(root.join(&values[PATHS.len() - 1].0))
+}
+
 /// The configured prose index, resolved against the supplied host.
 pub fn notes_db(root: &Path) -> Result<std::path::PathBuf, String> {
     let spec = PATHS
@@ -325,7 +332,7 @@ pub fn enclosing_repo(start: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-fn absolute_resolved(path: &Path) -> Result<PathBuf, String> {
+pub fn absolute_resolved(path: &Path) -> Result<PathBuf, String> {
     // Python's Path.resolve is non-strict. Canonicalize the closest existing
     // ancestor, then append missing lexical components for explicit starts.
     if let Ok(resolved) = path.canonicalize() {

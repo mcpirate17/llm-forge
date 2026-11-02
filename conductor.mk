@@ -163,21 +163,19 @@ slop-probe:  ## Probe one module against its driver tests: SLOP_MODULE=path.py S
 	$(PYTHON) -m conductor.equivalence_probe "$(SLOP_MODULE)" $(SLOP_TESTS)
 
 # ── Complexity ratchet ───────────────────────────────────────────────────
-# conductor.radon_complexity's default baseline ships beside the package; its
-# default scan paths are the monorepo's own layout literals ("conductor",
-# "research", ...), correct only when this Makefile is the one shipped beside
-# src/conductor (this repo). A host consuming conductor-tooling as a
-# dependency should call the module directly with explicit --path/--baseline
-# instead of this target.
+# Host-root/config/environment resolution is shared with native project_paths.
+# Legacy default scopes remain conductor/research/aria_core/aria_designer; hosts
+# can select explicit scopes/baselines with COMPLEXITY_ARGS.
+COMPLEXITY_ARGS ?=
 
 complexity-report:  ## Report production Python cyclomatic complexity
-	$(PYTHON) -m conductor.radon_complexity report
+	$(FORGE) complexity report --repo "$(CONDUCTOR_HOST_ROOT)" $(COMPLEXITY_ARGS)
 
 complexity-check:  ## Fail on new production Python D-F complexity blocks
-	$(PYTHON) -m conductor.radon_complexity check
+	$(FORGE) complexity check --repo "$(CONDUCTOR_HOST_ROOT)" $(COMPLEXITY_ARGS)
 
 complexity-refresh-baseline:  ## Refresh the legacy D-F complexity baseline
-	$(PYTHON) -m conductor.radon_complexity refresh-baseline
+	$(FORGE) complexity refresh-baseline --repo "$(CONDUCTOR_HOST_ROOT)" $(COMPLEXITY_ARGS)
 
 # ── Duplicate code detectors ─────────────────────────────────────────────
 # conductor.run_duplicate_audit scans conductor.duplicate_audit_config.DEFAULT_SOURCE_DIRS

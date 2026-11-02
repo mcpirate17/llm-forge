@@ -707,22 +707,19 @@ max_output_chars = 30000
 [checks.complexity]
 # The ratchet runs in BOTH profiles: pre-commit uses --profile fast, so a new or
 # worsened D-F block is refused at the commit, not discovered a branch later.
-# A full four-tree radon scan costs ~4s, so scoping it to changed files would buy
-# nothing and would blind the check to a grandfathered block that regressed.
+# Scan the complete supplied scope; changed-only selection would miss regression
+# of an existing grandfathered block. The native metric pins Radon6.0.1 rules.
 kind = "command"
 profiles = ["fast", "full"]
 classes = ["python"]
 command = [
-  "{python}",
-  "-m",
-  "conductor.radon_complexity",
+  "forge",
+  "complexity",
   "check",
-  "--baseline",
-  "conductor/radon_complexity_baseline.json",
   "--path",
   ".",
 ]
-version_command = ["radon", "--version"]
+version_command = ["forge", "complexity", "--tool-version"]
 cache = true
 severity = "high"
 timeout_seconds = 120
@@ -1083,13 +1080,13 @@ required_profiles = ["full"]
 provided_by = "operator-provisioned native clang-tidy 22.1.8, granted as FORGE_CLANG_TIDY"
 rationale = "Native Forge candidate execution uses an explicitly provisioned clang-tidy ELF and captured build context; no Python wrapper or uv.lock pin is involved."
 
-[tools.radon]
-executable = "radon"
-version_command = ["radon", "--version"]
-expected_version = "6.0.1"
+[tools.native-complexity]
+executable = "forge"
+version_command = ["forge", "complexity", "--tool-version"]
+expected_version = "radon-6.0.1-cpython-3.12"
 required_profiles = ["fast", "full"]
-provided_by = "declared in pyproject.toml (radon>=6.0.1)"
-rationale = "checks.complexity"
+provided_by = "operator-provisioned native Forge; no Python/Radon runtime"
+rationale = "checks.complexity; exact pinned metric protocol, separately held executable identity"
 
 [tools.vulture]
 executable = "vulture"

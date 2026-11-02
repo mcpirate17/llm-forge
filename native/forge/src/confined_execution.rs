@@ -249,7 +249,10 @@ pub fn start_with_resources(
         },
     })
 }
-fn limit_value(resource: libc::__rlimit_resource_t, requested: Option<u64>) -> Result<Option<u64>> {
+pub(crate) fn limit_value(
+    resource: libc::__rlimit_resource_t,
+    requested: Option<u64>,
+) -> Result<Option<u64>> {
     let Some(requested) = requested else {
         return Ok(None);
     };
@@ -268,7 +271,7 @@ fn limit_value(resource: libc::__rlimit_resource_t, requested: Option<u64>) -> R
     );
     Ok(Some(requested.min(inherited.rlim_max)))
 }
-fn configure_rlimits(command: &mut std::process::Command, limits: Limits) {
+pub(crate) fn configure_rlimits(command: &mut std::process::Command, limits: Limits) {
     // SAFETY: pre-exec uses only fixed scalar state and libc resource syscalls.
     unsafe {
         command.pre_exec(move || {

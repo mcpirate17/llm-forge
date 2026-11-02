@@ -290,7 +290,7 @@ latency claim is supported.
 
 ## Remaining migration
 
-The native migration remains open. The live source inventory is 113 Python
+The native migration remains open. The live source inventory is 111 Python
 files under `src/`; that count says nothing by itself about reachability,
 behavioral coverage or runtime usage. Remaining work is tracked by live
 callers and installation boundaries, not a stale count of old milestones.
@@ -333,6 +333,10 @@ commit results remain available in [native migration history](docs/native-migrat
 and [native migration history archive](docs/native-migration-history-archive.md).
 
 ## Detailed contracts
+
+- [Native complexity analysis and baseline ratchet](docs/native-complexity-cli.md)
+- [Native mutation receipt target-tree verification](docs/native-mutation-receipt-cli-migration.md)
+- [Measured real-code retrieval at 6630b37](docs/native-code-retrieval-measurement.md)
 
 - [Native runtime installation and compatibility distribution](docs/native-install-packaging.md)
 - [Local checks and verification receipts](docs/local-checks.md)

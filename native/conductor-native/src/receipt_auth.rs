@@ -1,6 +1,6 @@
 //! Target-tree authentication for mutation campaign receipts.
 //!
-//! Python keeps bounded Git process execution and CLI presentation. This module owns
+//! Forge keeps bounded Git object reads and CLI presentation. This module owns
 //! receipt/manifest validation, byte hashing, pin comparison, inventory reproduction,
 //! and the deterministic four-part verdict.
 
@@ -26,7 +26,7 @@ const PART3: &str = "source_pins";
 const PART4: &str = "inventory_digest";
 
 #[derive(Debug, Deserialize, Serialize)]
-struct TargetTreeReceipt {
+pub struct TargetTreeReceipt {
     path: String,
     schema_version: Option<String>,
     manifest: String,
@@ -41,9 +41,9 @@ struct PinDivergence {
     hash_mismatch: Vec<String>,
 }
 
-struct SourceRead {
-    sha256: Option<String>,
-    reason: String,
+pub struct SourceRead {
+    pub sha256: Option<String>,
+    pub reason: String,
 }
 
 #[cfg(feature = "python")]
@@ -86,12 +86,23 @@ fn load_pin_map(value: Option<&Value>, label: &str) -> Result<BTreeMap<String, S
     let mapping = value
         .and_then(Value::as_object)
         .ok_or_else(|| format!("{label} must be a JSON object"))?;
+    if mapping.len() > 4096 {
+        return Err(format!("{label} exceeds4096 pins"));
+    }
     if mapping.is_empty() {
         return Err(format!("{label} must not be empty"));
     }
     let mut pins = BTreeMap::new();
+    let mut bytes = 0usize;
     for (raw_path, raw_digest) in mapping {
+        if raw_path.len() > 4096 {
+            return Err(format!("{label} path exceeds4096 bytes"));
+        }
         let path = safe_relative(raw_path, &format!("{label} key"))?;
+        bytes = bytes.saturating_add(path.len());
+        if path.len() > 4096 || path.split('/').count() > 256 || bytes > 1024 * 1024 {
+            return Err(format!("{label} exceeds path byte/depth limits"));
+        }
         if pins.contains_key(&path) {
             return Err(format!(
                 "{label} contains duplicate normalized path: {path}"
@@ -115,11 +126,29 @@ fn load_receipt(path: &Path) -> Result<TargetTreeReceipt, String> {
     }
     let payload: Value = serde_json::from_slice(&raw)
         .map_err(|error| format!("receipt is not valid JSON: {}: {error}", path.display()))?;
-    let receipt = required_object(&payload, &format!("receipt {}", path.display()))?;
+    parse_receipt_value(&path.display().to_string(), &payload)
+}
+
+/// Parse the legacy target-tree binding surface; this does not validate campaign outcomes.
+pub fn parse_receipt_value(path: &str, payload: &Value) -> Result<TargetTreeReceipt, String> {
+    if path.len() > 4096 {
+        return Err("receipt path exceeds4096 bytes".into());
+    }
+    let receipt = required_object(payload, &format!("receipt {path}"))?;
+    if receipt
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .is_some_and(|s| s.len() > 4096)
+    {
+        return Err("receipt schema label exceeds4096 bytes".into());
+    }
     let manifest_raw = required_string(receipt.get("manifest"), "receipt.manifest")?;
     let manifest = safe_relative(&manifest_raw, "receipt.manifest")?;
+    if manifest.len() > 4096 || manifest.split('/').count() > 256 {
+        return Err("receipt.manifest exceeds path limits".into());
+    }
     Ok(TargetTreeReceipt {
-        path: path.display().to_string(),
+        path: path.to_owned(),
         schema_version: receipt
             .get("schema_version")
             .and_then(Value::as_str)
@@ -132,8 +161,19 @@ fn load_receipt(path: &Path) -> Result<TargetTreeReceipt, String> {
         source_sha256: load_pin_map(receipt.get("source_sha256"), "receipt.source_sha256")?,
     })
 }
+impl TargetTreeReceipt {
+    pub fn manifest(&self) -> &str {
+        &self.manifest
+    }
+}
 
-fn manifest_pins(blob: &[u8], manifest: &str) -> Result<BTreeMap<String, String>, String> {
+pub fn manifest_pins(blob: &[u8], manifest: &str) -> Result<BTreeMap<String, String>, String> {
+    if manifest.len() > 4096 {
+        return Err("manifest label exceeds4096 bytes".into());
+    }
+    if blob.len() > 2 * 1024 * 1024 {
+        return Err("manifest blob exceeds2MiB".into());
+    }
     let payload: Value = serde_json::from_slice(blob)
         .map_err(|error| format!("manifest blob is not valid JSON: {manifest}: {error}"))?;
     let mapping = required_object(&payload, &format!("manifest {manifest}"))?;
@@ -202,7 +242,7 @@ fn verdict(
     })
 }
 
-fn verify(
+pub fn verify(
     receipt: TargetTreeReceipt,
     repo_root: &str,
     tree_oid: &str,
@@ -210,6 +250,10 @@ fn verify(
     manifest_reason: &str,
     source_reads: &BTreeMap<String, SourceRead>,
 ) -> Result<Value, String> {
+    admit(&receipt, repo_root, tree_oid, manifest_reason, source_reads)?;
+    if manifest_blob.is_some_and(|blob| blob.len() > 2 * 1024 * 1024) {
+        return Err("manifest blob exceeds2MiB".into());
+    }
     let mut checks = BTreeMap::new();
     let mut failures = Vec::new();
     let Some(blob) = manifest_blob else {
@@ -256,10 +300,88 @@ fn verify(
     }
 
     let pins = manifest_pins(blob, &receipt.manifest)?;
+    let (actual_hashes, unreadable) =
+        verify_sources(&pins, source_reads, &mut checks, &mut failures);
+    verify_inventory(
+        &receipt,
+        &actual_hashes,
+        unreadable,
+        &mut checks,
+        &mut failures,
+    )?;
+    Ok(verdict(&receipt, repo_root, tree_oid, checks, failures))
+}
+
+fn admit(
+    receipt: &TargetTreeReceipt,
+    repo_root: &str,
+    tree_oid: &str,
+    reason: &str,
+    reads: &BTreeMap<String, SourceRead>,
+) -> Result<(), String> {
+    if receipt.path.len() > 4096
+        || repo_root.len() > 4096
+        || tree_oid.len() > 4096
+        || reason.len() > 4096
+        || receipt
+            .schema_version
+            .as_ref()
+            .is_some_and(|s| s.len() > 4096)
+        || reads.len() > 4096
+    {
+        return Err("target-tree receipt metadata bounds exceeded".into());
+    }
+    if safe_relative(&receipt.manifest, "receipt.manifest")? != receipt.manifest
+        || receipt.manifest.len() > 4096
+        || receipt.manifest.split('/').count() > 256
+    {
+        return Err("receipt.manifest must be a bounded normalized path".into());
+    }
+    crate::sha256_hex::parse(&receipt.manifest_sha256).map_err(str::to_owned)?;
+    if receipt.source_sha256.is_empty() || receipt.source_sha256.len() > 4096 {
+        return Err("receipt source pin count exceeds bounds".into());
+    }
+    let mut bytes = 0usize;
+    for (path, hash) in &receipt.source_sha256 {
+        bytes = bytes.saturating_add(path.len());
+        if path.len() > 4096
+            || path.split('/').count() > 256
+            || bytes > 1024 * 1024
+            || safe_relative(path, "receipt.source_sha256 key")? != *path
+            || crate::sha256_hex::parse(hash).is_err()
+        {
+            return Err("receipt source pins exceed path/hash bounds".into());
+        }
+    }
+    let mut bytes = 0usize;
+    for (path, read) in reads {
+        bytes = bytes
+            .saturating_add(path.len())
+            .saturating_add(read.reason.len());
+        if path.len() > 4096
+            || read.reason.len() > 4096
+            || bytes > 4 * 1024 * 1024
+            || read
+                .sha256
+                .as_ref()
+                .is_some_and(|s| crate::sha256_hex::parse(s).is_err())
+        {
+            return Err("source blob observations exceed path/hash/reason bounds".into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_sources(
+    pins: &BTreeMap<String, String>,
+    source_reads: &BTreeMap<String, SourceRead>,
+    checks: &mut BTreeMap<String, Value>,
+    failures: &mut Vec<String>,
+) -> (BTreeMap<String, String>, usize) {
     let mut pin_failures = Vec::new();
     let mut actual_hashes = BTreeMap::new();
     let mut unreadable = 0usize;
-    for (path, pinned) in &pins {
+    for (path, pinned) in pins {
         match source_reads.get(path).and_then(|row| row.sha256.as_deref()) {
             Some(actual) => {
                 actual_hashes.insert(path.clone(), actual.to_owned());
@@ -297,6 +419,15 @@ fn verify(
         );
     }
 
+    (actual_hashes, unreadable)
+}
+fn verify_inventory(
+    receipt: &TargetTreeReceipt,
+    actual_hashes: &BTreeMap<String, String>,
+    unreadable: usize,
+    checks: &mut BTreeMap<String, Value>,
+    failures: &mut Vec<String>,
+) -> Result<(), String> {
     let recorded_digest = inventory_digest(
         receipt
             .source_sha256
@@ -327,7 +458,7 @@ fn verify(
                 json!({"status": "PASS", "digest": recorded_digest, "pins": actual_hashes.len()}),
             );
         } else {
-            let divergence = pin_divergence(&receipt.source_sha256, &actual_hashes);
+            let divergence = pin_divergence(&receipt.source_sha256, actual_hashes);
             let divergence_json = serde_json::to_string(&divergence)
                 .map_err(|error| format!("cannot serialize pin divergence: {error}"))?;
             checks.insert(
@@ -344,7 +475,7 @@ fn verify(
             ));
         }
     }
-    Ok(verdict(&receipt, repo_root, tree_oid, checks, failures))
+    Ok(())
 }
 
 #[cfg(feature = "python")]
@@ -586,5 +717,30 @@ mod tests {
             inventory_digest(pins.iter().map(|(p, d)| (*p, d.as_str()))),
             expected
         );
+    }
+    #[test]
+    fn pin_count_predicates_include_every_observed_blob() {
+        // Pure count/digest observations only: no campaign, receipt artifact or outcome claim.
+        let (mut receipt, _, mut reads, _) = fixture();
+        let second = sha256_hex(b"second observed blob");
+        receipt
+            .source_sha256
+            .insert("src/second.py".into(), second.clone());
+        reads.insert(
+            "src/second.py".into(),
+            SourceRead {
+                sha256: Some(second),
+                reason: String::new(),
+            },
+        );
+        let mut checks = BTreeMap::new();
+        let mut failures = Vec::new();
+        let (actual, unreadable) =
+            verify_sources(&receipt.source_sha256, &reads, &mut checks, &mut failures);
+        assert_eq!(checks[PART3]["checked"], 2);
+        assert!(failures.is_empty());
+        verify_inventory(&receipt, &actual, unreadable, &mut checks, &mut failures).unwrap();
+        assert_eq!(checks[PART4]["pins"], 2);
+        assert!(failures.is_empty());
     }
 }

@@ -122,6 +122,8 @@ pub mod code_context;
 #[cfg(target_os = "linux")]
 pub mod code_index;
 pub mod code_tools;
+#[cfg(target_os = "linux")]
+pub mod complexity_cli;
 pub mod embedding;
 #[cfg(target_os = "linux")]
 pub mod embedding_broker;
@@ -203,3 +205,6 @@ pub mod terminal_session;
 pub mod tokenizer;
 pub mod tool_schema;
 pub mod write_targets;
+
+#[cfg(target_os = "linux")]
+pub mod mutation_receipt_verify;

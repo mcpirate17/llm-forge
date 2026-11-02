@@ -38,6 +38,7 @@ mod mcp_setup;
 mod merge;
 mod mutation_plan;
 mod mutation_results;
+use forge::mutation_receipt_verify;
 use forge::notes_index;
 mod obsidian_sync;
 use forge::ownership;
@@ -128,6 +129,9 @@ enum Command {
     Harness(forge::harness::cli::HarnessArgs),
     /// Build and query native immutable BM25 and vector code indexes.
     CodeIndex(forge::code_index::cli::CodeIndexArgs),
+    /// Exact Radon-compatible Python complexity report and baseline ratchet.
+    #[cfg(target_os = "linux")]
+    Complexity(forge::complexity_cli::ComplexityArgs),
     /// Native source definitions, references, scopes and body folding.
     Code(forge::code_tools::CodeArgs),
     /// Native source guardrails and read-only ablation proposals.
@@ -282,6 +286,8 @@ enum MutationCommand {
 
 #[derive(Subcommand)]
 enum ReceiptCommand {
+    /// Check mutation receipt byte bindings against an immutable target Git tree.
+    Verify(mutation_receipt_verify::VerifyArgs),
     /// Print a receipt with its slim detail block expanded back to full rows.
     Show(receipt_show::ShowArgs),
 }
@@ -337,7 +343,7 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = Cli::parse_from(mutation_receipt_verify::normalize_args(std::env::args_os()));
     match cli.command {
         Command::EquivalenceWorker(args) => command_exit(
             "equivalence-worker",
@@ -381,6 +387,10 @@ fn main() -> ExitCode {
         Command::CodeIndex(args) => {
             command_exit("code-index", forge::code_index::cli::run(args), 2)
         }
+        #[cfg(target_os = "linux")]
+        Command::Complexity(args) => {
+            command_exit("complexity", forge::complexity_cli::run(args), 1)
+        }
         Command::Schema(args) => command_exit("schema", tool_schema::cli::run(args), 2),
         Command::LegacyHook { operation } => {
             command_exit("legacy-hook", legacy_hook_api::run(&operation), 2)
@@ -421,6 +431,7 @@ fn main() -> ExitCode {
             ),
         },
         Command::Receipt { action } => match action {
+            ReceiptCommand::Verify(args) => ExitCode::from(mutation_receipt_verify::run(args)),
             ReceiptCommand::Show(args) => command_exit("receipt show", receipt_show::run(&args), 1),
         },
         Command::Route(args) => command_exit("route", route::run(args).map(|code| code as u8), 2),

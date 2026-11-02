@@ -1,5 +1,9 @@
 # Bounded real-code retrieval benchmark
 
+The [completed CPU measurement at 6630b37](native-code-retrieval-measurement.md)
+records all 144 retrievals, preparation cost, mixed relevance results and the
+frozen evidence artifact. It does not establish broad quality or a speedup.
+
 `real_code_index` is an explicitly opted-in native Rust benchmark using the production
 source planner, embedding Client, refresh/build, code-index Reader and vector Snapshot.
 The existing `code_index` benchmark remains a synthetic pipeline microbenchmark.

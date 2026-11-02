@@ -99,8 +99,8 @@ pub mod performance_receipt;
 pub mod project_config;
 pub mod project_context;
 pub mod project_paths;
-#[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
-mod receipt_auth;
+#[cfg(feature = "source-analysis")]
+pub mod receipt_auth;
 pub mod receipt_slim;
 pub mod regular_file;
 pub mod reuse_consolidation;
@@ -191,3 +191,6 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     workspace_runtime_matrix::register(module)?;
     Ok(())
 }
+
+#[cfg(feature = "source-analysis")]
+pub mod radon_complexity;

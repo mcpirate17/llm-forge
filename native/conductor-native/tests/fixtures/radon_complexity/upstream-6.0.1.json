@@ -1,0 +1,399 @@
+[
+  {
+    "case": "SIMPLE_BLOCKS/0",
+    "source": "if a: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/1",
+    "source": "if a: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/2",
+    "source": "if a: pass\nelif b: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/3",
+    "source": "if a: pass\nelif b: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/4",
+    "source": "if a and b: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/5",
+    "source": "if a and b: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/6",
+    "source": "if a and b: pass\nelif c and d: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 5
+  },
+  {
+    "case": "SIMPLE_BLOCKS/7",
+    "source": "if a and b or c and d: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 5
+  },
+  {
+    "case": "SIMPLE_BLOCKS/8",
+    "source": "if a and b or c: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 4
+  },
+  {
+    "case": "SIMPLE_BLOCKS/9",
+    "source": "for x in range(10): print(x)",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/10",
+    "source": "for x in xrange(10): print(x)\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/11",
+    "source": "while a < 4: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/12",
+    "source": "while a < 4: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/13",
+    "source": "while a < 4 and b < 42: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/14",
+    "source": "while a and b or c < 10: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 5
+  },
+  {
+    "case": "SIMPLE_BLOCKS/15",
+    "source": "with open('raw.py') as fobj: print(fobj.read())",
+    "no_assert": false,
+    "module_complexity": 1
+  },
+  {
+    "case": "SIMPLE_BLOCKS/16",
+    "source": "[i for i in range(4)]",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/17",
+    "source": "[i for i in range(4) if i&1]",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/18",
+    "source": "(i for i in range(4))",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/19",
+    "source": "(i for i in range(4) if i&1)",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/20",
+    "source": "[i for i in range(42) if sum(k ** 2 for k in divisors(i)) & 1]",
+    "no_assert": false,
+    "module_complexity": 4
+  },
+  {
+    "case": "SIMPLE_BLOCKS/21",
+    "source": "try: raise TypeError\nexcept TypeError: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/22",
+    "source": "try: raise TypeError\nexcept TypeError: pass\nelse: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/23",
+    "source": "try: raise TypeError\nfinally: pass",
+    "no_assert": false,
+    "module_complexity": 1
+  },
+  {
+    "case": "SIMPLE_BLOCKS/24",
+    "source": "try: raise TypeError\nexcept TypeError: pass\nfinally: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/25",
+    "source": "try: raise TypeError\nexcept TypeError: pass\nelse: pass\nfinally: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/26",
+    "source": "try: raise TypeError\nexcept TypeError: pass\nelse:\n   pass\n   pass\nfinally: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/27",
+    "source": "k = lambda a, b: k(b, a)",
+    "no_assert": false,
+    "module_complexity": 1
+  },
+  {
+    "case": "SIMPLE_BLOCKS/28",
+    "source": "k = lambda a, b, c: c if a else b",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/29",
+    "source": "v = a if b else c",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/30",
+    "source": "v = a if sum(i for i in xrange(c)) < 10 else c",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/31",
+    "source": "sum(i for i in range(12) for z in range(i ** 2) if i * z & 1)",
+    "no_assert": false,
+    "module_complexity": 4
+  },
+  {
+    "case": "SIMPLE_BLOCKS/32",
+    "source": "sum(i for i in range(10) if i >= 2 and val and val2 or val3)",
+    "no_assert": false,
+    "module_complexity": 6
+  },
+  {
+    "case": "SIMPLE_BLOCKS/33",
+    "source": "for i in range(10):\n    print(i)\nelse:\n    print('wah')\n    print('really not found')\n    print(3)",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/34",
+    "source": "while True:\n    print(1)\nelse:\n    print(2)\n    print(1)\n    print(0)\n    print(-1)",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SIMPLE_BLOCKS/35",
+    "source": "assert i < 0",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/36",
+    "source": "assert i < 0, \"Fail\"",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "SIMPLE_BLOCKS/37",
+    "source": "assert i < 0",
+    "no_assert": true,
+    "module_complexity": 1
+  },
+  {
+    "case": "SIMPLE_BLOCKS/38",
+    "source": "def f():\n   assert 10 > 20",
+    "no_assert": true,
+    "module_complexity": 1
+  },
+  {
+    "case": "SIMPLE_BLOCKS/39",
+    "source": "class TestYo(object):\n   def test_yo(self):\n       assert self.n > 4",
+    "no_assert": true,
+    "module_complexity": 1
+  },
+  {
+    "case": "ADDITIONAL_BLOCKS/0",
+    "source": "{i for i in range(4)}",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "ADDITIONAL_BLOCKS/1",
+    "source": "{i for i in range(4) if i&1}",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "ADDITIONAL_BLOCKS/2",
+    "source": "{i:i**4 for i in range(4)}",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "ADDITIONAL_BLOCKS/3",
+    "source": "{i:i**4 for i in range(4) if i&1}",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "MATCH_STATEMENT_BLOCKS/0",
+    "source": "match a:\n    case 1: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "MATCH_STATEMENT_BLOCKS/1",
+    "source": "match a:\n    case 1: pass\n    case _: pass",
+    "no_assert": false,
+    "module_complexity": 2
+  },
+  {
+    "case": "MATCH_STATEMENT_BLOCKS/2",
+    "source": "match a:\n    case 1: pass\n    case 2: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "MATCH_STATEMENT_BLOCKS/3",
+    "source": "match a:\n    case 1: pass\n    case 2: pass\n    case _: pass",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "SINGLE_FUNCTIONS_CASES/0",
+    "source": "def f(a, b, c):\n   if a and b == 4:\n       return c ** c\n   elif a and not c:\n       return sum(i for i in range(41) if i&1)\n   return a + b",
+    "no_assert": false,
+    "module_complexity": 1,
+    "function_complexities": [
+      7
+    ]
+  },
+  {
+    "case": "SINGLE_FUNCTIONS_CASES/1",
+    "source": "if a and not b: pass\nelif b or c: pass\nelse: pass\n\nfor i in range(4):\n   print(i)\n\ndef g(a, b):\n   while a < b:\n       b, a = a **2, b ** 2\n   return b",
+    "no_assert": false,
+    "module_complexity": 6,
+    "function_complexities": [
+      2
+    ]
+  },
+  {
+    "case": "SINGLE_FUNCTIONS_CASES/2",
+    "source": "def f(a, b):\n   while a**b:\n       a, b = b, a * (b - 1)\n       if a and b:\n           b = 0\n       else:\n           b = 1\n   return sum(i for i in range(b))",
+    "no_assert": false,
+    "module_complexity": 1,
+    "function_complexities": [
+      5
+    ]
+  },
+  {
+    "case": "SINGLE_FUNCTIONS_CASES/3",
+    "source": "async def f(a, b):\n   async with open('blabla.log', 'w') as f:\n       async for i in range(100):\n           f.write(str(i) + '\\n')",
+    "no_assert": false,
+    "module_complexity": 1,
+    "function_complexities": [
+      2
+    ]
+  },
+  {
+    "case": "FUNCTIONS_CASES/0",
+    "source": "def f(a, b):\n   return a if b else 2\n\ndef g(a, b, c):\n   if a and b:\n       return a / b + b / a\n   elif b and c:\n       return b / c - c / b\n   return a + b + c\n\ndef h(a, b):\n   return 2 * (a + b)",
+    "no_assert": false,
+    "function_complexities": [
+      2,
+      5,
+      1
+    ]
+  },
+  {
+    "case": "FUNCTIONS_CASES/1",
+    "source": "def f(p, q):\n   while p:\n       p, q = q, p - q\n   if q < 1:\n       return 1 / q ** 2\n   elif q > 100:\n       return 1 / q ** .5\n   return 42 if not q else p\n\ndef g(a, b, c):\n   if a and b or a - b:\n       return a / b - c\n   elif b or c:\n       return 1\n   else:\n       k = 0\n       with open('results.txt', 'w') as fobj:\n           for i in range(b ** c):\n               k += sum(1 / j for j in range(i ** 2) if j > 2)\n           fobj.write(str(k))\n       return k - 1",
+    "no_assert": false,
+    "function_complexities": [
+      5,
+      9
+    ]
+  },
+  {
+    "case": "CLASSES_CASES/0",
+    "source": "class A(object):\n\n    def m(self, a, b):\n        if not a or b:\n            return b - 1\n        try:\n            return a / b\n        except ZeroDivisionError:\n            return a\n\n    def n(self, k):\n        while self.m(k) < k:\n            k -= self.m(k ** 2 - min(self.m(j) for j in range(k ** 4)))\n        return k",
+    "no_assert": false,
+    "class_complexity": 5,
+    "method_complexities": [
+      4,
+      3
+    ]
+  },
+  {
+    "case": "CLASSES_CASES/1",
+    "source": "class B(object):\n\n    ATTR = 9 if A().n(9) == 9 else 10\n    import sys\n    if sys.version_info >= (3, 3):\n        import os\n        AT = os.openat('/random/loc')\n\n    def __iter__(self):\n        return __import__('itertools').tee(B.__dict__)\n\n    def test(self, func):\n        a = func(self.ATTR, self.AT)\n        if a < self.ATTR:\n            yield self\n        elif a > self.ATTR ** 2:\n            yield self.__iter__()\n        yield iter(a)",
+    "no_assert": false,
+    "class_complexity": 4,
+    "method_complexities": [
+      1,
+      3
+    ]
+  },
+  {
+    "case": "GENERAL_CASES/0",
+    "source": "if a and b:\n    print\nelse:\n    print\na = sum(i for i in range(1000) if i % 3 == 0 and i % 5 == 0)\n\ndef f(n):\n    def inner(n):\n        return n ** 2\n\n    if n == 0:\n        return 1\n    elif n == 1:\n        return n\n    elif n < 5:\n        return (n - 1) ** 2\n    return n * pow(inner(n), f(n - 1), n - 3)",
+    "no_assert": false,
+    "module_complexity": 6
+  },
+  {
+    "case": "GENERAL_CASES/1",
+    "source": "try:\n    1 / 0\nexcept ZeroDivisonError:\n    print\nexcept TypeError:\n    pass\n\nclass J(object):\n\n    def aux(self, w):\n        if w == 0:\n            return 0\n        return w - 1 + sum(self.aux(w - 3 - i) for i in range(2))\n\ndef f(a, b):\n    def inner(n):\n        return n ** 2\n    if a < b:\n        b, a = a, inner(b)\n    return a, b",
+    "no_assert": false,
+    "module_complexity": 3
+  },
+  {
+    "case": "GENERAL_CASES/2",
+    "source": "class f(object):\n    class inner(object):\n        pass",
+    "no_assert": false,
+    "module_complexity": 1
+  },
+  {
+    "case": "CLOSURES_CASES/0",
+    "source": "def f(n):\n    def g(l):\n        return l ** 4\n    def h(i):\n        return i ** 5 + 1 if i & 1 else 2\n    return sum(g(u + 4) / float(h(u)) for u in range(2, n))",
+    "no_assert": false,
+    "function_complexities": [
+      2
+    ]
+  },
+  {
+    "case": "CLOSURES_CASES/1",
+    "source": "# will it work? :D\ndef memoize(func):\n    cache = {}\n    def aux(*args, **kwargs):\n        key = (args, kwargs)\n        if key in cache:\n            return cache[key]\n        cache[key] = res = func(*args, **kwargs)\n        return res\n    return aux",
+    "no_assert": false,
+    "function_complexities": [
+      1
+    ]
+  }
+]

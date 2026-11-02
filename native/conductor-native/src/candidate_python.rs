@@ -167,6 +167,52 @@ impl<'a> Document<'a> {
         let parsed = ruff_python_parser::parse_module(source).map_err(|error| Error::Syntax {
             offset: error.location.start().to_usize(),
         })?;
+        Self::admit(source, parsed)
+    }
+    /// One source-bound parse pinned to CPython3.12 grammar. Version errors
+    /// refuse rather than analyze a different Python language.
+    pub fn parse_python312(source: &'a str) -> Result<Self, Error> {
+        // CPython ast.parse(str) rejects a BOM; Ruff accepts it as a file marker.
+        // This path models the legacy UTF-8 text reader, not encoding detection.
+        if source.starts_with('\u{feff}') {
+            return Err(Error::Syntax { offset: 0 });
+        }
+        preflight(source)?;
+        let options = ruff_python_parser::ParseOptions::from(Mode::Module)
+            .with_target_version(ast::PythonVersion::PY312);
+        let parsed = ruff_python_parser::parse(source, options).map_err(|error| Error::Syntax {
+            offset: error.location.start().to_usize(),
+        })?;
+        if let Some(error) = parsed.unsupported_syntax_errors().first() {
+            return Err(Error::Syntax {
+                offset: error.range.start().to_usize(),
+            });
+        }
+        for token in parsed.tokens() {
+            if token.kind() == TokenKind::Name {
+                use ruff_text_size::Ranged;
+                let range = token.range();
+                if source[range.start().to_usize()..range.end().to_usize()]
+                    .chars()
+                    .any(|ch| {
+                        unicode_general_category::get_general_category(ch)
+                            == unicode_general_category::GeneralCategory::Unassigned
+                    })
+                {
+                    return Err(Error::Syntax {
+                        offset: range.start().to_usize(),
+                    });
+                }
+            }
+        }
+        Self::admit(
+            source,
+            parsed
+                .try_into_module()
+                .ok_or(Error::Limit("expected a module"))?,
+        )
+    }
+    fn admit(source: &'a str, parsed: Parsed<ast::ModModule>) -> Result<Self, Error> {
         let mut admission = Admission::default();
         for statement in parsed.suite() {
             admission.visit_stmt(statement);
