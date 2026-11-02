@@ -360,6 +360,56 @@ fn python_ast_uses_syntax_and_comment_tokens_and_preserves_order() {
 }
 
 #[test]
+fn python_ast_counts_cr_and_crlf_and_ignores_stale_payload_lines() {
+    for source in [
+        "x=1\reval('x')\r",
+        "x=1\r\neval('x')\r\n",
+        "x=1\neval('x')\r",
+    ] {
+        let result = evaluate(
+            "python-ast",
+            &json!({"path":"x.py","text":source,"lines":["stale"],
+            "changed_lines":[],"classes":["python"],"hot":false}),
+        )
+        .unwrap();
+        let finding = result["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["rule_id"] == "dynamic-execution")
+            .unwrap();
+        assert_eq!(finding["line"], 2);
+        assert_eq!(finding["column"], 0);
+    }
+    let source = "x=1\r".repeat(1251);
+    let result = evaluate(
+        "python-ast",
+        &json!({"path":"x.py","text":source,"changed_lines":[],"classes":["python"],"hot":false}),
+    )
+    .unwrap();
+    assert!(rules(&result).contains(&"oversized-module"));
+    let syntax=evaluate("python-ast", &json!({"path":"x.py","text":"x=1\rdef f(:\r","changed_lines":[],"classes":["python"],"hot":false})).unwrap();
+    assert_eq!(syntax["findings"][0]["line"], 2);
+}
+
+#[test]
+fn python_ast_reports_original_sparse_changed_line_and_rejects_invalid_lines() {
+    let source = format!("{}# fallback uses softmax\n", "x=1\n".repeat(99));
+    let mut payload = json!({"path":"novel.py","text":source,"lines":["stale"],
+        "changed_lines":[3,100],"classes":["novel"],"hot":false});
+    let result = evaluate("python-ast", &payload).unwrap();
+    let finding = result["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["rule_id"] == "softmax-shaped-fallback")
+        .unwrap();
+    assert_eq!(finding["line"], 100);
+    payload["changed_lines"] = json!([101]);
+    assert!(evaluate("python-ast", &payload).is_err());
+}
+
+#[test]
 fn decorated_function_keeps_cpython_finding_order_and_def_location() {
     let mut source = "@wrap(eval('decorator'))\ndef f():\n    exec('body')\n".to_owned();
     source.push_str(&"    value = 1\n".repeat(100));

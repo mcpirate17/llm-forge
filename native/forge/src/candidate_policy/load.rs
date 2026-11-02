@@ -15,6 +15,21 @@ fn directory_options() -> OpenOptions {
     options
 }
 
+// Landlock allows traversal through ancestors without granting READ_DIR on
+// them. O_PATH preserves that distinction while retaining directory and
+// no-symlink checks; the final directory is reopened for actual reads.
+#[cfg(target_os = "linux")]
+fn traversal_options() -> OpenOptions {
+    let mut options = directory_options();
+    options.custom_flags(libc::O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY);
+    options
+}
+
+#[cfg(not(target_os = "linux"))]
+fn traversal_options() -> OpenOptions {
+    directory_options()
+}
+
 fn snapshot_root(path: &Path) -> Result<Dir> {
     ensure!(
         !path.as_os_str().is_empty(),
@@ -29,14 +44,25 @@ fn snapshot_root(path: &Path) -> Result<Dir> {
         absolute.as_os_str().len() <= 4096 && absolute.components().count() <= 256,
         "candidate snapshot path exceeds limits"
     );
-    let mut ancestors = vec![Dir::open_ambient_dir("/", cap_std::ambient_authority())?];
+    #[cfg(target_os = "linux")]
+    let root = {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open("/")?;
+        Dir::from_std_file(file)
+    };
+    #[cfg(not(target_os = "linux"))]
+    let root = Dir::open_ambient_dir("/", cap_std::ambient_authority())?;
+    let mut ancestors = vec![root];
     for component in absolute.components() {
         match component {
             Component::Normal(name) => {
                 let file = ancestors
                     .last()
                     .context("snapshot ancestor missing")?
-                    .open_with(name, &directory_options())
+                    .open_with(name, &traversal_options())
                     .context("snapshot ancestors must be real directories without symlinks")?;
                 ancestors.push(Dir::from_std_file(file.into_std()));
             }
@@ -48,9 +74,13 @@ fn snapshot_root(path: &Path) -> Result<Dir> {
             Component::Prefix(_) => anyhow::bail!("unsupported candidate snapshot path"),
         }
     }
-    ancestors
+    let selected = ancestors
         .pop()
-        .context("candidate snapshot directory missing")
+        .context("candidate snapshot directory missing")?;
+    let readable = selected
+        .open_with(".", &directory_options())
+        .context("open candidate snapshot directory for reading")?;
+    Ok(Dir::from_std_file(readable.into_std()))
 }
 
 fn relative(raw: &str) -> Result<String> {

@@ -1,17 +1,21 @@
 //! Batched structural quality facts for candidate review.
 //!
-//! Python retains snapshot traversal, finding construction, policy severity, and the
-//! small amount of CPython expression normalization needed for stable user-facing text.
-//! This module owns the repeated full-tree parse and AST traversal.
+//! Reuse one admitted source-bound document; display text is not expression identity.
+
+#[path = "candidate_structure_expression.rs"]
+mod expression;
+#[path = "candidate_structure_policy.rs"]
+mod policy;
+use crate::candidate_python::Document;
+use expression::{Budget, Work};
+pub use policy::evaluate;
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::source_order::{walk_expr, walk_stmt, SourceOrderVisitor};
+use ruff_python_ast::visitor::source_order::{
+    walk_expr, walk_node, walk_stmt, SourceOrderVisitor, TraversalSignal,
+};
 use ruff_text_size::Ranged;
 use serde::Serialize;
 
@@ -30,95 +34,72 @@ const BOUND_KEYWORDS: &[&str] = &["maxlen", "maxsize"];
 const LOCK_TOKENS: &[&str] = &["lock", "mutex", "semaphore"];
 
 #[derive(Debug, Serialize)]
-struct UnboundedFact {
-    name: String,
-    defined_line: usize,
-    growth_line: usize,
+pub struct UnboundedFact {
+    pub name: String,
+    pub defined_line: usize,
+    pub growth_line: usize,
 }
 
 #[derive(Debug, Serialize)]
-struct LeakFact {
-    function: String,
-    resource: String,
-    acquire: String,
-    release: String,
-    line: usize,
-    owned: bool,
+pub struct LeakFact {
+    pub function: String,
+    pub resource: String,
+    pub acquire: String,
+    pub release: String,
+    pub line: usize,
+    pub owned: bool,
 }
 
 #[derive(Debug, Serialize)]
-struct LockOrderFact {
-    outer: String,
-    inner: String,
-    line: usize,
+pub struct LockOrderFact {
+    pub outer: String,
+    pub inner: String,
+    pub outer_key: String,
+    pub inner_key: String,
+    pub line: usize,
 }
 
 #[derive(Debug, Serialize)]
-struct AbstractionFact {
-    name: String,
-    line: usize,
-    methods: usize,
+pub struct AbstractionFact {
+    pub name: String,
+    pub line: usize,
+    pub methods: usize,
 }
 
 #[derive(Debug, Serialize)]
-struct SubclassFact {
-    base: String,
-    implementation: String,
+pub struct SubclassFact {
+    pub base: String,
+    pub implementation: String,
 }
 
 #[derive(Debug, Serialize)]
-struct ConfigFact {
-    key: String,
-    line: usize,
-    default: String,
+pub struct ConfigFact {
+    pub key: String,
+    pub line: usize,
+    pub default: String,
+    pub default_key: String,
 }
 
 #[derive(Debug, Serialize)]
-struct FileFacts {
-    path: String,
-    unbounded: Vec<UnboundedFact>,
-    leaks: Vec<LeakFact>,
-    lock_orders: Vec<LockOrderFact>,
-    abstractions: Vec<AbstractionFact>,
-    subclasses: Vec<SubclassFact>,
-    configs: Vec<ConfigFact>,
+pub struct FileFacts {
+    pub path: String,
+    pub unbounded: Vec<UnboundedFact>,
+    pub leaks: Vec<LeakFact>,
+    pub lock_orders: Vec<LockOrderFact>,
+    pub abstractions: Vec<AbstractionFact>,
+    pub subclasses: Vec<SubclassFact>,
+    pub configs: Vec<ConfigFact>,
+    #[serde(skip)]
+    pub canonical_bytes: usize,
 }
 
-#[derive(Debug, Serialize)]
-struct AuditFacts {
-    modules_indexed: usize,
-    files: Vec<FileFacts>,
-}
+pub(crate) use crate::candidate_python::Lines;
 
-/// 1-based line numbers of byte offsets.
-pub(crate) struct Lines {
-    starts: Vec<usize>,
-}
-
-impl Lines {
-    pub(crate) fn new(source: &str) -> Self {
-        let mut starts = vec![0];
-        starts.extend(
-            source
-                .as_bytes()
-                .iter()
-                .enumerate()
-                .filter_map(|(index, byte)| (*byte == b'\n').then_some(index + 1)),
-        );
-        Self { starts }
-    }
-
-    pub(crate) fn number(&self, offset: usize) -> usize {
-        self.starts.partition_point(|start| *start <= offset)
-    }
-}
-
-fn expression_source(source: &str, expression: &ast::Expr) -> String {
+fn expression_source<'a>(source: &'a str, expression: &ast::Expr) -> Result<&'a str, String> {
     let range = expression.range();
     source
         .get(range.start().to_usize()..range.end().to_usize())
-        .unwrap_or_default()
-        .to_owned()
+        .ok_or_else(|| "structure expression range is outside its bound source".into())
 }
 
 fn receiver(expression: &ast::Expr) -> Option<(&str, &str)> {
@@ -131,16 +112,15 @@ fn receiver(expression: &ast::Expr) -> Option<(&str, &str)> {
     Some((name.id.as_str(), attribute.attr.as_str()))
 }
 
-fn expression_path(expression: &ast::Expr) -> Option<String> {
-    match expression {
-        ast::Expr::Name(name) => Some(name.id.as_str().to_owned()),
-        ast::Expr::Attribute(attribute) => Some(format!(
-            "{}.{}",
-            expression_path(attribute.value.as_ref())?,
-            attribute.attr.as_str()
-        )),
-        _ => None,
-    }
+fn config_call(expression: &ast::Expr) -> bool {
+    let Some((name, method)) = receiver(expression) else {
+        return matches!(expression, ast::Expr::Attribute(attribute)
+            if attribute.attr.as_str() == "get"
+            && matches!(attribute.value.as_ref(), ast::Expr::Attribute(inner)
+                if inner.attr.as_str() == "environ"
+                && matches!(inner.value.as_ref(), ast::Expr::Name(name) if name.id.as_str() == "os")));
+    };
+    name == "os" && method == "getenv"
 }
 
 fn subscript_name<'a>(expression: &'a ast::Expr, names: &BTreeSet<String>) -> Option<&'a str> {
@@ -208,10 +188,21 @@ fn module_containers(module: &ast::ModModule, lines: &Lines) -> BTreeMap<String,
 
 struct FunctionCollector<'a> {
     functions: Vec<&'a ast::StmtFunctionDef>,
+    work: &'a Work,
 }
 
 impl<'a> SourceOrderVisitor<'a> for FunctionCollector<'a> {
+    fn enter_node(&mut self, _: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.work.enter() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
     fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        if !self.work.enter() {
+            return;
+        }
         if let ast::Stmt::FunctionDef(function) = statement {
             self.functions.push(function);
         }
@@ -219,13 +210,23 @@ impl<'a> SourceOrderVisitor<'a> for FunctionCollector<'a> {
     }
 }
 
-#[derive(Default)]
-struct CallStartCollector {
+struct CallStartCollector<'a> {
     starts: HashSet<usize>,
+    work: &'a Work,
 }
 
-impl<'a> SourceOrderVisitor<'a> for CallStartCollector {
+impl<'a> SourceOrderVisitor<'a> for CallStartCollector<'a> {
+    fn enter_node(&mut self, _: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.work.enter() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
     fn visit_expr(&mut self, expression: &'a ast::Expr) {
+        if !self.work.enter() {
+            return;
+        }
         if let ast::Expr::Call(call) = expression {
             self.starts.insert(call.range.start().to_usize());
         }
@@ -233,16 +234,29 @@ impl<'a> SourceOrderVisitor<'a> for CallStartCollector {
     }
 }
 
-#[derive(Default)]
-struct FinallyCollector {
+struct FinallyCollector<'a> {
     guarded_calls: HashSet<usize>,
+    work: &'a Work,
 }
 
-impl<'a> SourceOrderVisitor<'a> for FinallyCollector {
+impl<'a> SourceOrderVisitor<'a> for FinallyCollector<'a> {
+    fn enter_node(&mut self, _: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.work.enter() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
     fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        if !self.work.enter() {
+            return;
+        }
         if let ast::Stmt::Try(node) = statement {
             if !node.is_star {
-                let mut calls = CallStartCollector::default();
+                let mut calls = CallStartCollector {
+                    starts: HashSet::new(),
+                    work: self.work,
+                };
                 for child in &node.finalbody {
                     calls.visit_stmt(child);
                 }
@@ -262,6 +276,7 @@ struct FunctionFactsVisitor<'a> {
     acquired: BTreeMap<String, (String, usize)>,
     released: BTreeMap<String, Vec<(String, bool)>>,
     bound: BTreeSet<String>,
+    work: &'a Work,
 }
 
 impl FunctionFactsVisitor<'_> {
@@ -312,7 +327,17 @@ impl FunctionFactsVisitor<'_> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for FunctionFactsVisitor<'a> {
+    fn enter_node(&mut self, _: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.work.enter() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
     fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        if !self.work.enter() {
+            return;
+        }
         match statement {
             ast::Stmt::Assign(assign) => {
                 for target in &assign.targets {
@@ -377,6 +402,9 @@ impl<'a> SourceOrderVisitor<'a> for FunctionFactsVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expression: &'a ast::Expr) {
+        if !self.work.enter() {
+            return;
+        }
         if let ast::Expr::Call(call) = expression {
             self.record_call(call);
         }
@@ -387,33 +415,67 @@ impl<'a> SourceOrderVisitor<'a> for FunctionFactsVisitor<'a> {
 struct LockOrderVisitor<'a> {
     source: &'a str,
     lines: &'a Lines,
-    held: Vec<String>,
+    held: Vec<(String, String)>,
     orders: Vec<LockOrderFact>,
+    budget: &'a mut Budget,
+    work: &'a Work,
+    error: Option<String>,
 }
-
-impl<'a> SourceOrderVisitor<'a> for LockOrderVisitor<'a> {
-    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
-        if let ast::Stmt::With(node) = statement {
-            let taken = node
-                .items
-                .iter()
-                .map(|item| expression_source(self.source, &item.context_expr))
-                .filter(|text| {
-                    let lowered = text.to_lowercase();
-                    LOCK_TOKENS.iter().any(|token| lowered.contains(token))
-                })
-                .collect::<Vec<_>>();
-            for outer in &self.held {
-                for inner in &taken {
-                    if outer != inner {
-                        self.orders.push(LockOrderFact {
-                            outer: outer.clone(),
-                            inner: inner.clone(),
-                            line: self.lines.number(node.range.start().to_usize()),
-                        });
-                    }
+impl LockOrderVisitor<'_> {
+    fn take(&mut self, node: &ast::StmtWith) -> Result<Vec<(String, String)>, String> {
+        let mut taken = Vec::new();
+        for item in &node.items {
+            let text = self
+                .budget
+                .text(expression_source(self.source, &item.context_expr)?)?;
+            let lowered = text.to_lowercase();
+            if LOCK_TOKENS.iter().any(|token| lowered.contains(token)) {
+                taken.push((text, self.budget.key(&item.context_expr)?));
+            }
+        }
+        for (outer, outer_key) in &self.held {
+            for (inner, inner_key) in &taken {
+                if !self.work.enter() {
+                    self.work.check()?;
+                }
+                if outer_key != inner_key {
+                    self.budget.fact()?;
+                    self.orders.push(LockOrderFact {
+                        outer: self.budget.text(outer)?,
+                        inner: self.budget.text(inner)?,
+                        outer_key: outer_key.clone(),
+                        inner_key: inner_key.clone(),
+                        line: self.lines.number(node.range.start().to_usize()),
+                    });
                 }
             }
+        }
+        Ok(taken)
+    }
+}
+impl<'a> SourceOrderVisitor<'a> for LockOrderVisitor<'a> {
+    fn enter_node(&mut self, _: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.error.is_none() && self.work.enter() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
+    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        if !self.work.enter() {
+            return;
+        }
+        if self.error.is_some() {
+            return;
+        }
+        if let ast::Stmt::With(node) = statement {
+            let taken = match self.take(node) {
+                Ok(taken) => taken,
+                Err(error) => {
+                    self.error = Some(error);
+                    return;
+                }
+            };
             let original = self.held.len();
             self.held.extend(taken);
             walk_stmt(self, statement);
@@ -431,380 +493,365 @@ struct ClassConfigVisitor<'a> {
     abstractions: Vec<AbstractionFact>,
     subclasses: Vec<SubclassFact>,
     configs: Vec<ConfigFact>,
+    budget: &'a mut Budget,
+    work: &'a Work,
+    error: Option<String>,
 }
 
-fn base_name(source: &str, expression: &ast::Expr) -> String {
-    match expression {
+fn base_name(source: &str, expression: &ast::Expr) -> Result<String, String> {
+    Ok(match expression {
         ast::Expr::Name(name) => name.id.as_str().to_owned(),
         ast::Expr::Attribute(attribute) => attribute.attr.as_str().to_owned(),
-        _ => expression_source(source, expression)
+        _ => expression_source(source, expression)?
             .rsplit('.')
             .next()
             .unwrap_or_default()
             .trim()
             .to_owned(),
-    }
+    })
 }
 
-fn is_abstract_method(source: &str, function: &ast::StmtFunctionDef) -> bool {
-    if function.decorator_list.iter().any(|decorator| {
-        expression_source(source, &decorator.expression).contains("abstractmethod")
-    }) {
-        return true;
-    }
-    function.body.len() == 1
-        && match &function.body[0] {
-            ast::Stmt::Raise(raise) => raise.exc.as_deref().is_some_and(|exception| {
-                expression_source(source, exception).contains("NotImplementedError")
-            }),
-            _ => false,
+fn is_abstract_method(source: &str, function: &ast::StmtFunctionDef) -> Result<bool, String> {
+    for decorator in &function.decorator_list {
+        if expression_source(source, &decorator.expression)?.contains("abstractmethod") {
+            return Ok(true);
         }
+    }
+    Ok(function.body.len() == 1
+        && match &function.body[0] {
+            ast::Stmt::Raise(raise) => match raise.exc.as_deref() {
+                Some(exception) => {
+                    expression_source(source, exception)?.contains("NotImplementedError")
+                }
+                None => false,
+            },
+            _ => false,
+        })
 }
 
-impl<'a> SourceOrderVisitor<'a> for ClassConfigVisitor<'a> {
-    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
-        if let ast::Stmt::ClassDef(class) = statement {
-            let bases = class
-                .arguments
-                .as_ref()
-                .map(|arguments| {
-                    arguments
-                        .args
-                        .iter()
-                        .map(|base| base_name(self.source, base))
-                        .collect::<Vec<_>>()
+impl ClassConfigVisitor<'_> {
+    fn class(&mut self, class: &ast::StmtClassDef) -> Result<(), String> {
+        let bases = class
+            .arguments
+            .as_ref()
+            .map(|arguments| {
+                arguments
+                    .args
+                    .iter()
+                    .map(|base| base_name(self.source, base))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        for base in &bases {
+            self.budget.fact()?;
+            self.subclasses.push(SubclassFact {
+                base: self.budget.text(base)?,
+                implementation: self.budget.text(&format!(
+                    "{}::{}",
+                    self.path,
+                    class.name.as_str()
+                ))?,
+            });
+        }
+        if !bases.iter().any(|base| base == "Protocol") {
+            let methods = class
+                .body
+                .iter()
+                .filter_map(|member| match member {
+                    ast::Stmt::FunctionDef(function) => Some(function),
+                    _ => None,
                 })
-                .unwrap_or_default();
-            for base in &bases {
-                self.subclasses.push(SubclassFact {
-                    base: base.clone(),
-                    implementation: format!("{}::{}", self.path, class.name.as_str()),
+                .collect::<Vec<_>>();
+            let mut abstract_method = false;
+            for method in &methods {
+                abstract_method |= is_abstract_method(self.source, method)?;
+            }
+            if bases.iter().any(|base| base == "ABC") || abstract_method {
+                self.budget.fact()?;
+                self.abstractions.push(AbstractionFact {
+                    name: self.budget.text(class.name.as_str())?,
+                    line: self.lines.number(class.name.range.start().to_usize()),
+                    methods: methods.len(),
                 });
             }
-            if !bases.iter().any(|base| base == "Protocol") {
-                let methods = class
-                    .body
-                    .iter()
-                    .filter_map(|member| match member {
-                        ast::Stmt::FunctionDef(function) => Some(function),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-                if bases.iter().any(|base| base == "ABC")
-                    || methods
-                        .iter()
-                        .any(|method| is_abstract_method(self.source, method))
-                {
-                    self.abstractions.push(AbstractionFact {
-                        name: class.name.as_str().to_owned(),
-                        line: self.lines.number(class.name.range.start().to_usize()),
-                        methods: methods.len(),
-                    });
-                }
+        }
+        Ok(())
+    }
+    fn call(&mut self, call: &ast::ExprCall) -> Result<(), String> {
+        if call.arguments.args.len() >= 2 && config_call(call.func.as_ref()) {
+            if let ast::Expr::StringLiteral(key) = &call.arguments.args[0] {
+                self.budget.fact()?;
+                self.configs.push(ConfigFact {
+                    key: self.budget.text(&key.value.to_string())?,
+                    line: self.lines.number(call.range.start().to_usize()),
+                    default: self
+                        .budget
+                        .text(expression_source(self.source, &call.arguments.args[1])?)?,
+                    default_key: self.budget.key(&call.arguments.args[1])?,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+impl<'a> SourceOrderVisitor<'a> for ClassConfigVisitor<'a> {
+    fn enter_node(&mut self, _: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.error.is_none() && self.work.enter() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
+    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        if !self.work.enter() {
+            return;
+        }
+        if self.error.is_some() {
+            return;
+        }
+        if let ast::Stmt::ClassDef(class) = statement {
+            if let Err(error) = self.class(class) {
+                self.error = Some(error);
+                return;
             }
         }
         walk_stmt(self, statement);
     }
-
     fn visit_expr(&mut self, expression: &'a ast::Expr) {
+        if !self.work.enter() {
+            return;
+        }
+        if self.error.is_some() {
+            return;
+        }
         if let ast::Expr::Call(call) = expression {
-            let is_config_call = matches!(
-                expression_path(call.func.as_ref()).as_deref(),
-                Some("os.getenv") | Some("os.environ.get")
-            );
-            if call.arguments.args.len() >= 2 && is_config_call {
-                if let ast::Expr::StringLiteral(key) = &call.arguments.args[0] {
-                    self.configs.push(ConfigFact {
-                        key: key.value.to_string(),
-                        line: self.lines.number(call.range.start().to_usize()),
-                        default: expression_source(self.source, &call.arguments.args[1]),
-                    });
-                }
+            if let Err(error) = self.call(call) {
+                self.error = Some(error);
+                return;
             }
         }
         walk_expr(self, expression);
     }
 }
 
-fn analyze_file(path: String, source: String, changed: bool) -> Option<FileFacts> {
-    let module = ruff_python_parser::parse_module(&source)
-        .ok()?
-        .into_syntax();
-    let lines = Lines::new(&source);
-    let containers = module_containers(&module, &lines);
-    let container_names = containers.keys().cloned().collect::<BTreeSet<_>>();
-
-    let mut lock_visitor = LockOrderVisitor {
-        source: &source,
-        lines: &lines,
-        held: Vec::new(),
-        orders: Vec::new(),
+fn function_facts<'a>(
+    function: &'a ast::StmtFunctionDef,
+    lines: &'a Lines,
+    containers: &'a BTreeSet<String>,
+    finally: &'a HashSet<usize>,
+    work: &'a Work,
+) -> Result<FunctionFactsVisitor<'a>, String> {
+    let mut facts = FunctionFactsVisitor {
+        lines,
+        containers,
+        guarded_calls: finally,
+        grown: BTreeMap::new(),
+        evicted: BTreeSet::new(),
+        acquired: BTreeMap::new(),
+        released: BTreeMap::new(),
+        bound: BTreeSet::new(),
+        work,
+    };
+    walk_node(&mut facts, function.into());
+    work.check()?;
+    Ok(facts)
+}
+fn leak_facts(
+    function: &ast::StmtFunctionDef,
+    facts: &FunctionFactsVisitor<'_>,
+    budget: &mut Budget,
+    output: &mut Vec<LeakFact>,
+) -> Result<(), String> {
+    for (resource, (acquire, line)) in &facts.acquired {
+        if facts.bound.contains(resource) {
+            continue;
+        }
+        let release = if acquire == "acquire" {
+            "release"
+        } else {
+            "close"
+        };
+        let mut matching = false;
+        let mut guarded = false;
+        for (verb, protected) in facts.released.get(resource).into_iter().flatten() {
+            if verb == release {
+                matching = true;
+                guarded |= protected;
+            }
+        }
+        if !matching || guarded {
+            continue;
+        }
+        budget.fact()?;
+        output.push(LeakFact {
+            function: budget.text(function.name.as_str())?,
+            resource: budget.text(resource)?,
+            owned: matches!(acquire.as_str(), "acquire" | "open"),
+            acquire: acquire.clone(),
+            release: release.to_owned(),
+            line: *line,
+        });
+    }
+    Ok(())
+}
+fn lifecycle(
+    module: &ast::ModModule,
+    lines: &Lines,
+    budget: &mut Budget,
+    work: &Work,
+) -> Result<(Vec<UnboundedFact>, Vec<LeakFact>), String> {
+    let containers = module_containers(module, lines);
+    let names = containers.keys().cloned().collect::<BTreeSet<_>>();
+    let mut functions = FunctionCollector {
+        functions: Vec::new(),
+        work,
     };
     for statement in &module.body {
-        lock_visitor.visit_stmt(statement);
+        functions.visit_stmt(statement);
     }
-
-    let mut class_config = ClassConfigVisitor {
-        path: &path,
-        source: &source,
-        lines: &lines,
+    work.check()?;
+    let mut grown = BTreeMap::new();
+    let mut evicted = BTreeSet::new();
+    let mut leaks = Vec::new();
+    for function in functions.functions {
+        let mut finally = FinallyCollector {
+            guarded_calls: HashSet::new(),
+            work,
+        };
+        walk_node(&mut finally, function.into());
+        work.check()?;
+        let facts = function_facts(function, lines, &names, &finally.guarded_calls, work)?;
+        leak_facts(function, &facts, budget, &mut leaks)?;
+        for (name, line) in facts.grown {
+            grown.entry(name).or_insert(line);
+        }
+        evicted.extend(facts.evicted);
+    }
+    let selected = grown
+        .keys()
+        .filter(|name| !evicted.contains(*name))
+        .cloned()
+        .collect();
+    let correction = expression::growth_lines(module, &selected, lines, work)?;
+    let mut unbounded = Vec::new();
+    for name in selected {
+        let defined_line = *containers
+            .get(&name)
+            .ok_or("missing structure container definition")?;
+        let growth_line = *correction
+            .get(&name)
+            .ok_or("missing structure growth-line evidence")?;
+        budget.fact()?;
+        unbounded.push(UnboundedFact {
+            name: budget.text(&name)?,
+            defined_line,
+            growth_line,
+        });
+    }
+    Ok((unbounded, leaks))
+}
+fn lock_facts(
+    source: &str,
+    module: &ast::ModModule,
+    lines: &Lines,
+    budget: &mut Budget,
+    work: &Work,
+) -> Result<Vec<LockOrderFact>, String> {
+    let mut visitor = LockOrderVisitor {
+        source,
+        lines,
+        held: Vec::new(),
+        orders: Vec::new(),
+        budget,
+        work,
+        error: None,
+    };
+    for statement in &module.body {
+        visitor.visit_stmt(statement);
+    }
+    if let Some(error) = visitor.error {
+        return Err(error);
+    }
+    work.check()?;
+    Ok(visitor.orders)
+}
+fn class_facts<'a>(
+    path: &'a str,
+    source: &'a str,
+    module: &'a ast::ModModule,
+    lines: &'a Lines,
+    budget: &'a mut Budget,
+    work: &'a Work,
+) -> Result<ClassConfigVisitor<'a>, String> {
+    let mut visitor = ClassConfigVisitor {
+        path,
+        source,
+        lines,
         abstractions: Vec::new(),
         subclasses: Vec::new(),
         configs: Vec::new(),
+        budget,
+        work,
+        error: None,
     };
     for statement in &module.body {
-        class_config.visit_stmt(statement);
+        visitor.visit_stmt(statement);
     }
-
-    let mut unbounded = Vec::new();
-    let mut leaks = Vec::new();
-    if changed {
-        let mut functions = FunctionCollector {
-            functions: Vec::new(),
-        };
-        for statement in &module.body {
-            functions.visit_stmt(statement);
-        }
-        let mut grown = BTreeMap::new();
-        let mut evicted = BTreeSet::new();
-        for function in functions.functions {
-            let function_statement = ast::Stmt::FunctionDef(function.clone());
-            let mut finally = FinallyCollector::default();
-            finally.visit_stmt(&function_statement);
-            let mut facts = FunctionFactsVisitor {
-                lines: &lines,
-                containers: &container_names,
-                guarded_calls: &finally.guarded_calls,
-                grown: BTreeMap::new(),
-                evicted: BTreeSet::new(),
-                acquired: BTreeMap::new(),
-                released: BTreeMap::new(),
-                bound: BTreeSet::new(),
-            };
-            facts.visit_stmt(&function_statement);
-            for (name, line) in facts.grown {
-                grown.entry(name).or_insert(line);
-            }
-            evicted.extend(facts.evicted);
-            for (resource, (acquire, line)) in facts.acquired {
-                if facts.bound.contains(&resource) {
-                    continue;
-                }
-                let release = if acquire == "acquire" {
-                    "release"
-                } else {
-                    "close"
-                };
-                let matching = facts
-                    .released
-                    .get(&resource)
-                    .into_iter()
-                    .flatten()
-                    .filter(|(verb, _)| verb == release)
-                    .collect::<Vec<_>>();
-                if matching.is_empty() || matching.iter().any(|(_, guarded)| *guarded) {
-                    continue;
-                }
-                leaks.push(LeakFact {
-                    function: function.name.as_str().to_owned(),
-                    resource,
-                    owned: matches!(acquire.as_str(), "acquire" | "open"),
-                    acquire,
-                    release: release.to_owned(),
-                    line,
-                });
-            }
-        }
-        unbounded = grown
-            .into_iter()
-            .filter(|(name, _)| !evicted.contains(name))
-            .filter_map(|(name, growth_line)| {
-                containers.get(&name).map(|defined_line| UnboundedFact {
-                    name,
-                    defined_line: *defined_line,
-                    growth_line,
-                })
-            })
-            .collect();
+    if let Some(error) = visitor.error.take() {
+        return Err(error);
     }
-
+    work.check()?;
+    Ok(visitor)
+}
+fn path_admission(path: &str) -> Result<(), String> {
+    if path.len() > 4096
+        || path.is_empty()
+        || path.chars().any(char::is_control)
+        || path.split('/').count() > 128
+        || path
+            .split('/')
+            .any(|part| part.is_empty() || matches!(part, "." | ".."))
+    {
+        return Err("structure path must be bounded normalized relative UTF8".into());
+    }
+    Ok(())
+}
+/// Reuse an admitted AST and its bound source, without parsing or cloning functions.
+pub fn analyze_document(
+    path: String,
+    document: &Document<'_>,
+    changed: bool,
+) -> Result<FileFacts, String> {
+    path_admission(&path)?;
+    let source = document.text();
+    let module = document.module();
+    let lines = Lines::new(source);
+    let work = Work::default();
+    let mut budget = Budget::default();
+    let lock_orders = lock_facts(source, module, &lines, &mut budget, &work)?;
     let ClassConfigVisitor {
         abstractions,
         subclasses,
         configs,
         ..
-    } = class_config;
-    Some(FileFacts {
+    } = class_facts(&path, source, module, &lines, &mut budget, &work)?;
+    let (unbounded, leaks) = if changed {
+        lifecycle(module, &lines, &mut budget, &work)?
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    Ok(FileFacts {
         path,
         unbounded,
         leaks,
-        lock_orders: lock_visitor.orders,
+        lock_orders,
         abstractions,
         subclasses,
         configs,
+        canonical_bytes: budget.bytes,
     })
 }
-
-/// Parse the candidate's Python sources once and return serializable
-/// cross-module facts for the structure-audit policy.
-pub fn structure_facts_json(
-    records: Vec<(String, String)>,
-    changed_paths: Vec<String>,
-) -> Result<String, serde_json::Error> {
-    let changed = changed_paths.into_iter().collect::<HashSet<_>>();
-    let files = records
-        .into_iter()
-        .filter_map(|(path, source)| {
-            let is_changed = changed.contains(&path);
-            analyze_file(path, source, is_changed)
-        })
-        .collect::<Vec<_>>();
-    serde_json::to_string(&AuditFacts {
-        modules_indexed: files.len(),
-        files,
-    })
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn candidate_structure_facts_native(
-    py: Python<'_>,
-    records: Vec<(String, String)>,
-    changed_paths: Vec<String>,
-) -> PyResult<String> {
-    py.detach(|| structure_facts_json(records, changed_paths))
-        .map_err(|error| PyValueError::new_err(error.to_string()))
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(candidate_structure_facts_native, module)?)?;
-    Ok(())
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::{json, to_value};
-
-    fn facts(source: &str, changed: bool) -> serde_json::Value {
-        to_value(analyze_file("pkg/example.py".to_owned(), source.to_owned(), changed).unwrap())
-            .unwrap()
-    }
-
-    #[test]
-    fn unguarded_resource_release_is_reported_but_finally_and_with_are_not() {
-        let leaking = facts(
-            "import os\n\ndef read_locked(path):\n    handle = os.open(path)\n    payload = handle.read()\n    handle.close()\n    return payload\n",
-            true,
-        );
-        assert_eq!(leaking["leaks"].as_array().unwrap().len(), 1);
-        assert_eq!(leaking["leaks"][0]["function"], "read_locked");
-        assert_eq!(leaking["leaks"][0]["resource"], "handle");
-        assert_eq!(leaking["leaks"][0]["line"], 4);
-        assert_eq!(leaking["leaks"][0]["owned"], true);
-
-        for safe in [
-            "import os\n\ndef read_locked(path):\n    handle = os.open(path)\n    try:\n        return handle.read()\n    finally:\n        handle.close()\n",
-            "import os\n\ndef read_locked(path):\n    with os.open(path) as handle:\n        return handle.read()\n",
-            "import os\n\ndef acquire(path):\n    handle = os.open(path)\n    return handle\n",
-        ] {
-            assert_eq!(facts(safe, true)["leaks"], json!([]), "{safe}");
-        }
-    }
-
-    #[test]
-    fn connection_close_has_distinct_ownership_fact() {
-        let source = "import sqlite3\n\ndef query(path):\n    conn = sqlite3.connect(path)\n    rows = conn.execute('select 1').fetchall()\n    conn.close()\n    return rows\n";
-        let result = facts(source, true);
-        assert_eq!(result["leaks"].as_array().unwrap().len(), 1);
-        assert_eq!(result["leaks"][0]["acquire"], "connect");
-        assert_eq!(result["leaks"][0]["release"], "close");
-        assert_eq!(result["leaks"][0]["owned"], false);
-    }
-
-    #[test]
-    fn lock_order_facts_anchor_the_inner_acquisition() {
-        let forward = facts(
-            "import threading\nalpha_lock = threading.Lock()\nbeta_lock = threading.Lock()\ndef forward():\n    with alpha_lock:\n        with beta_lock:\n            return 1\n",
-            true,
-        );
-        let backward = facts(
-            "def backward():\n    with beta_lock:\n        with alpha_lock:\n            return 2\n",
-            false,
-        );
-        assert_eq!(
-            forward["lock_orders"],
-            json!([{
-                "outer": "alpha_lock", "inner": "beta_lock", "line": 6
-            }])
-        );
-        assert_eq!(
-            backward["lock_orders"],
-            json!([{
-                "outer": "beta_lock", "inner": "alpha_lock", "line": 3
-            }])
-        );
-    }
-
-    #[test]
-    fn nominal_abstraction_and_subclass_facts_exclude_protocol() {
-        let nominal = facts(
-            "from abc import ABC, abstractmethod\nclass Storage(ABC):\n    @abstractmethod\n    def load(self, key): ...\n    @abstractmethod\n    def store(self, key, value): ...\nclass Backend(Storage):\n    def load(self, key): return None\n    def store(self, key, value): return None\n",
-            true,
-        );
-        assert_eq!(nominal["abstractions"][0]["name"], "Storage");
-        assert_eq!(nominal["abstractions"][0]["methods"], 2);
-        assert!(nominal["subclasses"].as_array().unwrap().contains(&json!({
-            "base": "Storage",
-            "implementation": "pkg/example.py::Backend",
-        })));
-
-        let protocol = facts(
-            "from typing import Protocol\nfrom abc import abstractmethod\nclass Storage(Protocol):\n    @abstractmethod\n    def load(self, key): ...\n    @abstractmethod\n    def store(self, key, value): ...\n",
-            true,
-        );
-        assert_eq!(protocol["abstractions"], json!([]));
-    }
-
-    #[test]
-    fn configuration_facts_preserve_key_default_and_line() {
-        let result = facts(
-            "import os\nfrom pkg.constants import DEFAULT\nhost = os.getenv('SERVICE_HOST', DEFAULT)\nurl = os.environ.get('SERVICE_URL', 'http://localhost')\nignored = os.getenv('NO_DEFAULT')\n",
-            false,
-        );
-        assert_eq!(
-            result["configs"],
-            json!([
-                {"key": "SERVICE_HOST", "line": 3, "default": "DEFAULT"},
-                {"key": "SERVICE_URL", "line": 4, "default": "'http://localhost'"},
-            ])
-        );
-    }
-
-    #[test]
-    fn unbounded_cache_requires_growth_inside_changed_function_without_eviction() {
-        let growing = "_CACHE = {}\n\ndef lookup(key):\n    if key not in _CACHE:\n        _CACHE[key] = compute(key)\n    return _CACHE[key]\n";
-        let result = facts(growing, true);
-        assert_eq!(
-            result["unbounded"],
-            json!([{
-                "name": "_CACHE", "defined_line": 1, "growth_line": 5
-            }])
-        );
-        assert_eq!(facts(growing, false)["unbounded"], json!([]));
-
-        for bounded in [
-            "_CACHE = {}\ndef lookup(key):\n    if len(_CACHE) > 128:\n        _CACHE.clear()\n    _CACHE[key] = compute(key)\n",
-            "import collections\n_RECENT = collections.deque(maxlen=64)\ndef record(event):\n    _RECENT.append(event)\n",
-            "_REGISTRY = {}\n_REGISTRY['one'] = 1\ndef lookup(key):\n    return _REGISTRY[key]\n",
-        ] {
-            assert_eq!(facts(bounded, true)["unbounded"], json!([]), "{bounded}");
-        }
-    }
-
-    #[test]
-    fn parser_rejects_invalid_source_without_emitting_partial_facts() {
-        assert!(analyze_file("broken.py".to_owned(), "def f(:\n".to_owned(), true).is_none());
-    }
-}
+#[path = "candidate_structure_tests.rs"]
+mod tests;

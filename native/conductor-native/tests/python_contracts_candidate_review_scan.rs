@@ -15,10 +15,9 @@ use candidate_review_support::{added_change, default_policy, isolated_case, revi
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use std::fs;
-use support::{module, AttrPatch, Case};
+use support::{module, Case};
 
 const UNREADABLE: &[u8] = b"\xff\xfe\x00 not utf-8";
-const CLEAN: &str = "def alpha() -> int:\n    return 1\n";
 
 fn scan_context<'py>(
     py: Python<'py>,
@@ -67,12 +66,7 @@ fn scan_context<'py>(
 }
 
 fn result<'py>(py: Python<'py>, check: &str, context: &Bound<'py, PyAny>) -> Bound<'py, PyAny> {
-    let owner = if check == "check_structure_audit" {
-        "conductor.candidate_review.quality_checks"
-    } else {
-        "conductor.candidate_review.checks"
-    };
-    module(py, owner)
+    module(py, "conductor.candidate_review.checks")
         .getattr(check)
         .unwrap()
         .call1((context,))
@@ -102,82 +96,6 @@ fn metric<T: for<'a> FromPyObject<'a, 'a>>(result: &Bound<'_, PyAny>, key: &str)
         .extract()
         .ok()
         .unwrap()
-}
-
-#[test]
-fn structure_audit_fails_closed_on_unreadable_changed_file() {
-    let case = isolated_case();
-    Python::attach(|py| {
-        let context = scan_context(
-            py,
-            &case,
-            &[("pkg/good.py", Some(CLEAN)), ("pkg/broken.py", None)],
-            &["pkg/good.py", "pkg/broken.py"],
-            &["python", "source"],
-        );
-        let checked = result(py, "check_structure_audit", &context);
-        assert_eq!(
-            severity(py, &checked, "unreadable-changed-file").as_deref(),
-            Some("high")
-        );
-        assert_eq!(metric::<usize>(&checked, "files_skipped"), 1);
-        let skipped = checked
-            .getattr("metrics")
-            .unwrap()
-            .get_item("skipped_files")
-            .unwrap();
-        assert!(skipped.contains("pkg/broken.py").unwrap());
-    });
-}
-
-#[test]
-fn unreadable_unchanged_file_stays_advisory() {
-    let case = isolated_case();
-    Python::attach(|py| {
-        let context = scan_context(
-            py,
-            &case,
-            &[("pkg/good.py", Some(CLEAN)), ("vendor/broken.py", None)],
-            &["pkg/good.py"],
-            &["python", "source"],
-        );
-        let checked = result(py, "check_structure_audit", &context);
-        assert_eq!(
-            severity(py, &checked, "incomplete-scan").as_deref(),
-            Some("medium")
-        );
-        assert_eq!(severity(py, &checked, "unreadable-changed-file"), None);
-        assert_eq!(metric::<usize>(&checked, "files_skipped"), 1);
-    });
-}
-
-#[test]
-fn complete_scan_reports_coverage() {
-    let case = isolated_case();
-    Python::attach(|py| {
-        let context = scan_context(
-            py,
-            &case,
-            &[("pkg/good.py", Some(CLEAN))],
-            &["pkg/good.py"],
-            &["python", "source"],
-        );
-        let checked = result(py, "check_structure_audit", &context);
-        assert_eq!(metric::<usize>(&checked, "files_skipped"), 0);
-        assert_eq!(metric::<usize>(&checked, "files_read"), 1);
-        assert_eq!(metric::<usize>(&checked, "files_expected"), 1);
-        assert_eq!(
-            checked
-                .getattr("metrics")
-                .unwrap()
-                .get_item("skipped_files")
-                .unwrap()
-                .len()
-                .unwrap(),
-            0
-        );
-        assert_eq!(severity(py, &checked, "incomplete-scan"), None);
-    });
 }
 
 #[test]
@@ -224,34 +142,5 @@ fn native_source_still_flags_readable_unsafe_api() {
         );
         assert_eq!(metric::<usize>(&checked, "files_skipped"), 0);
         assert_eq!(metric::<usize>(&checked, "files_read"), 1);
-    });
-}
-
-#[test]
-fn duplicate_bodies_fail_closed_on_unreadable_changed_file() {
-    let case = isolated_case();
-    Python::attach(|py| {
-        let checks = module(py, "conductor.candidate_review.checks");
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("return_value", PyDict::new(py)).unwrap();
-        let mock = module(py, "unittest.mock")
-            .getattr("Mock")
-            .unwrap()
-            .call((), Some(&kwargs))
-            .unwrap();
-        let _patch = AttrPatch::replace(checks.as_any(), "changed_line_numbers", &mock);
-        let context = scan_context(
-            py,
-            &case,
-            &[("pkg/good.py", Some(CLEAN)), ("pkg/broken.py", None)],
-            &["pkg/good.py", "pkg/broken.py"],
-            &["python", "source"],
-        );
-        let checked = result(py, "check_duplicate_function_bodies", &context);
-        assert_eq!(
-            severity(py, &checked, "unreadable-changed-file").as_deref(),
-            Some("high")
-        );
-        assert_eq!(metric::<usize>(&checked, "files_skipped"), 1);
     });
 }

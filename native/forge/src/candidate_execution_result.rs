@@ -1,6 +1,8 @@
 //! Pure supervisor-report mapping. Findings are execution observations, never
 //! approval/completeness/authentication. Ordinary fingerprints are finalized by
 //! the existing candidate assessor; jscpd has its legacy aggregate override.
+#[path = "candidate_execution_result_analysis.rs"]
+mod analysis;
 use crate::candidate_assessment::{CheckResult, CheckStatus, Finding, Severity};
 use crate::confined_execution::{Outcome, Report};
 use crate::process_capture_tail::MAX_OUTPUT_CHARS;
@@ -356,14 +358,57 @@ fn observation(check: &Check, report: &Report) -> Result<Option<Finding>> {
     }
     Ok(Some(result))
 }
-/// Invalid normalized/admission data is an error, never a synthesized pass.
-/// Report describes the analyzer attempt; version-probe evidence is separate.
+fn standard_findings(
+    check: &Check,
+    version_error: Option<&str>,
+    report: &Report,
+) -> Result<Vec<Finding>> {
+    let mut findings = Vec::new();
+    if let Some(error) = version_error {
+        let mut unavailable = finding(
+            check,
+            "required-analyzer-unavailable",
+            Severity::Critical,
+            format!("required analyzer is unavailable: {error}"),
+            None,
+        );
+        unavailable.help = Some(
+            "Install the pinned analyzer; required checks never skip on missing tools.".into(),
+        );
+        findings.push(unavailable);
+    } else if let Some(finding) = observation(check, report)? {
+        findings.push(finding);
+    }
+    Ok(findings)
+}
+
+/// Parent-owned classified candidate and captured policy, not child claims.
+pub struct AnalysisContext<'a> {
+    pub candidate: &'a crate::candidate_source::Candidate,
+    pub policy: &'a crate::candidate_policy::Policy,
+}
+
+/// Generic compatibility API. Native-analysis protocol requires parent context
+/// and fails closed when this unbound entry point receives a native command.
 pub fn map_result(
     normalized: &Value,
     files: &[String],
     command: &[String],
     version: Option<&VersionEvidence>,
     report: &Report,
+) -> Result<CheckResult> {
+    map_result_bound(normalized, files, command, version, report, None)
+}
+
+/// Invalid normalized/admission data is an error, never a synthesized pass.
+/// Report describes the analyzer attempt; version-probe evidence is separate.
+pub fn map_result_bound(
+    normalized: &Value,
+    files: &[String],
+    command: &[String],
+    version: Option<&VersionEvidence>,
+    report: &Report,
+    context: Option<AnalysisContext<'_>>,
 ) -> Result<CheckResult> {
     let check = check(normalized)?;
     report_bounds(report, check.maximum)?;
@@ -388,28 +433,28 @@ pub fn map_result(
         }
         None => (None, Some("no version evidence")),
     };
-    let mut findings = Vec::new();
-    if let Some(error) = version_error {
-        let mut unavailable = finding(
+    let (findings, analysis) = if analysis::selected(normalized) {
+        analysis::map(
+            normalized,
             &check,
-            "required-analyzer-unavailable",
-            Severity::Critical,
-            format!("required analyzer is unavailable: {error}"),
-            None,
-        );
-        unavailable.help = Some(
-            "Install the pinned analyzer; required checks never skip on missing tools.".into(),
-        );
-        findings.push(unavailable);
-    } else if let Some(finding) = observation(&check, report)? {
-        findings.push(finding);
-    }
-    let metrics = serde_json::from_value(
+            &files,
+            command,
+            tool_version.as_deref(),
+            report,
+            context.as_ref(),
+        )
+    } else {
+        (standard_findings(&check, version_error, report)?, None)
+    };
+    let mut metrics: Map<String, Value> = serde_json::from_value(
         json!({"timeout_seconds":check.timeout,"wall_timeout_seconds":check.wall_timeout,"memory_limit_mb":check.memory,
         "outcome":report.outcome,"signal":report.signal,"stdout_bytes":report.stdout_bytes,
         "stderr_bytes":report.stderr_bytes,"cleanup_complete":report.cleanup_complete,"supervisor_errors":report.errors,
         "resources":report.resources,"cpu_seconds":report.cpu_seconds,"address_space_bytes":report.address_space_bytes}),
     )?;
+    if let Some(analysis) = analysis {
+        metrics.insert("analysis".into(), analysis);
+    }
     Ok(CheckResult {
         check_id: check.id,
         status: if findings.is_empty() {

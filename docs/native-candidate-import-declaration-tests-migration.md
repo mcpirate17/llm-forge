@@ -1,4 +1,11 @@
-# Import declaration contract migration
+# Historical import declaration compatibility migration
+
+The compatibility targets described below have been retired with their Python
+implementation. Current native coverage lives in
+`candidate_import_declaration_tests.rs` and the Forge analysis CLI and Stage
+tests. See [native candidate analysis](native-candidate-analysis.md) for the
+pinned provider-observation interface and explicit incomplete-result semantics.
+The remainder records the earlier compatibility migration, not current execution.
 
 The 31 named cases in `src/conductor/candidate_review/test_import_declaration.py` are covered by Rust-owned PyO3 contracts in `native/conductor-native/tests/python_contracts_candidate_import_declaration_core.rs` (22 direct API, manifest, and tree-scope cases) and `python_contracts_candidate_import_declaration_integration.rs` (9 changed-source review cases). The original 31-case pytest baseline passed before migration. Both exact Rust targets passed (22 + 9) with two Cargo jobs and one test thread; scoped Clippy passed with warnings denied.
 

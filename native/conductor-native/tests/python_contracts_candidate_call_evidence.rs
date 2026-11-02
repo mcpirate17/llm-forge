@@ -1,6 +1,6 @@
 #![cfg(feature = "python-compat-tests")]
 //! Rust-owned contracts migrated from test_candidate_review_call_and_evidence.py.
-//! The 39 expanded Python cases each retain a distinct Rust test.
+//! Native Python-rule behavior now lives in candidate_python_semantics.rs.
 
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
@@ -11,7 +11,7 @@ use pyo3::types::{PyAny, PyDict, PyList, PySet, PyString, PyTuple};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::Path;
-use support::{attr_text, module, path, text, AttrPatch, Case};
+use support::{attr_text, module, path, AttrPatch, Case};
 
 fn namespace<'py>(py: Python<'py>, kwargs: &Bound<'py, PyDict>) -> Bound<'py, PyAny> {
     module(py, "types")
@@ -30,148 +30,6 @@ fn mock<'py>(py: Python<'py>, key: &str, value: &Bound<'py, PyAny>) -> Bound<'py
         .call((), Some(&kwargs))
         .unwrap()
 }
-
-fn parsed<'py>(py: Python<'py>, expression: &str) -> Bound<'py, PyAny> {
-    module(py, "ast")
-        .getattr("parse")
-        .unwrap()
-        .call1((expression,))
-        .unwrap()
-}
-
-fn visitor<'py>(py: Python<'py>, relative: &str, source: &str, hot: bool) -> Bound<'py, PyAny> {
-    let lines = PyString::new(py, source)
-        .call_method0("splitlines")
-        .unwrap();
-    let checks = module(py, "conductor.candidate_review.checks");
-    let visitor = checks
-        .getattr("_PythonVisitor")
-        .unwrap()
-        .call1((relative, lines, hot))
-        .unwrap();
-    visitor
-        .call_method1("visit", (parsed(py, source),))
-        .unwrap();
-    visitor
-}
-
-fn finding_rule_ids(py: Python<'_>, source: &str) -> Vec<String> {
-    visitor(py, "m.py", source, false)
-        .getattr("findings")
-        .unwrap()
-        .try_iter()
-        .unwrap()
-        .map(|row| attr_text(&row.unwrap(), "rule_id"))
-        .collect()
-}
-
-fn hotpath_lines(py: Python<'_>, source: &str, hot: bool) -> Vec<usize> {
-    visitor(py, "lane.py", source, hot)
-        .getattr("findings")
-        .unwrap()
-        .try_iter()
-        .unwrap()
-        .filter_map(|row| {
-            let row = row.unwrap();
-            (attr_text(&row, "rule_id") == "nested-loop-hotpath")
-                .then(|| row.getattr("line").unwrap().extract().unwrap())
-        })
-        .collect()
-}
-
-macro_rules! call_name_case {
-    ($name:ident, $expression:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            let _case = Case::new();
-            Python::attach(|py| {
-                let expr = parsed(py, $expression);
-                let func = expr
-                    .getattr("body")
-                    .unwrap()
-                    .get_item(0)
-                    .unwrap()
-                    .getattr("value")
-                    .unwrap()
-                    .getattr("func")
-                    .unwrap();
-                let checks = module(py, "conductor.candidate_review.checks");
-                let name = checks
-                    .getattr("_call_name")
-                    .unwrap()
-                    .call1((func,))
-                    .unwrap();
-                assert_eq!(text(&name), $expected);
-            });
-        }
-    };
-}
-
-call_name_case!(call_name_eval_builtin, "eval(payload)", "eval");
-call_name_case!(call_name_exec_builtin, "exec(payload)", "exec");
-call_name_case!(call_name_os_system, "os.system(cmd)", "os.system");
-call_name_case!(call_name_pickle_load, "pickle.load(handle)", "pickle.load");
-call_name_case!(call_name_yaml_load, "yaml.load(stream)", "yaml.load");
-call_name_case!(call_name_obj_eval, "obj.eval()", "obj.eval");
-call_name_case!(call_name_self_eval, "self.eval()", "self.eval");
-call_name_case!(
-    call_name_torch_module_eval,
-    "torch.nn.Module.eval(model)",
-    "torch.nn.Module.eval"
-);
-call_name_case!(
-    call_name_chained_eval_unresolved,
-    "model.to(device).eval()",
-    ""
-);
-call_name_case!(call_name_chained_exec_unresolved, "build().exec()", "");
-call_name_case!(
-    call_name_subscript_eval_unresolved,
-    "registry['key'].eval()",
-    ""
-);
-call_name_case!(call_name_binary_eval_unresolved, "(a + b).eval()", "");
-
-macro_rules! dynamic_execution_case {
-    ($name:ident, $source:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            let _case = Case::new();
-            Python::attach(|py| {
-                let flagged = finding_rule_ids(py, $source)
-                    .iter()
-                    .any(|rule| rule == "dynamic-execution");
-                assert_eq!(flagged, $expected);
-            });
-        }
-    };
-}
-
-dynamic_execution_case!(
-    dynamic_execution_chained_eval_is_clean,
-    "def f(model, device):\n    return model.to(device).eval()\n",
-    false
-);
-dynamic_execution_case!(
-    dynamic_execution_named_eval_is_clean,
-    "def f(model):\n    return model.eval()\n",
-    false
-);
-dynamic_execution_case!(
-    dynamic_execution_builtin_eval_is_flagged,
-    "def f(payload):\n    return eval(payload)\n",
-    true
-);
-dynamic_execution_case!(
-    dynamic_execution_builtin_exec_is_flagged,
-    "def f(payload):\n    return exec(payload)\n",
-    true
-);
-dynamic_execution_case!(
-    dynamic_execution_os_system_is_flagged,
-    "import os\n\n\ndef f(cmd):\n    return os.system(cmd)\n",
-    true
-);
 
 fn evidence_context<'py>(py: Python<'py>, root: &Path) -> Bound<'py, PyAny> {
     let kwargs = PyDict::new(py);
@@ -677,62 +535,4 @@ fn missing_engine_is_named_critical_finding_without_probe_run() {
         let count: usize = fake.getattr("call_count").unwrap().extract().unwrap();
         assert_eq!(count, 0);
     });
-}
-
-const KERNEL: &str = "\nimport triton\nimport triton.language as tl\n\n@triton.jit\ndef kernel(out_ptr, S: tl.constexpr):\n    for scale in tl.static_range(S):\n        for offset in tl.static_range(8):\n            tl.store(out_ptr + scale * 8 + offset, 0.0)\n";
-
-macro_rules! kernel_decorator_case {
-    ($name:ident, $decorator:expr) => {
-        #[test]
-        fn $name() {
-            let _case = Case::new();
-            Python::attach(|py| {
-                let source = format!("\n{}\ndef kernel(values):\n    for row in values:\n        for column in row:\n            store(row, column)\n", $decorator);
-                assert!(hotpath_lines(py, &source, true).is_empty());
-            });
-        }
-    };
-}
-
-kernel_decorator_case!(device_kernel_bare_jit_is_clean, "@jit");
-kernel_decorator_case!(device_kernel_numba_cuda_jit_is_clean, "@numba.cuda.jit");
-kernel_decorator_case!(device_kernel_numba_njit_is_clean, "@numba.njit");
-kernel_decorator_case!(
-    device_kernel_triton_autotune_is_clean,
-    "@triton.autotune(configs=[], key=['S'])"
-);
-kernel_decorator_case!(device_kernel_triton_jit_is_clean, "@triton.jit");
-
-#[test]
-fn triton_static_range_kernel_is_clean() {
-    let _case = Case::new();
-    Python::attach(|py| assert!(hotpath_lines(py, KERNEL, true).is_empty()));
-}
-
-#[test]
-fn real_python_nested_loop_beside_kernel_still_reports() {
-    let _case = Case::new();
-    let source = format!("{KERNEL}\n\ndef accumulate(rows):\n    total = 0\n    for row in rows:\n        for value in row:\n            total += value\n    return total\n");
-    Python::attach(|py| {
-        let lines = hotpath_lines(py, &source, true);
-        assert_eq!(lines.len(), 1);
-        assert_eq!(
-            source.lines().nth(lines[0] - 1).unwrap().trim(),
-            "for value in row:"
-        );
-    });
-}
-
-#[test]
-fn undecorated_helper_after_kernel_is_not_swallowed() {
-    let _case = Case::new();
-    let source = format!("{KERNEL}\n\ndef plain(rows):\n    for row in rows:\n        for value in row:\n            print(value)\n");
-    Python::attach(|py| assert_eq!(hotpath_lines(py, &source, true).len(), 1));
-}
-
-#[test]
-fn hot_path_flag_still_gates_the_rule() {
-    let _case = Case::new();
-    let source = "\ndef accumulate(rows):\n    total = 0\n    for row in rows:\n        for value in row:\n            total += value\n    return total\n";
-    Python::attach(|py| assert!(hotpath_lines(py, source, false).is_empty()));
 }

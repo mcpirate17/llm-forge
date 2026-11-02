@@ -16,6 +16,8 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Validate captured configuration and inspect Python source with native analyzers.
+    Analyze(crate::candidate_analysis_cli::AnalysisArgs),
     /// Compare captured crate production inputs, versions and installed metadata.
     CrateVersion(crate::candidate_crate_cli::CrateArgs),
     /// Plan or run native source checks against exact candidate changed lines.
@@ -86,6 +88,7 @@ fn print_json(value: &Value) -> Result<()> {
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
     match args.action {
+        Action::Analyze(args) => return crate::candidate_analysis_cli::run(args),
         Action::CrateVersion(args) => return crate::candidate_crate_cli::run(args),
         Action::Scan(args) => return crate::candidate_scan_cli::run(args),
         Action::ClangFormat(args) => return crate::candidate_clang_format_cli::run(args),

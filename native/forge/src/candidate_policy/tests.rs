@@ -232,6 +232,28 @@ fn confined_policy_and_config_symlinks_allow_only_relative_internal_targets() {
 }
 
 #[test]
+fn snapshot_traversal_checks_every_physical_ancestor() {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new();
+    fixture.write("nested/policy.toml", POLICY);
+    symlink("nested", fixture.0.join("nested-link")).unwrap();
+    for path in [
+        fixture.0.join("nested-link"),
+        fixture.0.join("nested-link/../nested"),
+        fixture.0.join("missing/../nested"),
+    ] {
+        assert!(load::load(&path, Some("policy.toml"), None, "2026-11-01").is_err());
+    }
+    assert!(load::load(
+        &fixture.0.join("nested/../nested"),
+        Some("policy.toml"),
+        None,
+        "2026-11-01"
+    )
+    .is_ok());
+}
+
+#[test]
 fn dates_expiry_and_exact_waiver_metadata_are_preserved() {
     let fixture = Fixture::new();
     let exceptions = r#"

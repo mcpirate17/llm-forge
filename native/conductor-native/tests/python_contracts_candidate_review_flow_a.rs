@@ -623,14 +623,11 @@ fn assert_adversarial_results(
     let mut rules = BTreeSet::new();
     for name in [
         "check_candidate_integrity",
-        "check_config_and_notebooks",
         "check_secrets",
-        "check_python_ast",
         "check_dependency_integrity",
         "check_performance_evidence",
         "check_research_evidence",
         "check_native_source",
-        "check_duplicate_function_bodies",
     ] {
         let args = if matches!(
             name,
@@ -647,26 +644,13 @@ fn assert_adversarial_results(
         "protected-delete-or-move",
         "binary-admission",
         "oversized-artifact",
-        "malformed-config",
-        "notebook-output",
         "generic-api-key",
-        "pass-stub",
-        "ellipsis-stub",
-        "dynamic-execution",
-        "unsafe-deserialization",
-        "unsafe-yaml",
-        "unsafe-shell",
-        "not-implemented-stub",
-        "softmax-shaped-fallback",
-        "nondeterministic-research",
-        "partial-promotion-write",
         "missing-lockfile",
         "missing-performance-budget",
         "python-only-hotpath",
         "incomplete-result-provenance",
         "missing-numerical-device-tests",
         "unsafe-native-api",
-        "copied-function-body",
     ])
     .into_iter()
     .map(str::to_owned)
@@ -704,165 +688,6 @@ fn assert_adversarial_results(
         .call1((context, unknown))
         .unwrap();
     assert_eq!(finding_rules(&result).first().unwrap(), "unknown-builtin");
-}
-
-#[test]
-fn dynamic_execution_gate_distinguishes_builtins_from_method_calls() {
-    let case = fixture::isolated_case();
-    let repo = case.root().join("repo");
-    fixture::init_repo(&repo);
-    let lines = [
-        "import os",
-        "",
-        "",
-        "def check_host(value):",
-        "    return os.system(value)",
-        "",
-        "",
-        "def refresh(model):",
-        "    return model.eval()",
-        "",
-        "",
-        "make().eval()",
-        "eval_used = eval('1')",
-        "exec_used = exec('pass')",
-    ];
-    fixture::write_fixture(&repo, "probe.py", &(lines.join("\n") + "\n"));
-    fixture::git(&repo, &["add", "--all"]);
-    Python::attach(|py| {
-        let policy = fixture::default_policy(py);
-        let candidate = fixture::classify_candidate(
-            py,
-            &fixture::resolve_candidate(py, &repo, "index", None, None),
-            &policy,
-        );
-        fixture::with_materialized(
-            py,
-            &repo,
-            &tree_oid(&candidate),
-            None,
-            |snapshot, entries| {
-                let context = configured_context(
-                    py,
-                    &repo,
-                    snapshot,
-                    entries,
-                    &candidate,
-                    &policy,
-                    "ci",
-                    "full",
-                    case.root(),
-                );
-                let result = module(py, "conductor.candidate_review.checks")
-                    .getattr("check_python_ast")
-                    .unwrap()
-                    .call1((context,))
-                    .unwrap();
-                let dynamic: Vec<_> = result
-                    .getattr("findings")
-                    .unwrap()
-                    .try_iter()
-                    .unwrap()
-                    .map(Result::unwrap)
-                    .filter(|f| attr_text(f, "rule_id") == "dynamic-execution")
-                    .collect();
-                let mut messages: Vec<String> =
-                    dynamic.iter().map(|f| attr_text(f, "message")).collect();
-                messages.sort();
-                assert_eq!(
-                    messages,
-                    [
-                        "unsafe dynamic execution via eval",
-                        "unsafe dynamic execution via exec",
-                        "unsafe dynamic execution via os.system"
-                    ]
-                );
-                let unflagged = lines
-                    .iter()
-                    .position(|line| *line == "make().eval()")
-                    .unwrap()
-                    + 1;
-                assert!(dynamic.iter().all(|f| f
-                    .getattr("line")
-                    .unwrap()
-                    .extract::<usize>()
-                    .unwrap()
-                    != unflagged));
-            },
-        );
-    });
-}
-
-#[test]
-fn protocol_ellipsis_methods_are_not_flagged_as_stubs() {
-    let case = fixture::isolated_case();
-    let repo = case.root().join("repo");
-    fixture::init_repo(&repo);
-    let source = concat!(
-        "from typing import Protocol\n\n\nclass Sink(Protocol):\n",
-        "    def put(self, key: str, value: int) -> None:\n        ...\n\n",
-        "    @property\n    def size(self) -> int:\n        ...\n\n\n",
-        "class Nested(Protocol):\n    class Inner(Protocol):\n",
-        "        def deep(self) -> str:\n            ...\n\n",
-        "    def flat(self) -> None:\n        ...\n\n",
-        "    class Concrete:\n        def inner_stub(self): ...\n\n\n",
-        "class Impl:\n    def real(self):\n        return 1\n\n    def missing(self): ...\n"
-    );
-    fixture::write_fixture(&repo, "protocol_probe.py", source);
-    fixture::git(&repo, &["add", "--all"]);
-    Python::attach(|py| {
-        let policy = fixture::default_policy(py);
-        let candidate = fixture::classify_candidate(
-            py,
-            &fixture::resolve_candidate(py, &repo, "index", None, None),
-            &policy,
-        );
-        fixture::with_materialized(
-            py,
-            &repo,
-            &tree_oid(&candidate),
-            None,
-            |snapshot, entries| {
-                let context = configured_context(
-                    py,
-                    &repo,
-                    snapshot,
-                    entries,
-                    &candidate,
-                    &policy,
-                    "ci",
-                    "full",
-                    case.root(),
-                );
-                let result = module(py, "conductor.candidate_review.checks")
-                    .getattr("check_python_ast")
-                    .unwrap()
-                    .call1((context,))
-                    .unwrap();
-                let flagged: Vec<usize> = result
-                    .getattr("findings")
-                    .unwrap()
-                    .try_iter()
-                    .unwrap()
-                    .map(Result::unwrap)
-                    .filter(|f| attr_text(f, "rule_id") == "ellipsis-stub")
-                    .map(|f| f.getattr("line").unwrap().extract().unwrap())
-                    .collect();
-                let expected: Vec<usize> = ["def inner_stub", "def missing"]
-                    .iter()
-                    .map(|marker| {
-                        source[..source.find(marker).unwrap()]
-                            .bytes()
-                            .filter(|byte| *byte == b'\n')
-                            .count()
-                            + 1
-                    })
-                    .collect();
-                assert_eq!(flagged, expected);
-                assert_eq!(flagged.len(), 2);
-            },
-        );
-    });
 }
 
 #[test]
@@ -904,6 +729,16 @@ fn analyzer_reporting_includes_stdout_alongside_warning_stderr() {
                 let exe = module(py, "sys").getattr("executable").unwrap();
                 let kwargs = PyDict::new(py);
                 kwargs.set_item("check_id", "analyzer-probe").unwrap();
+                kwargs
+                    .set_item(
+                        "severity",
+                        module(py, "conductor.candidate_review.model")
+                            .getattr("Severity")
+                            .unwrap()
+                            .getattr("HIGH")
+                            .unwrap(),
+                    )
+                    .unwrap();
                 kwargs.set_item("classes", PyTuple::empty(py)).unwrap();
                 kwargs.set_item("always", true).unwrap();
                 kwargs.set_item("command", PyTuple::new(py, [exe.clone(), fixture::py_string(py, "-c"),

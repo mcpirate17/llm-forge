@@ -4,14 +4,14 @@ Historical record: the retired Python crate-version and structure-audit modules
 contained 38 declared tests (21 and 17); parameterization made 44 pytest cases.
 The crate-version compatibility target has since been retired in favor of the
 native CLI documented in `native-crate-version.md`; the table below records its
-former case mapping only. The structure-audit target remains a separate Python
-compatibility surface and is not retired by that change.
+former case mapping only. The structure-audit compatibility target and Python
+implementation have now also been retired; see [native analysis](native-candidate-analysis.md).
 
 The former crate fixture exercised the Python evaluator through PyO3; its
 installed-version callback is historical and does not describe the current
-operator metadata-root interface. Native CLI parity validation is pending. The
-structure fixture continues to use temporary Python source snapshots and its
-existing review context.
+operator metadata-root interface. Current structure facts, policy and captured
+CLI coverage use native Rust with bounded source admission. The tables below
+describe historical compatibility fixtures, not current test targets.
 
 | Retired crate-version test | Rust test in `python_contracts_candidate_crate_version.rs` |
 | --- | --- |

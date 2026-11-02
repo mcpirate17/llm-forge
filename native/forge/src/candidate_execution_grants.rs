@@ -158,6 +158,12 @@ impl Grants {
                 && !self.scratch_parent.starts_with(source.common_dir()),
             "scratch parent must be outside source repository"
         );
+        if let Some(raw) = self.environment.get("FORGE_IMPORT_PROVIDERS") {
+            crate::candidate_analysis::validate_operator_provider(
+                raw,
+                &[source.root(), source.common_dir(), &self.scratch_parent],
+            )?;
+        }
         Ok(())
     }
 }

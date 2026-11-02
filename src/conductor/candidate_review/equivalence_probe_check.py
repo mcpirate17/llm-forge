@@ -7,8 +7,8 @@ leaves it where the backlog folds it in. This module gathers the inputs.
 
 The probe runs against a separate materialization of the candidate tree, not the
 shared review snapshot: a replay can write through a module-relative default path,
-and later checks read that snapshot. `check_import_declaration` is the same shape,
-including the deferred `_result` import that keeps this module and `checks` acyclic.
+and later checks read that snapshot. The deferred `_result` import keeps this
+module and `checks` acyclic.
 """
 
 from __future__ import annotations

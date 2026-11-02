@@ -120,6 +120,8 @@ pub fn evaluate(operation: &str, payload: &Value) -> Result<Value, String> {
         "research-integrity" => evidence::research_integrity(payload),
         #[cfg(feature = "source-analysis")]
         "python-ast" => ast::python_ast(payload),
+        #[cfg(feature = "source-analysis")]
+        "duplicate-function-bodies" => crate::candidate_duplicate_policy::evaluate(payload),
         _ => Err(format!("unknown candidate checks operation: {operation}")),
     }
 }

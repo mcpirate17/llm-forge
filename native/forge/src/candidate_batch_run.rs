@@ -115,12 +115,16 @@ async fn check(
         (vec![version_data], version_report, version_argv)
     };
     row["stages"] = json!(stages);
-    row["result"] = serde_json::to_value(candidate_execution_result::map_result(
+    row["result"] = serde_json::to_value(candidate_execution_result::map_result_bound(
         &plan.normalized,
         &plan.files,
         &argv,
         Some(&evidence),
         &report,
+        Some(candidate_execution_result::AnalysisContext {
+            candidate: &selection.candidate,
+            policy: &selection.policy,
+        }),
     )?)?;
     Ok(row)
 }

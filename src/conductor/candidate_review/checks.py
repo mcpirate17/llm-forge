@@ -2,25 +2,20 @@
 
 from __future__ import annotations
 
-import ast
-import fnmatch
 import hashlib
 import json
 import os
 import time
-import tomllib
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict
 
-from conductor._native import duplicate_body_fingerprints_native
 from conductor.candidate_review.equivalence_probe_check import (
     check_equivalence_probe,
 )
 from conductor.candidate_review.git_source import changed_line_numbers
-from conductor.candidate_review.import_declaration import check_import_declaration
 from conductor.candidate_review.model import (
     Candidate,
     Change,
@@ -179,70 +174,6 @@ def check_candidate_integrity(ctx: ReviewContext) -> CheckResult:
     )
 
 
-def check_config_and_notebooks(ctx: ReviewContext) -> CheckResult:
-    started = time.perf_counter()
-    findings: list[Finding] = []
-    files = _changed_files(ctx, {"config", "notebook", "workflow"})
-    yaml_module: object | None = None
-    for rel in files:
-        path = ctx.snapshot / rel
-        suffix = path.suffix.lower()
-        try:
-            if suffix == ".toml":
-                tomllib.loads(path.read_text(encoding="utf-8"))
-            elif suffix in {".json", ".ipynb"}:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-                if suffix == ".ipynb":
-                    _validate_notebook(rel, payload, findings)
-            elif suffix in {".yaml", ".yml"}:
-                if yaml_module is None:
-                    try:
-                        import yaml as yaml_module  # type: ignore[import-not-found]
-                    except ImportError as exc:
-                        raise RuntimeError(
-                            "PyYAML is required for YAML admission checks"
-                        ) from exc
-                yaml_module.safe_load(path.read_text(encoding="utf-8"))  # type: ignore[attr-defined]
-        except Exception as exc:  # noqa: BLE001 - normalize third-party parser failures
-            findings.append(
-                Finding(
-                    check_id="config-parse",
-                    rule_id="malformed-config",
-                    severity=Severity.CRITICAL,
-                    path=rel,
-                    message=f"candidate config/notebook cannot be parsed: {type(exc).__name__}: {exc}",
-                )
-            )
-    return _result("config-parse", started, findings, files=files)
-
-
-def _validate_notebook(rel: str, payload: object, findings: list[Finding]) -> None:
-    if not isinstance(payload, dict) or not isinstance(payload.get("cells"), list):
-        raise ValueError(  # noqa: TRY004 - all notebook parse failures share one path
-            "notebook must be an object with a cells array"
-        )
-    if payload.get("nbformat") != 4:
-        raise ValueError(f"unsupported notebook format: {payload.get('nbformat')!r}")
-    for index, cell in enumerate(payload["cells"]):
-        if not isinstance(cell, dict):
-            raise ValueError(  # noqa: TRY004 - all notebook parse failures share one path
-                f"cell {index} is not an object"
-            )
-        if cell.get("cell_type") == "code" and (
-            cell.get("outputs") or cell.get("execution_count")
-        ):
-            findings.append(
-                Finding(
-                    check_id="config-parse",
-                    rule_id="notebook-output",
-                    severity=Severity.HIGH,
-                    path=rel,
-                    line=index + 1,
-                    message="tracked notebooks must have outputs and execution counts stripped",
-                )
-            )
-
-
 def check_secrets(ctx: ReviewContext) -> CheckResult:
     started = time.perf_counter()
     files: list[dict[str, str]] = []
@@ -266,96 +197,6 @@ def check_secrets(ctx: ReviewContext) -> CheckResult:
         _native_findings(native),
         files=[item["path"] for item in files],
     )
-
-
-class _PythonVisitor(ast.NodeVisitor):
-    """Compatibility seam for direct visitor callers; rules live in Rust."""
-
-    def __init__(self, rel: str, lines: list[str], hot_path: bool) -> None:
-        self.rel = rel
-        self.lines = lines
-        self.hot_path = hot_path
-        self.findings: list[Finding] = []
-
-    def visit(self, node: ast.AST) -> None:
-        if not isinstance(node, ast.Module):
-            raise TypeError("candidate Python visitor requires a module AST")
-        native = _native_eval(
-            "python-ast",
-            {
-                "path": self.rel,
-                "text": "\n".join(self.lines),
-                "lines": self.lines,
-                "changed_lines": [],
-                "classes": [],
-                "hot": self.hot_path,
-            },
-        )
-        self.findings.extend(_native_findings(native))
-
-
-def _call_name(node: ast.expr) -> str:
-    """Resolve a call target to its dotted name, or "" when it cannot be resolved.
-
-    An attribute whose receiver is not itself a resolvable dotted name — a call,
-    subscript, literal — is deliberately NOT reported under its bare attribute
-    name. ``model.to(device).eval()`` is ``torch.nn.Module.eval``, not the ``eval``
-    builtin; returning ``"eval"`` for it raised a CRITICAL dynamic-execution
-    finding on the standard PyTorch idiom and made every model-evaluation script
-    in the repo untrackable.
-
-    Every name this module matches (``eval``, ``exec``, ``os.system``,
-    ``pickle.load``, ``yaml.load``, ``NotImplementedError``, …) is either a bare
-    builtin — an ``ast.Name``, still resolved above — or dotted from a ``Name``
-    root, so refusing the bare-attribute guess loses no real detection.
-    """
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        prefix = _call_name(node.value)
-        return f"{prefix}.{node.attr}" if prefix else ""
-    return ""
-
-
-def check_python_ast(ctx: ReviewContext) -> CheckResult:
-    started = time.perf_counter()
-    findings: list[Finding] = []
-    files = _changed_files(ctx, {"python"})
-    changes = {change.path: change for change in ctx.live_changes}
-    line_map = changed_line_numbers(ctx.repo, ctx.candidate, files)
-    for rel in files:
-        path = ctx.snapshot / rel
-        try:
-            text = path.read_text(encoding="utf-8")
-            ast.parse(text, filename=rel)
-        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
-            findings.append(
-                Finding(
-                    check_id="python-ast",
-                    rule_id="python-parse",
-                    severity=Severity.CRITICAL,
-                    path=rel,
-                    line=getattr(exc, "lineno", None),
-                    message=f"candidate Python cannot be parsed: {exc}",
-                )
-            )
-            continue
-        native = _native_eval(
-            "python-ast",
-            {
-                "path": rel,
-                "text": text,
-                "lines": text.splitlines(),
-                "changed_lines": sorted(line_map.get(rel, set())),
-                "classes": changes[rel].classes,
-                "hot": any(
-                    fnmatch.fnmatchcase(rel, pattern)
-                    for pattern in ctx.policy.hot_path_globs
-                ),
-            },
-        )
-        findings.extend(_native_findings(native))
-    return _result("python-ast", started, findings, files=files)
 
 
 def check_dependency_integrity(ctx: ReviewContext) -> CheckResult:
@@ -500,12 +341,9 @@ def check_cargo_audit(ctx: ReviewContext) -> CheckResult:
 BUILTIN_CHECKS: dict[str, Callable[[ReviewContext], CheckResult]] = {
     "cargo-audit": check_cargo_audit,
     "candidate-integrity": check_candidate_integrity,
-    "config-parse": check_config_and_notebooks,
     "dependency-integrity": check_dependency_integrity,
-    "import-declaration": check_import_declaration,
     "mutation-evidence": check_mutation_evidence,
     "ownership": check_ownership,
-    "python-ast": check_python_ast,
     "secret-scan": check_secrets,
 }
 
@@ -688,99 +526,6 @@ def check_native_source(ctx: ReviewContext) -> CheckResult:
 BUILTIN_CHECKS["native-source"] = check_native_source
 
 
-def check_duplicate_function_bodies(ctx: ReviewContext) -> CheckResult:
-    started = time.perf_counter()
-    changed = [change.path for change in ctx.live_changes if "python" in change.classes]
-    if not changed:
-        return _result("duplicate-function-bodies", started)
-    changed_lines = changed_line_numbers(ctx.repo, ctx.candidate, changed)
-    bodies: dict[str, list[tuple[str, str, int]]] = {}
-    changed_bodies: set[tuple[str, str, int]] = set()
-    records: list[tuple[str, str]] = []
-    ledger = ScanLedger("duplicate-function-bodies")
-    for path in ctx.snapshot.rglob("*.py"):
-        if any(
-            part in {".venv", "node_modules", "__pycache__", ".run"}
-            for part in path.parts
-        ):
-            continue
-        rel = path.relative_to(ctx.snapshot).as_posix()
-        source = ledger.read_text(ctx.snapshot, rel)
-        if source is None:
-            continue
-        records.append((rel, source))
-    native_files = json.loads(duplicate_body_fingerprints_native(records, "candidate"))
-    for native_file in native_files:
-        rel = native_file["path"]
-        for node in native_file["functions"]:
-            digest = node["digest"]
-            location = (rel, node["name"], node["lineno"])
-            bodies.setdefault(digest, []).append(location)
-            lines = changed_lines.get(rel, set())
-            if lines and any(
-                node["lineno"] <= line <= node["end_lineno"] for line in lines
-            ):
-                changed_bodies.add(location)
-    findings: list[Finding] = []
-    emitted: set[tuple[str, str, int]] = set()
-    for locations in bodies.values():
-        if len(locations) < 2:
-            continue
-        originals = sorted(locations)
-        for location in originals:
-            if location not in changed_bodies or location in emitted:
-                continue
-            peers = [peer for peer in originals if peer != location]
-            findings.append(
-                Finding(
-                    check_id="duplicate-function-bodies",
-                    rule_id="copied-function-body",
-                    severity=Severity.HIGH,
-                    path=location[0],
-                    line=location[2],
-                    message=(
-                        f"changed function {location[1]} duplicates "
-                        + ", ".join(
-                            f"{path}:{line} ({name})" for path, name, line in peers[:5]
-                        )
-                    ),
-                    evidence={"peers": peers},
-                )
-            )
-            emitted.add(location)
-    findings.extend(
-        ledger.incomplete_findings(
-            adjudicated=set(changed),
-            severity=Severity.HIGH,
-            subject="candidate source",
-        )
-    )
-    return _result(
-        "duplicate-function-bodies",
-        started,
-        findings,
-        files=changed,
-        metrics={
-            "candidate_function_bodies": sum(len(items) for items in bodies.values()),
-            **ledger.metrics(),
-        },
-    )
-
-
-BUILTIN_CHECKS["duplicate-function-bodies"] = check_duplicate_function_bodies
-
-
-def check_structure_audit(ctx: ReviewContext) -> CheckResult:
-    """Delegate to quality_checks, which imports this module for its helpers."""
-
-    from conductor.candidate_review.quality_checks import (
-        check_structure_audit as audit_structure,
-    )
-
-    return audit_structure(ctx)
-
-
-BUILTIN_CHECKS["structure-audit"] = check_structure_audit
 BUILTIN_CHECKS["equivalence-probe"] = check_equivalence_probe
 
 

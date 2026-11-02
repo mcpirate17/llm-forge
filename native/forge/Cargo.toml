@@ -1,6 +1,6 @@
 [package]
 name = "forge"
-version = "0.8.10"
+version = "0.8.11"
 edition = "2021"
 description = "Native hooks, resource-aware task execution, audit and cost tooling for AI agents"
 autobins = false
@@ -54,6 +54,10 @@ harness = false
 
 [[bench]]
 name = "candidate_builtin"
+harness = false
+
+[[bench]]
+name = "candidate_analysis"
 harness = false
 
 [[bench]]

@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "scope": "current-only warm native evaluators including parsing, allocation and result drop; excludes input JSON decoding, filesystem/Git capture, process, sandbox and end-to-end dispatch costs; no baseline or speedup claim",
+  "measurements": [
+    {
+      "name": "python_ast_1_statements",
+      "findings": 0,
+      "input_bytes": 93,
+      "input_sha256": "0c7b304ed878f06ade96eed65cc7f4cdb05da1e7cdbee15c91dd4b0d973ed3cc",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 0.5720000000000001,
+      "p95_sample_mean_us": 0.591
+    },
+    {
+      "name": "duplicate_1_candidates_plus_peer",
+      "findings": 1,
+      "input_bytes": 367,
+      "input_sha256": "16a6888a770e327c6abd985fa26694180c5a511ef1fbd4eb1f977141d45f7d8d",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 11.2391,
+      "p95_sample_mean_us": 12.0221
+    },
+    {
+      "name": "imports_1_files",
+      "findings": 1,
+      "input_bytes": 486,
+      "input_sha256": "37e6b56915da3663bb4b21186243ccf8c80a4ac030787061c7a36be975faf8f3",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 4.526,
+      "p95_sample_mean_us": 5.307
+    },
+    {
+      "name": "structure_1_files",
+      "findings": 1,
+      "input_bytes": 134,
+      "input_sha256": "fbe9951c7fc84635bff980780279330d208964fb2a11b00fe6b31e4c7792019e",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 3.9539999999999997,
+      "p95_sample_mean_us": 4.2401
+    },
+    {
+      "name": "config_1_files",
+      "findings": 0,
+      "input_bytes": 98,
+      "input_sha256": "f9e33b33a52ed6e67c1cc4db48f2986ca02c4aed1d0df86f88ca68e59697f613",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 1.413,
+      "p95_sample_mean_us": 1.479
+    },
+    {
+      "name": "python_ast_128_statements",
+      "findings": 0,
+      "input_bytes": 1490,
+      "input_sha256": "336e1d1a47e0a7245309977d7fd138bf3607a231569650e8766a6521bc3df592",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 27.232100000000003,
+      "p95_sample_mean_us": 28.809199999999997
+    },
+    {
+      "name": "duplicate_128_candidates_plus_peer",
+      "findings": 1,
+      "input_bytes": 22122,
+      "input_sha256": "2ef74f1268b4fceaed7b19701a86b091bba5ea5ce86c8cea6f7cb2be32688977",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 594.292,
+      "p95_sample_mean_us": 600.3509
+    },
+    {
+      "name": "imports_128_files",
+      "findings": 128,
+      "input_bytes": 11427,
+      "input_sha256": "d22e698c7af786ec518c2a726e5cc95f13377a509020cb98b88c7b078799d0c3",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 197.607,
+      "p95_sample_mean_us": 198.494
+    },
+    {
+      "name": "structure_128_files",
+      "findings": 128,
+      "input_bytes": 14523,
+      "input_sha256": "9a3e10685e10933c9ec0f4d31a5358c264021165d1b7e8b0627e1e44e495ece8",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 471.8763,
+      "p95_sample_mean_us": 476.20230000000004
+    },
+    {
+      "name": "config_128_files",
+      "findings": 0,
+      "input_bytes": 12563,
+      "input_sha256": "e0a55bed2ec333f0607c75cd2a3fcb23d8173a13b64e8f622d07b10807c16a6d",
+      "samples": 31,
+      "iterations_per_sample": 10,
+      "warmup_calls": 5,
+      "median_sample_mean_us": 125.1646,
+      "p95_sample_mean_us": 125.6076
+    }
+  ],
+  "recorded_at_utc": "2026-11-01T23:56:17Z",
+  "base_commit": "e154ee1751b358789550992aba873c133610d569",
+  "source_state": "native candidate analysis migration; source inputs and benchmark executable bound by SHA-256",
+  "host": {
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "architecture": "x86_64",
+    "kernel": "7.0.0-38-generic",
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "isolation": "unisolated host; no concurrent owned build during timed region"
+  },
+  "command": "cargo +1.98.0 bench --offline --locked --manifest-path native/forge/Cargo.toml --bench candidate_analysis",
+  "sha256": {
+    "native/conductor-native/Cargo.lock": "9adf29b12573d67881e05c2d511518c7f47e4a82e142c457fc65312f39690f4f",
+    "native/conductor-native/Cargo.toml": "df89d536cf84837e30d89bc1b834f0ffbaa6d2e87ad101a8d2370b5228cf627f",
+    "native/conductor-native/src/candidate_checks.rs": "34fb3781f85501adcf0123981d08094ffce013b7a451a77143bd1b20a9a4f8bd",
+    "native/conductor-native/src/candidate_checks_ast.rs": "05a837e4af02cdd38b132084d979935bfc91e8136a88550ec54f559f3d5603cd",
+    "native/conductor-native/src/candidate_duplicate_policy.rs": "ba86ccb959693eecebecb4c1d1cf233ca379dfd2f568c46d3637d4015fa81b73",
+    "native/conductor-native/src/candidate_import_declaration.rs": "5032f2302b85988c6c5c3428abfa1e31c525c2ce6023a97c9bbff6e50320f6a6",
+    "native/conductor-native/src/candidate_import_source.rs": "bdcbb0bfba9d05b822e42385c368a607a2bac2c9443b5c68edd42fc57b8188a4",
+    "native/conductor-native/src/candidate_python.rs": "a6984cc887593e243aacf6a610bb7132df1817dd87c2bfe97118af2630177494",
+    "native/conductor-native/src/candidate_structure.rs": "f9082f5d8a854db8fb89fb149621d3602edd6faa14c1371ffb3eb1926e71eff0",
+    "native/conductor-native/src/candidate_structure_expression.rs": "abf495dd8d8b6e3fecf8d3fc9b9b9562933be3a34d7c9c2ecb8d4d6408b925b3",
+    "native/conductor-native/src/candidate_structure_policy.rs": "bc2c35b2dde2a869bbb2339b7bec243c03d5b1635beb870e62790b4386b23f02",
+    "native/conductor-native/src/duplicate_fingerprints.rs": "c6a64e660f22a790a4d214a0442ce177ef8553de84fcb04c17e073b3e43ace3f",
+    "native/forge/Cargo.lock": "955dd9950b1bcb5021472074d87b7636e1a2131ae257a6ce43a883b6759e7ee8",
+    "native/forge/Cargo.toml": "412a5cb075415e4c93b20e4d0cd5910fd24cebd12217766efdb498bc5d54ee3d",
+    "native/forge/benches/candidate_analysis.rs": "4e2a90e35071ee3024f4bacfc8783db9baad05fdabe86aa0d2086d67bebe1364",
+    "native/forge/src/candidate_config.rs": "5e1e9bab458cdb9321108a49e0353dbd0468806359f569094c420f1869625f21",
+    "native/forge/src/candidate_config_yaml.rs": "a8a6696766190608f4d37a36215e0969ccec55332be606894164d9700ed2b4c2",
+    "native/forge/src/candidate_config_yaml_scalar.rs": "329fcd4e4375a3411a7739bb0a766d05dfa1ef543add4e826a8c4004c08b16b6",
+    "native/forge/target/release/deps/candidate_analysis-ad85ef914e82f715": "a8c72f5a0ffa5dc2c2a6d532fe4ac004b1f426fc8d259004e118cf78bf89b29d"
+  }
+}

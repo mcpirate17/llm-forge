@@ -1,4 +1,5 @@
 use super::{array, string, Finding};
+use crate::candidate_python::Lines;
 use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::token::TokenKind;
@@ -17,31 +18,6 @@ static RANDOM_TEXT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b(?:random\.|np\.random|torch\.rand|torch\.randn)").unwrap());
 static SEED_TEXT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b(?:seed|manual_seed|Generator)\b").unwrap());
-
-struct Lines {
-    starts: Vec<usize>,
-}
-
-impl Lines {
-    fn new(source: &str) -> Self {
-        let mut starts = vec![0];
-        starts.extend(
-            source
-                .bytes()
-                .enumerate()
-                .filter_map(|(index, byte)| (byte == b'\n').then_some(index + 1)),
-        );
-        Self { starts }
-    }
-
-    fn number(&self, offset: usize) -> usize {
-        self.starts.partition_point(|start| *start <= offset)
-    }
-
-    fn column(&self, offset: usize) -> usize {
-        offset - self.starts[self.number(offset).saturating_sub(1)]
-    }
-}
 
 fn call_name(expression: &ast::Expr) -> String {
     match expression {
@@ -86,6 +62,7 @@ struct Visitor<'a> {
     lines: &'a Lines,
     hot: bool,
     findings: Vec<Finding>,
+    exceeded: bool,
     loop_depth: usize,
     protocol_depth: usize,
     kernel_depth: usize,
@@ -99,6 +76,10 @@ impl Visitor<'_> {
         offset: usize,
         message: impl Into<String>,
     ) {
+        if self.findings.len() == 4096 {
+            self.exceeded = true;
+            return;
+        }
         self.findings.push(
             Finding::new("python-ast", rule, severity, message)
                 .path(self.path)
@@ -348,6 +329,26 @@ fn changed_text(lines: &[Value], changed: &[usize]) -> String {
         .join("\n")
 }
 
+fn changed_offset_line(
+    lines: &[Value],
+    changed: &[usize],
+    mut offset: usize,
+) -> Result<usize, String> {
+    for number in changed {
+        let text = lines
+            .get(number - 1)
+            .and_then(Value::as_str)
+            .ok_or("changed line is outside source")?;
+        if offset < text.len() {
+            return Ok(*number);
+        }
+        offset = offset
+            .checked_sub(text.len() + 1)
+            .ok_or("invalid changed text offset")?;
+    }
+    Err("invalid changed text offset".into())
+}
+
 fn stub_comment_lines(
     parsed: &ruff_python_parser::Parsed<ast::ModModule>,
     source: &str,
@@ -373,37 +374,79 @@ fn stub_comment_lines(
 pub fn python_ast(payload: &Value) -> Result<Value, String> {
     let path = string(payload, "path")?;
     let source = string(payload, "text")?;
-    let text_lines = array(payload, "lines")?;
-    let changed_numbers: HashSet<usize> = array(payload, "changed_lines")?
+    if path.is_empty() || path.len() > 4096 {
+        return Err("invalid Python analysis path".into());
+    }
+    let document = match crate::candidate_python::Document::parse(source) {
+        Ok(document) => document,
+        Err(crate::candidate_python::Error::Syntax { offset }) => {
+            let lines = Lines::new(source);
+            let offset = offset.min(source.len());
+            return Ok(
+                json!({"findings":[Finding::new("python-ast","python-parse","critical",
+                "captured Python source contains invalid syntax").path(path)
+                .line(lines.number(offset)).column(lines.column(offset))]}),
+            );
+        }
+        Err(error) => return Err(error.to_string()),
+    };
+    python_ast_document(payload, path, &document)
+}
+
+fn changed_numbers(payload: &Value) -> Result<HashSet<usize>, String> {
+    if array(payload, "changed_lines")?.len() > 65_536 || array(payload, "classes")?.len() > 64 {
+        return Err("Python changed-line/class admission exceeded".into());
+    }
+    array(payload, "changed_lines")?
         .iter()
         .map(|number| {
             number
                 .as_u64()
-                .ok_or("changed line must be an integer")
-                .map(|number| number as usize)
+                .and_then(|number| usize::try_from(number).ok())
+                .filter(|number| *number > 0)
+                .ok_or_else(|| "changed line must be a positive representable integer".to_string())
         })
-        .collect::<Result<_, _>>()?;
+        .collect()
+}
+
+fn module_size(path: &str, line_count: usize) -> Option<Finding> {
+    (line_count > 1250).then(|| {
+        Finding::new(
+            "python-ast",
+            "oversized-module",
+            "high",
+            format!("module is {line_count} lines (>1250)"),
+        )
+        .path(path)
+    })
+}
+
+fn python_ast_document(
+    payload: &Value,
+    path: &str,
+    document: &crate::candidate_python::Document<'_>,
+) -> Result<Value, String> {
+    let source = document.text();
+    let lines = Lines::new(source);
+    let text_lines: Vec<Value> = lines
+        .text(source)
+        .into_iter()
+        .map(|line| json!(line))
+        .collect();
+    let changed_numbers = changed_numbers(payload)?;
+    if changed_numbers.iter().any(|line| *line > text_lines.len()) {
+        return Err("changed line is outside source".into());
+    }
     let mut changed: Vec<usize> = changed_numbers.iter().copied().collect();
     changed.sort_unstable();
-    let parsed = ruff_python_parser::parse_module(source).map_err(|error| error.to_string())?;
-    let lines = Lines::new(source);
-    let mut findings = Vec::new();
-    if text_lines.len() > 1250 {
-        findings.push(
-            Finding::new(
-                "python-ast",
-                "oversized-module",
-                "high",
-                format!("module is {} lines (>1250)", text_lines.len()),
-            )
-            .path(path),
-        );
-    }
+    let parsed = document.parsed();
+    let mut findings: Vec<_> = module_size(path, text_lines.len()).into_iter().collect();
     let mut visitor = Visitor {
         path,
         lines: &lines,
         hot: payload["hot"].as_bool().unwrap_or(false),
         findings: Vec::new(),
+        exceeded: false,
         loop_depth: 0,
         protocol_depth: 0,
         kernel_depth: 0,
@@ -411,9 +454,12 @@ pub fn python_ast(payload: &Value) -> Result<Value, String> {
     for statement in parsed.suite() {
         visitor.visit_stmt(statement);
     }
+    if visitor.exceeded {
+        return Err("Python findings exceed 4096".into());
+    }
     findings.extend(visitor.findings);
-    let changed_text = changed_text(text_lines, &changed);
-    let comments = stub_comment_lines(&parsed, source, &lines, &changed_numbers);
+    let changed_text = changed_text(&text_lines, &changed);
+    let comments = stub_comment_lines(parsed, source, &lines, &changed_numbers);
     let classes = array(payload, "classes")?;
     let is_test = classes.iter().any(|class| class == "test");
     let is_novel = classes.iter().any(|class| class == "novel");
@@ -435,7 +481,7 @@ pub fn python_ast(payload: &Value) -> Result<Value, String> {
         if let Some(matched) = SOFTMAX_FALLBACK.find(&changed_text) {
             findings.push(Finding::new("python-ast", "softmax-shaped-fallback", "critical",
                 "novel-mechanism path adds an attention/softmax-shaped fallback; fix the novel branch instead of masking it")
-                .path(path).line(lines_count(&changed_text, matched.start())));
+                .path(path).line(changed_offset_line(&text_lines, &changed, matched.start())?));
         }
     }
     if RANDOM_TEXT.is_match(&changed_text) && !SEED_TEXT.is_match(source) {
@@ -466,13 +512,15 @@ pub fn python_ast(payload: &Value) -> Result<Value, String> {
             .path(path),
         );
     }
-    Ok(json!({"findings": findings}))
+    finish(findings)
 }
 
-fn lines_count(text: &str, offset: usize) -> usize {
-    text.as_bytes()[..offset]
-        .iter()
-        .filter(|byte| **byte == b'\n')
-        .count()
-        + 1
+fn finish(findings: Vec<Finding>) -> Result<Value, String> {
+    if findings.len() > 4096 {
+        return Err("Python findings exceed 4096".into());
+    }
+    let result = json!({"findings": findings});
+    crate::candidate_cargo_audit::serialized_size(&result, 32 * 1024 * 1024)
+        .map_err(|_| "Python findings exceed 32 MiB")?;
+    Ok(result)
 }

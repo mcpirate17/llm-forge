@@ -5,6 +5,8 @@ pub mod analysis;
 pub mod batch_execution;
 #[cfg(target_os = "linux")]
 pub mod bounded_file;
+pub mod candidate_analysis;
+pub mod candidate_analysis_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_assess_cli;
 #[cfg(target_os = "linux")]
@@ -23,6 +25,7 @@ pub mod candidate_clang_tidy_cli;
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_command;
+pub mod candidate_config;
 #[cfg(target_os = "linux")]
 pub mod candidate_crate_cli;
 #[cfg(target_os = "linux")]

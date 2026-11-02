@@ -107,15 +107,17 @@ memory_mb = 1024
 max_output_chars = 12000
 
 [checks.config-parse]
-kind = "builtin"
+kind = "command"
 # attribution = "diff": this check judges the candidate's changed files, so a
 # finding naming an unchanged path (or no path) is pre-existing tree debt. It is
 # reported and counted, but does not block. A candidate that cannot pass by doing
 # its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
 attribution = "diff"
 profiles = ["fast", "full"]
+command = ["forge", "candidate", "analyze", "--check", "config-parse", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "analyze", "--check", "config-parse", "--tool-version"]
 classes = ["config", "notebook", "workflow"]
-cache = true
+cache = false
 severity = "critical"
 timeout_seconds = 60
 memory_mb = 1024
@@ -130,15 +132,17 @@ severity = "low"
 timeout_seconds = 600
 
 [checks.python-ast]
-kind = "builtin"
+kind = "command"
 # attribution = "diff": this check judges the candidate's changed files, so a
 # finding naming an unchanged path (or no path) is pre-existing tree debt. It is
 # reported and counted, but does not block. A candidate that cannot pass by doing
 # its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
 attribution = "diff"
 profiles = ["fast", "full"]
+command = ["forge", "candidate", "analyze", "--check", "python-ast", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "analyze", "--check", "python-ast", "--tool-version"]
 classes = ["python"]
-cache = true
+cache = false
 severity = "high"
 timeout_seconds = 90
 memory_mb = 2048
@@ -184,39 +188,45 @@ memory_mb = 1024
 max_output_chars = 12000
 
 [checks.import-declaration]
-kind = "builtin"
+kind = "command"
 # attribution = "diff": the rule judges the imports of the files this candidate
 # changed. A finding on an unchanged path is pre-existing tree debt -- recorded,
 # but not a wall in front of unrelated work.
 attribution = "diff"
 profiles = ["fast", "full"]
+command = ["forge", "candidate", "analyze", "--check", "import-declaration", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "analyze", "--check", "import-declaration", "--tool-version"]
 classes = ["python"]
-cache = true
+cache = false
 severity = "critical"
 timeout_seconds = 90
 memory_mb = 1024
 max_output_chars = 12000
 
 [checks.duplicate-function-bodies]
-kind = "builtin"
+kind = "command"
 # attribution = "diff": this check judges the candidate's changed files, so a
 # finding naming an unchanged path (or no path) is pre-existing tree debt. It is
 # reported and counted, but does not block. A candidate that cannot pass by doing
 # its own work well gets bypassed rather than obeyed -- see conductor/gate_rollout.md.
 attribution = "diff"
 profiles = ["fast", "full"]
+command = ["forge", "candidate", "analyze", "--check", "duplicate-function-bodies", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "analyze", "--check", "duplicate-function-bodies", "--tool-version"]
 classes = ["python"]
-cache = true
+cache = false
 severity = "high"
 timeout_seconds = 180
 memory_mb = 4096
 max_output_chars = 12000
 
 [checks.structure-audit]
-kind = "builtin"
+kind = "command"
 profiles = ["fast", "full"]
+command = ["forge", "candidate", "analyze", "--check", "structure-audit", "--repo", "{snapshot}", "--base", "{base}", "--tree", "{tree}", "--execute", "--", "{files}"]
+version_command = ["forge", "candidate", "analyze", "--check", "structure-audit", "--tool-version"]
 classes = ["python"]
-cache = true
+cache = false
 severity = "high"
 timeout_seconds = 180
 memory_mb = 4096

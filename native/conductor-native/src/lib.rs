@@ -26,7 +26,13 @@ pub mod candidate_clang_args;
 pub mod candidate_clang_db;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_crate_version;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_duplicate_policy;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_import_declaration;
 pub mod candidate_policy;
+#[cfg(feature = "source-analysis")]
+pub mod candidate_python;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_rust_artifact;
 #[cfg(feature = "source-analysis")]
@@ -44,6 +50,8 @@ pub mod dead_code;
 mod dead_tests;
 #[cfg(feature = "python")]
 mod duplicate_bodies;
+#[cfg(feature = "source-analysis")]
+pub mod duplicate_fingerprints;
 #[cfg(feature = "python")]
 mod equivalence_targets;
 pub mod fleet_status;
@@ -143,7 +151,6 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     branch_policy::register(module)?;
     candidate_benchmark::register(module)?;
     candidate_checks::register(module)?;
-    candidate_structure::register(module)?;
     candidate_verification::register(module)?;
     dead_tests::register(module)?;
     duplicate_bodies::register(module)?;

@@ -1231,7 +1231,7 @@ scope and runs fmt/clippy through granted stages with private runtime directorie
 Its Python wrapper, ambient shim and compatibility target are deleted.
 Native [clang-format](docs/native-clang-format.md) and [clang-tidy](docs/native-clang-tidy.md)
 use captured ranges/styles, explicit ELFs, pinned databases and typed path rebasing.
-Their wrappers and shared diff consumers are deleted; see [native scans](docs/native-candidate-scan.md).
+Their wrappers and shared diff consumers are deleted; see [native scans](docs/native-candidate-scan.md) and [candidate analysis](docs/native-candidate-analysis.md).
 
 ## Executable identity and reusable builds
 
