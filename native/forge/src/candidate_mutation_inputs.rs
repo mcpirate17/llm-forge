@@ -1,6 +1,6 @@
 //! Reuse held candidate inputs for every registry/config/source/test/receipt byte.
 use super::*;
-pub(super) struct Capture<'a> {
+pub(crate) struct Capture<'a> {
     pub inputs: Inputs<'a>,
     pub ledger: BTreeMap<String, Value>,
     copied_bytes: usize,

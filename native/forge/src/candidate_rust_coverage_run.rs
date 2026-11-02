@@ -56,11 +56,12 @@ pub(crate) fn output(mut command: Command, label: &str, maximum: u64) -> Result<
         bail!("{label} output exceeds bound or cannot be read; kill: {killed:?}; wait: {waited:?}");
     }
     let status = child.wait().with_context(|| format!("wait {label}"))?;
-    ensure!(
-        status.success(),
-        "{label} failed: {status}; captured stdout tail: {}",
-        String::from_utf8_lossy(&bytes[bytes.len().saturating_sub(8192)..])
-    );
+    crate::child_exit_status::require_success(status, label).with_context(|| {
+        format!(
+            "{label} failed: {status}; captured stdout tail: {}",
+            String::from_utf8_lossy(&bytes[bytes.len().saturating_sub(8192)..])
+        )
+    })?;
     Ok(bytes)
 }
 fn isolated(path: &Path) -> Command {

@@ -61,6 +61,28 @@ pub fn run_with_input(
     run_inner(command, Some(input), timeout, output_limit, None)
 }
 
+/// Deliver bounded stdin while supervising interrupts and restoring the child's mask.
+pub fn run_with_input_interruptible(
+    command: &mut Command,
+    input: &[u8],
+    timeout: Duration,
+    output_limit: usize,
+    interrupts: &Interrupts,
+) -> Result<Output> {
+    ensure!(input.len() <= 1024 * 1024, "probe stdin exceeds 1 MiB");
+    if interrupts.interrupted()? {
+        return Err(Interrupted.into());
+    }
+    interrupts.configure_child(command);
+    run_inner(
+        command,
+        Some(input),
+        timeout,
+        output_limit,
+        Some(interrupts),
+    )
+}
+
 fn run_inner(
     command: &mut Command,
     input: Option<&[u8]>,

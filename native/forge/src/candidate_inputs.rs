@@ -372,6 +372,19 @@ pub(crate) fn repository_observed(
     Ok((held, bytes))
 }
 
+/// Bind one live repository file; the caller separately binds and verifies its root.
+pub(crate) fn repository_live(path: &Path, maximum: usize) -> Result<(BoundFile, Vec<u8>)> {
+    canonical(path)?;
+    let parent =
+        DirectoryBinding::repository(path.parent().context("metadata has no parent")?, None)?;
+    let (held, bytes) = capture(parent, filename(path)?, None, maximum, false)?;
+    ensure!(
+        (held.stamp.identity.uid == 0 || held.stamp.identity.uid == unsafe { libc::geteuid() })
+            && held.stamp.identity.mode & 0o002 == 0,
+        "repository metadata must be owned and not world writable"
+    );
+    Ok((held, bytes))
+}
 #[cfg(test)]
 #[path = "candidate_inputs_tests.rs"]
 mod tests;

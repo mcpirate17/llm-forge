@@ -105,8 +105,6 @@ src/conductor/worktree_reap.py	python_contracts_workspace_hygiene
 src/conductor/worktree_reap.py	python_contracts_worktree_reap
 
 # Final candidate-review test retirement: explicit Rust targets and their providers.
-native/conductor-native/src/candidate_benchmark.rs	python_contracts_candidate_benchmark
-native/conductor-native/src/lib.rs	python_contracts_candidate_benchmark
 native/conductor-native/tests/python_contracts/candidate_review_support.rs	python_contracts_candidate_cli
 native/conductor-native/tests/python_contracts/candidate_review_support.rs	python_contracts_candidate_policy_regressions
 native/conductor-native/tests/python_contracts/candidate_review_support.rs	python_contracts_candidate_review_evidence
@@ -146,7 +144,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_candi
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_patch_audit_a
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_patch_audit_b
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_patch_audit_c
-src/conductor/_native.py	python_contracts_candidate_benchmark
 src/conductor/_native.py	python_contracts_candidate_call_evidence
 src/conductor/candidate_review/checks.py	python_contracts_candidate_call_evidence
 src/conductor/candidate_review/checks.py	python_contracts_candidate_review_evidence

@@ -102,18 +102,25 @@ impl RunnerBundle {
         snapshot: &Snapshot,
         scratch_exclusions: &[PathBuf],
     ) -> Result<Self> {
-        excluded(spec.manifest, source, snapshot, scratch_exclusions)?;
-        let (manifest, bytes) = candidate_inputs::external(
-            spec.manifest,
-            spec.sha256,
-            MAX_MANIFEST_BYTES,
-            &snapshot.path(),
-        )?;
+        Self::capture_scoped(spec, source, &snapshot.path(), scratch_exclusions)
+    }
+    pub fn capture_live(spec: RunnerBundleSpec<'_>, source: &Source) -> Result<Self> {
+        Self::capture_scoped(spec, source, source.root(), &[])
+    }
+    fn capture_scoped(
+        spec: RunnerBundleSpec<'_>,
+        source: &Source,
+        scope: &Path,
+        scratch_exclusions: &[PathBuf],
+    ) -> Result<Self> {
+        excluded(spec.manifest, source, scope, scratch_exclusions)?;
+        let (manifest, bytes) =
+            candidate_inputs::external(spec.manifest, spec.sha256, MAX_MANIFEST_BYTES, scope)?;
         let parsed = crate::tool_schema::parse_document(std::str::from_utf8(&bytes)?)?;
         let payload: Manifest = serde_json::from_value(parsed)?;
         payload.validate()?;
-        excluded(&payload.package_root, source, snapshot, scratch_exclusions)?;
-        let root = DirectoryBinding::open(&payload.package_root, Some(&snapshot.path()))?;
+        excluded(&payload.package_root, source, scope, scratch_exclusions)?;
+        let root = DirectoryBinding::open(&payload.package_root, Some(scope))?;
         let mut bundle = Self {
             root,
             held: vec![manifest],
@@ -131,7 +138,7 @@ impl RunnerBundle {
             let bytes = bundle.file(
                 pin,
                 &payload.package_root,
-                snapshot,
+                scope,
                 &mut total,
                 MAX_SOURCE_BYTES,
             )?;
@@ -145,7 +152,7 @@ impl RunnerBundle {
             let bytes = bundle.file(
                 pin,
                 &payload.package_root,
-                snapshot,
+                scope,
                 &mut total,
                 MAX_SOURCE_BYTES,
             )?;
@@ -156,7 +163,7 @@ impl RunnerBundle {
             let bytes = bundle.file(
                 pin,
                 &payload.package_root,
-                snapshot,
+                scope,
                 &mut total,
                 MAX_SOURCE_BYTES,
             )?;
@@ -168,7 +175,7 @@ impl RunnerBundle {
             let bytes = bundle.file(
                 pin,
                 &payload.package_root,
-                snapshot,
+                scope,
                 &mut total,
                 MAX_PROBE_BYTES,
             )?;
@@ -195,7 +202,7 @@ impl RunnerBundle {
         &mut self,
         pin: &FilePin,
         root: &Path,
-        snapshot: &Snapshot,
+        scope: &Path,
         total: &mut usize,
         maximum: usize,
     ) -> Result<Vec<u8>> {
@@ -203,8 +210,7 @@ impl RunnerBundle {
             pin.path.is_absolute() && pin.path.starts_with(root),
             "runner component must be inside canonical installed package root"
         );
-        let (held, bytes) =
-            candidate_inputs::external(&pin.path, &pin.sha256, maximum, &snapshot.path())?;
+        let (held, bytes) = candidate_inputs::external(&pin.path, &pin.sha256, maximum, scope)?;
         *total = total
             .checked_add(bytes.len())
             .context("runner byte overflow")?;
@@ -233,7 +239,7 @@ impl RunnerBundle {
         Ok(())
     }
 }
-fn excluded(path: &Path, source: &Source, snapshot: &Snapshot, scratch: &[PathBuf]) -> Result<()> {
+fn excluded(path: &Path, source: &Source, scope: &Path, scratch: &[PathBuf]) -> Result<()> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
         "runner bundle paths must be canonical absolute paths"
@@ -241,10 +247,10 @@ fn excluded(path: &Path, source: &Source, snapshot: &Snapshot, scratch: &[PathBu
     ensure!(
         !path.starts_with(source.root())
             && !path.starts_with(source.common_dir())
-            && !path.starts_with(snapshot.path())
+            && !path.starts_with(scope)
             && !source.root().starts_with(path)
             && !source.common_dir().starts_with(path)
-            && !snapshot.path().starts_with(path),
+            && !scope.starts_with(path),
         "runner bundle must be outside candidate/source/Git metadata"
     );
     for root in scratch {

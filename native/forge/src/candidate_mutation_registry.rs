@@ -1,24 +1,28 @@
 //! Exhaustive candidate-tree registry/manifest/receipt capture; no ambient validator.
 use super::*;
 use conductor_native::mutation_evidence as engine;
-pub(super) struct Registry {
+pub(crate) struct Registry {
     pub path: String,
     pub payload: Value,
     pub manifests: Vec<String>,
 }
-pub(super) struct Catalog {
+pub(crate) struct Catalog {
     pub contracts: Vec<Value>,
     pub raw_manifests: BTreeMap<String, Value>,
     pub receipts: Vec<engine::CapturedReceipt>,
     pub broken: Vec<Value>,
     pub malformed: Vec<String>,
 }
-pub(super) fn registry(
+pub(crate) fn registry(
     capture: &mut Capture<'_>,
     config: Option<&conductor_native::project_config::ProjectConfig>,
 ) -> Result<Option<Registry>> {
     let path = conductor_native::project_paths::mutation_registry_from_config(config)
         .map_err(anyhow::Error::msg)?;
+    registry_at(capture, &path)
+}
+pub(crate) fn registry_at(capture: &mut Capture<'_>, path: &str) -> Result<Option<Registry>> {
+    let path = normalize(path)?;
     if !capture.inputs.entries.contains_key(&path) {
         capture.inputs.absent(&path)?;
         return Ok(None);
@@ -58,7 +62,7 @@ pub(super) fn registry(
         manifests,
     }))
 }
-pub(super) fn catalog(
+pub(crate) fn catalog(
     capture: &mut Capture<'_>,
     registry: &Registry,
     selected: &[String],

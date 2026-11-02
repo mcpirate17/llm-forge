@@ -1,6 +1,6 @@
 [package]
 name = "forge"
-version = "0.8.16"
+version = "0.8.17"
 edition = "2021"
 description = "Native hooks, resource-aware task execution, audit and cost tooling for AI agents"
 autobins = false
@@ -124,3 +124,7 @@ sha1 = "0.10"
 tempfile = "3"
 quick-xml = "0.41"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
+[[bench]]
+name = "graph_test_select"
+harness = false

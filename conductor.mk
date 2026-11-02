@@ -224,16 +224,31 @@ mutation-retention:  ## Report (or with MUTATION_RETENTION_APPLY=1, delete) unci
 	$(PYTHON) -m conductor.mutation_retention --repo-root "$(CONDUCTOR_HOST_ROOT)" \
 		$(if $(MUTATION_RETENTION_APPLY),--apply,) $(MUTATION_RETENTION_ARGS)
 
-mutation-patch-audit:  ## Report campaigns that cannot be applied, re-run, or vouched for
-	$(PYTHON) -m conductor.mutation_patch_audit \
-		--registry "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_MUTATION_REGISTRY)" $(MUTATION_AUDIT_ARGS)
+# Operator-provisioned pins; the build profile asserts the exact system attributes
+# path for the pinned Git binary (or an explicitly attribute-free build).
+CONDUCTOR_MUTATION_GIT ?=
+CONDUCTOR_MUTATION_GIT_SHA256 ?=
+CONDUCTOR_MUTATION_GIT_BUILD_PROFILE ?=
+CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256 ?=
+CONDUCTOR_MUTATION_RUNNER_BUNDLE ?=
+CONDUCTOR_MUTATION_RUNNER_SHA256 ?=
 
-# Records today's findings as the new debt. Run only after repairing campaigns --
-# recording a grown baseline is how the ratchet is defeated.
-mutation-patch-audit-record:  ## Re-record the reproducibility baseline after repairs
-	$(PYTHON) -m conductor.mutation_patch_audit \
+mutation-patch-audit:  ## Report campaigns that cannot be applied, re-run, or vouched for
+	@test -n "$(CONDUCTOR_MUTATION_GIT)" -a -n "$(CONDUCTOR_MUTATION_GIT_SHA256)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" || { echo "Set operator-pinned Git, build profile and runner bundle paths and SHA-256 values"; exit 2; }
+	"$(FORGE)" candidate mutation-corpus --repo "$(CONDUCTOR_HOST_ROOT)" \
 		--registry "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_MUTATION_REGISTRY)" \
-		--summary --write-baseline
+		--git "$(CONDUCTOR_MUTATION_GIT)" --git-sha256 "$(CONDUCTOR_MUTATION_GIT_SHA256)" \
+		--git-build-profile "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" --git-build-profile-sha256 "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" \
+		--mutation-runner-bundle "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" --mutation-runner-sha256 "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" $(MUTATION_AUDIT_ARGS)
+
+# Records today's findings as the new debt. Run only after repairing campaigns.
+mutation-patch-audit-record:  ## Re-record the reproducibility baseline after repairs
+	@test -n "$(CONDUCTOR_MUTATION_GIT)" -a -n "$(CONDUCTOR_MUTATION_GIT_SHA256)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" || { echo "Set operator-pinned Git, build profile and runner bundle paths and SHA-256 values"; exit 2; }
+	"$(FORGE)" candidate mutation-corpus --repo "$(CONDUCTOR_HOST_ROOT)" \
+		--registry "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_MUTATION_REGISTRY)" \
+		--git "$(CONDUCTOR_MUTATION_GIT)" --git-sha256 "$(CONDUCTOR_MUTATION_GIT_SHA256)" \
+		--git-build-profile "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" --git-build-profile-sha256 "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" \
+		--mutation-runner-bundle "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" --mutation-runner-sha256 "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" --summary --write-baseline
 
 mutation-reap:  ## List engine runs orphaned by a dead engine (MUTATION_REAP_APPLY=1 kills them)
 	$(PYTHON) -m conductor.mutation_testing_support reap \
@@ -339,8 +354,10 @@ dead-tests:  ## Import-closure dead-test finder: broken tests, test-only targets
 	$(PYTHON) -m conductor.dead_tests --root "$(CONDUCTOR_HOST_ROOT)" \
 		--json-out "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/dead_tests.json"
 
-test-graph:  ## Run pytest on tests selected via code-review-graph for changed code
-	$(PYTHON) -m conductor.graph_test_select --repo "$(CONDUCTOR_HOST_ROOT)" --run
+# Test execution is explicit; an absent guest interpreter/toolchain fails visibly.
+GRAPH_TEST_ARGS ?=
+test-graph:  ## Advisory graph-selected tests; set GRAPH_TEST_ARGS for explicit guest prerequisites
+	"$(FORGE)" graph-test-select --repo "$(CONDUCTOR_HOST_ROOT)" --run $(GRAPH_TEST_ARGS)
 
 # ── Journals and bundles ──────────────────────────────────────────────────
 

@@ -12,6 +12,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 static OWNED: AtomicBool = AtomicBool::new(false);
 
+// In-process tests of single-owner CLI entrypoints must not create competing
+// supervisors in the shared test harness. Signal-delivery tests use subprocesses.
+#[cfg(test)]
+pub(crate) static TEST_OWNER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub struct Interrupts {
     descriptor: OwnedFd,
     previous: libc::sigset_t,

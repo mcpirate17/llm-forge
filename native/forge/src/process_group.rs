@@ -121,6 +121,33 @@ impl ProcessGroup {
         }
         Ok(status)
     }
+    /// Reap a still-owned leader once, retaining Linux wait4 usage.
+    /// ru_maxrss is the largest individual process peak propagated through completed
+    /// waits, excluding unpropagated descendants; it is not an aggregate tree peak.
+    /// Never combine with try_wait: reaping would discard the wait4 observation.
+    pub(crate) fn stop_with_usage(&mut self) -> io::Result<(ExitStatus, libc::rusage)> {
+        use std::os::unix::process::ExitStatusExt;
+        if self.stopped.is_some() {
+            return Err(io::Error::other("measurement leader was already reaped"));
+        }
+        self.signal(libc::SIGKILL)?;
+        let mut raw = 0;
+        let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
+        loop {
+            // The unreaped child pins this PID; SIGCHLD disposition was checked at spawn.
+            let waited = unsafe { libc::wait4(self.id() as libc::pid_t, &mut raw, 0, &mut usage) };
+            if waited >= 0 {
+                break;
+            }
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::Interrupted {
+                return Err(error);
+            }
+        }
+        let status = ExitStatus::from_raw(raw);
+        self.stopped = Some(status);
+        Ok((status, usage))
+    }
     /// The owned leader remains unreaped while the process group is signalled.
     pub fn signal(&self, signal: i32) -> io::Result<()> {
         if self.stopped.is_some() {

@@ -99,12 +99,11 @@ checks top-level and nested Forge providers while rejecting traversal, invalid
 extensions, empty path segments, and paths outside the source directory.
 
 A bounded executable-importer audit found no source import of any of the nine
-Python originals in this broader migration. `candidate_review/benchmark.py`
-still requires a host-specific `conductor/` layout and several LLM-only paths,
-including old test filenames. Those are different from Forge's retired
-`src/conductor/` paths; this preexisting limitation prevents using that benchmark
-directly on Forge and remains outside this migration. Its existing native
-contracts synthesize the required host layout. Historical mutation fixtures
+Python originals in this broader migration. The remaining candidate-review
+benchmark has since moved to `forge candidate benchmark`, with explicit fixture
+preparation and operator-granted native execution. Its interpreter-only wrapper
+and exact compatibility target are retired in favor of native CLI observations.
+Historical mutation fixtures
 and baselines also carry literal old test paths as data.
 
 The draft's 50 native cases and scoped Clippy check passed in the prior

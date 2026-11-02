@@ -16,6 +16,12 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Prepare or explicitly measure fresh native review workloads.
+    Benchmark(Box<crate::candidate_benchmark_cli::BenchmarkArgs>),
+    #[command(hide = true)]
+    BenchmarkWorker(Box<crate::candidate_benchmark_cli::WorkerArgs>),
+    /// Audit the captured mutation corpus against its reproducibility baseline.
+    MutationCorpus(Box<crate::mutation_corpus_cli::AuditArgs>),
     /// Snapshot admitted work and hold the exclusive lease through native Git commit.
     Commit(crate::candidate_commit::CommitArgs),
     /// Review the complete active policy using captured evidence and isolated native execution.
@@ -126,6 +132,14 @@ pub fn run_with_stamp(
     stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
 ) -> Result<u8> {
     match args.action {
+        Action::Benchmark(args) => return crate::candidate_benchmark_cli::run(*args),
+        Action::BenchmarkWorker(args) => {
+            return crate::candidate_benchmark_cli::worker(
+                *args,
+                stamp.context("benchmark worker requires the CLI's compiled engine identity")?,
+            )
+        }
+        Action::MutationCorpus(args) => return crate::mutation_corpus_cli::run(*args),
         Action::Commit(args) => return crate::candidate_commit::run(args),
         Action::Review(args) => {
             let report = crate::candidate_review::run(

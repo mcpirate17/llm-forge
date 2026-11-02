@@ -7,6 +7,7 @@ store read-only and fails closed when its head does not match the candidate.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path, PurePosixPath
 from typing import Sequence
 
@@ -15,15 +16,17 @@ from conductor.candidate_review.model import sha256_json
 
 
 def _graph_database(repo: Path) -> Path:
-    from conductor.graph_test_select import graph_database_path
+    from conductor._native import graph_context_native
 
-    return graph_database_path(repo)
+    return Path(json.loads(graph_context_native(
+        "database_path", json.dumps({"repo": str(repo)})
+    )))
 
 
 def _graph_test_paths(
     ctx: ReviewContext, source_paths: Sequence[str]
 ) -> tuple[set[str], dict[str, object]]:
-    from conductor.graph_test_select import GraphSelectError, graph_test_plan
+    from conductor._native import graph_context_native
 
     expected = (
         ctx.candidate.base_commit_oid
@@ -33,10 +36,11 @@ def _graph_test_paths(
     if not expected:
         raise RuntimeError("candidate revision is missing")
     try:
-        plan = graph_test_plan(
-            ctx.repo, source_paths, expected_head=expected, inventory_root=ctx.snapshot
-        )
-    except GraphSelectError as exc:
+        plan = json.loads(graph_context_native("test_selection", json.dumps({
+            "repo": str(ctx.repo), "paths": list(source_paths),
+            "expected_head": expected, "inventory_root": str(ctx.snapshot),
+        })))
+    except ValueError as exc:
         raise RuntimeError(str(exc)) from exc
     tests = {
         relative

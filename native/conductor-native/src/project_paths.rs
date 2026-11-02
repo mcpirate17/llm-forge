@@ -188,6 +188,15 @@ pub fn mutation_registry_from_config(config: Option<&ProjectConfig>) -> Result<S
     }
 }
 
+/// Captured package-root choice, sharing ordinary validation/defaults without
+/// consulting environment overrides or reopening the manifest.
+pub fn package_root_from_config(config: Option<&ProjectConfig>) -> Result<String, String> {
+    match config {
+        Some(config) => configured_value(config, PATHS[2]).map(|(path, _)| path),
+        None => Ok(PATHS[2].default.into()),
+    }
+}
+
 /// Resolve the crate roster from captured configuration without reopening files.
 pub fn crate_roster_relative(config: &ProjectConfig) -> Result<(String, bool), String> {
     let spec = PATHS[8];

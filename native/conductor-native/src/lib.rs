@@ -14,8 +14,7 @@ pub mod a2a_store;
 pub mod bounded_io;
 #[cfg(feature = "python")]
 mod branch_policy;
-#[cfg(feature = "python")]
-mod candidate_benchmark;
+pub mod candidate_benchmark;
 pub mod candidate_cargo_audit;
 pub mod candidate_cargo_engine;
 pub mod candidate_cargo_evidence;
@@ -78,11 +77,15 @@ pub mod memory_chunking;
 pub mod memory_index;
 #[cfg(feature = "vector-search")]
 pub mod memory_index_sidecar;
+pub mod mutation_corpus_delta;
+pub mod mutation_corpus_receipts;
+pub mod mutation_corpus_territory;
 pub mod mutation_coverage;
 #[cfg(feature = "source-analysis")]
 pub mod mutation_evidence;
 #[cfg(feature = "source-analysis")]
 mod mutation_manifest;
+pub mod mutation_patch_anchor;
 pub mod mutation_plan;
 #[cfg(feature = "source-analysis")]
 mod mutation_receipt;
@@ -163,7 +166,6 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(target_os = "linux")]
     invariant_probe::register(module)?;
     branch_policy::register(module)?;
-    candidate_benchmark::register(module)?;
     candidate_checks::register(module)?;
     candidate_verification::register(module)?;
     dead_tests::register(module)?;

@@ -9,9 +9,6 @@ import site
 import subprocess
 import sys
 import sysconfig
-import tempfile
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import TypedDict
 
@@ -96,41 +93,3 @@ def prepare_contract_runtime(
             )
         _stage_artifact(build)
     return environment
-
-
-@contextmanager
-def standalone_contract_runtime(
-    repo: Path, contract_plan: ContractPlan
-) -> Iterator[dict[str, str]]:
-    """Stage the same candidate binaries for one standalone graph-selector run."""
-    with tempfile.TemporaryDirectory(prefix="forge-graph-contracts-") as temporary:
-        runtime = _runtime_plan(repo, Path(temporary), contract_plan)
-        environment: dict[str, str] = runtime["test_env"]
-        for build in runtime["build_commands"]:
-            if Path(build["cwd"]) != repo:
-                raise RuntimeError(
-                    "native contract build escaped the selected repository"
-                )
-            completed = subprocess.run(
-                build["argv"],
-                cwd=repo,
-                env={
-                    **{
-                        key: value
-                        for key, value in os.environ.items()
-                        if key not in {"PYO3_CONFIG_FILE", "PYTHONHOME"}
-                    },
-                    **environment,
-                },
-                capture_output=True,
-                text=True,
-                timeout=900,
-                check=False,
-            )
-            if completed.returncode:
-                detail = _tail(completed.stdout + "\n" + completed.stderr, 10000)
-                raise RuntimeError(
-                    f"contract build exited {completed.returncode}: {detail.strip()}"
-                )
-            _stage_artifact(build)
-        yield environment

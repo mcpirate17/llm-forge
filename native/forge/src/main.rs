@@ -151,6 +151,12 @@ enum Command {
     Mailbox(mailbox::MailboxArgs),
     /// Retrieve bounded code relationships and message references from the local graph.
     Graph(graph_context::GraphArgs),
+    /// Advisory graph-selected pytest, native crate and compatibility tests.
+    #[cfg(target_os = "linux")]
+    GraphTestSelect(forge::graph_test_select::SelectArgs),
+    #[cfg(target_os = "linux")]
+    #[command(hide = true)]
+    GraphTestWorker(forge::graph_test_select::WorkerArgs),
     /// Land a branch on the integration line from a persistent local clone:
     /// rebase, run the host's `.forge/land.toml` checks bounded, fast-forward
     /// push, delete the branch. No CI service involved.
@@ -381,18 +387,7 @@ fn main() -> ExitCode {
             command_exit("workspace-runtime", workspace_runtime::run(args), 2)
         }
         Command::Claim(args) => command_exit("claim", claims::run(args).map(|()| 0), 2),
-        Command::Candidate(args) => command_exit(
-            "candidate",
-            forge::candidate_cli::run_with_stamp(
-                args,
-                Some(&forge::candidate_engine_identity::BuildStamp {
-                    source_sha256: env!("FORGE_SOURCE_SHA256"),
-                    git_commit: env!("FORGE_GIT_FULL_REV"),
-                    source_matches_git: env!("FORGE_SOURCE_MATCHES_GIT"),
-                }),
-            ),
-            1,
-        ),
+        Command::Candidate(args) => run_candidate(args),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
         Command::Cards(args) => command_exit("cards", forge::cards_cli::run(args), 2),
         Command::Clerk(args) => command_exit("clerk", forge::local_clerk::cli::run(args), 2),
@@ -436,6 +431,16 @@ fn main() -> ExitCode {
         Command::Status(args) => command_exit("status", status::run(args), 1),
         Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),
         Command::Graph(args) => command_exit("graph", graph_context::run(args), 2),
+        #[cfg(target_os = "linux")]
+        Command::GraphTestSelect(args) => {
+            command_exit("graph-test-select", forge::graph_test_select::run(args), 2)
+        }
+        #[cfg(target_os = "linux")]
+        Command::GraphTestWorker(args) => command_exit(
+            "graph-test-worker",
+            forge::graph_test_select::worker(args),
+            2,
+        ),
         Command::Hook {
             event,
             protocol,
@@ -468,6 +473,21 @@ fn main() -> ExitCode {
         Command::Notes { action } => command_exit("notes", notes_index::run(action), 1),
         Command::Ledger { action } => run_ledger(action),
     }
+}
+
+fn run_candidate(args: forge::candidate_cli::CandidateArgs) -> ExitCode {
+    command_exit(
+        "candidate",
+        forge::candidate_cli::run_with_stamp(
+            args,
+            Some(&forge::candidate_engine_identity::BuildStamp {
+                source_sha256: env!("FORGE_SOURCE_SHA256"),
+                git_commit: env!("FORGE_GIT_FULL_REV"),
+                source_matches_git: env!("FORGE_SOURCE_MATCHES_GIT"),
+            }),
+        ),
+        1,
+    )
 }
 
 fn run_session(action: SessionCommand) -> ExitCode {

@@ -464,3 +464,8 @@ pub fn legacy_anchor_registry_path() -> String {
 #[cfg(test)]
 #[path = "mutation_capture_tests.rs"]
 mod capture_tests;
+
+/// Check a held, caller-verified lineage payload against recorded runner components.
+pub fn captured_lineage_accepts(recorded: &Value, lineage: &Value) -> bool {
+    crate::mutation_receipt::lineage_payload_accepts(Some(recorded), lineage)
+}

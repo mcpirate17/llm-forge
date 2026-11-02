@@ -764,7 +764,8 @@ satisfy the collector. No complete positive collector run is claimed from the
 leaf probe tests.
 
 The Python candidate-review package remains shipped for live compatibility APIs.
-`conductor.gate` and the legacy review benchmark still invoke its review CLI.
+`conductor.gate` still invokes its review CLI. The latency benchmark now uses
+`forge candidate benchmark` and the native coordinator directly.
 `governance-commit` and `attest-message` still use its shared governance mutex,
 inherited lock token/descriptor, canonical pre-commit receipt lookup and commit
 message mutation. Those callers must switch with equivalent native lock and

@@ -81,6 +81,15 @@ pub fn dispatch(operation: &str, input: &Value) -> Result<Value, String> {
         "is_test_path" => Ok(json!(markdown::is_test_path(string_field(input, "path")?))),
         "markdown" => Ok(json!(markdown::format(input)?)),
         "test_selection" => test_selection::select(input),
+        "database_path" => {
+            let root = Path::new(string_field(input, "repo")?);
+            let native = root.join(".forge/graph.db");
+            Ok(json!(if native.is_file() {
+                native
+            } else {
+                root.join(".code-review-graph/graph.db")
+            }))
+        }
         #[cfg(feature = "source-analysis")]
         "python_skeleton" => {
             python_skeleton::python(string_field(input, "source")?, target_symbol(input)?)

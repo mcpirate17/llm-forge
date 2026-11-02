@@ -1,12 +1,12 @@
 # Native tool orchestration architecture
 
-Status snapshot: 2026-11-01. This document describes the current architecture,
+Status snapshot: 2026-11-02. This document describes the current architecture,
 its remaining boundaries, and the evidence presently available. It replaces the
 chronological implementation log; detailed contracts and historical receipts
 belong in the linked documents.
 
 The native migration remains active. The current live `src/` inventory
-contains 111 Python source files. The integration baseline before the native
+contains 109 Python source files. The integration baseline before the native
 review batch was `838474b`; validation scope is summarized under Evidence below.
 
 ## Mission and operating rules
@@ -222,6 +222,24 @@ Cargo lint, clang-format, clang-tidy, cppcheck and scan capabilities have their
 own grants, scope and evidence contracts; link those contracts instead of
 repeating their detailed limits here.
 
+### Native test, benchmark and corpus orchestration
+
+The native `graph-test-select` command plans advisory affected tests and can run
+selected pytest, Cargo and contract tests under native supervision. Python remains
+an explicit compatibility guest where selected tests require it; selected contract
+and pytest stages share freshly provisioned artifacts. This selection is not a
+governance PASS or proof of complete test coverage. The native candidate benchmark
+prepares captured fixtures and, only with explicit execution, measures the real
+review coordinator; optional Python equivalence guests remain external inputs.
+Its wait4 RSS field is the largest individual waited-process peak, not aggregate
+simultaneous tree memory. The mutation-corpus auditor checks live or explicitly
+captured corpus state using operator-pinned Git, Git build-profile and runner
+inputs. The profile's system-attributes declaration is a trusted provisioning
+assertion, not binary discovery. Corpus reproducibility status is not a mutation
+campaign receipt or review approval. See [native graph test selection](docs/native-graph-test-selection.md),
+[native review benchmark](docs/native-review-benchmark.md), and
+[native mutation corpus audit](docs/native-mutation-corpus-audit.md).
+
 ### Commit recovery
 
 The native commit wrapper captures a recovery ref before invoking Git and its
@@ -306,7 +324,7 @@ latency claim is supported.
 
 ## Remaining migration
 
-The native migration remains open. The live source inventory is 111 Python
+The native migration remains open. The live source inventory is 109 Python
 files under `src/`; that count says nothing by itself about reachability,
 behavioral coverage or runtime usage. Remaining work is tracked by live
 callers and installation boundaries, not a stale count of old milestones.
@@ -350,6 +368,9 @@ and [native migration history archive](docs/native-migration-history-archive.md)
 
 ## Detailed contracts
 
+- [Native graph test selection](docs/native-graph-test-selection.md)
+- [Native review benchmark](docs/native-review-benchmark.md)
+- [Native mutation corpus audit](docs/native-mutation-corpus-audit.md)
 - [Native complexity analysis and baseline ratchet](docs/native-complexity-cli.md)
 - [Native mutation receipt target-tree verification](docs/native-mutation-receipt-cli-migration.md)
 - [Measured real-code retrieval at 6630b37](docs/native-code-retrieval-measurement.md)

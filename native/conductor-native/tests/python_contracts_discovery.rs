@@ -584,17 +584,16 @@ fn final_candidate_helpers_select_their_exact_rust_targets() {
 }
 
 #[test]
-fn benchmark_native_and_python_providers_select_its_contract() {
+fn native_benchmark_no_longer_requires_an_interpreted_contract_target() {
     let root = repo_root();
     for provider in [
-        "src/conductor/candidate_review/benchmark.py",
         "src/conductor/_native.py",
         "native/conductor-native/src/candidate_benchmark.rs",
         "native/conductor-native/src/lib.rs",
     ] {
         let selected = plan(&root, &[provider.to_owned()]).unwrap();
         assert!(
-            selected
+            !selected
                 .targets
                 .contains(&"python_contracts_candidate_benchmark".to_owned()),
             "{provider}"

@@ -15,6 +15,8 @@ mod candidate_attestation;
 #[cfg(target_os = "linux")]
 pub mod candidate_batch;
 #[cfg(target_os = "linux")]
+pub mod candidate_benchmark_cli;
+#[cfg(target_os = "linux")]
 mod candidate_builtin;
 #[cfg(target_os = "linux")]
 pub mod candidate_cargo_lint_cli;
@@ -210,3 +212,32 @@ pub mod write_targets;
 
 #[cfg(target_os = "linux")]
 pub mod mutation_receipt_verify;
+
+#[cfg(target_os = "linux")]
+pub mod graph_test_select;
+
+#[cfg(target_os = "linux")]
+pub(crate) mod child_exit_status;
+
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_corpus_audit;
+#[cfg(target_os = "linux")]
+pub mod mutation_corpus_cli;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_corpus_git_attrs;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_corpus_git_profile;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_corpus_patch;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_corpus_record;
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) mod mutation_corpus_test_support;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_live_baseline;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_live_catalog;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_live_cli;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_live_inputs;

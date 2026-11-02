@@ -211,7 +211,7 @@ fn copy_artifact(source: &Path, dest: &Path, name: &str) -> Result<Artifact> {
         bytes,
     })
 }
-fn environment(
+pub(crate) fn environment(
     command: &mut Command,
     python: &Path,
     snapshot: &Path,
@@ -332,13 +332,10 @@ pub(crate) fn run(
         command.arg("--test").arg(name);
     }
     command.args(["--", "--test-threads=1"]);
-    ensure!(
-        command
-            .status()
-            .context("launch candidate contracts")?
-            .success(),
-        "candidate contract tests failed"
-    );
+    crate::child_exit_status::require_success(
+        command.status().context("launch candidate contracts")?,
+        "candidate contract tests",
+    )?;
     Ok(Evidence {
         targets,
         python: python.to_string_lossy().into(),

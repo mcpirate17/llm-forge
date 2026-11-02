@@ -1,101 +1,83 @@
-//! Stable Python input for the candidate-review latency benchmark.
-//!
-//! The benchmark's small-Python and full-review scenarios edit a shipped module
-//! that the fixture already copies and claims. Retired test suites are not inputs.
+//! Prospectively versioned benchmark source data, without an interpreter.
+//! Frozen optional guest inputs are not the benchmark coordinator.
 
-use std::fs;
-use std::path::Path;
+pub const WORKLOAD_REVISION: &str = "native-review-fixtures-v1";
+pub const PYTHON_INPUT_SUFFIX: &str = "candidate_review/benchmark_probe.py";
+pub const PYTHON_BASE: &[u8] = include_bytes!("candidate_benchmark/python_input.py");
+const MARKER: &[u8] = b"Frozen Python analysis workload; never a review coordinator.";
+const REPLACEMENT: &[u8] =
+    b"Frozen Python analysis workload; never a review coordinator. Python benchmark probe.";
+pub const RUST_INPUT_PATH: &str = "native/benchmark_probe/src/lib.rs";
+pub const RUST_BASE: &[u8] = b"pub fn identity(value: u64) -> u64 { value }\n";
+pub const RUST_CHANGED: &[u8] = b"pub fn identity(value: u64) -> u64 { value.wrapping_add(0) }\n";
+pub const RUST_MANIFEST: &[u8] =
+    b"[package]\nname='candidate_benchmark_probe'\nversion='0.0.0'\nedition='2021'\n[workspace]\n";
 
-#[cfg(feature = "python")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::PyBytes;
-
-pub const PYTHON_INPUT_PATH: &str = "conductor/candidate_review/benchmark.py";
-const MARKER: &[u8] =
-    b"\"\"\"Reproducible latency benchmarks using only temporary repositories and indexes.\"\"\"";
-const REPLACEMENT: &[u8] = b"\"\"\"Reproducible latency benchmarks using only temporary repositories and indexes. Python benchmark probe.\"\"\"";
-
-fn replace_marker(content: &[u8]) -> Result<Vec<u8>, &'static str> {
-    let mut matches = content
+/// Refuse changed fixture markers rather than silently choosing another edit.
+pub fn python_projection(content: &[u8]) -> Result<Vec<u8>, String> {
+    if content.len() > 1024 * 1024 {
+        return Err("Python fixture exceeds 1 MiB".into());
+    }
+    let mut offsets = content
         .windows(MARKER.len())
         .enumerate()
-        .filter_map(|(offset, window)| (window == MARKER).then_some(offset));
-    let Some(offset) = matches.next() else {
-        return Err("marker was not found");
-    };
-    if matches.next().is_some() {
-        return Err("marker is ambiguous");
+        .filter_map(|(offset, value)| (value == MARKER).then_some(offset));
+    let offset = offsets.next().ok_or("Python fixture marker is missing")?;
+    if offsets.next().is_some() {
+        return Err("Python fixture marker is ambiguous".into());
     }
-    let mut changed = Vec::with_capacity(content.len() + REPLACEMENT.len() - MARKER.len());
+    let mut changed = Vec::with_capacity(content.len() + REPLACEMENT.len());
     changed.extend_from_slice(&content[..offset]);
     changed.extend_from_slice(REPLACEMENT);
     changed.extend_from_slice(&content[offset + MARKER.len()..]);
     Ok(changed)
 }
 
-/// Return an exact one-file candidate change, or fail if the shipped input drifts.
-pub fn python_input(source: &Path) -> Result<(&'static str, Vec<u8>), String> {
-    let path = source.join(PYTHON_INPUT_PATH);
-    let content = fs::read(&path).map_err(|error| {
-        format!(
-            "required small-Python benchmark source is missing or unreadable: {}: {error}",
-            path.display()
-        )
-    })?;
-    let changed = replace_marker(&content)
-        .map_err(|error| format!("small-Python benchmark {error} in {}", path.display()))?;
-    Ok((PYTHON_INPUT_PATH, changed))
+pub fn python_path(package_root: &str) -> Result<String, String> {
+    if package_root.len() > 4000 || package_root.bytes().any(|b| b.is_ascii_control()) {
+        return Err(
+            "benchmark package_root exceeds 4000 bytes or contains control characters".into(),
+        );
+    }
+    let package = crate::project_paths::relative(package_root, "benchmark package_root")?;
+    if package.split('/').any(|p| p.eq_ignore_ascii_case(".git")) {
+        return Err("benchmark package_root cannot address Git metadata".into());
+    }
+    Ok(format!("{package}/{PYTHON_INPUT_SUFFIX}"))
 }
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn candidate_benchmark_python_input_native(
-    py: Python<'_>,
-    source_dir: &str,
-) -> PyResult<(&'static str, Py<PyBytes>)> {
-    let (relative, content) = python_input(Path::new(source_dir)).map_err(PyValueError::new_err)?;
-    Ok((relative, PyBytes::new(py, &content).unbind()))
-}
-
-#[cfg(feature = "python")]
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        candidate_benchmark_python_input_native,
-        module
-    )?)?;
-    Ok(())
+pub fn python_input(package_root: &str) -> Result<(String, Vec<u8>), String> {
+    Ok((python_path(package_root)?, python_projection(PYTHON_BASE)?))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn real_shipped_module_has_one_marker_and_one_changed_line() {
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src");
-        let original = fs::read(source.join(PYTHON_INPUT_PATH)).unwrap();
-        let (relative, changed) = python_input(&source).unwrap();
-        assert_eq!(relative, PYTHON_INPUT_PATH);
+    fn frozen_python_edit_changes_only_one_docstring_line() {
+        let (path, changed) = python_input("conductor").unwrap();
+        assert_eq!(path, "conductor/candidate_review/benchmark_probe.py");
+        let original = std::str::from_utf8(PYTHON_BASE).unwrap();
+        let changed = std::str::from_utf8(&changed).unwrap();
+        assert_eq!(original.lines().count(), changed.lines().count());
         assert_eq!(
-            changed.len(),
-            original.len() + REPLACEMENT.len() - MARKER.len()
+            original.lines().skip(1).collect::<Vec<_>>(),
+            changed.lines().skip(1).collect::<Vec<_>>()
         );
-        assert!(changed.starts_with(REPLACEMENT));
-        assert_eq!(&changed[REPLACEMENT.len()..], &original[MARKER.len()..]);
+        assert_ne!(original.lines().next(), changed.lines().next());
     }
-
     #[test]
-    fn absent_and_duplicate_markers_fail_loudly() {
-        assert_eq!(
-            replace_marker(b"\"\"\"Different module\"\"\"\n").unwrap_err(),
-            "marker was not found"
-        );
-        assert_eq!(
-            replace_marker(&[MARKER, b"\n", MARKER].concat()).unwrap_err(),
-            "marker is ambiguous"
-        );
+    fn source_drift_refuses_missing_or_ambiguous_marker() {
+        assert!(python_projection(b"unrelated")
+            .unwrap_err()
+            .contains("missing"));
+        let twice = [PYTHON_BASE, PYTHON_BASE].concat();
+        assert!(python_projection(&twice).unwrap_err().contains("ambiguous"));
+    }
+    #[test]
+    fn bounded_fixture_inputs_refuse_git_metadata_and_oversized_payloads() {
+        assert!(python_path(".git").is_err());
+        assert!(python_path("../outside").is_err());
+        assert!(python_path(&"x".repeat(4001)).is_err());
+        assert!(python_projection(&vec![b'x'; 1024 * 1024 + 1]).is_err());
     }
 }

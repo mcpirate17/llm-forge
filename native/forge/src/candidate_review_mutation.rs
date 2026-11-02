@@ -9,9 +9,9 @@ mod definitions;
 #[path = "candidate_mutation_git.rs"]
 mod git;
 #[path = "candidate_mutation_inputs.rs"]
-mod inputs;
+pub(crate) mod inputs;
 #[path = "candidate_mutation_registry.rs"]
-mod registry;
+pub(crate) mod registry;
 #[cfg(test)]
 #[path = "candidate_review_mutation_tests.rs"]
 mod tests;

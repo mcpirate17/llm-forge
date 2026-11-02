@@ -8,7 +8,6 @@ src/conductor/avo_cards.py	python_contracts_avo_workflows
 src/conductor/avo_supervisor.py	python_contracts_avo_workflows
 src/conductor/branch_policy.py	python_contracts_branch_policy
 src/conductor/bytecode_isolation.py	python_contracts_mutation_pycache_evict
-src/conductor/candidate_review/benchmark.py	python_contracts_candidate_benchmark
 src/conductor/candidate_review/checks.py	python_contracts_candidate_cli
 src/conductor/candidate_review/checks.py	python_contracts_candidate_policy_regressions
 src/conductor/candidate_review/checks.py	python_contracts_contract_runner
@@ -47,8 +46,6 @@ src/conductor/candidate_review/vulture_baseline_init.py	python_contracts_candida
 src/conductor/check_generated_mutants.py	python_contracts_mutation_guard
 src/conductor/codex_journal.py	python_contracts_codex_journal
 src/conductor/dead_tests.py	python_contracts_dead_tests
-src/conductor/graph_test_select.py	python_contracts_graph_test_select
-src/conductor/graph_test_select.py	python_contracts_contract_runner
 src/conductor/mutation_campaign_generate.py	python_contracts_campaign_plan
 src/conductor/mutation_campaign_generate.py	python_contracts_mutation_campaign_model
 src/conductor/mutation_campaign_model.py	python_contracts_mutation_campaign_model
@@ -88,8 +85,6 @@ src/conductor/duplicate_audit_config.py	python_contracts_reuse_file_family_profi
 native/conductor-native/tests/python_contracts/candidate_review_support.rs	python_contracts_candidate_review_isolation
 native/conductor-native/tests/python_contracts/candidate_support.rs	python_contracts_candidate_files
 native/conductor-native/tests/python_contracts/graph_selection_support.rs	python_contracts_graph_selection
-native/conductor-native/tests/python_contracts/graph_test_select_support.rs	python_contracts_graph_test_select
-native/conductor-native/tests/python_contracts/graph_test_select_support.rs	python_contracts_contract_runner
 native/conductor-native/tests/python_contracts/git_fixture_support.rs	python_contracts_candidate_review_isolation
 native/conductor-native/tests/python_contracts/mutation_value_support.rs	python_contracts_mutation_gate_edges
 native/conductor-native/tests/python_contracts/mutation_value_support.rs	python_contracts_mutation_receipt_slim
@@ -100,7 +95,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_audit
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_avo_workflows
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_branch_policy
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_campaign_plan
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_benchmark
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_cli
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_engine
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_candidate_files
@@ -115,7 +109,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_contr
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_dead_tests
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_governance_lock
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_selection
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_graph_test_select
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_campaign_model
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_gate_edges
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_mutation_guard

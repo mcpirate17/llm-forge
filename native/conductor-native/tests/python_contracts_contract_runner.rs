@@ -1,14 +1,10 @@
 #![cfg(feature = "python-compat-tests")]
 //! End-to-end adapter contracts for targeted Python and Rust test execution.
 
-#[path = "python_contracts/graph_test_select_support.rs"]
-#[allow(dead_code)]
-mod graph_support;
 #[path = "python_contracts/support.rs"]
 #[allow(dead_code)]
 mod support;
 
-use graph_support::{capture, git, GraphRepo};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList, PySet, PyTuple};
 use serde_json::{json, Value};
@@ -23,22 +19,6 @@ fn forge_root() -> PathBuf {
         .parent()
         .unwrap()
         .to_path_buf()
-}
-
-fn contract_fixture(repo: &GraphRepo<'_>) {
-    repo.write("src/conductor/gate_rollout.py", "def probe(): return 1\n");
-    repo.write(
-        "native/conductor-native/src/python_contract_targets.tsv",
-        "src/conductor/gate_rollout.py\tpython_contracts_gate_rollout\n",
-    );
-    repo.write(
-        "native/conductor-native/Cargo.toml",
-        "[package]\nname='probe'\n",
-    );
-    repo.write(
-        "native/conductor-native/tests/python_contracts_gate_rollout.rs",
-        "#[test] fn probe() {}\n",
-    );
 }
 
 const PROVENANCE_TEST: &str = r#"
@@ -320,46 +300,6 @@ fn runtime_check<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
         .unwrap()
 }
 
-fn mock_graph_cargo<'py>(
-    py: Python<'py>,
-    graph: &Bound<'py, pyo3::types::PyModule>,
-    repo: &GraphRepo<'_>,
-) -> (Bound<'py, PyAny>, Vec<AttrPatch>) {
-    let mock = module(py, "unittest.mock").getattr("Mock").unwrap();
-    let process_args = PyDict::new(py);
-    process_args.set_item("returncode", 0).unwrap();
-    let process = module(py, "types")
-        .getattr("SimpleNamespace")
-        .unwrap()
-        .call((), Some(&process_args))
-        .unwrap();
-    let result_args = PyDict::new(py);
-    result_args.set_item("return_value", process).unwrap();
-    let subprocess_run = mock.call((), Some(&result_args)).unwrap();
-    let subprocess = graph.getattr("subprocess").unwrap();
-    let run_guard = AttrPatch::replace(&subprocess, "run", &subprocess_run);
-    let no_build = PyDict::new(py);
-    no_build
-        .set_item(
-            "return_value",
-            module(py, "contextlib")
-                .getattr("nullcontext")
-                .unwrap()
-                .call1((PyDict::new(py),))
-                .unwrap(),
-        )
-        .unwrap();
-    let runtime = mock.call((), Some(&no_build)).unwrap();
-    let runtime_guard = AttrPatch::replace(graph, "standalone_contract_runtime", &runtime);
-    let root_kwargs = PyDict::new(py);
-    root_kwargs
-        .set_item("return_value", path(py, repo.root()))
-        .unwrap();
-    let root_lookup = mock.call((), Some(&root_kwargs)).unwrap();
-    let root_guard = AttrPatch::replace(graph, "repository_root", &root_lookup);
-    (subprocess_run, vec![run_guard, runtime_guard, root_guard])
-}
-
 #[test]
 fn candidate_selection_includes_renamed_source_and_keeps_pytest_separate() {
     let _case = Case::new();
@@ -466,127 +406,6 @@ fn native_policy_reports_unmapped_source_in_mixed_contract_change() {
             json!(["src/conductor/unmapped.py"])
         );
         assert_eq!(response["graph"]["contract_test_files"], 1);
-    });
-}
-
-#[test]
-fn graph_cli_exposes_and_launches_cargo_without_passing_rust_to_pytest() {
-    let case = Case::new();
-    let repo = GraphRepo::new(&case);
-    contract_fixture(&repo);
-    Python::attach(|py| {
-        let graph = module(py, "conductor.graph_test_select");
-        let root = repo.root().to_string_lossy().into_owned();
-        let args = vec!["--repo", &root, "--json", "src/conductor/gate_rollout.py"];
-        let (code, stdout, _) = capture(py, || {
-            graph
-                .getattr("main")
-                .unwrap()
-                .call1((args,))
-                .unwrap()
-                .extract::<i64>()
-                .unwrap()
-        });
-        assert_eq!(code, 0);
-        let result: Value = serde_json::from_str(&stdout).unwrap();
-        assert_eq!(result["selected_tests"], json!([]));
-        assert_eq!(
-            result["contract_targets"],
-            json!(["python_contracts_gate_rollout"])
-        );
-        assert_eq!(result["count"], 1);
-        let (subprocess_run, _guards) = mock_graph_cargo(py, &graph, &repo);
-        let (code, _, _) = capture(py, || {
-            graph
-                .getattr("main")
-                .unwrap()
-                .call1((vec![
-                    "--repo",
-                    &root,
-                    "--run",
-                    "src/conductor/gate_rollout.py",
-                ],))
-                .unwrap()
-                .extract::<i64>()
-                .unwrap()
-        });
-        assert_eq!(code, 0);
-        let calls = subprocess_run.getattr("call_args_list").unwrap();
-        assert_eq!(calls.len().unwrap(), 1);
-        assert_eq!(
-            calls
-                .get_item(0)
-                .unwrap()
-                .getattr("kwargs")
-                .unwrap()
-                .get_item("timeout")
-                .unwrap()
-                .extract::<usize>()
-                .unwrap(),
-            900
-        );
-        let argv: Vec<String> = calls
-            .get_item(0)
-            .unwrap()
-            .getattr("args")
-            .unwrap()
-            .get_item(0)
-            .unwrap()
-            .extract()
-            .unwrap();
-        assert_eq!(argv[0], "cargo");
-        assert!(argv
-            .windows(2)
-            .any(|pair| pair == ["--test", "python_contracts_gate_rollout"]));
-        assert!(!argv.iter().any(|arg| arg.ends_with(".rs")));
-        subprocess_run
-            .getattr("return_value")
-            .unwrap()
-            .setattr("returncode", 3)
-            .unwrap();
-        let (failed, _, _) = capture(py, || {
-            graph
-                .getattr("main")
-                .unwrap()
-                .call1((vec![
-                    "--repo",
-                    &root,
-                    "--run",
-                    "src/conductor/gate_rollout.py",
-                ],))
-                .unwrap()
-                .extract::<i64>()
-                .unwrap()
-        });
-        assert_eq!(failed, 3);
-    });
-}
-
-#[test]
-fn default_graph_cli_diff_keeps_both_sides_of_a_rename() {
-    let case = Case::new();
-    let repo = GraphRepo::new(&case);
-    repo.write("src/conductor/gate_rollout.py", "MARKER = 'old'\n");
-    git(repo.root(), &["add", "src/conductor/gate_rollout.py"]);
-    git(repo.root(), &["commit", "-m", "add probe", "--quiet"]);
-    git(
-        repo.root(),
-        &[
-            "mv",
-            "src/conductor/gate_rollout.py",
-            "src/conductor/renamed_vectors.py",
-        ],
-    );
-    Python::attach(|py| {
-        let changed: Vec<String> = module(py, "conductor.graph_test_select")
-            .getattr("git_changed_and_untracked_files")
-            .unwrap()
-            .call1((path(py, repo.root()),))
-            .unwrap()
-            .extract()
-            .unwrap();
-        assert!(changed.contains(&"src/conductor/gate_rollout.py".to_owned()));
-        assert!(changed.contains(&"src/conductor/renamed_vectors.py".to_owned()));
     });
 }
 
@@ -793,26 +612,6 @@ fn candidate_runner_executes_candidate_python_extension_and_forge() {
 }
 
 #[test]
-fn standalone_runner_executes_selected_source_and_binaries() {
-    let mut case = Case::new();
-    let root = runtime_fixture(&case);
-    conflicting_ambient(&mut case);
-    Python::attach(|py| {
-        let plan = runtime_contract_plan(py, &root);
-        let options = PyDict::new(py);
-        options.set_item("contract_plan", plan).unwrap();
-        let code = module(py, "conductor.graph_test_select")
-            .getattr("run_tests")
-            .unwrap()
-            .call((path(py, &root), PyList::empty(py)), Some(&options))
-            .unwrap()
-            .extract::<i32>()
-            .unwrap();
-        assert_eq!(code, 0);
-    });
-}
-
-#[test]
 fn candidate_runner_uses_candidate_slop_over_conflicting_ambient() {
     let mut case = Case::new();
     let root = slop_runtime_fixture(&case);
@@ -860,25 +659,5 @@ fn candidate_runner_uses_candidate_slop_over_conflicting_ambient() {
             .is_file());
         assert!(text(&result.getattr("stdout_tail").unwrap())
             .contains("candidate_slop_extension_is_used ... ok"));
-    });
-}
-
-#[test]
-fn standalone_runner_uses_candidate_slop_over_conflicting_ambient() {
-    let mut case = Case::new();
-    let root = slop_runtime_fixture(&case);
-    conflicting_ambient(&mut case);
-    Python::attach(|py| {
-        let plan = runtime_contract_plan(py, &root);
-        let options = PyDict::new(py);
-        options.set_item("contract_plan", plan).unwrap();
-        let code = module(py, "conductor.graph_test_select")
-            .getattr("run_tests")
-            .unwrap()
-            .call((path(py, &root), PyList::empty(py)), Some(&options))
-            .unwrap()
-            .extract::<i32>()
-            .unwrap();
-        assert_eq!(code, 0);
     });
 }
