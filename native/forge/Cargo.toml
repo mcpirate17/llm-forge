@@ -41,6 +41,10 @@ name = "code_index"
 harness = false
 
 [[bench]]
+name = "real_code_index"
+harness = false
+
+[[bench]]
 name = "candidate"
 harness = false
 
