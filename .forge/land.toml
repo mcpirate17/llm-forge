@@ -30,7 +30,7 @@ timeout_s = 1800
 
 [[check]]
 name = "rust-conductor-native"
-run = "cargo +1.98.0 fmt --manifest-path native/conductor-native/Cargo.toml --check && cargo +1.98.0 clippy --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets --features bundled-sqlite -- -D warnings"
+run = "cargo +1.98.0 fmt --manifest-path native/conductor-native/Cargo.toml --check && cargo +1.98.0 clippy --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets --features bundled-sqlite,contract-registry -- -D warnings"
 paths = ['^native/conductor-native/', '^\.forge/']
 timeout_s = 1800
 

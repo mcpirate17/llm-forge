@@ -94,13 +94,13 @@ pub fn plan(request: &Value) -> Result<Value, String> {
         .map_err(|error| format!("cannot resolve candidate snapshot: {error}"))?;
     let runtime = required_absolute(request, "runtime_dir")?;
     let python = required_absolute(request, "python_executable")?;
-    crate::test_contracts::require_regular_file(&root, NATIVE_MANIFEST)
+    crate::regular_file::require_regular_file(&root, NATIVE_MANIFEST)
         .map_err(|error| format!("candidate native crate invalid: {error:#}"))?;
     let targets = selected_targets(request)?;
     if targets.is_empty() {
         return Err("contract runtime requires selected targets".into());
     }
-    crate::test_contracts::require_regular_file(&root, FORGE_MANIFEST)
+    crate::regular_file::require_regular_file(&root, FORGE_MANIFEST)
         .map_err(|error| format!("selected contracts require candidate Forge binary: {error:#}"))?;
     let target_dir = runtime.join("contract-cargo-target");
     let extension_dir = runtime.join("contract-extension");
@@ -116,7 +116,7 @@ pub fn plan(request: &Value) -> Result<Value, String> {
         .iter()
         .any(|target| SLOP_CONSUMERS.contains(&target.as_str()))
     {
-        crate::test_contracts::require_regular_file(&root, SLOP_MANIFEST).map_err(|error| {
+        crate::regular_file::require_regular_file(&root, SLOP_MANIFEST).map_err(|error| {
             format!("selected contracts require candidate slop_core: {error:#}")
         })?;
         build.push(build_step(
@@ -179,7 +179,7 @@ pub fn plan(request: &Value) -> Result<Value, String> {
     Ok(json!({"build_commands": build, "test_env": env, "extension": extension}))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "contract-registry"))]
 mod tests {
     use super::SLOP_CONSUMERS;
 

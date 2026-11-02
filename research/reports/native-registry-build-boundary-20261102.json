@@ -1,0 +1,85 @@
+{
+  "after_edit_warm_core_manifests_support_claim": "registry-edited invocation did not rewrite core artifacts",
+  "after_edit_warm_core_sha256_manifests_identical": true,
+  "after_edit_warm_core_stat_manifests_identical": true,
+  "after_source_patch_sha256": "4da13bd3b42f05a6694611d21379661d61546b355be2a703edaa79e83b3d166b",
+  "baseline": {
+    "log": "before-edit.log",
+    "rebuilt": [
+      "conductor-native",
+      "forge",
+      "forge-cli"
+    ],
+    "timing": "before-edit-time.json",
+    "user_seconds": 199.09,
+    "wall_seconds": 154.46,
+    "timing_observation": {
+      "wall_seconds": 154.46,
+      "user_seconds": 199.09,
+      "system_seconds": 3.00,
+      "max_rss_kib": 1564856,
+      "exit_code": 0
+    }
+  },
+  "baseline_commit": "ce77347d8f137a81f70d78289703dbbff5327173",
+  "cli_full_source_fingerprint_restamp_must_remain": true,
+  "excluded_after_initial_changed_source_compilation": {
+    "log": "after-initial.log",
+    "timing": "after-initial-time.json",
+    "wall_seconds": 152.04
+  },
+  "invocation_source": "coordinator original execution record; not retained Cargo logs",
+  "invocation_template": "env CARGO_NET_OFFLINE=true CARGO_LOG=cargo::core::compiler::fingerprint=info /usr/bin/time -f '{\"wall_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S,\"max_rss_kib\":%M,\"exit_code\":%x}' -o <phase>-time.json make install INSTALL_ROOT=/home/tim/.local/state/llm-forge/native-migration/native-registry-benchmark/install > <phase>.log 2>&1",
+  "literal_invocation_available": true,
+  "make_native_env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CUDA_VISIBLE_DEVICES": "",
+    "PYO3_PYTHON": "/nonexistent/forbidden-python",
+    "RUSTUP_TOOLCHAIN": "1.98.0",
+    "RUST_TEST_THREADS": "2"
+  },
+  "measurement": "single shared-host cargo install observations; not a controlled causal benchmark",
+  "phases": [
+    "before-warm",
+    "before-edit",
+    "after-initial",
+    "after-warm",
+    "after-edit"
+  ],
+  "registry_matrix_validation_claimed": false,
+  "registry_trigger_after_change": {
+    "log": "after-edit.log",
+    "rebuilt": [
+      "forge-cli"
+    ],
+    "timing": "after-edit-time.json",
+    "user_seconds": 122.17,
+    "wall_seconds": 76.75,
+    "timing_observation": {
+      "wall_seconds": 76.75,
+      "user_seconds": 122.17,
+      "system_seconds": 1.68,
+      "max_rss_kib": 1441980,
+      "exit_code": 0
+    }
+  },
+  "schema_version": 1,
+  "untracked_helper": {
+    "path": "native/conductor-native/src/regular_file.rs",
+    "sha256": "1f3d5ffd48329298049e094f3eb8b70fc096beb53a47b4684cb9bf8b7c288e1f"
+  },
+  "verified_git_tree_oid": "392eecfac0fe3438d7d2a24cc5661e5b0ea1e6aa",
+  "warm": {
+    "after_log": "after-warm.log",
+    "after_wall_seconds": 0.13,
+    "before_log": "before-warm.log",
+    "before_wall_seconds": 0.12
+  },
+  "input_manifests": {
+    "before": "7a7f64b066571e8e603c77eafee939472438a05351844bf29776a4accc93ff6b  native/conductor-native/src/python_contract_targets.tsv\n165822a60ee2c8db34d90f8e4a18cfa7719a6fd1458c43157f2a04763e68401f  native/conductor-native/src/python_contract_targets_extra.tsv\ndf89d536cf84837e30d89bc1b834f0ffbaa6d2e87ad101a8d2370b5228cf627f  native/conductor-native/Cargo.toml\n412a5cb075415e4c93b20e4d0cd5910fd24cebd12217766efdb498bc5d54ee3d  native/forge/Cargo.toml\n98481f308f58207c901dd272513dffdba1b10df42fae6eadc2ccc93f5f01d48c  native/forge-cli/Cargo.toml\n955dd9950b1bcb5021472074d87b7636e1a2131ae257a6ce43a883b6759e7ee8  native/forge/Cargo.lock\n",
+    "after": "7a7f64b066571e8e603c77eafee939472438a05351844bf29776a4accc93ff6b  native/conductor-native/src/python_contract_targets.tsv\n165822a60ee2c8db34d90f8e4a18cfa7719a6fd1458c43157f2a04763e68401f  native/conductor-native/src/python_contract_targets_extra.tsv\n94b899a39230ac075f9ce07c9ec6fbcbe741d9dccce1dea8914aa31a2aa5159b  native/conductor-native/Cargo.toml\n412a5cb075415e4c93b20e4d0cd5910fd24cebd12217766efdb498bc5d54ee3d  native/forge/Cargo.toml\n98481f308f58207c901dd272513dffdba1b10df42fae6eadc2ccc93f5f01d48c  native/forge-cli/Cargo.toml\n955dd9950b1bcb5021472074d87b7636e1a2131ae257a6ce43a883b6759e7ee8  native/forge/Cargo.lock\n1f3d5ffd48329298049e094f3eb8b70fc096beb53a47b4684cb9bf8b7c288e1f  native/conductor-native/src/regular_file.rs\n574b5d534ad28a72b698cd95b4ef780a356949afc450e4388346ac7acffc374e  native/conductor-native/src/test_contracts.rs\nf8bb5fe62fd350bd1fc8a72d0928dd56f9af3d044b7aefe7be6a77d38ec0de44  native/conductor-native/src/lib.rs\n43ef8b7078993156f46b34273942460bbc21fe8aca5c60ae227502a8288f2ae5  native/conductor-native/src/candidate_verification_runtime.rs\n700790ab9769db0aba3d51bbc6a7791585dec7248d40e6ff1c4516e33ee75360  native/forge/src/local_check_preview.rs\n"
+  },
+  "edited_registry_sha256_before_and_after": "9153cc13e165f36753a4b1a4a4b7ef2599c4ff1432bdff9de7b93cc2580d796a",
+  "measurement_scope": "Registry feature-boundary draft at Forge 0.8.11/conductor 0.1.86 before subsequent package version bumps and isolated-task integration; not a benchmark of the final combined binary",
+  "local_evidence_directory": "/home/tim/.local/state/llm-forge/native-migration/native-registry-benchmark"
+}

@@ -48,7 +48,7 @@ BASELINE_EXPIRES ?= $(shell $(UV) run python -c \
   'import tomllib; from conductor.project_paths import project_paths; \
    print(tomllib.loads(project_paths(".").policy_path.read_text(encoding="utf-8"))["baseline_expires"])')
 
-.PHONY: build install test test-install native gate candidate-review local-preview local-check local-verify \
+.PHONY: build install test test-install test-contract-registry native gate candidate-review local-preview local-check local-verify \
 	mutation-plan mutation-generate mutation-engine-run mutation-evidence \
 	mutation-canary mutation-coverage baselines baseline-jscpd baseline-pmd \
 	baseline-complexity baseline-vulture help
@@ -70,8 +70,14 @@ test-install: build
 
 test: test-install  ## Run all default native release tests without interpreter discovery
 	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite
+	$(MAKE) test-contract-registry
 	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml
 	$(NATIVE_ENV) FORGE_TEST_BIN="$$(cd "$(FORGE_TARGET_ROOT)/test-install" && pwd -P)/bin/forge" cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --target-dir "$(FORGE_TARGET_ROOT)"
+
+# This native feature matrix retains all 33 discovery cases and the library's
+# Slop-consumer registry assertion; it never enables python/python-compat-tests.
+test-contract-registry:  ## Check embedded contract discovery without Python
+	$(NATIVE_ENV) cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite,contract-registry --lib --test python_contracts_discovery
 
 native: build  ## Build native Forge; test fixtures compile natively on demand
 

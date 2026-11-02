@@ -70,9 +70,23 @@ count, compiler flags and toolchain remain available. A native re-execution
 test exercises the measured command path with synthetic metadata and settings.
 
 `make test` runs the default release test inventory for conductor-native,
-slop-core and both Forge workspace packages. Explicit Python compatibility features remain outside this
-native gate while their adapters are being retired; a native PASS does not
-attest those adapters. Existing ignored tests retain their stated prerequisites.
+slop-core and both Forge workspace packages. It also runs the explicit native
+`make test-contract-registry` matrix: conductor-native library tests plus all
+33 native cases in `python_contracts_discovery`, with `contract-registry` enabled
+and the Python binding feature disabled. This preserves the Slop-consumer
+registry assertion too. The separate `native-contract-registry` local-check step
+runs that same target; native Clippy includes the feature. The gate's forbidden
+`PYO3_PYTHON` remains in force.
+
+Default native features remain `source-analysis,vector-search`; default Forge
+builds do not compile the embedded legacy contract registry. The optional native
+`contract-registry` feature enables it. `python` automatically enables that
+feature, preserving installed Python discovery, compiled fallback identities and
+missing-registry refusal. Registry parsing and refusal semantics are unchanged;
+no external asset loader or new fallback was added. Explicit Python compatibility
+features remain outside this native gate while their adapters are being retired;
+a native PASS does not attest those adapters. Existing ignored tests retain their
+stated prerequisites.
 
 Receipts and step logs live under `.git/forge-checks/run-*/`. `forge verify`
 requires the latest attempt to have passed and rechecks log hashes, committed
@@ -104,8 +118,10 @@ An optional `--filter test_name` limits preview tests only.
 
 Preview plans list `excluded_compatibility_tests` for selected
 `python_contracts_*` adapter targets; the native discovery-planner target remains
-selectable despite its historical prefix. They never enable Python bindings, execute an
-existing `.venv/bin/python`, or build an extension overlay. Execution output
+selectable despite its historical prefix, using the explicit native
+`contract-registry` feature. Other preview targets keep their original native
+features. They never enable Python bindings, execute an existing
+`.venv/bin/python`, or build an extension overlay. Execution output
 reports `native_only` and the excluded count; the receipt preserves the complete
 plan. Default output summarizes graph selection; `--details` expands its path
 inventory. Tests sharing a crate and feature set use one Cargo invocation.

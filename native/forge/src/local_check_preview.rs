@@ -99,7 +99,11 @@ fn target(crate_name: &str, test: Option<&str>) -> Target {
         crate_name: crate_name.into(),
         manifest: format!("native/{crate_name}/Cargo.toml"),
         features: if crate_name == "conductor-native" {
-            vec!["bundled-sqlite".into()]
+            let mut features = vec!["bundled-sqlite".into()];
+            if test == Some("python_contracts_discovery") {
+                features.push("contract-registry".into());
+            }
+            features
         } else {
             vec![]
         },
@@ -564,6 +568,10 @@ mod tests {
         assert_eq!(
             target("conductor-native", None).features,
             ["bundled-sqlite"]
+        );
+        assert_eq!(
+            target("conductor-native", Some("python_contracts_discovery")).features,
+            ["bundled-sqlite", "contract-registry"]
         );
         assert_eq!(target("forge", None).selector, ["--lib", "--bin", "forge"]);
         assert_eq!(

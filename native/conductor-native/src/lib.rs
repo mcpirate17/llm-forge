@@ -97,11 +97,13 @@ pub mod project_paths;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
 mod receipt_auth;
 pub mod receipt_slim;
+pub mod regular_file;
 pub mod reuse_consolidation;
 pub mod sha256_hex;
 pub mod state_paths;
 #[cfg(feature = "source-analysis")]
 pub mod syntax;
+#[cfg(feature = "contract-registry")]
 pub mod test_contracts;
 #[cfg(feature = "python")]
 mod test_record;

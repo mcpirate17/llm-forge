@@ -3,6 +3,7 @@
 //! Selection stays separate from pytest. This module returns data and argv;
 //! callers decide when and how to execute the Cargo command.
 
+use crate::regular_file::require_regular_file;
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -203,22 +204,6 @@ pub fn registered_sources() -> Result<Vec<String>> {
         .into_keys()
         .filter(|source| source.ends_with(".py") && !python_fixture_source(source))
         .collect())
-}
-
-pub(crate) fn require_regular_file(root: &Path, relative: &str) -> Result<()> {
-    let file = root.join(relative);
-    let metadata = fs::symlink_metadata(&file)
-        .with_context(|| format!("mapped contract file missing: {}", file.display()))?;
-    if !metadata.file_type().is_file() {
-        bail!("mapped contract file is not regular: {}", file.display());
-    }
-    let canonical = file
-        .canonicalize()
-        .with_context(|| format!("cannot resolve mapped contract file: {}", file.display()))?;
-    if canonical != file {
-        bail!("mapped contract file escapes its crate: {}", file.display());
-    }
-    Ok(())
 }
 
 #[derive(Default)]

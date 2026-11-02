@@ -401,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.86"
+version = "0.1.87"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -749,7 +749,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "forge"
-version = "0.8.11"
+version = "0.8.12"
 dependencies = [
  "anyhow",
  "axum",
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "forge-cli"
-version = "0.8.11"
+version = "0.8.12"
 dependencies = [
  "anyhow",
  "axum",

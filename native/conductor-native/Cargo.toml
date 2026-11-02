@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.86"
+version = "0.1.87"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -108,7 +108,9 @@ default = ["source-analysis", "vector-search"]
 bundled-sqlite = ["rusqlite/bundled"]
 source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:tree-sitter", "dep:tree-sitter-c", "dep:tree-sitter-cpp", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-rust", "dep:tree-sitter-typescript"]
 vector-search = ["dep:memmap2"]
-python = ["dep:pyo3", "source-analysis", "vector-search", "dep:libloading", "dep:sha1"]
+# Embedded legacy contract discovery is native but not needed by default Forge.
+contract-registry = []
+python = ["dep:pyo3", "source-analysis", "vector-search", "contract-registry", "dep:libloading", "dep:sha1"]
 python-compat-tests = ["python"]
 extension-module = ["python", "pyo3/extension-module"]
 
@@ -120,6 +122,11 @@ codegen-units = 1
 [package.metadata.maturin]
 bindings = "pyo3"
 
+
+# Keep all native discovery tests explicit without enabling an interpreter.
+[[test]]
+name = "python_contracts_discovery"
+required-features = ["contract-registry", "source-analysis"]
 
 # Do not compile compatibility executables in native-only builds.
 # These adapters remain explicitly opt-in until their interpreted callers retire.
