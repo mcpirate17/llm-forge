@@ -151,6 +151,9 @@ enum Command {
     Mailbox(mailbox::MailboxArgs),
     /// Retrieve bounded code relationships and message references from the local graph.
     Graph(graph_context::GraphArgs),
+    /// Native branch naming, atomic claim bindings and read-only exposure reports.
+    #[cfg(target_os = "linux")]
+    BranchPolicy(forge::branch_policy_cli::BranchArgs),
     /// Advisory graph-selected pytest, native crate and compatibility tests.
     #[cfg(target_os = "linux")]
     GraphTestSelect(forge::graph_test_select::SelectArgs),
@@ -432,6 +435,10 @@ fn main() -> ExitCode {
         Command::Mailbox(args) => command_exit("mailbox", mailbox::run(args), 2),
         Command::Graph(args) => command_exit("graph", graph_context::run(args), 2),
         #[cfg(target_os = "linux")]
+        Command::BranchPolicy(args) => {
+            command_exit("branch-policy", forge::branch_policy_cli::run(args), 2)
+        }
+        #[cfg(target_os = "linux")]
         Command::GraphTestSelect(args) => {
             command_exit("graph-test-select", forge::graph_test_select::run(args), 2)
         }
@@ -452,16 +459,7 @@ fn main() -> ExitCode {
                 ExitCode::from(1)
             }
         },
-        Command::Mutation { action } => match action {
-            MutationCommand::Results(args) => {
-                command_exit("mutation results", mutation_results::run(args), 2)
-            }
-            MutationCommand::Plan(args) => command_exit(
-                "mutation plan",
-                mutation_plan::run(*args).map(|code| code as u8),
-                1,
-            ),
-        },
+        Command::Mutation { action } => run_mutation(action),
         Command::Receipt { action } => match action {
             ReceiptCommand::Verify(args) => ExitCode::from(mutation_receipt_verify::run(args)),
             ReceiptCommand::Show(args) => command_exit("receipt show", receipt_show::run(&args), 1),
@@ -472,6 +470,19 @@ fn main() -> ExitCode {
         Command::Doctor(args) => command_exit("doctor", doctor::run(&args), 1),
         Command::Notes { action } => command_exit("notes", notes_index::run(action), 1),
         Command::Ledger { action } => run_ledger(action),
+    }
+}
+
+fn run_mutation(action: MutationCommand) -> ExitCode {
+    match action {
+        MutationCommand::Results(args) => {
+            command_exit("mutation results", mutation_results::run(args), 2)
+        }
+        MutationCommand::Plan(args) => command_exit(
+            "mutation plan",
+            mutation_plan::run(*args).map(|code| code as u8),
+            1,
+        ),
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.91"
+version = "0.1.92"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -59,6 +59,7 @@ test = false
 bench = false
 
 [dependencies]
+git2 = { version = "=0.21.0", default-features = false, features = ["vendored-libgit2"] }
 anyhow = "1"
 cap-std = "4"
 ignore = "0.4.34"
@@ -141,14 +142,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_baseline_merge"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_branch_policy"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_branch_policy_native"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -296,14 +289,6 @@ name = "python_contracts_finding_attribution"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_gate"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_gate_policy_provenance"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_gate_rollout"
 required-features = ["python-compat-tests"]
 
@@ -333,10 +318,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_import_ablation"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_installed_layout"
 required-features = ["python-compat-tests"]
 
 [[test]]

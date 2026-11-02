@@ -31,7 +31,7 @@ Two independent safety nets, and both are load-bearing:
   (reports stale or unleased trees), `conductor.checkout_sync` (keeps a shared checkout
   even with the integration branch) — a host project wires these into its own
   `make governance-claim` / `make governance-check` / `make governance-release-claim`
-  style targets, the way this repository wires `make gate` around `conductor.gate`.
+  style targets, the way this repository wires `make gate` around `forge candidate gate`.
 
 ### Worktrees are scratch
 

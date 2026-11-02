@@ -7,12 +7,9 @@ needs at build time, including the memory catalog and embedding route table.
 Project-context Rust primitives remain available independently; see
 [native-project-context-migration.md](native-project-context-migration.md).
 
-The installed-layout contract still checks that an installed Forge command
-resolves host configuration rather than leaking its site-install path. Its
-current Rust-owned assertion is in
-`native/conductor-native/tests/python_contracts_installed_layout.rs` and
-exercises `conductor.gate --help` against a private fake host. The tooling
-boundary suite remains separately covered by
+The native gate help contract is exercised from a clean host by
+`native/forge/tests/native_candidate_gate.rs`; it does not consult an installed
+Python site. The tooling boundary suite remains separately covered by
 `native/conductor-native/tests/python_contracts_tooling_boundary.rs`.
 
 Historical resource-wheel case tables and pass statements from previous

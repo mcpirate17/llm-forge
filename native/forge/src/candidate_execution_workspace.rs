@@ -19,11 +19,10 @@ pub(crate) use grants::{Grants, MutationGrandfather};
 use serde_json::Value;
 use std::{
     io::Write,
-    os::unix::process::CommandExt,
     path::{Path, PathBuf},
 };
 
-struct Scratch {
+pub(crate) struct Scratch {
     parent: Dir,
     name: String,
     path: PathBuf,
@@ -31,7 +30,7 @@ struct Scratch {
     keep: bool,
 }
 impl Scratch {
-    fn new(parent: &Path) -> Result<Self> {
+    pub(crate) fn new(parent: &Path) -> Result<Self> {
         let directory = Dir::open_ambient_dir(parent, cap_std::ambient_authority())?;
         let name = crate::native_id::new("forge-candidate-stage")?;
         directory.create_dir_with(&name, DirBuilder::new().mode(0o700))?;
@@ -50,7 +49,7 @@ impl Scratch {
             keep: false,
         })
     }
-    fn verify(&self) -> Result<()> {
+    pub(crate) fn verify(&self) -> Result<()> {
         let meta = self.parent.symlink_metadata(&self.name)?;
         ensure!(
             meta.is_dir()
@@ -59,6 +58,15 @@ impl Scratch {
             "candidate scratch path changed"
         );
         Ok(())
+    }
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+    pub(crate) fn retain(&mut self) {
+        self.keep = true;
+    }
+    pub(crate) fn release(&mut self) {
+        self.keep = false;
     }
     fn directory(&self) -> Result<Dir> {
         self.verify()?;
@@ -195,7 +203,8 @@ impl Workspace {
         }
         let mut plan = self.sandbox.command(program)?;
         let command = plan.command();
-        command.arg0(program.file_name().context("program basename missing")?);
+        // Keep the granted absolute spelling as argv[0]. With PATH deliberately
+        // empty, reducing it to a basename loses interpreter/virtualenv identity.
         command.args(&prepared.argv[1..]);
         command.current_dir(self.path());
         command

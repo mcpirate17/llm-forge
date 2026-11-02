@@ -6,8 +6,10 @@ chronological implementation log; detailed contracts and historical receipts
 belong in the linked documents.
 
 The native migration remains active. The current live `src/` inventory
-contains 109 Python source files. The integration baseline before the native
-review batch was `838474b`; validation scope is summarized under Evidence below.
+contains 107 Python source files, including fixtures under
+`src/conductor/testdata/`; this is not a count of remaining production cores.
+The integration baseline before the native review batch was `838474b`;
+validation scope is summarized under Evidence below.
 
 ## Mission and operating rules
 
@@ -215,6 +217,13 @@ execution, approval, or external-tool completeness. The standalone supplied-
 results assessment is not a full review. See
 [native candidate review](docs/native-candidate-review.md).
 
+`make gate` now invokes `forge candidate gate` with explicit review grants and
+pinned Git/build-profile/mutation-runner inputs. Native code exports the selected
+candidate, runs the preflight/corpus/cost phases and coordinates the fresh CI
+review; live import closure deliberately observes the live index/worktree.
+Preflight-only or skipped phases do not establish a complete review. See
+[native gate retirement](docs/native-gate-retirement.md).
+
 Current candidate test evidence is bounded to the named candidate and selected
 profile. A passing local report is not merge authorization and does not show
 that an external analyzer examined every relevant input. Native Cargo audit,
@@ -239,6 +248,29 @@ assertion, not binary discovery. Corpus reproducibility status is not a mutation
 campaign receipt or review approval. See [native graph test selection](docs/native-graph-test-selection.md),
 [native review benchmark](docs/native-review-benchmark.md), and
 [native mutation corpus audit](docs/native-mutation-corpus-audit.md).
+
+### Native workspace policy and explicit fixes
+
+`forge branch-policy` owns name validation, project integration-line resolution,
+binding persistence, local audit/status and full read-only workspace exposure.
+The branch status/audit Make targets call it directly. Bind/unbind update only
+locked common-Git-dir metadata; exposure provides PR/claim/commit/dirty/worktree
+rows and a conservative cleanup preview. It does not mutate Git refs or remove
+worktrees. Optional GitHub observations use the operator's `gh`; missing or
+failed observations remain visible. The Python `workspace_hygiene` command and
+its native exposure transport still remain. See
+[native branch policy](docs/native-branch-policy.md).
+
+`make governance-fix` invokes `forge candidate fix` with a JSON paths file,
+operator grants and a SHA-pinned native Ruff executable. The default CLI path
+only admits inputs; explicit execution supervises Ruff 0.16.5 stdin filters with
+read-only source access, bound hierarchical configuration and exact bounded
+output. All filters must succeed before native validated edits are published.
+Publication uses one cooperating-writer lock, retained Git recovery blobs and
+sequential renames with guarded rollback; it is not filesystem-wide atomic
+visibility. The displaced Python fix subcommand is removed, while other Python
+candidate-review callers remain. See
+[native candidate fixes](docs/native-candidate-fix.md).
 
 ### Commit recovery
 
@@ -308,6 +340,16 @@ cases passed using the freshly built external conductor extension. These
 overlapping selections are not additive totals. Full-gate receipts must still
 be bound to the committed tree by `forge check --all` and `forge verify --require-all`.
 
+Focused validation of the native gate, branch/exposure and explicit Ruff fix
+batch passed 610 Forge library tests, 552 conductor source-analysis library
+tests, 11 branch-policy CLI cases, seven fix admission cases, and ten explicitly
+provisioned fix execution cases including native Ruff 0.16.5. Two actual Cargo
+fixtures passed source/build-input and Git-ref freshness checks. These are
+overlapping working-tree selections, not full-gate or clean-host evidence. The
+eight opt-in gate execution cases still require separate validation with a clean,
+source-matching executable. Committed full-gate evidence remains in the generated
+check receipts, not in these test counts.
+
 Mutation review defaults to strict behavior. Portable grandfathering requires an
 external operator grant pinning the repository commit, tree, inventory path and
 inventory SHA-256. Candidate policy cannot authorize its own exemptions.
@@ -324,8 +366,9 @@ latency claim is supported.
 
 ## Remaining migration
 
-The native migration remains open. The live source inventory is 109 Python
-files under `src/`; that count says nothing by itself about reachability,
+The native migration remains open. The live source inventory is 107 Python
+files under `src/`, including testdata fixtures; that count says nothing by
+itself about reachability,
 behavioral coverage or runtime usage. Remaining work is tracked by live
 callers and installation boundaries, not a stale count of old milestones.
 Requirements A–E remain system-level obligations: native components and focused
@@ -368,6 +411,9 @@ and [native migration history archive](docs/native-migration-history-archive.md)
 
 ## Detailed contracts
 
+- [Native gate retirement](docs/native-gate-retirement.md)
+- [Native branch policy and exposure](docs/native-branch-policy.md)
+- [Explicit native candidate fixes](docs/native-candidate-fix.md)
 - [Native graph test selection](docs/native-graph-test-selection.md)
 - [Native review benchmark](docs/native-review-benchmark.md)
 - [Native mutation corpus audit](docs/native-mutation-corpus-audit.md)

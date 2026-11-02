@@ -12,8 +12,9 @@ mod a2a_compaction;
 pub mod a2a_retention;
 pub mod a2a_store;
 pub mod bounded_io;
-#[cfg(feature = "python")]
-mod branch_policy;
+pub mod branch_policy;
+#[cfg(target_os = "linux")]
+pub mod branch_policy_runtime;
 pub mod candidate_benchmark;
 pub mod candidate_cargo_audit;
 pub mod candidate_cargo_engine;
@@ -48,8 +49,9 @@ pub mod context_telemetry_usage;
 pub mod contract_registry;
 #[cfg(feature = "source-analysis")]
 pub mod dead_code;
-#[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
-mod dead_tests;
+#[cfg(feature = "source-analysis")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
+pub mod dead_tests;
 #[cfg(feature = "python")]
 mod duplicate_bodies;
 #[cfg(feature = "source-analysis")]
@@ -165,7 +167,8 @@ mod invariant_probe;
 fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(target_os = "linux")]
     invariant_probe::register(module)?;
-    branch_policy::register(module)?;
+    #[cfg(target_os = "linux")]
+    branch_policy_runtime::register(module)?;
     candidate_checks::register(module)?;
     candidate_verification::register(module)?;
     dead_tests::register(module)?;

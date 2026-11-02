@@ -20,6 +20,14 @@ pub(super) struct Outputs {
     junit_out: Option<PathBuf>,
 }
 impl Outputs {
+    pub(super) fn set_gate_receipt(&mut self, path: PathBuf) -> Result<()> {
+        ensure!(
+            self.receipt.is_none(),
+            "gate --json-out and review --receipt cannot both be supplied"
+        );
+        self.receipt = Some(path);
+        Ok(())
+    }
     pub(super) fn is_empty(&self) -> bool {
         self.receipt.is_none() && self.sarif_out.is_none() && self.junit_out.is_none()
     }

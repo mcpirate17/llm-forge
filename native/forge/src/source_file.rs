@@ -2,6 +2,7 @@
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::{Dir, Metadata, MetadataExt, OpenOptions, OpenOptionsExt};
 use conductor_native::syntax::{fingerprint, MAX_SOURCE_BYTES};
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::path::{Component, Path, PathBuf};
@@ -130,6 +131,190 @@ impl SourceRoot {
         Ok(blob)
     }
 
+    /// Stage every candidate under one cooperating-writer lock. Publication is
+    /// sequential, not atomically visible across files. Recovery IDs survive errors.
+    pub(crate) fn replace_many<F>(
+        &self,
+        replacements: &[(&Snapshot, &str)],
+        precommit: F,
+    ) -> Result<Vec<String>>
+    where
+        F: FnOnce() -> Result<()>,
+    {
+        self.replace_many_inner(replacements, precommit, |_| Ok(()))
+    }
+
+    fn replace_many_inner<F, H>(
+        &self,
+        replacements: &[(&Snapshot, &str)],
+        precommit: F,
+        before_publish: H,
+    ) -> Result<Vec<String>>
+    where
+        F: FnOnce() -> Result<()>,
+        H: FnMut(usize) -> Result<()>,
+    {
+        self.replace_many_monitored_inner(replacements, precommit, before_publish, || Ok(()))
+    }
+
+    pub(crate) fn replace_many_monitored<F, G>(
+        &self,
+        replacements: &[(&Snapshot, &str)],
+        precommit: F,
+        poll: G,
+    ) -> Result<Vec<String>>
+    where
+        F: FnOnce() -> Result<()>,
+        G: FnMut() -> Result<()>,
+    {
+        self.replace_many_monitored_inner(replacements, precommit, |_| Ok(()), poll)
+    }
+
+    fn replace_many_monitored_inner<F, H, G>(
+        &self,
+        replacements: &[(&Snapshot, &str)],
+        precommit: F,
+        mut before_publish: H,
+        mut poll: G,
+    ) -> Result<Vec<String>>
+    where
+        F: FnOnce() -> Result<()>,
+        H: FnMut(usize) -> Result<()>,
+        G: FnMut() -> Result<()>,
+    {
+        validate_batch(replacements)?;
+        let _lock = DirectoryLock::new(&self.directory)?;
+        for (original, _) in replacements {
+            self.check_current(original)
+                .with_context(|| format!("batch source {}", original.path.display()))?;
+        }
+        let mut recovery = Vec::with_capacity(replacements.len());
+        let result = (|| {
+            let mut staged = Vec::with_capacity(replacements.len());
+            for (original, candidate) in replacements {
+                recovery.push(
+                    self.git_snapshot(&original.content)
+                        .with_context(|| format!("snapshot {}", original.path.display()))?,
+                );
+                staged.push(
+                    self.stage(original, candidate)
+                        .with_context(|| format!("stage {}", original.path.display()))?,
+                );
+            }
+            // A slow validator cannot hide a changed source: recheck every input
+            // after it returns, before publishing the first candidate.
+            precommit().context("batch precommit validator rejected publication")?;
+            for (original, _) in replacements {
+                self.check_current(original)
+                    .with_context(|| format!("precommit source {}", original.path.display()))?;
+            }
+            self.publish_many(replacements, &staged, &mut before_publish, &mut poll)
+        })();
+        result.with_context(|| {
+            let retained: Vec<_> = replacements
+                .iter()
+                .zip(&recovery)
+                .map(|((original, _), id)| format!("{}={id}", original.path.display()))
+                .collect();
+            format!(
+                "batch failed; retained Git recovery snapshots [{}]",
+                retained.join(", ")
+            )
+        })?;
+        Ok(recovery)
+    }
+
+    fn publish_many<H, G>(
+        &self,
+        replacements: &[(&Snapshot, &str)],
+        staged: &[StagedFile],
+        before_publish: &mut H,
+        poll: &mut G,
+    ) -> Result<()>
+    where
+        H: FnMut(usize) -> Result<()>,
+        G: FnMut() -> Result<()>,
+    {
+        let mut published = 0;
+        for (index, ((original, _), temporary)) in replacements.iter().zip(staged).enumerate() {
+            let result = (|| {
+                poll()?;
+                before_publish(index)?;
+                self.check_current(original)?;
+                let name = original
+                    .path
+                    .file_name()
+                    .context("source has no filename")?;
+                temporary
+                    .directory
+                    .rename(&temporary.name, &temporary.directory, name)?;
+                published += 1; // A sync failure still needs rollback of this rename.
+                temporary.sync()?;
+                poll()
+            })();
+            if let Err(error) =
+                result.with_context(|| format!("publish {}", original.path.display()))
+            {
+                let failures =
+                    self.rollback_many(&replacements[..published], &staged[..published], poll);
+                if failures.is_empty() {
+                    return Err(error)
+                        .context("batch publication failed; published sources restored");
+                }
+                anyhow::bail!(
+                    "batch publication failed: {error:#}; rollback incomplete: {}",
+                    failures.join("; ")
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn rollback_many<G>(
+        &self,
+        replacements: &[(&Snapshot, &str)],
+        staged: &[StagedFile],
+        poll: &mut G,
+    ) -> Vec<String>
+    where
+        G: FnMut() -> Result<()>,
+    {
+        let mut failures = Vec::new();
+        for ((original, candidate), published) in replacements.iter().zip(staged).rev() {
+            if let Err(error) = poll() {
+                eprintln!("forge: publication guard during rollback: {error:#}");
+            }
+            let result = (|| -> Result<()> {
+                let rollback = self.stage(original, &original.content)?;
+                let current = self.read(&original.path)?;
+                ensure!(
+                    current.sha256 == fingerprint(candidate)
+                        && current.metadata.dev() == published.identity.0
+                        && current.metadata.ino() == published.identity.1
+                        && current.metadata.nlink() == 1,
+                    "concurrent edit or replacement prevents rollback"
+                );
+                let name = original
+                    .path
+                    .file_name()
+                    .context("source has no filename")?;
+                rollback
+                    .directory
+                    .rename(&rollback.name, &rollback.directory, name)?;
+                rollback
+                    .sync()
+                    .context("original restored but rollback directory sync failed")
+            })();
+            if let Err(error) = poll() {
+                eprintln!("forge: publication guard after rollback: {error:#}");
+            }
+            if let Err(error) = result {
+                failures.push(format!("{}: {error:#}", original.path.display()));
+            }
+        }
+        failures
+    }
+
     fn check_current(&self, original: &Snapshot) -> Result<()> {
         let current = self.read(&original.path)?;
         ensure!(
@@ -162,7 +347,12 @@ impl SourceRoot {
             &name,
             OpenOptions::new().write(true).create_new(true).mode(0o600),
         )?;
-        let staged = StagedFile { directory, name };
+        let metadata = file.metadata()?;
+        let staged = StagedFile {
+            directory,
+            name,
+            identity: (metadata.dev(), metadata.ino()),
+        };
         file.write_all(candidate.as_bytes())?;
         file.set_permissions(original.metadata.permissions())?;
         file.sync_all()?;
@@ -219,6 +409,36 @@ impl SourceRoot {
     }
 }
 
+fn validate_batch(replacements: &[(&Snapshot, &str)]) -> Result<()> {
+    ensure!(
+        (1..=256).contains(&replacements.len()),
+        "batch must contain 1..256 files"
+    );
+    let mut paths = HashSet::new();
+    let mut bytes = 0usize;
+    for (original, candidate) in replacements {
+        validate_relative(&original.path)?;
+        ensure!(paths.insert(&original.path), "duplicate batch source path");
+        ensure!(
+            original.metadata.nlink() == 1,
+            "refusing multiply-linked batch source"
+        );
+        ensure!(
+            candidate.len() <= MAX_SOURCE_BYTES && !candidate.contains('\0'),
+            "batch candidate size/NUL limit exceeded"
+        );
+        bytes = bytes
+            .checked_add(original.content.len())
+            .and_then(|size| size.checked_add(candidate.len()))
+            .context("batch byte accounting overflow")?;
+        ensure!(
+            bytes <= 32 * 1024 * 1024,
+            "batch original/candidate bytes exceed 32 MiB"
+        );
+    }
+    Ok(())
+}
+
 pub fn validate_relative(path: &Path) -> Result<()> {
     ensure!(
         !path.as_os_str().is_empty()
@@ -234,6 +454,7 @@ pub fn validate_relative(path: &Path) -> Result<()> {
 struct StagedFile {
     directory: Dir,
     name: PathBuf,
+    identity: (u64, u64),
 }
 
 impl StagedFile {
@@ -291,3 +512,7 @@ impl Drop for DirectoryLock {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "source_file_batch_tests.rs"]
+mod batch_tests;

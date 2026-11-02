@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::fs::{self, File, OpenOptions};
 use std::os::fd::AsRawFd;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -39,7 +39,10 @@ pub fn acquire(repo: &Path, timeout: Duration) -> Result<Lease> {
     }
     let path = ownership::checked_claim_path(repo, "commit-review.lock")?
         .context("repository has no Git common directory")?;
-    fs::create_dir_all(path.parent().context("governance lock parent")?)?;
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path.parent().context("governance lock parent")?)?;
     let file = OpenOptions::new()
         .read(true)
         .write(true)

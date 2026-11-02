@@ -53,6 +53,7 @@ mod candidate_execution_plan;
 pub mod candidate_execution_result;
 #[cfg(target_os = "linux")]
 mod candidate_execution_workspace;
+pub mod candidate_fix;
 #[cfg(target_os = "linux")]
 mod candidate_inputs;
 #[cfg(target_os = "linux")]
@@ -241,3 +242,9 @@ pub(crate) mod mutation_live_catalog;
 pub(crate) mod mutation_live_cli;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_live_inputs;
+
+#[cfg(target_os = "linux")]
+pub mod candidate_gate;
+
+#[cfg(target_os = "linux")]
+pub mod branch_policy_cli;

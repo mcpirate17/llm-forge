@@ -1,27 +1,17 @@
-//! Branch policy: naming rules, binding-store validation, and the push-decision core.
-//!
-//! Python (`conductor/branch_policy.py`) keeps subprocess git, the clock, the CLI and
-//! filesystem policy, exactly as `git_source.rs` draws the boundary. This module owns
-//! everything deterministic that the pre-push hook consults: the branch-name grammar
-//! and its refusal messages, best-effort name suggestions, force-mode token
-//! classification, ISO-timestamp parsing for binding staleness, the binding-store
-//! schema, the one-claim-one-live-branch fan-out guard, and the reason construction
-//! for both push classes. The refusal and reason strings are load-bearing: the
-//! pre-push hook prints them at agents, and `conductor/test_branch_policy.py` asserts
-//! them, so they are ported character-for-character.
+//! Deterministic branch naming, binding schema, fanout and timestamp primitives.
+//! `branch_policy_runtime` owns live configuration, Git and atomic persistence.
+//! No ref/worktree mutation or push authorization lives in these primitives.
+//! Refusal strings preserve the retired adapter's observable contracts.
 
 use std::collections::HashSet;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::prelude::*;
 use serde_json::Value;
 
 const EXPECTED_SHAPE: &str = "expected shape: <agent>/<topic>-<yyyymmdd> \
      (agent=[a-z][a-z0-9-]*, topic=[a-z0-9][a-z0-9-]*, date=8-digit valid calendar date)";
 
-/// Empty-store JSON handed to the native helpers when no store file exists, mirroring
-/// `load_bindings`' missing-file case without a second filesystem read in Python.
-const EMPTY_STORE: &str = r#"{"schema_version":1,"bindings":[]}"#;
+/// Canonical missing-store payload for the native runtime reader.
+pub(crate) const EMPTY_STORE: &str = r#"{"schema_version":1,"bindings":[]}"#;
 
 // --------------------------------------------------------------------------- repr
 
@@ -29,7 +19,7 @@ const EMPTY_STORE: &str = r#"{"schema_version":1,"bindings":[]}"#;
 /// unless the text contains `'` and not `"`), and the escapes cover the control
 /// characters a branch name can realistically carry. Deep-unicode repr parity is out
 /// of scope; branch names are filesystem-ish tokens, not prose.
-fn python_repr(s: &str) -> String {
+pub(crate) fn python_repr(s: &str) -> String {
     let use_double = s.contains('\'') && !s.contains('"');
     let mut out = String::with_capacity(s.len() + 2);
     out.push(if use_double { '"' } else { '\'' });
@@ -165,7 +155,10 @@ fn suggest_branch_name(name: &str, today: &str) -> String {
 /// `(raw, agent, topic, date)` for a valid name, or the exact refusal message the
 /// Python module raised. Each violated rule keeps its distinct message so callers can
 /// tell which check fired.
-fn validate_name(name: &str, today: &str) -> Result<(String, String, String, String), String> {
+pub(crate) fn validate_name(
+    name: &str,
+    today: &str,
+) -> Result<(String, String, String, String), String> {
     let suggestion = suggest_branch_name(name, today);
     let Some((agent, rest)) = name.split_once('/') else {
         return Err(format!(
@@ -241,15 +234,56 @@ fn valid_ymd(year: i64, month: i64, day: i64) -> bool {
     valid_calendar_date(&format!("{year:04}{month:02}{day:02}"))
 }
 
+fn parse_stamp_time(stamp: &str, cursor: &mut usize) -> Result<(i64, i64, i64, i64), ()> {
+    let bytes = stamp.as_bytes();
+    let hour = two_digits(bytes, *cursor).ok_or(())?;
+    *cursor += 2;
+    let minute = if bytes.get(*cursor) == Some(&b':') {
+        *cursor += 1;
+        let m = two_digits(bytes, *cursor).ok_or(())?;
+        *cursor += 2;
+        m
+    } else {
+        0
+    };
+    let second = if bytes.get(*cursor) == Some(&b':') {
+        *cursor += 1;
+        let s = two_digits(bytes, *cursor).ok_or(())?;
+        *cursor += 2;
+        s
+    } else {
+        0
+    };
+    let mut micros = 0i64;
+    if bytes.get(*cursor) == Some(&b'.') {
+        *cursor += 1;
+        let start = *cursor;
+        while *cursor < bytes.len() && bytes[*cursor].is_ascii_digit() && *cursor - start < 6 {
+            *cursor += 1;
+        }
+        if *cursor == start {
+            return Err(());
+        }
+        let digits = &stamp[start..*cursor];
+        micros = format!("{digits:0<6}").parse().map_err(|_| ())?;
+    }
+    Ok((hour, minute, second, micros))
+}
+
 /// Parse an ISO-8601 stamp the way `datetime.fromisoformat` does for the shapes this
 /// module writes and reads: `YYYY-MM-DD[THH:MM[:SS[.f{1,6}]]][Z|±HH[:MM[:SS]]]`,
 /// including the date-only form. Returns epoch microseconds plus whether the stamp
 /// carried a UTC offset; a naive stamp is reported so the Python adapter can raise
 /// the same `TypeError` aware-minus-naive subtraction raises.
-fn parse_stamp(stamp: &str) -> Result<(i64, bool), ()> {
+pub(crate) fn parse_stamp(stamp: &str) -> Result<(i64, bool), ()> {
     let bytes = stamp.as_bytes();
     let invalid = Err(());
-    if bytes.len() < 10 {
+    if bytes.len() < 10
+        || !stamp.is_ascii()
+        || !bytes[..4].iter().all(u8::is_ascii_digit)
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+    {
         return invalid;
     }
     let year: i64 = stamp[..4].parse().map_err(|_| ())?;
@@ -258,40 +292,6 @@ fn parse_stamp(stamp: &str) -> Result<(i64, bool), ()> {
     if !valid_ymd(year, month, day) {
         return invalid;
     }
-    let parse_time = |cursor: &mut usize| -> Result<(i64, i64, i64, i64), ()> {
-        let hour = two_digits(bytes, *cursor).ok_or(())?;
-        *cursor += 2;
-        let minute = if bytes.get(*cursor) == Some(&b':') {
-            *cursor += 1;
-            let m = two_digits(bytes, *cursor).ok_or(())?;
-            *cursor += 2;
-            m
-        } else {
-            0
-        };
-        let second = if bytes.get(*cursor) == Some(&b':') {
-            *cursor += 1;
-            let s = two_digits(bytes, *cursor).ok_or(())?;
-            *cursor += 2;
-            s
-        } else {
-            0
-        };
-        let mut micros = 0i64;
-        if bytes.get(*cursor) == Some(&b'.') {
-            *cursor += 1;
-            let start = *cursor;
-            while *cursor < bytes.len() && bytes[*cursor].is_ascii_digit() && *cursor - start < 6 {
-                *cursor += 1;
-            }
-            if *cursor == start {
-                return Err(());
-            }
-            let digits = &stamp[start..*cursor];
-            micros = format!("{digits:0<6}").parse().map_err(|_| ())?;
-        }
-        Ok((hour, minute, second, micros))
-    };
     let parse_offset = |cursor: &mut usize| -> Result<Option<i64>, ()> {
         match bytes.get(*cursor) {
             None => Ok(None),
@@ -333,7 +333,7 @@ fn parse_stamp(stamp: &str) -> Result<(i64, bool), ()> {
         return Ok((days_from_civil(year, month, day) * 86_400_000_000, false));
     }
     let mut cursor = 11usize;
-    let (hour, minute, second, micros) = parse_time(&mut cursor)?;
+    let (hour, minute, second, micros) = parse_stamp_time(stamp, &mut cursor)?;
     let offset_secs = parse_offset(&mut cursor)?;
     if !(0..24).contains(&hour) || !(0..60).contains(&minute) || !(0..60).contains(&second) {
         return invalid;
@@ -357,17 +357,17 @@ fn parse_stamp(stamp: &str) -> Result<(i64, bool), ()> {
 // --------------------------------------------------------------------------- bindings
 
 #[derive(Clone, Debug)]
-struct Binding {
-    branch: String,
-    claim_id: String,
-    owner: String,
-    created_at: String,
-    last_push_at: Option<String>,
-    pr_number: Option<i64>,
+pub struct Binding {
+    pub branch: String,
+    pub claim_id: String,
+    pub owner: String,
+    pub created_at: String,
+    pub last_push_at: Option<String>,
+    pub pr_number: Option<i64>,
 }
 
 impl Binding {
-    fn to_row(&self) -> Value {
+    pub fn to_row(&self) -> Value {
         serde_json::json!({
             "branch": self.branch,
             "claim_id": self.claim_id,
@@ -452,7 +452,7 @@ fn binding_from_payload(payload: &Value) -> Result<Binding, String> {
     })
 }
 
-fn validate_store(text: &str) -> Result<Vec<Binding>, String> {
+pub(crate) fn validate_store(text: &str) -> Result<Vec<Binding>, String> {
     let invalid_top = || "branch binding store has an invalid top-level schema".to_owned();
     let payload: Value = serde_json::from_str(text).map_err(|_| invalid_top())?;
     let Some(map) = payload.as_object() else {
@@ -486,7 +486,7 @@ fn validate_store(text: &str) -> Result<Vec<Binding>, String> {
     Ok(bindings)
 }
 
-fn second_branch_conflict(
+pub(crate) fn second_branch_conflict(
     live: &[String],
     bindings: &[Binding],
     branch: &str,
@@ -505,75 +505,24 @@ fn second_branch_conflict(
         })
 }
 
-// --------------------------------------------------------------------------- pyo3
-
-#[pyfunction]
-fn branch_policy_validate_name_native(
-    name: &str,
-    today: &str,
-) -> PyResult<(String, String, String, String)> {
-    validate_name(name, today).map_err(PyValueError::new_err)
+/// Strict Gregorian-calendar admission shared by branch status and lease readers.
+/// A naive timestamp retains its UTC wall-clock epoch value and reports `false`;
+/// the lease caller explicitly applies UTC, matching datetime.replace(tzinfo=UTC).
+pub fn stamp_epoch_seconds(stamp: &str) -> Result<(f64, bool), String> {
+    let (micros, aware) =
+        parse_stamp(stamp).map_err(|_| format!("Invalid isoformat string: {stamp:?}"))?;
+    Ok((micros as f64 / 1_000_000.0, aware))
 }
 
-/// Hours between ``stamp`` and ``now`` as f64. Invalid stamps raise ``ValueError``
-/// (matching ``datetime.fromisoformat``); a naive/aware mix raises ``TypeError``
-/// (matching aware-minus-naive subtraction).
-#[pyfunction]
-fn branch_policy_stamp_age_hours_native(stamp: &str, now: &str) -> PyResult<f64> {
-    let (stamp_us, stamp_aware) = parse_stamp(stamp)
-        .map_err(|_| PyValueError::new_err(format!("Invalid isoformat string: {stamp:?}")))?;
-    let (now_us, now_aware) = parse_stamp(now)
-        .map_err(|_| PyValueError::new_err(format!("Invalid isoformat string: {now:?}")))?;
+pub fn stamp_age_hours(stamp: &str, now: &str) -> Result<f64, String> {
+    let (stamp_us, stamp_aware) =
+        parse_stamp(stamp).map_err(|_| format!("Invalid isoformat string: {stamp:?}"))?;
+    let (now_us, now_aware) =
+        parse_stamp(now).map_err(|_| format!("Invalid isoformat string: {now:?}"))?;
     if stamp_aware != now_aware {
-        return Err(PyTypeError::new_err(
-            "can't subtract offset-naive and offset-aware datetimes",
-        ));
+        return Err("can't subtract offset-naive and offset-aware datetimes".into());
     }
     Ok((now_us - stamp_us) as f64 / 3_600_000_000.0)
-}
-
-#[pyfunction]
-fn branch_policy_validate_bindings_native(text: &str) -> PyResult<String> {
-    let bindings = validate_store(text).map_err(PyValueError::new_err)?;
-    let rows: Vec<Value> = bindings.iter().map(Binding::to_row).collect();
-    serde_json::to_string(&rows).map_err(|err| PyValueError::new_err(err.to_string()))
-}
-
-#[pyfunction]
-fn branch_policy_second_branch_conflict_native(
-    live_branches: Vec<String>,
-    store_text: Option<&str>,
-    branch: &str,
-    claim_id: &str,
-) -> PyResult<Option<String>> {
-    let bindings =
-        validate_store(store_text.unwrap_or(EMPTY_STORE)).map_err(PyValueError::new_err)?;
-    Ok(second_branch_conflict(
-        &live_branches,
-        &bindings,
-        branch,
-        claim_id,
-    ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        branch_policy_validate_name_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        branch_policy_stamp_age_hours_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        branch_policy_validate_bindings_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        branch_policy_second_branch_conflict_native,
-        module
-    )?)?;
-    Ok(())
 }
 
 // --------------------------------------------------------------------------- tests
@@ -685,6 +634,20 @@ mod tests {
         assert_eq!(us_date_only, 1_787_961_600 * 1_000_000);
         assert!(parse_stamp("not-a-stamp").is_err());
         assert!(parse_stamp("2026-13-01T00:00:00+00:00").is_err());
+        for invalid in [
+            "2020-02-31T00:00:00+00:00",
+            "2021-02-29T00:00:00Z",
+            "2020-04-31T00:00:00",
+            "2020/02/29",
+            "雪雪-02-29T00:00:00Z",
+        ] {
+            assert!(
+                stamp_epoch_seconds(invalid).is_err(),
+                "invalid calendar/ISO deadline accepted: {invalid}"
+            );
+        }
+        assert!(stamp_epoch_seconds("2020-02-29T00:00:00+00:00").unwrap().1);
+        assert!(!stamp_epoch_seconds("2020-02-29").unwrap().1);
         assert!(parse_stamp("2026-08-29T25:00:00+00:00").is_err());
     }
 
@@ -744,12 +707,9 @@ mod tests {
     fn age_hours_matches_python_boundaries() {
         let stamp = "2026-08-29T06:00:00+00:00";
         let now = "2026-08-29T12:00:00+00:00";
-        assert_eq!(
-            branch_policy_stamp_age_hours_native(stamp, now).unwrap(),
-            6.0
-        );
+        assert_eq!(stamp_age_hours(stamp, now).unwrap(), 6.0);
         let just_over = "2026-08-29T05:59:00+00:00";
-        let hours = branch_policy_stamp_age_hours_native(just_over, now).unwrap();
+        let hours = stamp_age_hours(just_over, now).unwrap();
         assert!(hours > 6.0);
     }
 }

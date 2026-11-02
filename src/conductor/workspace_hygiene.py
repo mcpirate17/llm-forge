@@ -26,18 +26,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from conductor import _native, branch_policy, worktree_reap
+from conductor import _native, worktree_reap
 from conductor.candidate_review.ownership import (
-    OwnershipClaim,
     load_claims,
-    paths_overlap,
 )
 from conductor.dead_tests import tracked_files
 from conductor.mutation_registry_rows import registry_manifests
@@ -498,16 +499,6 @@ def untracked_import_closure(tracked: Iterable[str]) -> list[dict[str, object]]:
     return records
 
 
-def _claim_for_path(
-    claims: Iterable[OwnershipClaim], path: str, *, now: datetime
-) -> str:
-    """The claim id covering ``path``, or ``UNCLAIMED``. First match wins."""
-    for claim in claims:
-        if claim.active(now) and any(paths_overlap(p, path) for p in claim.paths):
-            return claim.claim_id
-    return "UNCLAIMED"
-
-
 def _git_in(repo: Path, *args: str) -> str:
     """Like ``_git``, but against an explicit repo rather than the module's own ROOT.
 
@@ -523,241 +514,81 @@ def _git_in(repo: Path, *args: str) -> str:
     return completed.stdout
 
 
-def local_only_commit_exposure(repo: Path = ROOT) -> list[dict[str, str]]:
-    """Every commit ``branch_policy.local_only_commits`` finds, with claim coverage.
+def _native_exposure(
+    repo: Path,
+    operation: str,
+    *,
+    live_ref: str | None = None,
+    stale_hours: float = 24.0,
+    payload: object = None,
+) -> Any:
+    """Transitional data transport; all reporting and decisions live in Forge."""
+    binary = _native.resolve_forge_binary_native(
+        str(repo), sys.executable, os.environ.get("FORGE_BIN"), shutil.which("forge")
+    )
+    if binary is None:
+        raise HygieneError("native Forge is required for workspace exposure reporting")
+    argv = [
+        binary,
+        "branch-policy",
+        "--repo",
+        str(repo),
+        "--stale-hours",
+        str(stale_hours),
+    ]
+    if live_ref is not None:
+        argv.extend(["--live-ref", live_ref])
+    if operation == "render":
+        argv.append("render-exposure")
+    else:
+        argv.extend(["exposure-data", operation])
+    completed = subprocess.run(
+        argv,
+        input=json.dumps(payload) if operation == "render" else None,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode:
+        raise HygieneError(
+            f"native exposure failed ({completed.returncode}): {completed.stderr.strip()}"
+        )
+    return json.loads(completed.stdout)
 
-    A local-only commit is one that exists on no pushed ref at all -- the 2026-08-29
-    incident class this whole reset addresses. Each row names the claim (or
-    ``UNCLAIMED``) covering the files it touches, so a reviewer knows who to ask.
-    """
-    commits = branch_policy.local_only_commits(repo)
-    if not commits:
-        return []
-    claims, _digest = load_claims(repo)
-    now = datetime.now(UTC)
-    out: list[dict[str, str]] = []
-    for row in commits:
-        touched = [
-            line
-            for line in _git_in(
-                repo, "show", "--name-only", "--format=", row["sha"]
-            ).splitlines()
-            if line
-        ]
-        claim_id = "UNCLAIMED"
-        for path in touched:
-            hit = _claim_for_path(claims, path, now=now)
-            if hit != "UNCLAIMED":
-                claim_id = hit
-                break
-        out.append({"sha": row["sha"], "subject": row["subject"], "claim_id": claim_id})
-    return out
+
+def local_only_commit_exposure(repo: Path = ROOT) -> list[dict[str, str]]:
+    return _native_exposure(repo, "commits")
 
 
 def stale_dirty_files(
     stale_hours: float = 24.0, repo: Path = ROOT
 ) -> list[dict[str, str]]:
-    """Dirty working-tree files (by mtime) older than ``stale_hours``, with claim coverage."""
-    now = datetime.now(UTC)
-    claims, _digest = load_claims(repo)
-    out: list[dict[str, str]] = []
-    for line in _git_in(
-        repo, "status", "--porcelain", "--untracked-files=all"
-    ).splitlines():
-        if not line.strip():
-            continue
-        path = line[3:].strip()
-        if " -> " in path:  # rename: report the destination
-            path = path.split(" -> ", 1)[1]
-        full = repo / path
-        if not full.exists():
-            continue
-        age_hours = (now.timestamp() - full.stat().st_mtime) / 3600.0
-        if age_hours <= stale_hours:
-            continue
-        out.append(
-            {
-                "path": path,
-                "age_hours": f"{age_hours:.1f}",
-                "claim_id": _claim_for_path(claims, path, now=now),
-            }
-        )
-    return sorted(out, key=lambda row: -float(row["age_hours"]))
-
-
-def _branch_created_at(repo: Path, name: str, live_ref: str) -> datetime | None:
-    """Committer time of the oldest commit unique to ``name`` vs ``live_ref``."""
-    lines = [
-        line
-        for line in _git_in(
-            repo, "log", "--format=%cI", f"{live_ref}..{name}"
-        ).splitlines()
-        if line
-    ]
-    return datetime.fromisoformat(lines[-1]) if lines else None
-
-
-def _branch_last_push_at(
-    repo: Path, name: str, bindings: dict[str, branch_policy.BranchBinding]
-) -> tuple[datetime | None, str]:
-    """(timestamp, source). Prefers our own push record over the remote tip's commit
-    date, which is only a proxy for push time (commit time != push time)."""
-    binding = bindings.get(name)
-    if binding is not None and binding.last_push_at:
-        return datetime.fromisoformat(binding.last_push_at), "recorded push"
-    remote_ref = f"refs/remotes/origin/{name}"
-    verify = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", remote_ref],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if verify.returncode != 0:
-        return None, "never pushed"
-    stamp = _git_in(repo, "log", "-1", "--format=%cI", remote_ref).strip()
-    return (
-        datetime.fromisoformat(stamp) if stamp else None
-    ), "remote-tip commit date (approx)"
-
-
-def _pr_rows_for_branch(repo: Path, name: str) -> list[dict[str, object]] | None:
-    """``gh pr list`` for one branch, or None if the lookup itself failed."""
-    completed = subprocess.run(
-        ["gh", "pr", "list", "--head", name, "--json", "number,state"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        return None
-    try:
-        return json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        return None
+    return _native_exposure(repo, "dirty", stale_hours=stale_hours)
 
 
 def stale_feature_branches(
     live_ref: str, repo: Path = ROOT
 ) -> tuple[list[dict[str, object]], bool]:
-    """(rows, gh_available). EXPOSED at >6h since last push, or >24h since creation
-    with no open PR (PR check only runs when ``gh`` is on PATH -- see the module note
-    on why an absent ``gh`` is reported rather than silently read as "no PR")."""
-    gh_available = shutil.which("gh") is not None
-    now = datetime.now(UTC)
-    bindings = {b.branch: b for b in branch_policy.load_bindings(repo)}
-    rows: list[dict[str, object]] = []
-    for name in _git_in(
-        repo, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-    ).split():
-        if branch_policy.is_integration_branch(name) or name == live_ref:
-            continue
-        created = _branch_created_at(repo, name, live_ref)
-        if created is None:
-            continue  # no unique commits: redundant_branches' territory, not exposure
-        last_push, push_source = _branch_last_push_at(repo, name, bindings)
-        push_hours = (
-            None if last_push is None else (now - last_push).total_seconds() / 3600.0
+    report = _native_exposure(repo, "branches", live_ref=live_ref)
+    if report["gh_errors"]:
+        raise HygieneError(
+            "PR staleness unavailable: " + "; ".join(report["gh_errors"])
         )
-        reasons: list[str] = []
-        if push_hours is None or push_hours > branch_policy.STALE_PUSH_HOURS:
-            seen = "never" if push_hours is None else f"{push_hours:.1f}h ago"
-            reasons.append(
-                f"no push in {branch_policy.STALE_PUSH_HOURS:g}h (last push {seen}, "
-                f"source={push_source})"
-            )
-        if gh_available:
-            prs = _pr_rows_for_branch(repo, name)
-            create_hours = (now - created).total_seconds() / 3600.0
-            if not prs and create_hours > branch_policy.STALE_PR_HOURS:
-                reasons.append(
-                    f"no PR in {branch_policy.STALE_PR_HOURS:g}h "
-                    f"(created {create_hours:.1f}h ago)"
-                )
-        if not reasons:
-            continue
-        binding = bindings.get(name)
-        rows.append(
-            {
-                "branch": name,
-                "claim_id": binding.claim_id if binding else "UNCLAIMED",
-                "owner": binding.owner if binding else "UNCLAIMED",
-                "reasons": reasons,
-            }
-        )
-    return rows, gh_available
+    return report["rows"], report["gh_available"]
 
 
 def reap_preview(repo: Path = ROOT) -> list[dict[str, str]]:
-    """Name the worktrees the next ``make worktree-reap REAP_ARGS=--apply`` takes.
-
-    This report used to say only that finished worktrees existed, which is why
-    63 GB of them could stand while every check stayed green: nobody could tell
-    from here what removal would actually do. These rows are the reaper's own
-    decision, so the line and the enforcement cannot drift apart.
-    """
-    try:
-        decisions = worktree_reap.decide(repo)
-    except worktree_reap.ReapError as exc:
-        return [
-            {"worktree": str(repo), "branch": "", "reason": f"reap unavailable: {exc}"}
-        ]
-    return [
-        {
-            "worktree": str(decision.worktree.path),
-            "branch": decision.worktree.branch,
-            "reason": "; ".join(decision.reasons[:3]),
-        }
-        for decision in decisions
-        if decision.eligible
-    ]
+    return _native_exposure(repo, "reap-preview")
 
 
 def exposure_report(
     repo: Path = ROOT, live_ref: str | None = None
 ) -> dict[str, object]:
-    """The four EXPOSED checks in one payload, for the session-preamble hook and CLI."""
-    ref = live_ref or _git_in(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
-    branches, gh_available = stale_feature_branches(ref, repo)
-    return {
-        "stale_feature_branches": branches,
-        "gh_available": gh_available,
-        "local_only_commit_exposure": local_only_commit_exposure(repo),
-        "stale_dirty_files": stale_dirty_files(repo=repo),
-        "reap_preview": reap_preview(repo),
-    }
+    return _native_exposure(repo, "report", live_ref=live_ref)
 
 
 def render_exposure(report: dict[str, object]) -> str:
-    branches = report["stale_feature_branches"]  # type: ignore[assignment]
-    gh_note = (
-        "" if report["gh_available"] else "  [gh NOT on PATH: PR staleness skipped]"
-    )
-    lines = [f"EXPOSED BRANCHES -- stale by push or PR ({len(branches)}){gh_note}"]  # type: ignore[arg-type]
-    for row in branches:  # type: ignore[assignment]
-        lines.append(
-            f"  {row['branch']}  claim={row['claim_id']}  owner={row['owner']}"
-        )
-        for reason in row["reasons"]:  # type: ignore[index]
-            lines.append(f"      {reason}")
-    commits = report["local_only_commit_exposure"]  # type: ignore[assignment]
-    lines.append(f"EXPOSED LOCAL-ONLY COMMITS -- on no pushed ref ({len(commits)})")  # type: ignore[arg-type]
-    for row in commits:  # type: ignore[assignment]
-        lines.append(f"  {row['sha'][:8]}  claim={row['claim_id']}  {row['subject']}")
-    files = report["stale_dirty_files"]  # type: ignore[assignment]
-    lines.append(f"EXPOSED STALE DIRTY FILES -- >24h uncommitted ({len(files)})")  # type: ignore[arg-type]
-    for row in files:  # type: ignore[assignment]
-        lines.append(
-            f"  {row['age_hours']:>6}h  claim={row['claim_id']}  {row['path']}"
-        )
-    reapable = report.get("reap_preview", [])
-    lines.append(
-        f"EXPOSED WORKTREES -- next reap archives then removes ({len(reapable)})"  # type: ignore[arg-type]
-    )
-    for row in reapable:  # type: ignore[assignment]
-        lines.append(f"  {row['worktree']}  [{row['branch']}]  {row['reason']}")
-    return "\n".join(lines)
+    return _native_exposure(ROOT, "render", payload=report)
 
 
 def cheap_exposure_counts(repo: Path = ROOT) -> dict[str, object]:
@@ -783,7 +614,13 @@ def cheap_exposure_counts(repo: Path = ROOT) -> dict[str, object]:
         # two counts rather than losing the whole line to one unanswerable check.
         landed, worktrees_skipped = None, str(exc)
     return {
-        "local_only_commits": len(branch_policy.local_only_commits(repo)),
+        "local_only_commits": len(
+            json.loads(
+                _native.branch_policy_runtime_native(
+                    "local-only-commits", json.dumps({"repo": str(repo)})
+                )
+            )
+        ),
         "stale_dirty_files": len(stale_dirty_files(repo=repo)),
         "landed_worktrees": landed,
         "worktrees_skipped": worktrees_skipped,

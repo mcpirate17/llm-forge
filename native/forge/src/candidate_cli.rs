@@ -16,6 +16,10 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Explicit bounded fixes using a pinned native Ruff and operator grants.
+    Fix(crate::candidate_fix::FixArgs),
+    /// Run preflight, source audits and a fresh complete CI review.
+    Gate(Box<crate::candidate_gate::GateArgs>),
     /// Prepare or explicitly measure fresh native review workloads.
     Benchmark(Box<crate::candidate_benchmark_cli::BenchmarkArgs>),
     #[command(hide = true)]
@@ -132,6 +136,13 @@ pub fn run_with_stamp(
     stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
 ) -> Result<u8> {
     match args.action {
+        Action::Fix(args) => return crate::candidate_fix::run(args),
+        Action::Gate(args) => {
+            return Ok(crate::candidate_gate::run(
+                *args,
+                stamp.context("gate requires the CLI's compiled engine identity")?,
+            ))
+        }
         Action::Benchmark(args) => return crate::candidate_benchmark_cli::run(*args),
         Action::BenchmarkWorker(args) => {
             return crate::candidate_benchmark_cli::worker(

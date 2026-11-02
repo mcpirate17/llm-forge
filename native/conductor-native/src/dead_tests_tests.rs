@@ -270,3 +270,74 @@ fn scanned_module_json_orders_dependencies_independently_of_tracked_input() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn native_bounded_closure_preserves_transitive_importers_without_python() {
+    let root = repo_path();
+    write(&root, "pkg/__init__.py", "");
+    write(&root, "pkg/entry.py", "from pkg import hidden\n");
+    write(&root, "pkg/hidden.py", "from pkg import deeper\n");
+    write(&root, "pkg/deeper.py", "value = 1\n");
+    let tracked = vec!["pkg/__init__.py".into(), "pkg/entry.py".into()];
+    let result = super::bounded::scan(&root, &tracked).unwrap();
+    assert_eq!(
+        result
+            .records
+            .iter()
+            .map(|r| r.module.as_str())
+            .collect::<Vec<_>>(),
+        vec!["pkg/deeper.py", "pkg/hidden.py"]
+    );
+    assert_eq!(result.records[0].importers, vec!["pkg/hidden.py"]);
+    assert_eq!(result.records[1].tracked_importers, vec!["pkg/entry.py"]);
+    assert_eq!(result.files_scanned, 4);
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn native_bounded_closure_rejects_parse_failure_symlink_and_invalid_paths() {
+    use std::os::unix::fs::symlink;
+    let root = repo_path();
+    write(&root, "pkg/__init__.py", "");
+    write(&root, "pkg/entry.py", "def broken(\n");
+    let tracked = vec!["pkg/__init__.py".into(), "pkg/entry.py".into()];
+    assert!(super::bounded::scan(&root, &tracked).is_err());
+    write(&root, "pkg/entry.py", "import pkg.other\n");
+    let outside = root.parent().unwrap().join(format!(
+        "{}-outside.py",
+        root.file_name().unwrap().to_string_lossy()
+    ));
+    fs::write(&outside, "value = 1\n").unwrap();
+    symlink(&outside, root.join("pkg/other.py")).unwrap();
+    assert!(super::bounded::scan(&root, &tracked).is_err());
+    assert!(super::bounded::scan(&root, &["../outside.py".into()]).is_err());
+    fs::remove_file(outside).unwrap();
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn native_bounded_closure_rejects_oversized_source() {
+    let root = repo_path();
+    write(&root, "pkg/entry.py", "");
+    fs::OpenOptions::new()
+        .write(true)
+        .open(root.join("pkg/entry.py"))
+        .unwrap()
+        .set_len(16 * 1024 * 1024 + 1)
+        .unwrap();
+    assert!(super::bounded::scan(&root, &["pkg/entry.py".into()]).is_err());
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn native_closure_replay_binds_empty_sources_and_negative_import_lookups() {
+    let root = repo_path();
+    write(&root, "pkg/__init__.py", "");
+    write(&root, "pkg/main.py", "from pkg import absent\n");
+    let tracked = vec!["pkg/__init__.py".into(), "pkg/main.py".into()];
+    let first = super::bounded::scan(&root, &tracked).unwrap();
+    assert!(!first.sources["pkg/__init__.py"].is_empty());
+    assert_eq!(first.lookups.get("pkg/absent.py"), Some(&false));
+    write(&root, "pkg/absent.py", "answer = 1\n");
+    let second = super::bounded::scan(&root, &tracked).unwrap();
+    assert_ne!(first, second);
+    assert_eq!(second.records[0].module, "pkg/absent.py");
+    fs::remove_dir_all(root).unwrap();
+}

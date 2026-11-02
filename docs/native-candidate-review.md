@@ -763,15 +763,11 @@ bound to a manifest declaring the invariant; a successful probe alone does not
 satisfy the collector. No complete positive collector run is claimed from the
 leaf probe tests.
 
-The Python candidate-review package remains shipped for live compatibility APIs.
-`conductor.gate` still invokes its review CLI. The latency benchmark now uses
-`forge candidate benchmark` and the native coordinator directly.
-`governance-commit` and `attest-message` still use its shared governance mutex,
-inherited lock token/descriptor, canonical pre-commit receipt lookup and commit
-message mutation. Those callers must switch with equivalent native lock and
-receipt-binding behavior before their engine/CLI code can be removed. Existing
-PyO compatibility drivers also call that code; retire them only with an explicit
-native coverage map, not by making imports fail.
+The Python candidate-review package remains shipped for other live compatibility APIs.
+`make gate` now calls `forge candidate gate`, which observes its candidate audits
+and runs a fresh complete native CI review under explicit operator grants. See
+`docs/native-gate-retirement.md` for the native gate contract and remaining
+compatibility boundaries.
 
 Executing native review holds the Git-common governance lock through selection,
 cleanup, and publication. `--lock-timeout` defaults to 30 seconds and accepts

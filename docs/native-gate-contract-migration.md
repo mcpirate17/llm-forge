@@ -1,5 +1,10 @@
 # Native gate contract migration
 
+> Historical migration record: the Python `gate.py` adapter and its compatibility
+> targets were retired by the native gate. Current ownership and tests are mapped
+> in [native-gate-retirement.md](native-gate-retirement.md); the rollout target
+> described below remains separate.
+
 The two original Python suites have 56 collected cases: 33 in
 `src/conductor/test_gate.py` and 23 in `src/conductor/test_gate_rollout.py`.
 Each case below has a Rust-owned assertion in a PyO3 integration target. The

@@ -102,6 +102,32 @@ pub fn prepare(root: &SourceRoot, request: &Request) -> Result<Plan> {
             max_offset_lines,
         } => diff::apply(&snapshot.content, patch, &request.path, *max_offset_lines)?,
     };
+    finish_plan(snapshot, candidate, request.language.as_deref())
+}
+
+/// Prepare a complete UTF-8 replacement, including empty source/candidate text.
+/// Existing files are required; an empty candidate removes content, not the file.
+pub fn prepare_content(
+    root: &SourceRoot,
+    path: &std::path::Path,
+    expected_sha256: &str,
+    candidate: &str,
+    language: Option<&str>,
+) -> Result<Plan> {
+    ensure!(
+        expected_sha256.len() == 64 && expected_sha256.bytes().all(|b| b.is_ascii_hexdigit()),
+        "expected_sha256 must be a complete SHA-256 digest"
+    );
+    ensure!(
+        candidate.len() <= MAX_SOURCE_BYTES && !candidate.contains('\0'),
+        "candidate size/NUL limit exceeded"
+    );
+    let snapshot = root.read(path)?;
+    ensure!(snapshot.sha256 == expected_sha256, "source hash changed");
+    finish_plan(snapshot, candidate.to_owned(), language)
+}
+
+fn finish_plan(snapshot: Snapshot, candidate: String, language: Option<&str>) -> Result<Plan> {
     ensure!(
         candidate.len() <= MAX_SOURCE_BYTES && !candidate.contains('\0'),
         "candidate size/NUL limit exceeded"
@@ -110,18 +136,16 @@ pub fn prepare(root: &SourceRoot, request: &Request) -> Result<Plan> {
         candidate != snapshot.content,
         "patch does not change source"
     );
-    let language = request
-        .language
-        .as_deref()
+    let language = language
         .map(Language::from_name)
         .transpose()?
-        .or_else(|| Language::from_path(&request.path));
+        .or_else(|| Language::from_path(&snapshot.path));
     let validation = match language {
         Some(language) => {
             syntax::parse(&candidate, language).context("candidate syntax rejected")?;
             "native_ast"
         }
-        None => match request.path.extension().and_then(|s| s.to_str()) {
+        None => match snapshot.path.extension().and_then(|s| s.to_str()) {
             Some("json") => {
                 serde_json::from_str::<serde_json::Value>(&candidate)
                     .context("candidate JSON rejected")?;
@@ -139,6 +163,50 @@ pub fn prepare(root: &SourceRoot, request: &Request) -> Result<Plan> {
         candidate,
         validation,
     })
+}
+
+/// Publish sequentially under one root lock after the caller's source/config
+/// validator succeeds. Errors retain recovery IDs and describe rollback conflicts.
+pub fn apply_many<F>(root: &SourceRoot, plans: Vec<Plan>, precommit: F) -> Result<Vec<Report>>
+where
+    F: FnOnce() -> Result<()>,
+{
+    batch_reports(plans, |replacements| {
+        root.replace_many(replacements, precommit)
+    })
+}
+
+/// Poll publication/cancellation around each rename and throughout rollback.
+/// A poll failure starts rollback; it never abandons cleanup midway.
+pub fn apply_many_monitored<F, G>(
+    root: &SourceRoot,
+    plans: Vec<Plan>,
+    precommit: F,
+    poll: G,
+) -> Result<Vec<Report>>
+where
+    F: FnOnce() -> Result<()>,
+    G: FnMut() -> Result<()>,
+{
+    batch_reports(plans, |replacements| {
+        root.replace_many_monitored(replacements, precommit, poll)
+    })
+}
+fn batch_reports<F>(plans: Vec<Plan>, commit: F) -> Result<Vec<Report>>
+where
+    F: FnOnce(&[(&Snapshot, &str)]) -> Result<Vec<String>>,
+{
+    let mut reports: Vec<_> = plans.iter().map(Plan::report).collect();
+    let replacements: Vec<_> = plans
+        .iter()
+        .map(|plan| (&plan.snapshot, plan.candidate.as_str()))
+        .collect();
+    let snapshots = commit(&replacements)?;
+    for (report, snapshot) in reports.iter_mut().zip(snapshots) {
+        report.git_snapshot = Some(snapshot);
+        report.applied = true;
+    }
+    Ok(reports)
 }
 
 fn replace(source: &str, search: &str, replacement: &str, expected: usize) -> Result<String> {

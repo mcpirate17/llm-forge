@@ -20,23 +20,50 @@ fn git_text(args: &[&str]) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-fn watch_git_path(name: &str) {
+fn watch_git_path(name: &str, required: bool) {
     if let Some(path) = git_text(&["rev-parse", "--git-path", name]) {
-        if Path::new(&path).exists() {
+        if required || Path::new(&path).exists() {
             println!("cargo:rerun-if-changed={path}");
         }
     }
+}
+
+// Watch only the active branch namespace. Remote-tracking and Forge recovery
+// refs do not change the build revision; watching all refs would relink on push.
+fn watch_branch_parent(branch: &str) {
+    let Some(path) = git_text(&["rev-parse", "--git-path", branch]) else {
+        return;
+    };
+    let Some(refs) = git_text(&["rev-parse", "--git-path", "refs"]) else {
+        return;
+    };
+    let path = Path::new(&path);
+    let refs = Path::new(&refs);
+    for directory in path.ancestors().skip(1) {
+        if !directory.starts_with(refs) {
+            break;
+        }
+        if directory.is_dir() {
+            println!("cargo:rerun-if-changed={}", directory.display());
+            return;
+        }
+    }
+    // A missing refs namespace is conservatively dirty. Never fall back to the
+    // Git directory itself: it contains object caches and unrelated metadata.
+    println!("cargo:rerun-if-changed={}", refs.display());
 }
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     // HEAD names the branch; commits and fast-forwards update its ref instead.
     // Resolve Git paths so packed refs and git-dir indirection also work.
-    for name in ["HEAD", "packed-refs"] {
-        watch_git_path(name);
-    }
+    watch_git_path("HEAD", true);
+    watch_git_path("packed-refs", false);
     if let Some(branch) = git_text(&["symbolic-ref", "--quiet", "HEAD"]) {
-        watch_git_path(&branch);
+        watch_git_path(&branch, false);
+        // Packing can remove a loose ref; a later commit creates it again.
+        // Watch its nearest existing parent to catch both packed and unborn refs.
+        watch_branch_parent(&branch);
     }
     let rev = git_text(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=FORGE_GIT_REV={rev}");

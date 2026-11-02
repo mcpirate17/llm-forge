@@ -1,5 +1,9 @@
 # Probe budget, policy provenance, and value-scope contract migration
 
+> Historical record: the gate-policy provenance compatibility target was
+> retired with Python `gate.py`. Current native gate coverage is mapped in
+> [native-gate-retirement.md](native-gate-retirement.md).
+
 Three shipped host-tool suites now have Rust-owned PyO3 drivers. They call production Python APIs and the compiled bindings those APIs use; no Python test module or `conftest.py` is imported by a Rust target. The original baseline passed **30 tests in 0.59s** with `CUDA_VISIBLE_DEVICES=''`, bytecode writes disabled, and pytest cache disabled (`/tmp/forge-native-budget-value-original-baseline.log`). `gh issue list --limit 100 --state open --json number,title,body,url` returned `[]`; no open issue covered this migration.
 
 | Original Python module | Rust target | Cases |

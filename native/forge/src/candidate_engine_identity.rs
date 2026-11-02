@@ -190,11 +190,12 @@ fn valid_commit(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-struct BinaryIdentity {
-    sha256: String,
-    bytes: u64,
-    dev: u64,
-    ino: u64,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BinaryIdentity {
+    pub(crate) sha256: String,
+    pub(crate) bytes: u64,
+    pub(crate) dev: u64,
+    pub(crate) ino: u64,
 }
 fn running_executable() -> Result<BinaryIdentity> {
     // `/proc/self/exe` opens the inode backing this process, including when the
@@ -202,7 +203,7 @@ fn running_executable() -> Result<BinaryIdentity> {
     let file = File::open("/proc/self/exe").context("open running native executable")?;
     executable_file(file, || Ok(()))
 }
-fn executable_file(
+pub(crate) fn executable_file(
     mut file: File,
     before_final_stat: impl FnOnce() -> Result<()>,
 ) -> Result<BinaryIdentity> {

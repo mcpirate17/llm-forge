@@ -599,6 +599,22 @@ struct DeadTestsAnalysisNative {
 }
 
 #[cfg(feature = "python")]
+impl DeadTestsAnalysisNative {
+    fn source_reachable(&self, path: &str, config_text: &str) -> bool {
+        let non_test = self.importers.get(path).is_some_and(|importers| {
+            importers
+                .iter()
+                .any(|importer| !is_dead_test_side(importer))
+        });
+        let dynamic = path
+            .rsplit('/')
+            .next()
+            .is_some_and(|name| self.dynamic_basenames.contains(name));
+        non_test || dynamic || corpus_references(path, config_text)
+    }
+}
+
+#[cfg(feature = "python")]
 #[pymethods]
 impl DeadTestsAnalysisNative {
     #[new]
@@ -649,18 +665,6 @@ impl DeadTestsAnalysisNative {
         notes_text: &str,
         dates: HashMap<String, String>,
     ) -> PyResult<String> {
-        let reachable = |path: &str| {
-            let non_test = self.importers.get(path).is_some_and(|importers| {
-                importers
-                    .iter()
-                    .any(|importer| !is_dead_test_side(importer))
-            });
-            let dynamic = path
-                .rsplit('/')
-                .next()
-                .is_some_and(|name| self.dynamic_basenames.contains(name));
-            non_test || dynamic || corpus_references(path, config_text)
-        };
         let tests = self
             .modules
             .keys()
@@ -694,7 +698,11 @@ impl DeadTestsAnalysisNative {
                 .filter(|dependency| !is_dead_test_side(dependency))
                 .cloned()
                 .collect::<Vec<_>>();
-            if !targets.is_empty() && !targets.iter().any(|target| reachable(target)) {
+            if !targets.is_empty()
+                && !targets
+                    .iter()
+                    .any(|target| self.source_reachable(target, config_text))
+            {
                 let notes_only = targets
                     .iter()
                     .filter(|target| corpus_references(target, notes_text))
@@ -728,7 +736,7 @@ impl DeadTestsAnalysisNative {
                         .get(&module.path)
                         .is_none_or(BTreeSet::is_empty)
                     && !module.path.ends_with("__init__.py")
-                    && !reachable(&module.path)
+                    && !self.source_reachable(&module.path, config_text)
             })
             .map(|module| UnreferencedDeadTestSource {
                 path: module.path.clone(),
@@ -982,3 +990,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 #[path = "dead_tests_tests.rs"]
 mod tests;
+
+#[path = "dead_tests_bounded.rs"]
+pub mod bounded;

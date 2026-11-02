@@ -3,6 +3,7 @@ use super::{Interrupted, TimedOut};
 use crate::process_capture_tail::TailBuffer;
 use crate::process_io::make_nonblocking;
 use anyhow::{ensure, Context, Result};
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::{self, Read};
 use std::os::fd::{AsRawFd, OwnedFd, RawFd};
@@ -78,15 +79,20 @@ pub(crate) enum Observation {
 
 pub(crate) struct Input<'a> {
     socket: Option<UnixStream>,
-    remaining: &'a [u8],
+    bytes: Cow<'a, [u8]>,
+    offset: usize,
 }
 impl<'a> Input<'a> {
     pub(crate) fn prepare(command: &mut Command, bytes: Option<&'a [u8]>) -> Result<Self> {
+        Self::prepare_bytes(command, bytes.map(Cow::Borrowed))
+    }
+    fn prepare_bytes(command: &mut Command, bytes: Option<Cow<'a, [u8]>>) -> Result<Self> {
         let Some(bytes) = bytes else {
             command.stdin(Stdio::null());
             return Ok(Self {
                 socket: None,
-                remaining: &[],
+                bytes: Cow::Borrowed(&[]),
+                offset: 0,
             });
         };
         let (sender, receiver) = UnixStream::pair()?;
@@ -94,7 +100,8 @@ impl<'a> Input<'a> {
         command.stdin(Stdio::from(OwnedFd::from(receiver)));
         Ok(Self {
             socket: (!bytes.is_empty()).then_some(sender),
-            remaining: bytes,
+            bytes,
+            offset: 0,
         })
     }
     fn poll(&self) -> libc::pollfd {
@@ -107,7 +114,8 @@ impl<'a> Input<'a> {
         let Some(socket) = &self.socket else {
             return Ok(());
         };
-        let bytes = &self.remaining[..self.remaining.len().min(QUANTUM)];
+        let remaining = &self.bytes[self.offset..];
+        let bytes = &remaining[..remaining.len().min(QUANTUM)];
         // SAFETY: both slices and socket remain borrowed; SIGPIPE is suppressed.
         let count = unsafe {
             libc::send(
@@ -125,16 +133,30 @@ impl<'a> Input<'a> {
             ) {
                 return Ok(());
             }
+            if matches!(&self.bytes, Cow::Owned(_)) && error.kind() == io::ErrorKind::BrokenPipe {
+                // A filter may reject its input before reading it. Retain the
+                // undelivered offset so its owner can reject only a zero exit;
+                // a natural nonzero/signal status must remain observable.
+                self.socket.take();
+                return Ok(());
+            }
             return Err(error).context("write probe stdin");
         }
         ensure!(count > 0, "probe stdin accepted zero bytes");
-        self.remaining = &self.remaining[count as usize..];
-        if self.remaining.is_empty() {
+        self.offset += count as usize;
+        if self.offset == self.bytes.len() {
             self.socket.take();
         }
         Ok(())
     }
 }
+impl Input<'static> {
+    pub(crate) fn prepare_owned(command: &mut Command, bytes: Vec<u8>) -> Result<Self> {
+        ensure!(bytes.len() <= 1024 * 1024, "probe stdin exceeds 1 MiB");
+        Self::prepare_bytes(command, Some(Cow::Owned(bytes)))
+    }
+}
+
 struct Stream {
     file: File,
     capture: Capture,
@@ -250,7 +272,7 @@ impl<'a> Monitor<'a> {
     }
     pub(crate) fn require_stdin_consumed(&self) -> Result<()> {
         ensure!(
-            self.input.remaining.is_empty(),
+            self.input.offset == self.input.bytes.len(),
             "probe exited before accepting all stdin"
         );
         Ok(())
@@ -328,3 +350,7 @@ fn poll(descriptors: &mut [libc::pollfd], remaining: Duration) -> Result<()> {
     );
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "process_probe_io_tests.rs"]
+mod tests;

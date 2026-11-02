@@ -19,6 +19,7 @@ use crate::instant::{self, format_hm, format_ymd_hm};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
 pub const MAX_CLAIM_HOURS: f64 = 24.0;
@@ -252,7 +253,10 @@ pub(crate) fn write_activity(
         return err("claim activity log: repository has no resolvable common directory");
     };
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(parent)
             .map_err(|exc| OwnershipError(format!("claim activity log is unwritable: {exc}")))?;
     }
     let mut seen_sorted: Vec<(&String, &String)> = seen.iter().collect();

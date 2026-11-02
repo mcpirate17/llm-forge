@@ -165,7 +165,7 @@ ledger records a baseline receipt the first time a metric is measured for a
 given scope (`RATCHET_HELD`, not PASS — a first run has nothing to compare
 against). A subsequent PR's gate run recomputes the same three numbers for
 the candidate tree and compares to the last **registered** receipt, not the
-live working tree, matching `gate.py::run_gate`'s existing rule that policy
+live working tree, matching the native gate's rule that policy
 and evidence come from the exported candidate tree so an uncommitted edit
 can't change the verdict. A new phase, `cost_budget_audit`, is added to
 `run_gate`'s phase list alongside `mutation_corpus_audit` — same shape
@@ -237,7 +237,7 @@ marked.
    for this repo's last 30 landed PRs, cross-checked by hand against `git
    log` for 3 of them. Claude (join logic, tier inference is a design
    choice).
-5. **Gate phase `cost_budget_audit`** (`src/conductor/gate.py`, `PhaseResult`,
+5. **Gate phase `cost_budget_audit`** (native candidate gate, phase report,
    `ledger/registry.d/` convention, `conductor.mk` target
    `cost-budget-audit`). Exit: first run on this repo produces
    `RATCHET_HELD` baseline receipts for all three metrics; a synthetic

@@ -28,27 +28,27 @@ pub(crate) enum Surface {
 #[derive(Args)]
 pub(crate) struct SelectionArgs {
     #[arg(long, default_value = ".")]
-    repo: PathBuf,
+    pub(crate) repo: PathBuf,
     #[arg(long, value_enum)]
-    kind: Kind,
-    #[arg(long, default_value = "HEAD")]
-    target_ref: String,
+    pub(crate) kind: Kind,
+    #[arg(long, alias = "ref", default_value = "HEAD")]
+    pub(crate) target_ref: String,
+    #[arg(long, alias = "base")]
+    pub(crate) base_ref: Option<String>,
     #[arg(long)]
-    base_ref: Option<String>,
+    pub(crate) policy: Option<String>,
+    #[arg(long, value_enum)]
+    pub(crate) profile: Option<Profile>,
     #[arg(long)]
-    policy: Option<String>,
-    #[arg(long, value_enum, default_value = "fast")]
-    profile: Profile,
-    #[arg(long)]
-    today: Option<String>,
+    pub(crate) today: Option<String>,
     /// Owned version-1 operator grants JSON outside the repository.
     #[arg(long)]
-    grants: PathBuf,
+    pub(crate) grants: PathBuf,
     #[arg(long)]
-    expected_tree: Option<String>,
+    pub(crate) expected_tree: Option<String>,
     /// Explicit review surface; required by scheduled candidate-integrity checks.
     #[arg(long, value_enum)]
-    surface: Option<Surface>,
+    pub(crate) surface: Option<Surface>,
 }
 impl SelectionArgs {
     pub(crate) fn repository(&self) -> &std::path::Path {
@@ -116,7 +116,7 @@ impl Selection {
             surface: args.surface,
             changes,
             date,
-            profile: args.profile.name(),
+            profile: args.profile.unwrap_or(Profile::Fast).name(),
         })
     }
     pub(crate) fn checks(&self) -> Result<Vec<Value>> {

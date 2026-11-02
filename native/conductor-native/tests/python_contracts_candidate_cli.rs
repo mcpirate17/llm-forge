@@ -352,66 +352,6 @@ fn cli_failure_paths_write_a_sealed_failure_and_refuse_unbound_inputs() {
     });
 }
 
-#[test]
-fn fix_command_preserves_subprocess_exit_and_requires_paths() {
-    let case = Case::new();
-    let repo = fixture(&case, false);
-    Python::attach(|py| {
-        let cli_module = module(py, "conductor.candidate_review.cli");
-        let args = cli_module
-            .getattr("_parser")
-            .unwrap()
-            .call0()
-            .unwrap()
-            .call_method1(
-                "parse_args",
-                (vec!["fix", "--repo", repo.to_str().unwrap(), "probe.txt"],),
-            )
-            .unwrap();
-        let subprocess = PyModule::import(py, "subprocess").unwrap();
-        let completed = subprocess
-            .getattr("CompletedProcess")
-            .unwrap()
-            .call1((Vec::<String>::new(), 7))
-            .unwrap();
-        let mock = PyModule::import(py, "unittest.mock")
-            .unwrap()
-            .getattr("Mock")
-            .unwrap();
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("return_value", completed).unwrap();
-        let fake_run = mock.call((), Some(&kwargs)).unwrap();
-        let _patch = AttrPatch::replace(&subprocess, "run", &fake_run);
-        let root_kwargs = PyDict::new(py);
-        root_kwargs
-            .set_item("return_value", path(py, &repo))
-            .unwrap();
-        let root = mock.call((), Some(&root_kwargs)).unwrap();
-        let _root = AttrPatch::replace(&cli_module, "repository_root", &root);
-        assert_eq!(
-            cli_module
-                .getattr("fix_command")
-                .unwrap()
-                .call1((&args,))
-                .unwrap()
-                .extract::<i64>()
-                .unwrap(),
-            7
-        );
-        args.setattr("paths", Vec::<String>::new()).unwrap();
-        assert_eq!(
-            cli_module
-                .getattr("fix_command")
-                .unwrap()
-                .call1((args,))
-                .unwrap()
-                .extract::<i64>()
-                .unwrap(),
-            2
-        );
-    });
-}
-
 fn command_check_context<'py>(
     py: Python<'py>,
     case: &Case,

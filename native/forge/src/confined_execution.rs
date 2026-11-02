@@ -171,10 +171,51 @@ pub fn start(plan: CommandPlan, group: Cgroup, limits: Limits) -> Result<Executi
     start_with_resources(plan, group, limits, Box::new(NoResources))
 }
 pub fn start_with_resources(
+    plan: CommandPlan,
+    group: Cgroup,
+    limits: Limits,
+    resources: Box<dyn Resources>,
+) -> Result<Execution> {
+    start_inner(
+        plan,
+        group,
+        limits,
+        resources,
+        None,
+        CapturePolicy::TailChars(limits.max_output_chars),
+    )
+}
+
+/// Run a bounded UTF-8 filter without changing line endings or trimming output.
+/// Input and combined raw stdout/stderr are each limited to 1 MiB. Invalid UTF-8,
+/// incomplete stdin delivery, and output overflow fail through the owning actor.
+/// `max_output_chars` is unused for this opt-in byte capture mode.
+pub fn start_filter_with_resources(
+    plan: CommandPlan,
+    group: Cgroup,
+    limits: Limits,
+    resources: Box<dyn Resources>,
+    input: Vec<u8>,
+    max_output_bytes: usize,
+) -> Result<Execution> {
+    ensure!(input.len() <= 1024 * 1024, "probe stdin exceeds 1 MiB");
+    start_inner(
+        plan,
+        group,
+        limits,
+        resources,
+        Some(input),
+        CapturePolicy::StrictCombined(max_output_bytes),
+    )
+}
+
+fn start_inner(
     mut plan: CommandPlan,
     mut group: Cgroup,
     mut limits: Limits,
     mut resources: Box<dyn Resources>,
+    bytes: Option<Vec<u8>>,
+    capture: CapturePolicy,
 ) -> Result<Execution> {
     tokio::runtime::Handle::try_current().context("execution requires a Tokio reactor")?;
     let admission = EXECUTIONS
@@ -185,10 +226,13 @@ pub fn start_with_resources(
         "execution wall timeout exceeds one day"
     );
     readiness::deadline(limits.timeout)?;
-    CapturePolicy::TailChars(limits.max_output_chars).validate()?;
+    capture.validate()?;
     limits.cpu_seconds = limit_value(libc::RLIMIT_CPU, limits.cpu_seconds)?;
     limits.address_space_bytes = limit_value(libc::RLIMIT_AS, limits.address_space_bytes)?;
-    let input = Input::prepare(plan.command(), None)?;
+    let input = match bytes {
+        Some(bytes) => Input::prepare_owned(plan.command(), bytes)?,
+        None => Input::prepare(plan.command(), None)?,
+    };
     plan.command().stdout(Stdio::piped()).stderr(Stdio::piped());
     configure_rlimits(plan.command(), limits);
     group.configure_command(plan.command())?;
@@ -200,7 +244,7 @@ pub fn start_with_resources(
         let _admission = admission;
         let started = Instant::now();
         resources.arm();
-        let mut report = run(plan, group, input, limits, cancel.clone()).await;
+        let mut report = run(plan, group, input, limits, capture, cancel.clone()).await;
         // A cancellation observed before this point wins over normal exit.
         // After this point finalization owns the disposition and is irreversible.
         if cancel.is_cancelled() && report.outcome == Outcome::Exited {
@@ -297,7 +341,7 @@ fn prepare_monitor(
     owned: &mut Observed,
     group: &Cgroup,
     input: Input<'static>,
-    limits: Limits,
+    capture: CapturePolicy,
 ) -> Result<()> {
     let Process::Running(process) = &mut owned.process else {
         anyhow::bail!("launch did not attach a broker")
@@ -314,7 +358,7 @@ fn prepare_monitor(
             .context("execution stderr missing")?
             .into(),
         input,
-        CapturePolicy::TailChars(limits.max_output_chars),
+        capture,
     )?);
     Ok(())
 }
@@ -336,13 +380,14 @@ async fn observe(
                 .as_ref()
                 .context("execution pidfd missing")?
                 .as_raw_fd();
-            owned
+            let monitor = owned
                 .monitor
                 .as_mut()
-                .context("execution monitor missing")?
-                .observe(fd, cutoff, Some(cancel.as_raw_fd()), || {
-                    Ok(cancel.is_cancelled())
-                })
+                .context("execution monitor missing")?;
+            let observation = monitor.observe(fd, cutoff, Some(cancel.as_raw_fd()), || {
+                Ok(cancel.is_cancelled())
+            })?;
+            Ok(observation)
         }))
         .map_err(|_| anyhow::anyhow!("execution monitor panicked"))?
     })
@@ -354,6 +399,7 @@ async fn run(
     mut group: Cgroup,
     input: Input<'static>,
     limits: Limits,
+    capture: CapturePolicy,
     cancel: Arc<Cancellation>,
 ) -> Report {
     let started = Instant::now();
@@ -382,7 +428,7 @@ async fn run(
     }
     if report.errors.is_empty() {
         if let Some(state) = owned.as_mut() {
-            match prepare_monitor(state, &group, input, limits) {
+            match prepare_monitor(state, &group, input, capture) {
                 Err(error) => report
                     .errors
                     .push(format!("monitor preparation: {error:#}")),
@@ -432,6 +478,13 @@ async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut R
             }
         }
         if let Some(monitor) = state.monitor.take() {
+            // A filter may intentionally reject stdin with a natural nonzero
+            // exit or signal. Only successful exits promise full delivery.
+            if report.outcome == Outcome::Exited && report.exit_code == Some(0) {
+                if let Err(error) = monitor.require_stdin_consumed() {
+                    report.errors.push(format!("stdin delivery: {error:#}"));
+                }
+            }
             let captured = match drain(monitor).await {
                 Ok((captured, error)) => {
                     if let Some(error) = error {
@@ -451,8 +504,8 @@ async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut R
             if let Some(captured) = captured {
                 report.stdout_bytes = captured.stdout_bytes;
                 report.stderr_bytes = captured.stderr_bytes;
-                // TailBuffer emits valid UTF-8. A broken invariant is an error, not
-                // replacement decoding that would conceal corrupted native output.
+                // TailBuffer emits valid UTF-8; strict capture retains raw bytes.
+                // Reject invalid UTF-8 instead of concealing it by replacement.
                 match (
                     String::from_utf8(captured.stdout),
                     String::from_utf8(captured.stderr),
@@ -465,7 +518,7 @@ async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut R
                         complete = false;
                         report
                             .errors
-                            .push("native output tail contained invalid UTF-8".into());
+                            .push("native output contained invalid UTF-8".into());
                     }
                 }
             }

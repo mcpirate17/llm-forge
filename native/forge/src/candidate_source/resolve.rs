@@ -283,6 +283,18 @@ impl Source {
         read_index(&path)
     }
 
+    /// Read the current index path inventory without writing its tree or index.
+    pub(crate) fn tracked_index_paths(&self) -> Result<Vec<String>> {
+        let index = self.index()?;
+        let mut paths = std::collections::BTreeSet::new();
+        for entry in index.iter() {
+            let path = super::safe_path(&entry.path)?.to_owned();
+            paths.insert(path);
+            ensure!(paths.len() <= 100_000, "index tracked path limit exceeded");
+        }
+        Ok(paths.into_iter().collect())
+    }
+
     fn resolve_index(&self, base_ref: Option<&str>) -> Result<Candidate> {
         let head = match self.repository.head() {
             Ok(head) => Some(head.peel_to_commit()?.id().to_string()),

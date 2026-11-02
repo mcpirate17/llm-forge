@@ -43,7 +43,7 @@ CONDUCTOR_REPORTS_DIR ?= reports
 	dupes-nicad dupes-deep dupes-deep-check \
 	mutation-retention mutation-patch-audit mutation-patch-audit-record mutation-reap \
 	ledger-rollup ledger-report route-report cost-budget-audit cost-budget-record \
-	graph-seed-worktree worktree-reap workspace-hygiene branch-policy \
+	graph-seed-worktree worktree-reap workspace-hygiene branch-policy branch-policy-status \
 	branch-policy-audit checkout-sync crg-probe crg-check \
 	dead-tests test-graph codex-journal notebooklm-bundle notebooklm-research-bundle \
 	test-conductor-native test-slop-core test-forge forge-build
@@ -84,7 +84,9 @@ governance-preflight:  ## Run the native CI review for PREFLIGHT_REF (default HE
 		--receipt "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/preflight.json"
 	"$(FORGE)" candidate report "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/preflight.json" --format human
 
-FIX_PATHS ?=
+FIX_PATHS_FILE ?=
+FIX_GRANTS ?=
+FIX_RUFF_SHA256 ?=
 COMMIT_ARGS ?=
 CLAIM_PATHS ?=
 CLAIM_JUSTIFICATION ?=
@@ -95,9 +97,11 @@ OWNER ?=
 SESSION_TITLE ?=
 SESSION_BODY ?=
 
-governance-fix:  ## Explicitly fix only FIX_PATHS='path ...' outside commit hooks
-	@test -n "$(FIX_PATHS)" || { echo "Set FIX_PATHS to explicit paths"; exit 2; }
-	$(PYTHON) -m conductor.candidate_review.cli fix --repo "$(CONDUCTOR_HOST_ROOT)" $(FIX_PATHS)
+governance-fix:  ## Explicit native Ruff batch; set FIX_PATHS_FILE (JSON), FIX_GRANTS and FIX_RUFF_SHA256
+	@test -n "$(FIX_PATHS_FILE)" -a -n "$(FIX_GRANTS)" -a -n "$(FIX_RUFF_SHA256)" || { echo "Set FIX_PATHS_FILE, FIX_GRANTS and FIX_RUFF_SHA256"; exit 2; }
+	"$(FORGE)" candidate fix --repo "$(CONDUCTOR_HOST_ROOT)" \
+		--grants "$(FIX_GRANTS)" --ruff-sha256 "$(FIX_RUFF_SHA256)" \
+		--paths-from "$(FIX_PATHS_FILE)" --execute
 
 governance-commit:  ## Hold the commit mutex; pass COMMIT_ARGS='-m ... path ...'
 	"$(FORGE)" candidate commit --repo "$(CONDUCTOR_HOST_ROOT)" -- $(COMMIT_ARGS)
@@ -340,11 +344,11 @@ crg-probe crg-check:  ## Verify the native MCP binding; MCP_SOCKET must name the
 workspace-hygiene:  ## Read-only: what is safe to delete (branches, worktrees, claims) and what breaks a clean clone
 	$(PYTHON) -m conductor.workspace_hygiene
 
-branch-policy:  ## Branch binding status: live claim/branch pairs, age, PR number, staleness
-	$(PYTHON) -m conductor.branch_policy status
+branch-policy branch-policy-status:  ## Branch binding status: live claim/branch pairs, age, PR number, staleness
+	"$(FORGE)" branch-policy --repo "$(CONDUCTOR_HOST_ROOT)" status
 
 branch-policy-audit:  ## Check every branch-policy rule decidable without a push; exits 1 on violations
-	$(PYTHON) -m conductor.branch_policy audit
+	"$(FORGE)" branch-policy --repo "$(CONDUCTOR_HOST_ROOT)" audit
 
 checkout-sync:  ## Snapshot the dirty tree, then fast-forward this checkout onto the remote line
 	$(PYTHON) -m conductor.checkout_sync --repo "$(CONDUCTOR_HOST_ROOT)"

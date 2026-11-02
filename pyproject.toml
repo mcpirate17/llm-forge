@@ -121,7 +121,7 @@ package_root = "src/conductor"
 # which this repository does not have; point it at the registered receipts
 # directory instead so an ad hoc run has somewhere real to write.
 mutation_receipt_root = "campaigns/receipts"
-# The integration line conductor.branch_policy, workspace_hygiene and
+# The integration line native branch policy, workspace_hygiene and
 # candidate_review.git_source resolve their "master"-shaped defaults through
 # (env override: $CONDUCTOR_INTEGRATION_BRANCH). The monorepo conductor was
 # extracted from names its own line "master"; this repository's is "main", which is

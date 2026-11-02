@@ -21,6 +21,7 @@ include conductor.mk
 GATE_REF ?= HEAD
 GATE_BASE ?= origin/main
 GATE_PROFILE ?= full
+GATE_ARGS ?=
 LOCAL_CHECK_ARGS ?= --all
 
 REVIEW_PROFILE ?= full
@@ -93,10 +94,12 @@ local-verify:  ## Revalidate the latest source-bound full local-check receipt
 	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- verify --require-all
 
 gate:  ## The governance gate: config self-check plus the CI-identical review
-	$(UV) run python -m conductor.gate \
-		--ref "$(GATE_REF)" \
-		--base "$(GATE_BASE)" \
-		--profile "$(GATE_PROFILE)"
+	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" -a -n "$(CONDUCTOR_MUTATION_GIT)" -a -n "$(CONDUCTOR_MUTATION_GIT_SHA256)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" || { echo "Set operator review grants and pinned Git, Git build profile and mutation runner bundle paths and SHA-256 values"; exit 2; }
+	"$(FORGE)" candidate gate --repo "$(CONDUCTOR_HOST_ROOT)" --surface ci --kind range \
+		--ref "$(GATE_REF)" --base "$(GATE_BASE)" --profile "$(GATE_PROFILE)" \
+		--grants "$(CONDUCTOR_REVIEW_GRANTS)" --git "$(CONDUCTOR_MUTATION_GIT)" --git-sha256 "$(CONDUCTOR_MUTATION_GIT_SHA256)" \
+		--git-build-profile "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" --git-build-profile-sha256 "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" \
+		--mutation-runner-bundle "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" --mutation-runner-sha256 "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" $(GATE_ARGS)
 
 candidate-review:  ## Run the native index review with explicit operator grants
 	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" || { echo "Set CONDUCTOR_REVIEW_GRANTS to an operator-owned grants JSON file"; exit 2; }

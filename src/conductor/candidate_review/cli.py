@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from dataclasses import asdict
@@ -447,23 +446,6 @@ def claims_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def fix_command(args: argparse.Namespace) -> int:
-    repo = repository_root(Path(args.repo))
-    if not args.paths:
-        print(
-            "fix requires explicit paths; broad worktree mutation is forbidden",
-            file=sys.stderr,
-        )
-        return 2
-    commands = [
-        ["uv", "run", "ruff", "check", "--fix", *args.paths],
-        ["uv", "run", "ruff", "format", *args.paths],
-    ]
-    for command in commands:
-        completed = subprocess.run(command, cwd=repo, check=False)
-        if completed.returncode:
-            return completed.returncode
-    return 0
 
 
 def _add_review_parsers(
@@ -584,12 +566,6 @@ def _parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_review_parsers(subparsers)
     _add_claim_parsers(subparsers)
-    fix = subparsers.add_parser(
-        "fix", help="Explicitly mutate only named worktree paths"
-    )
-    fix.add_argument("--repo", default=".")
-    fix.add_argument("paths", nargs="+")
-    fix.set_defaults(func=fix_command)
     return parser
 
 

@@ -20,10 +20,6 @@ from conductor_native import (
     DeadTestsResolverNative,
     admission_errors_native,
     analyze_test_value_native,
-    branch_policy_second_branch_conflict_native,
-    branch_policy_stamp_age_hours_native,
-    branch_policy_validate_bindings_native,
-    branch_policy_validate_name_native,
     compare_duplicate_baseline_native,
     dead_tests_closure_native,
     duplicate_body_fingerprints_native,
@@ -34,13 +30,13 @@ from conductor_native import (
     git_tree_entries_native,
     graph_context_native,
     guardrail_ast_metrics_native,
+    hook_context_project_native,
     hook_installer_is_managed_native,
     hook_installer_merge_install_native,
     hook_installer_shlex_join_native,
     hook_installer_shlex_split_native,
     hook_installer_without_managed_native,
     hook_merge_native,
-    hook_context_project_native,
     inspect_mutation_campaign_native,
     is_mutation_test_path_native,
     load_mutation_campaign_native,
@@ -94,6 +90,12 @@ def candidate_verification_native(operation: str, request_json: str) -> str:
     from conductor_native import candidate_verification_native as decide
 
     return decide(operation, request_json)
+
+
+def branch_policy_runtime_native(operation: str, request_json: str) -> str:
+    from conductor_native import branch_policy_runtime_native as dispatch
+
+    return dispatch(operation, request_json)
 
 
 def contract_test_plan_native(repo_root: str, changed_paths: list[str]) -> str:
@@ -342,10 +344,6 @@ __all__ = [
     "admission_errors_native",
     "analyze_test_value_native",
     "analyze_test_value_reports_native",
-    "branch_policy_second_branch_conflict_native",
-    "branch_policy_stamp_age_hours_native",
-    "branch_policy_validate_bindings_native",
-    "branch_policy_validate_name_native",
     "candidate_checks_native",
     "candidate_policy_classify_native",
     "candidate_policy_fragment_native",
@@ -353,6 +351,7 @@ __all__ = [
     "candidate_value_waivers_parse_native",
     "candidate_verification_ast_native",
     "candidate_verification_native",
+    "branch_policy_runtime_native",
     "compare_duplicate_baseline_native",
     "dead_tests_closure_native",
     "duplicate_body_fingerprints_native",
