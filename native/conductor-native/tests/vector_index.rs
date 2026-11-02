@@ -274,3 +274,51 @@ fn empty_snapshots_are_queryable_and_still_check_their_offset_table() {
     repair_checksums(&mut bytes);
     assert!(Snapshot::open(&fixture.write("bad-empty.bin", &bytes)).is_err());
 }
+
+#[test]
+fn reused_rows_preserve_bits_and_reject_invalid_masks_or_vectors() {
+    let original = vec![0.6_f32, 0.8_f32, 4.0, 3.0];
+    let expected: Vec<_> = original[..2].iter().map(|x| x.to_bits()).collect();
+    let builder = Builder::new_reusing_checked(
+        space(2),
+        original,
+        Config::default(),
+        &[true, false],
+        || Ok(()),
+    )
+    .unwrap();
+    let fixture = Fixture::new();
+    let path = fixture.path("reuse.bin");
+    builder.write(&path, [1; 32]).unwrap();
+    let mapped = Snapshot::open(&path).unwrap();
+    assert_eq!(
+        mapped
+            .row(0)
+            .unwrap()
+            .iter()
+            .map(|x| x.to_bits())
+            .collect::<Vec<_>>(),
+        expected
+    );
+    assert!(mapped.row(2).is_err());
+    assert!(
+        Builder::new_reusing_checked(space(2), vec![1.0, 0.0], Config::default(), &[], || Ok(()))
+            .is_err()
+    );
+    assert!(Builder::new_reusing_checked(
+        space(2),
+        vec![3.0, 4.0],
+        Config::default(),
+        &[true],
+        || Ok(())
+    )
+    .is_err());
+    assert!(Builder::new_reusing_checked(
+        space(2),
+        vec![f32::NAN, 0.0],
+        Config::default(),
+        &[true],
+        || Ok(())
+    )
+    .is_err());
+}

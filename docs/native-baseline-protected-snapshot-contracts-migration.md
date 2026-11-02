@@ -1,5 +1,7 @@
 # Native baseline, protected deletion, and snapshot contracts
 
+The snapshot and locked-commit rows below are historical; native Forge commit recovery replaces their former Python providers and compatibility targets. See `docs/native-commit-recovery.md`.
+
 This cohort ports the executable assertions in three Python test modules to Rust-owned PyO3 targets:
 
 | Original module | Rust contract | Original cases |

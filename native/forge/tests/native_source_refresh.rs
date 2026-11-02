@@ -45,6 +45,7 @@ fn sequence(vectors: Vec<Vec<f32>>) -> Vec<Reply> {
 fn settings(endpoint: String, paths: &[&str]) -> Refresh {
     Refresh {
         sources: options(paths, 512),
+        force_reembed: false,
         batch: BatchPolicy::default(),
         embedding: config(endpoint),
         graph: Config::default(),
@@ -106,6 +107,8 @@ fn source_refresh_batches_in_order_and_matches_embedding_recipe() {
     let expected = cfg.embedding.space().unwrap();
     let report = extract::refresh(&store, &source, cfg).unwrap();
     assert_eq!(report.manifest.rows, 2);
+    assert_eq!(report.manifest.version, 2);
+    assert!(report.manifest.refresh_origin.is_some());
     assert_eq!(report.manifest.space, expected);
     assert_eq!(report.batches, 1);
     assert_eq!(report.batch, BatchPolicy::default());
@@ -144,7 +147,9 @@ fn concurrent_source_change_and_provider_failure_cannot_publish_partial_refresh(
         fs::write(changed, "fn changed() {}\n").unwrap()
     }));
     let (endpoint, worker) = server(responses);
-    assert!(extract::refresh(&store, &source, settings(endpoint, &["a.rs"])).is_err());
+    let mut forced = settings(endpoint, &["a.rs"]);
+    forced.force_reembed = true;
+    assert!(extract::refresh(&store, &source, forced).is_err());
     worker.join().unwrap();
     assert_eq!(store.current().unwrap(), original);
     let (endpoint, worker) = server(vec![reply("/api/tags", inventory(8))]);
@@ -561,6 +566,8 @@ fn later_overflow_sized_server_count_refuses_refresh_and_preserves_previous_inde
     let (endpoint, worker) = server(excessive_later_token_count());
     let mut cfg = settings(endpoint, &["a.txt", "b.txt"]);
     cfg.batch.max_inputs = 1;
+    // Exercise two real provider batches even though a prior row is reusable.
+    cfg.force_reembed = true;
     let mut seen = Vec::new();
     let result = extract::refresh_with_progress(&store, &source, cfg, |p| {
         seen.push(p);
@@ -570,6 +577,7 @@ fn later_overflow_sized_server_count_refuses_refresh_and_preserves_previous_inde
     worker.join().unwrap();
     assert_eq!(store.current().unwrap(), original);
     assert_eq!(seen.len(), 2);
+    assert_eq!((seen[1].reused_rows, seen[1].new_rows), (0, 1));
     assert_eq!(
         (seen[1].rows, seen[1].batches, seen[1].input_tokens_total),
         (1, 1, 10)
@@ -640,4 +648,369 @@ fn query_observer_error_is_explicit_and_stops_before_the_next_request() {
         (seen[1].rows, seen[1].batches, seen[1].input_tokens_total),
         (1, 1, 10)
     );
+}
+
+#[test]
+fn unchanged_refresh_reuses_exact_vectors_without_network_or_token_fabrication() {
+    use conductor_native::vector_index::Snapshot;
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn alpha() {}\n").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![3.0, 4.0]]));
+    let first = extract::refresh(&store, &source, settings(endpoint, &["a.rs"])).unwrap();
+    worker.join().unwrap();
+    let old = Snapshot::open(
+        &store
+            .root()
+            .join(&first.manifest.generation)
+            .join("vectors.bin"),
+    )
+    .unwrap();
+    let before: Vec<_> = old.row(0).unwrap().iter().map(|v| v.to_bits()).collect();
+    drop(old);
+    let sentinel = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    sentinel.set_nonblocking(true).unwrap();
+    let endpoint = format!("http://{}", sentinel.local_addr().unwrap());
+    let next = extract::refresh(&store, &source, settings(endpoint, &["a.rs"])).unwrap();
+    assert_eq!(
+        sentinel.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    assert_eq!(
+        (
+            next.reused_rows,
+            next.new_rows,
+            next.batches,
+            next.input_tokens_total
+        ),
+        (1, 0, 0, 0)
+    );
+    let snapshot = Snapshot::open(
+        &store
+            .root()
+            .join(&next.manifest.generation)
+            .join("vectors.bin"),
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot
+            .row(0)
+            .unwrap()
+            .iter()
+            .map(|v| v.to_bits())
+            .collect::<Vec<_>>(),
+        before
+    );
+}
+#[test]
+fn changed_deleted_and_new_files_refresh_only_missing_rows() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    for (path, data) in [
+        ("a.rs", "fn a() {}\n"),
+        ("b.rs", "fn b() {}\n"),
+        ("c.rs", "fn c() {}\n"),
+    ] {
+        fs::write(source.join(path), data).unwrap();
+    }
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]; 3]));
+    extract::refresh(
+        &store,
+        &source,
+        settings(endpoint, &["a.rs", "b.rs", "c.rs"]),
+    )
+    .unwrap();
+    worker.join().unwrap();
+    fs::write(source.join("b.rs"), "fn changed() {}\n").unwrap();
+    fs::remove_file(source.join("c.rs")).unwrap();
+    fs::write(source.join("d.rs"), "fn added() {}\n").unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![0.0, 1.0]; 2]));
+    let report = extract::refresh(
+        &store,
+        &source,
+        settings(endpoint, &["a.rs", "b.rs", "d.rs"]),
+    )
+    .unwrap();
+    let calls = worker.join().unwrap();
+    let body: Value = serde_json::from_slice(&calls[1].1).unwrap();
+    assert_eq!(
+        body["input"],
+        json!(["fn changed() {}\n", "fn added() {}\n"])
+    );
+    assert_eq!(
+        (report.reused_rows, report.new_rows, report.manifest.rows),
+        (1, 2, 3)
+    );
+    assert_eq!(report.input_tokens_total, 10);
+    let mut reader = Reader::open(&store).unwrap();
+    assert!(reader.search(&source, query("c")).unwrap().hits.is_empty());
+}
+#[test]
+fn changed_space_and_force_reembed_do_not_reuse() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    extract::refresh(&store, &source, settings(endpoint, &["a.rs"])).unwrap();
+    worker.join().unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![0.0, 1.0]]));
+    let mut changed = settings(endpoint, &["a.rs"]);
+    changed.embedding.threads = 2;
+    let report = extract::refresh(&store, &source, changed).unwrap();
+    worker.join().unwrap();
+    assert_eq!((report.reused_rows, report.new_rows), (0, 1));
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let mut forced = settings(endpoint, &["a.rs"]);
+    forced.embedding.threads = 2;
+    forced.force_reembed = true;
+    let report = extract::refresh(&store, &source, forced).unwrap();
+    worker.join().unwrap();
+    assert_eq!(
+        (report.reused_rows, report.new_rows, report.batches),
+        (0, 1, 1)
+    );
+}
+#[test]
+fn corrupted_prior_generation_fails_closed_without_reembedding() {
+    use std::os::unix::fs::PermissionsExt;
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let prior = extract::refresh(&store, &source, settings(endpoint, &["a.rs"]))
+        .unwrap()
+        .manifest
+        .generation;
+    worker.join().unwrap();
+    let vector = store.root().join(&prior).join("vectors.bin");
+    fs::set_permissions(&vector, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut bytes = fs::read(&vector).unwrap();
+    bytes[0] ^= 1;
+    fs::write(&vector, bytes).unwrap();
+    fs::set_permissions(&vector, fs::Permissions::from_mode(0o400)).unwrap();
+    assert!(extract::refresh(
+        &store,
+        &source,
+        settings("http://127.0.0.1:1".into(), &["a.rs"])
+    )
+    .is_err());
+    assert_eq!(store.current().unwrap(), prior);
+}
+#[test]
+fn partial_reuse_then_provider_failure_keeps_prior_generation() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    fs::write(source.join("b.rs"), "fn b() {}\n").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]; 2]));
+    let prior = extract::refresh(&store, &source, settings(endpoint, &["a.rs", "b.rs"]))
+        .unwrap()
+        .manifest
+        .generation;
+    worker.join().unwrap();
+    fs::write(source.join("b.rs"), "fn changed() {}\n").unwrap();
+    let (endpoint, worker) = server(vec![reply("/api/tags", inventory(8))]);
+    assert!(extract::refresh(&store, &source, settings(endpoint, &["a.rs", "b.rs"])).is_err());
+    worker.join().unwrap();
+    assert_eq!(store.current().unwrap(), prior);
+}
+#[test]
+fn imported_generation_without_native_refresh_origin_is_reembedded() {
+    use forge::code_index::{build, BuildHeader, EmbeddingRow};
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    let text = "fn a() {}\n";
+    fs::write(source.join("a.rs"), text).unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let model = config("http://127.0.0.1:1".into());
+    let plan = extract::plan(&source, &options(&["a.rs"], 512)).unwrap();
+    let prior = build(
+        &store,
+        &source,
+        BuildHeader {
+            version: 1,
+            rows: 1,
+            space: model.space().unwrap(),
+            config: Config::default(),
+        },
+        [Ok(EmbeddingRow {
+            path: "a.rs".into(),
+            source_sha256: plan.files[0].source_sha256.clone(),
+            start_byte: 0,
+            end_byte: text.len(),
+            vector: vec![1.0, 0.0],
+        })],
+    )
+    .unwrap();
+    assert_eq!(prior.version, 1);
+    assert!(prior.refresh_origin.is_none());
+    let (endpoint, worker) = server(sequence(vec![vec![0.0, 1.0]]));
+    let report = extract::refresh(&store, &source, settings(endpoint, &["a.rs"])).unwrap();
+    worker.join().unwrap();
+    assert_eq!((report.reused_rows, report.new_rows), (0, 1));
+    assert!(report.manifest.refresh_origin.is_some());
+}
+#[test]
+fn corrupted_refresh_origin_is_rejected_even_with_force() {
+    use std::os::unix::fs::PermissionsExt;
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let prior = extract::refresh(&store, &source, settings(endpoint, &["a.rs"]))
+        .unwrap()
+        .manifest
+        .generation;
+    worker.join().unwrap();
+    let manifest = store.root().join(&prior).join("manifest.json");
+    let mut value: Value = serde_json::from_slice(&fs::read(&manifest).unwrap()).unwrap();
+    value["refresh_origin"]["generation"] = json!("mismatched-generation");
+    fs::set_permissions(&manifest, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&manifest, serde_json::to_vec(&value).unwrap()).unwrap();
+    fs::set_permissions(&manifest, fs::Permissions::from_mode(0o400)).unwrap();
+    let mut forced = settings("http://127.0.0.1:1".into(), &["a.rs"]);
+    forced.force_reembed = true;
+    assert!(extract::refresh(&store, &source, forced).is_err());
+    assert_eq!(store.current().unwrap(), prior);
+}
+#[test]
+fn changing_span_or_path_requires_new_embeddings() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.txt"), "x".repeat(200)).unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    extract::refresh(&store, &source, settings(endpoint, &["a.txt"])).unwrap();
+    worker.join().unwrap();
+    let mut changed = settings("http://127.0.0.1:1".into(), &["a.txt"]);
+    changed.sources.chunk_bytes = 128;
+    let spans = extract::plan(&source, &changed.sources).unwrap().rows;
+    assert!(spans > 1);
+    let (endpoint, worker) = server(sequence(vec![vec![0.0, 1.0]; spans]));
+    changed.embedding.endpoint = endpoint;
+    let result = extract::refresh(&store, &source, changed).unwrap();
+    worker.join().unwrap();
+    assert_eq!((result.reused_rows, result.new_rows), (0, spans as u64));
+    fs::rename(source.join("a.txt"), source.join("b.txt")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]; spans]));
+    let mut renamed = settings(endpoint, &["b.txt"]);
+    renamed.sources.chunk_bytes = 128;
+    let result = extract::refresh(&store, &source, renamed).unwrap();
+    worker.join().unwrap();
+    assert_eq!((result.reused_rows, result.new_rows), (0, spans as u64));
+}
+#[test]
+fn empty_planned_file_drift_aborts_before_publication() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    fs::write(source.join("empty.txt"), "").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let prior = extract::refresh(&store, &source, settings(endpoint, &["a.rs", "empty.txt"]))
+        .unwrap()
+        .manifest
+        .generation;
+    worker.join().unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let mut forced = settings(endpoint, &["a.rs", "empty.txt"]);
+    forced.force_reembed = true;
+    let mut changed = false;
+    let result = extract::refresh_with_progress(&store, &source, forced, |progress| {
+        if progress.new_rows > 0 && !changed {
+            fs::write(source.join("empty.txt"), "newly nonempty")?;
+            changed = true;
+        }
+        Ok(())
+    });
+    assert!(result.is_err());
+    worker.join().unwrap();
+    assert_eq!(store.current().unwrap(), prior);
+}
+#[test]
+fn cli_force_reembed_sends_new_request_for_unchanged_row() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    extract::refresh(&store, &source, settings(endpoint, &["a.rs"])).unwrap();
+    worker.join().unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![0.0, 1.0]]));
+    let cfg = host.0.join("refresh.json");
+    fs::write(
+        &cfg,
+        serde_json::to_vec(&settings(endpoint, &["a.rs"])).unwrap(),
+    )
+    .unwrap();
+    let output = std::process::Command::new(support::forge_binary::path())
+        .args(["code-index", "refresh", "--index"])
+        .arg(store.root())
+        .arg("--source-root")
+        .arg(&source)
+        .arg("--config")
+        .arg(&cfg)
+        .arg("--force-reembed")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["reused_rows"], 0);
+    assert_eq!(report["new_rows"], 1);
+    assert_eq!(worker.join().unwrap().len(), 3);
+}
+#[test]
+fn named_source_root_replacement_during_refresh_refuses_publication() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    let displaced = host.0.join("source-original");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.rs"), "fn a() {}\n").unwrap();
+    fs::write(source.join("empty.txt"), "").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let prior = extract::refresh(&store, &source, settings(endpoint, &["a.rs", "empty.txt"]))
+        .unwrap()
+        .manifest
+        .generation;
+    worker.join().unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let mut forced = settings(endpoint, &["a.rs", "empty.txt"]);
+    forced.force_reembed = true;
+    let mut swapped = false;
+    let result = extract::refresh_with_progress(&store, &source, forced, |progress| {
+        if progress.new_rows > 0 && !swapped {
+            fs::rename(&source, &displaced)?;
+            fs::create_dir(&source)?;
+            fs::write(source.join("a.rs"), "fn a() {}\n")?;
+            fs::write(source.join("empty.txt"), "replacement content")?;
+            swapped = true;
+        }
+        Ok(())
+    });
+    worker.join().unwrap();
+    assert!(swapped);
+    assert!(result.is_err());
+    assert_eq!(store.current().unwrap(), prior);
+    assert_eq!(fs::read(displaced.join("empty.txt")).unwrap(), b"");
 }

@@ -18,7 +18,6 @@ from conductor.candidate_review.checks import ReviewContext
 from conductor.candidate_review.engine import (
     append_attestation,
     governance_lock,
-    run_locked_git_commit,
     run_review,
     verify_receipt_payload,
 )
@@ -244,14 +243,6 @@ def verify_command(args: argparse.Namespace) -> int:
         f"valid receipt {payload.get('receipt_id')} decision={payload.get('decision')}"
     )
     return 0
-
-
-def commit_command(args: argparse.Namespace) -> int:
-    repo = repository_root(Path(args.repo))
-    commit_args = list(args.git_args)
-    if commit_args and commit_args[0] == "--":
-        commit_args = commit_args[1:]
-    return run_locked_git_commit(repo, ["commit", *commit_args])
 
 
 def _claim_owner(repo: Path, declared: str) -> str:
@@ -517,12 +508,6 @@ def _add_review_parsers(
     verify.add_argument("--repo", default="")
     verify.add_argument("--ref", default="")
     verify.set_defaults(func=verify_command)
-    commit = subparsers.add_parser(
-        "commit", help="Hold the governance mutex across git commit"
-    )
-    commit.add_argument("--repo", default=".")
-    commit.add_argument("git_args", nargs=argparse.REMAINDER)
-    commit.set_defaults(func=commit_command)
 
 
 def _add_claim_parsers(

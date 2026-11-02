@@ -5,9 +5,13 @@ use std::{
     fs::{self, File, OpenOptions},
     os::{
         fd::{AsRawFd, FromRawFd},
-        unix::fs::{MetadataExt, OpenOptionsExt},
+        unix::{
+            fs::{MetadataExt, OpenOptionsExt},
+            process::CommandExt,
+        },
     },
     path::{Path, PathBuf},
+    process::Command,
     time::{Duration, Instant},
 };
 
@@ -17,16 +21,6 @@ pub(crate) struct ReviewLock {
     parent: (u64, u64),
     borrowed: bool,
 }
-impl Drop for ReviewLock {
-    fn drop(&mut self) {
-        if !self.borrowed && unsafe { libc::flock(self.file.as_raw_fd(), libc::LOCK_UN) } != 0 {
-            eprintln!(
-                "forge: release review lock: {}",
-                std::io::Error::last_os_error()
-            );
-        }
-    }
-}
 impl ReviewLock {
     pub(crate) fn acquire(repo: &Path, timeout: Duration) -> Result<Self> {
         let path = crate::ownership::checked_claim_path(repo, "commit-review.lock")?
@@ -35,6 +29,47 @@ impl ReviewLock {
         let raw = std::env::var_os("LLM_GOVERNANCE_COMMIT_LOCK_FD");
         let token = std::env::var_os("LLM_GOVERNANCE_COMMIT_LOCK_TOKEN");
         choose(&path, raw, token.is_some(), timeout)
+    }
+    /// Acquire a writer lease, or validate an already-inherited writer lease.
+    pub(crate) fn acquire_exclusive_cancellable(
+        repo: &Path,
+        timeout: Duration,
+        cancel: &mut dyn FnMut() -> Result<()>,
+    ) -> Result<Self> {
+        let path = crate::ownership::checked_claim_path(repo, "commit-review.lock")?
+            .context("repository has no Git common directory")?;
+        fs::create_dir_all(path.parent().context("governance lock parent missing")?)?;
+        let raw = std::env::var_os("LLM_GOVERNANCE_COMMIT_LOCK_FD");
+        let token = std::env::var_os("LLM_GOVERNANCE_COMMIT_LOCK_TOKEN");
+        choose_exclusive_cancellable(&path, raw, token.is_some(), timeout, cancel)
+    }
+    /// Wait for the child while retaining the same exclusive open-file description.
+    /// The caller must propagate ExitStatus, including Unix signals, to its own caller.
+    pub(crate) fn prepare_child(&self, command: &mut Command) -> Result<()> {
+        self.verify()?;
+        verify_exclusive(&self.file, &self.path)?;
+        let fd = self.file.as_raw_fd();
+        command.env("LLM_GOVERNANCE_COMMIT_LOCK_FD", fd.to_string());
+        command.env_remove("LLM_GOVERNANCE_COMMIT_LOCK_TOKEN");
+        unsafe {
+            command.pre_exec(move || {
+                let flags = libc::fcntl(fd, libc::F_GETFD);
+                if flags < 0 || libc::fcntl(fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        Ok(())
+    }
+    #[cfg(test)]
+    pub(crate) fn run_child(&self, command: &mut Command) -> Result<std::process::ExitStatus> {
+        self.prepare_child(command)?;
+        let status = command
+            .status()
+            .context("run child under governance lease")?;
+        self.verify()?;
+        Ok(status)
     }
     pub(crate) fn verify(&self) -> Result<()> {
         ensure!(
@@ -72,6 +107,33 @@ fn choose(
     ensure!(!token, "token-only governance inheritance cannot retain the owning flock; pass the inherited lock descriptor");
     shared(path, timeout)
 }
+#[cfg(test)]
+fn choose_exclusive(
+    path: &Path,
+    raw: Option<std::ffi::OsString>,
+    token: bool,
+    timeout: Duration,
+) -> Result<ReviewLock> {
+    choose_exclusive_cancellable(path, raw, token, timeout, &mut || Ok(()))
+}
+fn choose_exclusive_cancellable(
+    path: &Path,
+    raw: Option<std::ffi::OsString>,
+    token: bool,
+    timeout: Duration,
+    cancel: &mut dyn FnMut() -> Result<()>,
+) -> Result<ReviewLock> {
+    cancel()?;
+    if let Some(raw) = raw {
+        let text = raw
+            .to_str()
+            .context("inherited governance fd is not UTF-8")?;
+        let fd: i32 = text.parse().context("invalid inherited governance fd")?;
+        return inherited(path, fd);
+    }
+    ensure!(!token, "token-only governance inheritance cannot retain the owning flock; pass the inherited lock descriptor");
+    acquire_cancellable(path, timeout, libc::LOCK_EX, cancel)
+}
 fn open(path: &Path) -> Result<File> {
     let file = OpenOptions::new()
         .read(true)
@@ -102,13 +164,26 @@ fn verify(file: &File, path: &Path) -> Result<()> {
     Ok(())
 }
 fn shared(path: &Path, timeout: Duration) -> Result<ReviewLock> {
+    acquire(path, timeout, libc::LOCK_SH)
+}
+fn acquire(path: &Path, timeout: Duration, operation: i32) -> Result<ReviewLock> {
+    acquire_cancellable(path, timeout, operation, &mut || Ok(()))
+}
+fn acquire_cancellable(
+    path: &Path,
+    timeout: Duration,
+    operation: i32,
+    cancel: &mut dyn FnMut() -> Result<()>,
+) -> Result<ReviewLock> {
+    cancel()?;
     let parent = parent_identity(path)?;
     let file = open(path)?;
     let deadline = Instant::now()
         .checked_add(timeout)
         .context("lock timeout overflow")?;
     loop {
-        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) } == 0 {
+        cancel()?;
+        if unsafe { libc::flock(file.as_raw_fd(), operation | libc::LOCK_NB) } == 0 {
             let held = ReviewLock {
                 file,
                 path: path.to_owned(),
@@ -144,6 +219,14 @@ fn inherited(path: &Path, raw: i32) -> Result<ReviewLock> {
     );
     let file = unsafe { File::from_raw_fd(fd) };
     verify_exclusive(&file, path)?;
+    // The incoming descriptor is inheritable to reach this process. Keep both
+    // the original and our owned duplicate close-on-exec for unrelated stages.
+    let flags = unsafe { libc::fcntl(raw, libc::F_GETFD) };
+    ensure!(
+        flags >= 0 && unsafe { libc::fcntl(raw, libc::F_SETFD, flags | libc::FD_CLOEXEC) } == 0,
+        "cannot protect inherited governance fd: {}",
+        std::io::Error::last_os_error()
+    );
     let held = ReviewLock {
         file,
         path: path.to_owned(),

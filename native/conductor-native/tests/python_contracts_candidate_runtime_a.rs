@@ -35,53 +35,6 @@ fn call_bool<'py>(object: &Bound<'py, PyAny>, name: &str, arg: impl IntoPyObject
 }
 
 #[test]
-fn locked_commit_reuses_mutex_in_precommit_hook() {
-    let case = fixture::isolated_case();
-    let repo = runtime::repo(&case);
-    runtime::write(&repo, "probe.txt", "baseline\n");
-    fixture::commit_all(&repo, "baseline");
-    fixture::git(&repo, &["config", "--unset", "core.hooksPath"]);
-    let hook = repo.join(".git/hooks/pre-commit");
-    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join("src")
-        .canonicalize()
-        .unwrap();
-    let interpreter = Python::attach(|py| {
-        module(py, "sys")
-            .getattr("executable")
-            .unwrap()
-            .extract::<String>()
-            .unwrap()
-    });
-    fs::write(
-        &hook,
-        format!(
-            "#!{interpreter}\nimport os\nimport sys\nfrom pathlib import Path\nsys.path.insert(0, {source:?})\nfrom conductor.candidate_review.engine import governance_lock\ninherited_fd = os.environ.pop('LLM_GOVERNANCE_COMMIT_LOCK_FD', None)\nif inherited_fd is not None:\n    try:\n        os.close(int(inherited_fd))\n    except OSError:\n        pass\nwith governance_lock(Path.cwd(), exclusive=False, timeout_seconds=0.2):\n    pass\n",
-            source = source.to_str().unwrap()
-        ),
-    )
-    .unwrap();
-    fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
-    runtime::write(&repo, "probe.txt", "candidate\n");
-    fixture::git(&repo, &["add", "probe.txt"]);
-    Python::attach(|py| {
-        let rc: i32 = module(py, "conductor.candidate_review.engine")
-            .getattr("run_locked_git_commit")
-            .unwrap()
-            .call1((path(py, &repo), vec!["commit", "-m", "candidate"]))
-            .unwrap()
-            .extract()
-            .unwrap();
-        assert_eq!(rc, 0);
-    });
-    assert_eq!(
-        fixture::git(&repo, &["show", "HEAD:probe.txt"]),
-        "candidate"
-    );
-}
-
-#[test]
 fn inherited_lock_descriptor_validation() {
     let mut case = fixture::isolated_case();
     let repo = runtime::repo(&case);
@@ -102,6 +55,7 @@ fn inherited_lock_descriptor_validation() {
         assert!(!call_bool(engine.as_any(), "_is_ancestor_process", -1));
         fs::create_dir_all(lock.parent().unwrap()).unwrap();
         fs::write(&lock, "").unwrap();
+        fs::set_permissions(&lock, fs::Permissions::from_mode(0o600)).unwrap();
         let fd_env: String = engine
             .getattr("INHERITED_LOCK_FD_ENV")
             .unwrap()
@@ -127,14 +81,73 @@ fn inherited_lock_descriptor_validation() {
             "LLM_GOVERNANCE_COMMIT_LOCK_FD",
             &matching.as_raw_fd().to_string(),
         );
+        assert!(inherited.call1((path(py, &lock),)).unwrap().is_none());
+        assert_eq!(
+            unsafe { libc::flock(matching.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+            0
+        );
+        fs::set_permissions(&lock, fs::Permissions::from_mode(0o660)).unwrap();
+        assert!(inherited.call1((path(py, &lock),)).unwrap().is_none());
+        fs::set_permissions(&lock, fs::Permissions::from_mode(0o600)).unwrap();
+        let flags = unsafe { libc::fcntl(matching.as_raw_fd(), libc::F_GETFD) };
+        assert_eq!(
+            unsafe {
+                libc::fcntl(
+                    matching.as_raw_fd(),
+                    libc::F_SETFD,
+                    flags & !libc::FD_CLOEXEC,
+                )
+            },
+            0
+        );
         let actual: i32 = inherited
             .call1((path(py, &lock),))
             .unwrap()
             .extract()
             .unwrap();
         assert_eq!(actual, matching.as_raw_fd());
+        assert_ne!(
+            unsafe { libc::fcntl(actual, libc::F_GETFD) } & libc::FD_CLOEXEC,
+            0
+        );
         drop(matching);
+        case.set_env("LLM_GOVERNANCE_COMMIT_LOCK_FD", "99999");
+        let lock_args = PyDict::new(py);
+        lock_args.set_item("exclusive", false).unwrap();
+        lock_args.set_item("timeout_seconds", 0.1).unwrap();
+        let closed = engine
+            .getattr("governance_lock")
+            .unwrap()
+            .call((path(py, &repo),), Some(&lock_args))
+            .unwrap();
+        assert!(closed.call_method0("__enter__").is_err());
+        case.remove_env("LLM_GOVERNANCE_COMMIT_LOCK_FD");
         case.set_env("LLM_GOVERNANCE_COMMIT_LOCK_TOKEN", "short");
+        let token_only = engine
+            .getattr("governance_lock")
+            .unwrap()
+            .call((path(py, &repo),), Some(&lock_args))
+            .unwrap();
+        assert!(token_only.call_method0("__enter__").is_err());
+    });
+}
+
+#[test]
+fn legacy_token_diagnostics_are_not_authorization() {
+    let mut case = fixture::isolated_case();
+    let repo = runtime::repo(&case);
+    case.set_env("LLM_GOVERNANCE_COMMIT_LOCK_TOKEN", "short");
+    Python::attach(|py| {
+        let engine = module(py, "conductor.candidate_review.engine");
+        let lock: std::path::PathBuf = engine
+            .getattr("_governance_lock_path")
+            .unwrap()
+            .call1((path(py, &repo),))
+            .unwrap()
+            .extract()
+            .unwrap();
+        fs::create_dir_all(lock.parent().unwrap()).unwrap();
+        fs::write(&lock, "").unwrap();
         let valid = engine.getattr("_inherited_lock_token_valid").unwrap();
         assert!(!valid
             .call1((path(py, &lock),))

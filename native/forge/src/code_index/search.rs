@@ -7,6 +7,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+pub(super) struct ReuseRow {
+    pub index: usize,
+    pub path: String,
+    pub source_sha256: String,
+    pub start: usize,
+    pub end: usize,
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchMode {
@@ -138,6 +146,56 @@ impl Reader {
             vectors,
             workspace,
         })
+    }
+    pub(super) fn reuse_metadata(
+        &self,
+        checkpoint: &mut dyn FnMut() -> Result<()>,
+    ) -> Result<Vec<ReuseRow>> {
+        let mut statement = self.database.prepare(
+            "SELECT rowid,path,source_sha256,start_byte,end_byte FROM chunks ORDER BY rowid",
+        )?;
+        let mut rows = statement.query([])?;
+        let mut out = Vec::new();
+        let mut budget = 0usize;
+        while let Some(row) = rows.next()? {
+            checkpoint()?;
+            let id: usize = row.get(0)?;
+            let path: String = row.get(1)?;
+            let hash: String = row.get(2)?;
+            let start: usize = row.get(3)?;
+            let end: usize = row.get(4)?;
+            budget = budget
+                .checked_add(path.len() + hash.len() + 96)
+                .context("reuse metadata budget overflow")?;
+            ensure!(
+                budget <= 128 * 1024 * 1024,
+                "reuse metadata exceeds 128 MiB"
+            );
+            ensure!(id == out.len() + 1, "reuse row identity is invalid");
+            out.push(ReuseRow {
+                index: id - 1,
+                path,
+                source_sha256: hash,
+                start,
+                end,
+            });
+        }
+        ensure!(
+            out.len() == self.vectors.len(),
+            "reuse metadata row count mismatch"
+        );
+        Ok(out)
+    }
+    pub(super) fn reuse_vector(&self, row: usize, expected: &str) -> Result<Vec<f32>> {
+        let text: String = self
+            .database
+            .prepare_cached("SELECT text FROM chunks WHERE rowid=?1")?
+            .query_row([row + 1], |r| r.get(0))?;
+        ensure!(
+            text == expected,
+            "reusable chunk content differs from verified source"
+        );
+        Ok(self.vectors.row(row)?.to_vec())
     }
     pub fn manifest(&self) -> &Manifest {
         &self.pinned.manifest

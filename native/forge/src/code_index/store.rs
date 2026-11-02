@@ -4,10 +4,22 @@ use crate::harness::state;
 use anyhow::{ensure, Context, Result};
 use conductor_native::vector_index::{Config, Space};
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
-use std::os::unix::fs::DirBuilderExt;
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
+/// Native-refresh lineage, local evidence rather than authentication against the owner.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RefreshOrigin {
+    pub version: u32,
+    pub generation: String,
+    pub source_root: PathBuf,
+    pub space: Space,
+    #[serde(with = "conductor_native::sha256_hex")]
+    pub source_set_sha256: [u8; 32],
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
@@ -21,11 +33,14 @@ pub struct Manifest {
     pub config: Config,
     pub database_sha256: String,
     pub vectors_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_origin: Option<RefreshOrigin>,
 }
 impl Manifest {
     pub(crate) fn validate(&self, generation: &str) -> Result<()> {
         ensure!(
-            self.version == 1
+            ((self.version == 1 && self.refresh_origin.is_none())
+                || (self.version == 2 && self.refresh_origin.is_some()))
                 && self.generation == generation
                 && self.source_root.is_absolute()
                 && self.rows <= conductor_native::vector_index::MAX_ROWS
@@ -34,6 +49,16 @@ impl Manifest {
         );
         self.space.validate()?;
         self.config.validate()?;
+        if let Some(origin) = &self.refresh_origin {
+            ensure!(
+                origin.version == 1
+                    && origin.generation == self.generation
+                    && origin.source_root == self.source_root
+                    && origin.space == self.space
+                    && origin.source_set_sha256 == self.source_set_sha256,
+                "native refresh origin binding mismatch"
+            );
+        }
         validate_hash(&self.database_sha256)?;
         validate_hash(&self.vectors_sha256)?;
         Ok(())
@@ -169,8 +194,64 @@ pub(crate) struct Staging {
     _builder: Lease,
     published: bool,
 }
+struct PendingPointer {
+    path: PathBuf,
+    armed: bool,
+}
+impl Drop for PendingPointer {
+    fn drop(&mut self) {
+        if self.armed {
+            if let Err(error) = fs::remove_file(&self.path) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    eprintln!(
+                        "forge: failed to remove unpublished pointer {}: {error}",
+                        self.path.display()
+                    );
+                }
+            }
+        }
+    }
+}
+fn write_pointer(root: &Path, id: &str) -> Result<PendingPointer> {
+    let path = root.join(crate::native_id::new("pointer")?);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)?;
+    let pointer = PendingPointer { path, armed: true };
+    file.write_all(id.as_bytes())?;
+    file.sync_all()?;
+    File::open(root)?.sync_all()?;
+    Ok(pointer)
+}
+struct PublicationChecks<'a> {
+    checkpoint: &'a mut dyn FnMut() -> Result<()>,
+    final_check: &'a mut dyn FnMut() -> Result<()>,
+}
 impl Staging {
     pub fn publish(mut self, manifest: &Manifest) -> Result<Manifest> {
+        self.publish_inner(manifest, None)
+    }
+    pub fn publish_checked(
+        mut self,
+        manifest: &Manifest,
+        checkpoint: &mut dyn FnMut() -> Result<()>,
+        final_check: &mut dyn FnMut() -> Result<()>,
+    ) -> Result<Manifest> {
+        self.publish_inner(
+            manifest,
+            Some(PublicationChecks {
+                checkpoint,
+                final_check,
+            }),
+        )
+    }
+    fn publish_inner(
+        &mut self,
+        manifest: &Manifest,
+        checks: Option<PublicationChecks<'_>>,
+    ) -> Result<Manifest> {
         manifest.validate(&self.id)?;
         state::write_new(
             &self.path.join("manifest.json"),
@@ -179,6 +260,7 @@ impl Staging {
         seal(&self.path.join("manifest.json"))?;
         drop(lock(&self.path.join("readers.lock"), true)?);
         File::open(&self.path)?.sync_all()?;
+        // This existing private-state lock is deliberately nonblocking.
         let _publication = lock(&self.store.root.join("publication.lock"), true)?;
         let previous = match self.store.current() {
             Ok(id) => Some(id),
@@ -190,9 +272,14 @@ impl Staging {
             }
             Err(e) => return Err(e),
         };
-        let pointer = self.store.root.join(crate::native_id::new("pointer")?);
-        state::write_new(&pointer, self.id.as_bytes())?;
-        fs::rename(&pointer, self.store.root.join("current"))?;
+        let mut pointer = write_pointer(&self.store.root, &self.id)?;
+        if let Some(checks) = checks {
+            (checks.checkpoint)()?;
+            (checks.final_check)()?;
+            (checks.checkpoint)()?;
+        }
+        fs::rename(&pointer.path, self.store.root.join("current"))?;
+        pointer.armed = false;
         // Once published, never delete this generation on a durability/GC error.
         self.published = true;
         File::open(&self.store.root)?.sync_all().with_context(|| {
@@ -212,6 +299,7 @@ impl Staging {
         Ok(manifest.clone())
     }
 }
+
 impl Drop for Staging {
     fn drop(&mut self) {
         if !self.published {
@@ -244,3 +332,7 @@ pub(crate) fn seal(path: &Path) -> Result<()> {
     crate::state_publish::seal_file(path)?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "store_tests.rs"]
+mod publication_tests;

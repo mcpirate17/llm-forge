@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::{Dir, DirBuilder, DirBuilderExt, MetadataExt, OpenOptions, OpenOptionsExt};
-pub(crate) use grants::Grants;
+pub(crate) use grants::{Grants, MutationGrandfather};
 use serde_json::Value;
 use std::{
     io::Write,

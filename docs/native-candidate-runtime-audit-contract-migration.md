@@ -1,5 +1,7 @@
 # Candidate runtime and mutation patch audit contracts in Rust
 
+The snapshot and locked-commit rows below are historical; native Forge commit recovery replaces their former Python providers and compatibility targets. See `docs/native-commit-recovery.md`.
+
 This slice moves the final 17 cases of `src/conductor/test_candidate_review.py`
 and all 27 cases of `src/conductor/test_mutation_patch_audit.py` into Rust owned
 fixtures and assertions. Each Rust test calls the shipped Python API through

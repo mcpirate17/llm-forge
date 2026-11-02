@@ -23,8 +23,27 @@ impl Builder {
     /// insertion. Failure drops the unpublished builder, never a mapped snapshot.
     pub fn new_checked(
         space: Space,
+        vectors: Vec<f32>,
+        config: Config,
+        checkpoint: impl FnMut() -> Result<()>,
+    ) -> Result<Self> {
+        Self::new_inner(space, vectors, config, None, checkpoint)
+    }
+    /// Preserve bit-identical previously validated unit vectors; normalize new rows.
+    pub fn new_reusing_checked(
+        space: Space,
+        vectors: Vec<f32>,
+        config: Config,
+        reused: &[bool],
+        checkpoint: impl FnMut() -> Result<()>,
+    ) -> Result<Self> {
+        Self::new_inner(space, vectors, config, Some(reused), checkpoint)
+    }
+    fn new_inner(
+        space: Space,
         mut vectors: Vec<f32>,
         config: Config,
+        reused: Option<&[bool]>,
         mut checkpoint: impl FnMut() -> Result<()>,
     ) -> Result<Self> {
         space.validate()?;
@@ -39,9 +58,19 @@ impl Builder {
         {
             bail!("embedding matrix exceeds shape or byte limits");
         }
-        for row in vectors.chunks_exact_mut(space.dimension) {
+        if reused.is_some_and(|flags| flags.len() != rows) {
+            bail!("reuse mask does not match matrix rows");
+        }
+        for (index, row) in vectors.chunks_exact_mut(space.dimension).enumerate() {
             checkpoint()?;
-            distance::normalize(row)?;
+            if reused.is_some_and(|flags| flags[index]) {
+                let norm: f64 = row.iter().map(|&v| f64::from(v).powi(2)).sum();
+                if !norm.is_finite() || (norm - 1.0).abs() > 1e-5 {
+                    bail!("reused vector is not finite and normalized");
+                }
+            } else {
+                distance::normalize(row)?;
+            }
         }
         let mut result = Self {
             space,

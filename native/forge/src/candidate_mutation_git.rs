@@ -25,12 +25,64 @@ impl<'a> GitInputs<'a> {
         }
     }
     pub fn anchor(&mut self, commit: &str, tree: &str) -> Result<()> {
+        let id = Oid::from_str(commit)?;
+        let (size, kind) = self.source.repository().odb()?.read_header(id)?;
+        ensure!(
+            kind == ObjectType::Commit && size <= 1024 * 1024,
+            "grandfather anchor commit exceeds bounds"
+        );
         ensure!(
             self.source.commit_tree(commit)? == tree,
             "review anchor commit/tree binding differs"
         );
         self.anchors.insert(commit.into(), tree.into());
         Ok(())
+    }
+    pub fn anchor_ancestor(&mut self, commit: &str, tree: &str, base: &str) -> Result<()> {
+        self.anchor(commit, tree)?;
+        let repo = self.source.repository();
+        let odb = repo.odb()?;
+        let expected = Oid::from_str(commit)?;
+        let mut pending = vec![Oid::from_str(base)?];
+        let mut seen = std::collections::HashSet::new();
+        let mut bytes = 0usize;
+        while let Some(id) = pending.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            ensure!(
+                seen.len() <= 20_000,
+                "grandfather ancestry exceeds 20000 commits"
+            );
+            let (size, kind) = odb
+                .read_header(id)
+                .context("grandfather ancestry unavailable or shallow")?;
+            bytes = bytes
+                .checked_add(size)
+                .context("grandfather ancestry overflow")?;
+            ensure!(
+                kind == ObjectType::Commit && size <= 1024 * 1024 && bytes <= 32 * 1024 * 1024,
+                "grandfather ancestry exceeds bounds"
+            );
+            if id == expected {
+                return Ok(());
+            }
+            let node = repo
+                .find_commit(id)
+                .context("grandfather ancestry unavailable or shallow")?;
+            ensure!(
+                node.parent_count() <= 64,
+                "grandfather ancestry parent count exceeds bound"
+            );
+            ensure!(
+                pending.len().saturating_add(node.parent_count()) <= 100_000,
+                "grandfather ancestry frontier exceeds bound"
+            );
+            pending.extend(node.parent_ids());
+        }
+        anyhow::bail!(
+            "grandfather anchor is not an ancestor of candidate base or history is shallow"
+        )
     }
     pub fn entries(&mut self, tree: &str) -> Result<&BTreeMap<String, TreeEntry>> {
         if !self.trees.contains_key(tree) {

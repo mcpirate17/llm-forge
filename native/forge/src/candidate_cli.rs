@@ -16,8 +16,12 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Snapshot admitted work and hold the exclusive lease through native Git commit.
+    Commit(crate::candidate_commit::CommitArgs),
     /// Review the complete active policy using captured evidence and isolated native execution.
     Review(Box<crate::candidate_review::ReviewArgs>),
+    /// Run a fresh pre-commit review and bind a commit message to its result.
+    AttestMessage(Box<crate::candidate_review::AttestArgs>),
     /// Pin installed compatibility runner sources; never executes or approves them.
     RunnerBundle(crate::candidate_runner_bundle_cli::BundleArgs),
     /// Validate captured configuration and inspect Python source with native analyzers.
@@ -122,6 +126,7 @@ pub fn run_with_stamp(
     stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
 ) -> Result<u8> {
     match args.action {
+        Action::Commit(args) => return crate::candidate_commit::run(args),
         Action::Review(args) => {
             let report = crate::candidate_review::run(
                 *args,
@@ -130,6 +135,14 @@ pub fn run_with_stamp(
             let failed = report["executed"] == true && report["decision"] != "pass";
             print_json(&report)?;
             return Ok(u8::from(failed));
+        }
+        Action::AttestMessage(args) => {
+            let report = crate::candidate_review::attest(
+                *args,
+                stamp.context("attestation requires the CLI's compiled engine identity")?,
+            )?;
+            print_json(&report)?;
+            return Ok(0);
         }
         Action::RunnerBundle(args) => crate::candidate_runner_bundle_cli::run(args)?,
         Action::Analyze(args) => return crate::candidate_analysis_cli::run(args),

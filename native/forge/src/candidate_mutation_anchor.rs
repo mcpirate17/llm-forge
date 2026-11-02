@@ -5,7 +5,14 @@ pub(super) fn prove(
     path: &str,
     bytes: &[u8],
     contract: &Value,
+    baseline: Option<&crate::candidate_execution_workspace::MutationGrandfather>,
 ) -> Result<()> {
+    let baseline = baseline
+        .context("legacy receipt requires explicitly pinned legacy grandfather baseline")?;
+    ensure!(
+        definitions::legacy(baseline),
+        "legacy receipt requires exact legacy grandfather pins"
+    );
     ensure!(
         path.starts_with("conductor/mutation_campaigns/receipts/") && path.ends_with(".json"),
         "legacy receipt path is outside the anchored receipt directory"

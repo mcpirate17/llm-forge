@@ -29,6 +29,9 @@ enum Action {
         source_root: PathBuf,
         #[arg(long)]
         config: PathBuf,
+        /// Re-embed all rows even if exact reusable rows are available.
+        #[arg(long)]
+        force_reembed: bool,
     },
     /// Ingest bounded JSONL: one BuildHeader followed by sorted EmbeddingRows.
     Build {
@@ -68,9 +71,11 @@ pub fn run(args: CodeIndexArgs) -> Result<u8> {
             index,
             source_root,
             config,
+            force_reembed,
         } => {
-            let config: super::extract::Refresh =
+            let mut config: super::extract::Refresh =
                 serde_json::from_slice(&crate::harness::state::read(&config, 1024 * 1024)?)?;
+            config.force_reembed |= force_reembed;
             serde_json::to_value(super::extract::refresh(
                 &Store::create(&index)?,
                 &source_root,

@@ -110,6 +110,33 @@ impl ProcessGroup {
         })
     }
 
+    /// Nonblocking reap, recording status so Drop never signals a recycled group.
+    pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        if let Some(status) = self.stopped {
+            return Ok(Some(status));
+        }
+        let status = self.child.as_mut().expect("owned child").try_wait()?;
+        if let Some(status) = status {
+            self.stopped = Some(status);
+        }
+        Ok(status)
+    }
+    /// The owned leader remains unreaped while the process group is signalled.
+    pub fn signal(&self, signal: i32) -> io::Result<()> {
+        if self.stopped.is_some() {
+            return Err(io::Error::other("group leader already reaped"));
+        }
+        if unsafe { libc::kill(-(self.id() as libc::pid_t), signal) } == 0 {
+            return Ok(());
+        }
+        let error = io::Error::last_os_error();
+        if error.raw_os_error() == Some(libc::ESRCH) {
+            Ok(())
+        } else {
+            Err(error)
+        }
+    }
+
     pub fn child(&self) -> &Child {
         self.child.as_ref().expect("owned child")
     }

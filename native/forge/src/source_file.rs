@@ -41,6 +41,12 @@ impl SourceRoot {
         })
     }
 
+    pub(crate) fn identity(&self) -> Result<(u64, u64)> {
+        let metadata = self.directory.dir_metadata()?;
+        ensure!(metadata.is_dir(), "source root is not a directory");
+        Ok((metadata.dev(), metadata.ino()))
+    }
+
     pub fn read(&self, path: &Path) -> Result<Snapshot> {
         validate_relative(path)?;
         let mut file = self

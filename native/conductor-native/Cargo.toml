@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.89"
+version = "0.1.90"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -253,10 +253,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_codex_journal"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_commit_snapshot"
 required-features = ["python-compat-tests"]
 
 [[test]]

@@ -46,6 +46,8 @@ pub(crate) struct Context<'a> {
     pub today: &'a str,
     pub runner: Option<RunnerBundleSpec<'a>>,
     pub scratch_exclusions: &'a [PathBuf],
+    pub grandfather: Option<&'a crate::candidate_execution_workspace::MutationGrandfather>,
+    pub waiver_policy_sha256: Option<&'a str>,
 }
 /// Retain this provider, its Source/Snapshot/Policy and any applied Stage observation
 /// until final disposition. Public output edits fail verify().
@@ -61,6 +63,7 @@ pub(crate) struct Evidence<'a> {
     date: String,
     requests: Vec<Request>,
     observation: Option<Observation>,
+    waivers_authorized: bool,
     output_digest: String,
     pub result: CheckResult,
     pub evidence: Value,
@@ -126,7 +129,14 @@ impl Evidence<'_> {
         if let Some(values) = &self.values {
             findings.extend(values.findings(self.observation.as_ref())?);
         }
-        let states = waivers::apply(&mut findings, self.policy, self.candidate, &self.date)?;
+        let mut states = if self.waivers_authorized {
+            waivers::apply(&mut findings, self.policy, self.candidate, &self.date)?
+        } else {
+            waivers::value_states(self.policy, self.candidate, &self.date)?
+        };
+        if !self.waivers_authorized {
+            waivers::deny_candidate_waivers(&mut states)?;
+        }
         ensure!(findings.len() <= 4096, "mutation findings exceed4096");
         for row in &mut findings {
             candidate_assessment::finalize_finding(row);
@@ -154,6 +164,11 @@ impl Evidence<'_> {
         Ok(())
     }
 }
+fn waiver_authorized(document: &Value, digest: &str, pin: Option<&str>) -> Result<bool> {
+    let receipt = list(&document["mutation_waivers"])?;
+    let value = list(&document["value_waivers"])?;
+    Ok((receipt.is_empty() && value.is_empty()) || pin == Some(digest))
+}
 pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
     let started = Instant::now();
     ensure!(
@@ -161,6 +176,11 @@ pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
         "mutation candidate exceeds4096 changes"
     );
     crate::candidate_review_evidence::validate_changes(context.source, context.candidate)?;
+    let waivers_authorized = waiver_authorized(
+        &context.policy.document,
+        &context.policy.digest,
+        context.waiver_policy_sha256,
+    )?;
     let mut classified = context.candidate.clone();
     context.policy.classify_candidate(&mut classified)?;
     let capture = Capture::new(
@@ -170,8 +190,13 @@ pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
         context.policy,
         context.today,
     )?;
-    let mut build = Build::new(capture, GitInputs::new(context.source), classified);
-    build.run(&context)?;
+    let mut build = Build::new(
+        capture,
+        GitInputs::new(context.source),
+        classified,
+        context.grandfather.is_none(),
+    );
+    build.run(&context, waivers_authorized)?;
     let requests = build
         .values
         .as_ref()
@@ -180,6 +205,9 @@ pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
     let evidence = json!({"schema_version":1,"candidate_tree_oid":context.candidate.tree_oid,"base_tree_oid":context.candidate.base_tree_oid,
         "policy_path":context.policy.path,"policy_sha256":context.policy.digest,"inputs":build.capture.ledger.values().collect::<Vec<_>>(),
         "git_inputs":build.git.evidence,"gated_nodeids":build.gated,"base_definition_errors":build.notes,
+        "grandfather_mode":if context.grandfather.is_some(){"operator_pinned"}else{"strict_all_changed_test_definitions"},
+        "grandfather_baseline":context.grandfather,
+        "waiver_policy_authorized":waivers_authorized,
         "receipt_verification":build.payload,"runner":build.bundle.as_ref().map(|b|&b.evidence),
         "original_witnesses":build.values.as_ref().map(value::Values::witnesses),"external_invariant_requests":requests,
         "external_invariants":null,"execution_verified":false,"approval":false,
@@ -216,6 +244,7 @@ pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
         date: waivers::local_date()?,
         requests,
         observation: None,
+        waivers_authorized,
         output_digest: String::new(),
         result,
         evidence,
@@ -239,11 +268,15 @@ struct Build<'a> {
     metrics: Map<String, Value>,
 }
 impl<'a> Build<'a> {
-    fn new(capture: Capture<'a>, git: GitInputs<'a>, candidate: Candidate) -> Self {
+    fn new(capture: Capture<'a>, git: GitInputs<'a>, candidate: Candidate, strict: bool) -> Self {
         let files = candidate
             .changes
             .iter()
-            .filter(|c| !c.deleted() && definitions::value_test(c))
+            .filter(|c| {
+                !c.deleted()
+                    && (definitions::value_test(c)
+                        || strict && c.classes.iter().any(|class| class == "test"))
+            })
             .map(|c| c.path.clone())
             .collect();
         Self {
@@ -261,12 +294,22 @@ impl<'a> Build<'a> {
             metrics: Map::new(),
         }
     }
-    fn run(&mut self, ctx: &Context<'a>) -> Result<()> {
+    fn run(&mut self, ctx: &Context<'a>, waivers_authorized: bool) -> Result<()> {
+        if !waivers_authorized {
+            self.findings.push(finding("mutation-waiver-policy-untrusted", "candidate mutation waivers require an operator pin matching the exact policy SHA-256".into(), None)?);
+        }
         if self.files.is_empty() {
-            self.skip = Some("no matching candidate test changes".into());
+            if self.findings.is_empty() {
+                self.skip = Some("no matching candidate test changes".into());
+            }
             return Ok(());
         }
-        match definitions::grandfather(&mut self.capture.inputs, &mut self.git) {
+        match definitions::grandfather(
+            &mut self.capture.inputs,
+            &mut self.git,
+            &self.candidate,
+            ctx.grandfather,
+        ) {
             Err(error) => self.findings.push(finding(
                 "grandfather-inventory-invalid",
                 format!("grandfather inventory fails closed: {error:#}"),
@@ -278,6 +321,7 @@ impl<'a> Build<'a> {
                 ctx.snapshot,
                 &self.candidate,
                 &grandfathered,
+                ctx.grandfather.is_none(),
             ) {
                 Ok((gated, notes)) => {
                     self.gated = gated;
@@ -312,7 +356,14 @@ impl<'a> Build<'a> {
         Ok(())
     }
     fn receipts(&mut self, ctx: &Context<'a>, paths: &[String]) -> Result<()> {
-        let states = waivers::receipt_states(&mut self.capture, &self.candidate, ctx.policy)?;
+        let mut states = waivers::receipt_states(&mut self.capture, &self.candidate, ctx.policy)?;
+        if !waiver_authorized(
+            &ctx.policy.document,
+            &ctx.policy.digest,
+            ctx.waiver_policy_sha256,
+        )? {
+            waivers::deny_candidate_waivers(&mut states)?;
+        }
         let config = self.capture.config()?;
         let Some(registry) = registry::registry(&mut self.capture, config.as_ref())? else {
             self.findings.push(finding("mutation-registry-missing","candidate snapshot lacks the configured mutation registry; changed tests cannot prove mutation evidence".into(),None)?);
@@ -340,7 +391,7 @@ impl<'a> Build<'a> {
             .map(|b| json!({"runner":b.runner,"binding_sha256":b.bindings,"lineage":b.lineage}));
         let verified=conductor_native::mutation_evidence::verify_captured(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
             "runtime":runtime,"broken_campaigns":catalog.broken,"malformed_receipts":catalog.malformed}),&catalog.receipts,
-            |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract).map_err(|e|format!("{e:#}"))).map_err(anyhow::Error::msg)?;
+            |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}"))).map_err(anyhow::Error::msg)?;
         self.payload = verified.result;
         let waived: Vec<_> = list(&states)?
             .iter()

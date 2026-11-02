@@ -1,5 +1,21 @@
 //! Exact base/hash/date-bound exceptions retained as visible findings.
 use super::*;
+pub(super) fn deny_candidate_waivers(states: &mut Value) -> Result<()> {
+    for state in states
+        .as_array_mut()
+        .context("candidate waiver states must be an array")?
+    {
+        let row = state
+            .as_object_mut()
+            .context("candidate waiver state must be an object")?;
+        row.insert("active".into(), json!(false));
+        row.insert(
+            "reason".into(),
+            json!("candidate policy is not pinned by operator grants"),
+        );
+    }
+    Ok(())
+}
 pub(super) fn receipt_states(
     capture: &mut Capture<'_>,
     candidate: &Candidate,

@@ -5,17 +5,36 @@ pub(super) const ANCHOR_COMMIT: &str = "61343f575215dd222a74fc2c060d0328692ded5e
 pub(super) const ANCHOR_TREE: &str = "b01877ba62c32445f7649450f9b395dd70de306a";
 const INVENTORY: &str = "conductor/candidate_review/grandfathered_test_nodeids_61343f57.json";
 const INVENTORY_SHA: &str = "aa0a89e12c7a43e9dc3f509f5540ed67df112462cb9fd6cafe060c596f3414d8";
-pub(super) fn grandfather(inputs: &mut Inputs<'_>, git: &mut GitInputs<'_>) -> Result<Value> {
+pub(super) fn legacy(spec: &crate::candidate_execution_workspace::MutationGrandfather) -> bool {
+    spec.commit == ANCHOR_COMMIT
+        && spec.tree == ANCHOR_TREE
+        && spec.inventory_path == INVENTORY
+        && spec.inventory_sha256 == INVENTORY_SHA
+}
+pub(super) fn grandfather(
+    inputs: &mut Inputs<'_>,
+    git: &mut GitInputs<'_>,
+    candidate: &Candidate,
+    spec: Option<&crate::candidate_execution_workspace::MutationGrandfather>,
+) -> Result<Value> {
+    let Some(spec) = spec else {
+        return Ok(json!({}));
+    };
+    spec.validate()?;
     let raw = inputs
-        .read_bytes_with_limit(INVENTORY, 2 * 1024 * 1024)?
+        .read_bytes_with_limit(&spec.inventory_path, 2 * 1024 * 1024)?
         .to_vec();
     ensure!(
-        hex(&raw) == INVENTORY_SHA,
+        hex(&raw) == spec.inventory_sha256,
         "grandfather inventory differs from SHA bound at fixed anchor"
     );
-    git.anchor(ANCHOR_COMMIT, ANCHOR_TREE)?;
+    let base = candidate
+        .base_commit_oid
+        .as_deref()
+        .context("grandfather baseline requires a candidate base commit")?;
+    git.anchor_ancestor(&spec.commit, &spec.tree, base)?;
     let paths: Vec<_> = git
-        .entries(ANCHOR_TREE)?
+        .entries(&spec.tree)?
         .keys()
         .filter(|path| {
             path.ends_with(".py")
@@ -31,7 +50,7 @@ pub(super) fn grandfather(inputs: &mut Inputs<'_>, git: &mut GitInputs<'_>) -> R
     );
     let mut derived = Map::new();
     for path in paths {
-        let text = std::str::from_utf8(git.read(ANCHOR_TREE, &path)?)?;
+        let text = std::str::from_utf8(git.read(&spec.tree, &path)?)?;
         let definitions =
             conductor_native::candidate_verification::python_test_definitions(text, &path)
                 .map_err(anyhow::Error::msg)?;
@@ -47,6 +66,10 @@ pub(super) fn grandfather(inputs: &mut Inputs<'_>, git: &mut GitInputs<'_>) -> R
     }
     let payload =
         crate::tool_schema::parse_document_with_limit(std::str::from_utf8(&raw)?, 2 * 1024 * 1024)?;
+    let milestone = payload["milestone"]
+        .as_str()
+        .filter(|v| !v.is_empty() && v.len() <= 256 && !v.chars().any(char::is_control))
+        .context("grandfather inventory milestone missing or invalid")?;
     let present: Vec<_> = inputs
         .entries
         .iter()
@@ -58,8 +81,8 @@ pub(super) fn grandfather(inputs: &mut Inputs<'_>, git: &mut GitInputs<'_>) -> R
     decide(
         "inventory_validate",
         &json!({"payload":payload,"expected_schema":"conductor.candidate_review.grandfather_inventory/v1",
-        "anchor_commit":ANCHOR_COMMIT,"milestone":"w7-trident-linear-integration","derived":derived,
-        "present_paths":present,"dead_paths":DEAD_PATHS}),
+        "anchor_commit":spec.commit,"milestone":milestone,"derived":derived,
+        "present_paths":present,"dead_paths":if legacy(spec) { DEAD_PATHS } else { &[] }}),
     )
 }
 pub(super) fn value_test(change: &crate::candidate_source::Change) -> bool {
@@ -72,6 +95,7 @@ pub(super) fn gated(
     _snapshot: &Snapshot,
     candidate: &Candidate,
     grandfathered: &Value,
+    strict: bool,
 ) -> Result<(Value, Vec<Value>)> {
     let mut entries = Vec::new();
     let rust_needed = candidate
@@ -83,7 +107,7 @@ pub(super) fn gated(
     } else {
         BTreeMap::new()
     };
-    let base_rust = if rust_needed {
+    let base_rust = if rust_needed && !strict {
         base_rust_files(git, &candidate.base_tree_oid)?
     } else {
         BTreeMap::new()
@@ -91,6 +115,10 @@ pub(super) fn gated(
     let mut notes = Vec::new();
     for change in candidate.changes.iter().filter(|change| !change.deleted()) {
         let mut row = json!({"path":change.path,"classes":change.classes,"old_mode":change.old_mode,"old_oid":change.old_oid});
+        if strict {
+            row["old_mode"] = json!("000000");
+            row["old_oid"] = json!("0000000000000000000000000000000000000000");
+        }
         if value_test(change) {
             row["definitions"] = definitions(
                 inputs.read(&change.path)?,
@@ -98,7 +126,7 @@ pub(super) fn gated(
                 Path::new("/"),
                 &current_rust,
             )?;
-            row["base"] = if change.old_mode == "000000" {
+            row["base"] = if strict || change.old_mode == "000000" {
                 Value::Null
             } else {
                 let path = change.old_path.as_deref().unwrap_or(&change.path);

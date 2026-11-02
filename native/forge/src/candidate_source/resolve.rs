@@ -98,7 +98,7 @@ pub(super) fn read_index(path: &Path) -> Result<Index> {
 
 /// libgit2 reopens filenames, so give it an immutable private copy rather than
 /// the mutable admitted path. No index bytes or temporary files reach disk.
-pub(super) fn parse_index(raw: &[u8]) -> Result<Index> {
+pub(crate) fn parse_index(raw: &[u8]) -> Result<Index> {
     preflight_index(raw)?;
     let descriptor = unsafe {
         libc::memfd_create(

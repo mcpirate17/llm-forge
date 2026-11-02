@@ -1,17 +1,17 @@
 {
-  "revision": "674d258ad2dc9653b883a2923f40932178a49798+embedding-batch-controls-v2",
+  "revision": "968fd0585e68b7ec8fb502321d40de6884ed963c+native-review-reuse-prospective-ccecb05b2c85",
   "files": {
     "native/conductor-native/src/syntax.rs": "f162fc5aea73745aa03dddec4ef931be7191505c0d5b3d4e25aa8c66399f9617",
     "native/conductor-native/src/vector_index/search.rs": "a9bb89afb365dcef33730aef98040d778ecba45f8062774ebf0badd7e841f796",
-    "native/forge/src/candidate_review.rs": "1e757a562a08326c3dced0af0b4bfd85e7c97e6cb9fc698667479a65187d1bb1",
-    "native/forge/src/candidate_review_collect.rs": "419b944ad79efcfc101b9a9e431f979c501336e80d38317960df1ed193eb748a",
+    "native/forge/src/candidate_review.rs": "19c696408c5e322ebd4f45feaf68fc71b4bc0602028caeb96a8cde6c3f3b697f",
+    "native/forge/src/candidate_review_collect.rs": "6cc8e165cf28e9bd83ad52e1601f410491ce62e03afb9c366f169e0ddbade629",
     "native/forge/src/candidate_review_evidence.rs": "344ad5b552ee8e690d593e704af451b36dce5a39b3a7dd4c50fb87333da00b5f",
     "native/forge/src/candidate_review_receipt.rs": "851decf94c3d7479884f134a82fc1fdaa0e29d5e6a7f0aad5938c17b71610130",
     "native/forge/src/candidate_test_selection.rs": "ab944a932ccbe1c03671b483c046b038b1dbaf1e2533a350f58053598466323e",
     "native/forge/src/cgroup.rs": "6c8ceaaf07fc4c17895d3e522086243f84640e329719f388a9d3f566ebf7769b",
-    "native/forge/src/code_index/extract.rs": "a30187c3822f3c51a6acd901b31d12bb615e59d8556cd18ea93ef31af8da8c98",
-    "native/forge/src/code_index/search.rs": "c6552ec0ec1052e753e55238b1d2560858b1f14db740992328dd796c5dfce795",
-    "native/forge/src/code_index/store.rs": "0dee7dd4c5294ae700f2f9049a261eb14e7e2324300e0a4f3938a7c0926f2dde",
+    "native/forge/src/code_index/extract.rs": "a990346b9755827c1642b1e059ac650074a6ae751e36a21aad7f8e71e5037379",
+    "native/forge/src/code_index/search.rs": "0d59d6f9fda38f90aa8b7e927cd398e0277fc739c6104cc4ec4a2b80fd4099b7",
+    "native/forge/src/code_index/store.rs": "5af35d1ef8665f93d20c84aed61e163d8b6c58c05ed780a734299b7d549bc252",
     "native/forge/src/code_tools.rs": "9e7a14e1cdcd3120b63eebd0c2c4cfa37f9c6467511c076501b54d678a761efb",
     "native/forge/src/context_store.rs": "4a9d3e7ef7028b60d94727acf9a3d1c6893dc40c7bac0c0248fdade14898b1f8",
     "native/forge/src/context_tools.rs": "c242ffdb72942f8ee506aaddcce39053185b1cf0e13a50a7f4b0c37d6bb2901b",
@@ -166,8 +166,8 @@
         {
           "path": "native/forge/src/code_index/search.rs",
           "symbol": "Searcher::search",
-          "line_start": 148,
-          "line_end": 315,
+          "line_start": 206,
+          "line_end": 373,
           "reason": "Combines lexical and vector search, freshness checks, exact scoring and bounded result formation."
         }
       ]
@@ -179,15 +179,15 @@
         {
           "path": "native/forge/src/code_index/extract.rs",
           "symbol": "plan",
-          "line_start": 99,
-          "line_end": 209,
+          "line_start": 108,
+          "line_end": 219,
           "reason": "Plans bounded chunks with source hashes and syntax-aware boundaries."
         },
         {
           "path": "native/forge/src/code_index/extract.rs",
           "symbol": "refresh",
-          "line_start": 211,
-          "line_end": 385,
+          "line_start": 255,
+          "line_end": 482,
           "reason": "Coordinates embedding, source rechecks and index publication."
         }
       ]
@@ -212,8 +212,8 @@
         {
           "path": "native/forge/src/code_index/store.rs",
           "symbol": "Store::publish",
-          "line_start": 173,
-          "line_end": 226,
+          "line_start": 233,
+          "line_end": 314,
           "reason": "Publishes a complete generation and accounts for previous generations and active leases."
         }
       ]
@@ -371,7 +371,7 @@
           "path": "native/forge/src/candidate_review_collect.rs",
           "symbol": "run and evidence collectors",
           "line_start": 56,
-          "line_end": 302,
+          "line_end": 308,
           "reason": "Coordinates the requested observations, including mutation and equivalence providers."
         },
         {
@@ -397,8 +397,8 @@
         {
           "path": "native/forge/src/candidate_review.rs",
           "symbol": "run",
-          "line_start": 83,
-          "line_end": 160,
+          "line_start": 101,
+          "line_end": 208,
           "reason": "Owns explicit selection, optional execution and completion coordination."
         }
       ]

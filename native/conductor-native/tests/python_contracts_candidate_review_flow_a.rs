@@ -1054,16 +1054,6 @@ fn assert_attestation_contract(
         .unwrap()
         .eq(&trailers)
         .unwrap());
-    assert_error(
-        py,
-        engine
-            .getattr("run_locked_git_commit")
-            .unwrap()
-            .call1((path(py, repo), ["status"]))
-            .unwrap_err(),
-        &module(py, "builtins").getattr("ValueError").unwrap(),
-        "beginning with 'commit'",
-    );
 }
 
 #[test]

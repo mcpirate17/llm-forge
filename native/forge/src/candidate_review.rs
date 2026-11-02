@@ -1,4 +1,6 @@
 //! Complete-profile native coordination. Only owned observations enter assessment.
+#[path = "candidate_attest_message.rs"]
+mod attest_message;
 #[path = "candidate_review_collect.rs"]
 mod collect;
 #[path = "candidate_review_equivalence.rs"]
@@ -64,6 +66,22 @@ pub struct ReviewArgs {
     #[arg(long)]
     equivalence_artifacts: Option<PathBuf>,
 }
+#[derive(Args)]
+pub struct AttestArgs {
+    /// Existing owned commit message to atomically append.
+    message: PathBuf,
+    #[command(flatten)]
+    review: ReviewArgs,
+}
+pub fn attest(args: AttestArgs, stamp: &BuildStamp) -> Result<Value> {
+    ensure!(args.review.execute, "attest-message requires --execute");
+    ensure!(
+        args.review.outputs.is_empty(),
+        "attest-message publishes only its canonical receipt"
+    );
+    let message = attest_message::Message::open(&args.message)?;
+    run_inner(args.review, stamp, Some(message))
+}
 
 fn required(plans: &[Arc<CheckPlan>]) -> Result<Vec<String>> {
     let mut seen = BTreeSet::from(["engine-integrity", "attestation"]);
@@ -81,6 +99,13 @@ fn required(plans: &[Arc<CheckPlan>]) -> Result<Vec<String>> {
 }
 
 pub fn run(args: ReviewArgs, stamp: &BuildStamp) -> Result<Value> {
+    run_inner(args, stamp, None)
+}
+fn run_inner(
+    args: ReviewArgs,
+    stamp: &BuildStamp,
+    message: Option<attest_message::Message>,
+) -> Result<Value> {
     args.outputs.validate()?;
     ensure!(
         args.lock_timeout <= 3600,
@@ -101,6 +126,18 @@ pub fn run(args: ReviewArgs, stamp: &BuildStamp) -> Result<Value> {
         .as_secs_f64();
     let interrupts = args.execute.then(Interrupts::install).transpose()?;
     let selection = Arc::new(Selection::load(&args.selection)?);
+    if message.is_some() {
+        ensure!(
+            matches!(
+                selection.candidate.kind,
+                crate::candidate_source::Kind::Index
+            ) && matches!(
+                selection.surface,
+                Some(crate::candidate_execution_plan::Surface::PreCommit)
+            ) && selection.profile() == "fast",
+            "attest-message requires index, pre-commit and fast profile"
+        );
+    }
     selection
         .surface
         .context("review requires an explicit --surface")?;
@@ -139,6 +176,17 @@ pub fn run(args: ReviewArgs, stamp: &BuildStamp) -> Result<Value> {
     }
     lease.as_ref().expect("executing").verify()?;
     let report = receipt::build(&selection, &ids, observation, wall, started)?;
+    if let Some(message) = message {
+        let owned = attest_message::Completed::new(&report, &selection, &plans, &ids)?;
+        let publication = attest_message::publish(
+            owned,
+            message,
+            &args.selection,
+            &selection,
+            lease.as_ref().expect("executing"),
+        )?;
+        return Ok(json!({"review":report,"attestation":publication}));
+    }
     lease.as_ref().expect("executing").verify()?;
     args.outputs.publish(&report)?;
     lease.as_ref().expect("executing").verify()?;

@@ -542,6 +542,7 @@ fn refresh_index(
         &bench.root,
         extract::Refresh {
             sources: options,
+            force_reembed: true,
             batch: recipe.batch,
             embedding: recipe.embedding.clone(),
             graph: Default::default(),

@@ -132,6 +132,12 @@ pub(crate) fn resolve_captured_file(
     paths::resolve_captured_file(source, entries, path)
 }
 
+pub(crate) fn validate_recovery_tree(source: &Source, tree: &str, limits: Limits) -> Result<()> {
+    let plan = paths::prepare(source, tree, limits)?;
+    ensure!(plan.skipped == 0, "recovery tree refuses gitlinks");
+    Ok(())
+}
+
 pub fn preflight(source: &Source, tree: &str, output: &Path, limits: Limits) -> Result<Report> {
     let destination = Destination::open(output)?;
     let plan = paths::prepare(source, tree, limits)?;

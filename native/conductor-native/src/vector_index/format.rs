@@ -226,6 +226,13 @@ impl Snapshot {
     pub fn mapped_bytes(&self) -> usize {
         self.map.len()
     }
+    /// Return an immutable, validated normalized row from the pinned snapshot.
+    pub fn row(&self, row: usize) -> Result<&[f32]> {
+        if row >= self.len() {
+            bail!("vector row out of bounds");
+        }
+        Ok(self.vector(row))
+    }
     pub fn search<'a>(
         &self,
         query: &Query,

@@ -2,6 +2,7 @@
 mod changes;
 pub mod lines;
 mod resolve;
+pub(crate) use resolve::parse_index;
 mod tool_context;
 pub use tool_context::ToolBinding;
 #[cfg(test)]

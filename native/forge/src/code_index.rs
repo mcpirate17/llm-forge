@@ -2,11 +2,12 @@
 mod build;
 pub mod cli;
 pub mod extract;
+mod reuse;
 mod search;
 mod store;
 pub use build::{build, BuildHeader, EmbeddingRow};
 pub use search::{QueryRequest, ReadLimits, Reader, SearchMode, SearchResult};
-pub use store::{Manifest, Store};
+pub use store::{Manifest, RefreshOrigin, Store};
 
 use anyhow::{ensure, Result};
 use sha2::{Digest, Sha256};

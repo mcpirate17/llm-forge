@@ -99,6 +99,8 @@ fn context<'a>(
         today: TODAY,
         runner: None,
         scratch_exclusions: &[],
+        grandfather: None,
+        waiver_policy_sha256: None,
     }
 }
 #[test]
@@ -114,24 +116,243 @@ fn non_test_candidate_needs_neither_runner_registry_nor_anchor() {
     evidence.verify().unwrap();
 }
 #[test]
-fn missing_grandfather_and_registry_are_critical_and_never_pass() {
+fn strict_default_requires_registry_without_historical_anchor() {
     let f = Fixture::new();
     f.write("tests/test_new.py", "def test_new():\n    assert True\n");
     let (source, snapshot, candidate, policy) = f.captured();
     let evidence = collect(context(&source, &snapshot, &candidate, &policy)).unwrap();
     assert_eq!(evidence.result.status, CheckStatus::Failed);
-    for rule in ["grandfather-inventory-invalid", "mutation-registry-missing"] {
-        assert!(evidence
-            .result
-            .findings
-            .iter()
-            .any(|f| f.rule_id == rule && f.severity == candidate_assessment::Severity::Critical));
-    }
+    assert!(evidence
+        .result
+        .findings
+        .iter()
+        .any(|f| f.rule_id == "mutation-registry-missing"
+            && f.severity == candidate_assessment::Severity::Critical));
     assert!(evidence
         .result
         .findings
         .iter()
         .all(|f| f.fingerprint.len() == 24));
+}
+#[test]
+fn unborn_repository_strictly_gates_added_test() {
+    let root = std::env::temp_dir().join(crate::native_id::new("mutation-unborn").unwrap());
+    fs::create_dir(&root).unwrap();
+    let repo = git2::Repository::init(root.join("repo")).unwrap();
+    let f = Fixture { root, repo };
+    f.write("policy.toml", POLICY);
+    f.write(
+        "tests/test_first.py",
+        "def test_first():\n    assert True\n",
+    );
+    let (source, snapshot, candidate, policy) = f.captured();
+    assert!(candidate.base_commit_oid.is_none());
+    let evidence = collect(context(&source, &snapshot, &candidate, &policy)).unwrap();
+    assert_eq!(
+        evidence.evidence["gated_nodeids"]["tests/test_first.py"],
+        json!(["tests/test_first.py::test_first"])
+    );
+    assert!(!evidence
+        .result
+        .findings
+        .iter()
+        .any(|v| v.rule_id == "grandfather-inventory-invalid"));
+}
+#[test]
+fn strict_mode_gates_every_definition_in_changed_test_even_if_unchanged() {
+    let f = Fixture::new();
+    f.write(
+        "tests/test_sample.py",
+        "def test_old():\n    assert True\n\ndef test_changed():\n    assert True\n",
+    );
+    f.write("tests/legacy.test.js", "test('old', () => {});\n");
+    f.write(
+        "tests/test_unchanged.py",
+        "def test_unchanged():\n    assert True\n",
+    );
+    f.commit();
+    f.write(
+        "tests/test_sample.py",
+        "def test_old():\n    assert True\n\ndef test_changed():\n    assert 2 == 2\n",
+    );
+    f.write(
+        "tests/legacy.test.js",
+        "test('old', () => { return 1; });\n",
+    );
+    f.write(
+        "pyproject.toml",
+        "[tool.conductor.mutation_grandfather]\ncommit='candidate-cannot-set-this'\n",
+    );
+    let (source, snapshot, candidate, policy) = f.captured();
+    let evidence = collect(context(&source, &snapshot, &candidate, &policy)).unwrap();
+    assert_eq!(
+        evidence.evidence["gated_nodeids"]["tests/test_sample.py"],
+        json!([
+            "tests/test_sample.py::test_changed",
+            "tests/test_sample.py::test_old"
+        ])
+    );
+    assert_eq!(
+        evidence.evidence["gated_nodeids"]["tests/legacy.test.js"],
+        json!(["tests/legacy.test.js"])
+    );
+    assert!(evidence.evidence["gated_nodeids"]
+        .get("tests/test_unchanged.py")
+        .is_none());
+    assert!(!evidence
+        .result
+        .findings
+        .iter()
+        .any(|v| v.rule_id == "grandfather-inventory-invalid"));
+}
+#[test]
+fn explicit_operator_baseline_requires_exact_inventory_and_ancestor() {
+    let f = Fixture::new();
+    f.write("tests/test_sample.py", "def test_old():\n    assert True\n");
+    f.commit();
+    let commit = f.repo.head().unwrap().peel_to_commit().unwrap();
+    let inventory = json!({"schema":"conductor.candidate_review.grandfather_inventory/v1", "anchor_commit":commit.id().to_string(), "milestone":"fixture", "tests":{"tests/test_sample.py":["test_old"]}}).to_string();
+    let pin = crate::candidate_execution_workspace::MutationGrandfather {
+        commit: commit.id().to_string(),
+        tree: commit.tree_id().to_string(),
+        inventory_path: "baseline.json".into(),
+        inventory_sha256: hex(inventory.as_bytes()),
+    };
+    f.write("baseline.json", &inventory);
+    f.write(
+        "tests/test_sample.py",
+        "def test_old():\n    assert False\n\ndef test_new():\n    assert True\n",
+    );
+    let (source, snapshot, candidate, policy) = f.captured();
+    let mut ctx = context(&source, &snapshot, &candidate, &policy);
+    ctx.grandfather = Some(&pin);
+    let evidence = collect(ctx).unwrap();
+    assert_eq!(
+        evidence.evidence["gated_nodeids"]["tests/test_sample.py"],
+        json!(["tests/test_sample.py::test_new"])
+    );
+    assert!(!evidence
+        .result
+        .findings
+        .iter()
+        .any(|v| v.rule_id == "grandfather-inventory-invalid"));
+    let mut wrong = pin.clone();
+    wrong.inventory_sha256 = "0".repeat(64);
+    let mut ctx = context(&source, &snapshot, &candidate, &policy);
+    ctx.grandfather = Some(&wrong);
+    let evidence = collect(ctx).unwrap();
+    assert!(evidence
+        .result
+        .findings
+        .iter()
+        .any(|v| v.rule_id == "grandfather-inventory-invalid"));
+    wrong = pin.clone();
+    wrong.inventory_path = "missing.json".into();
+    let mut ctx = context(&source, &snapshot, &candidate, &policy);
+    ctx.grandfather = Some(&wrong);
+    let evidence = collect(ctx).unwrap();
+    assert!(evidence
+        .result
+        .findings
+        .iter()
+        .any(|v| v.rule_id == "grandfather-inventory-invalid"));
+    wrong = pin.clone();
+    wrong.tree = "0".repeat(40);
+    let mut ctx = context(&source, &snapshot, &candidate, &policy);
+    ctx.grandfather = Some(&wrong);
+    let evidence = collect(ctx).unwrap();
+    assert!(evidence
+        .result
+        .findings
+        .iter()
+        .any(|v| v.rule_id == "grandfather-inventory-invalid"));
+    let sig = git2::Signature::now("test", "test@example.invalid").unwrap();
+    let tree = f.repo.find_tree(commit.tree_id()).unwrap();
+    let detached = f
+        .repo
+        .commit(None, &sig, &sig, "unrelated", &tree, &[])
+        .unwrap();
+    wrong = pin.clone();
+    wrong.commit = detached.to_string();
+    let mut git = GitInputs::new(&source);
+    assert!(git
+        .anchor_ancestor(&wrong.commit, &wrong.tree, &pin.commit)
+        .is_err());
+}
+#[test]
+fn candidate_policy_cannot_define_operator_grandfather_pins() {
+    let f = Fixture::new();
+    let forged = POLICY.replacen(
+        "[classes]",
+        "mutation_grandfather = { commit = 'fake' }\n[classes]",
+        1,
+    );
+    f.write("policy.toml", &forged);
+    let source = Source::open(&f.root.join("repo")).unwrap();
+    let candidate = source.resolve(Kind::Index, "HEAD", None).unwrap();
+    let snapshot = Snapshot::create(
+        &source,
+        &candidate.tree_oid,
+        &f.root.join("forged"),
+        Limits::default(),
+    )
+    .unwrap();
+    assert!(crate::candidate_policy::load(&snapshot.path(), Some("policy.toml"), TODAY).is_err());
+}
+#[test]
+fn untrusted_candidate_waivers_are_inactive_with_operator_pin_reason() {
+    let mut states = json!([{"active":true,"reason":"","path":"tests/test_one.py"}]);
+    waivers::deny_candidate_waivers(&mut states).unwrap();
+    assert_eq!(states[0]["active"], false);
+    assert!(states[0]["reason"]
+        .as_str()
+        .unwrap()
+        .contains("not pinned by operator grants"));
+}
+#[test]
+fn mutation_and_value_waivers_require_the_exact_operator_policy_pin() {
+    let digest = "a".repeat(64);
+    let other = "b".repeat(64);
+    for document in [
+        json!({"mutation_waivers":[{}],"value_waivers":[]}),
+        json!({"mutation_waivers":[],"value_waivers":[{}]}),
+        json!({"mutation_waivers":[{}],"value_waivers":[{}]}),
+    ] {
+        assert!(!waiver_authorized(&document, &digest, None).unwrap());
+        assert!(!waiver_authorized(&document, &digest, Some(&other)).unwrap());
+        assert!(waiver_authorized(&document, &digest, Some(&digest)).unwrap());
+    }
+    let no_exemptions = json!({"mutation_waivers":[],"value_waivers":[]});
+    assert!(waiver_authorized(&no_exemptions, &digest, None).unwrap());
+}
+#[test]
+fn strict_rename_gates_destination_and_deletion_adds_no_exemption() {
+    let f = Fixture::new();
+    f.write("tests/test_old.py", "def test_old():\n    assert True\n");
+    f.write(
+        "tests/test_deleted.py",
+        "def test_deleted():\n    assert True\n",
+    );
+    f.commit();
+    f.write(
+        "tests/test_renamed.py",
+        "def test_old():\n    assert True\n",
+    );
+    for path in ["tests/test_old.py", "tests/test_deleted.py"] {
+        fs::remove_file(f.root.join("repo").join(path)).unwrap();
+        let mut index = f.repo.index().unwrap();
+        index.remove_path(Path::new(path)).unwrap();
+        index.write().unwrap();
+    }
+    let (source, snapshot, candidate, policy) = f.captured();
+    let evidence = collect(context(&source, &snapshot, &candidate, &policy)).unwrap();
+    assert_eq!(
+        evidence.evidence["gated_nodeids"]["tests/test_renamed.py"],
+        json!(["tests/test_renamed.py::test_old"])
+    );
+    assert!(evidence.evidence["gated_nodeids"]
+        .get("tests/test_deleted.py")
+        .is_none());
 }
 #[test]
 fn observed_outputs_and_snapshot_bytes_are_reverified() {
@@ -190,6 +411,9 @@ fn exact_value_waiver_preserves_visible_reason_and_expires() {
     candidate.integration_base_oid = Some("a".repeat(40));
     policy.document["value_waivers"] = json!([{"integration_base":"a".repeat(40),"nodeids":["tests/test_a.py::test_a"],"reason":"external engine contract",
         "approved_by":"operator","approved_on":"2026-10-01","expires":"2026-11-02"}]);
+    assert!(!waiver_authorized(&policy.document, &policy.digest, None).unwrap());
+    assert!(waiver_authorized(&policy.document, &policy.digest, Some(&policy.digest)).unwrap());
+    assert!(!waiver_authorized(&policy.document, &"f".repeat(64), Some(&policy.digest)).unwrap());
     let mut finding = finding(
         "new-test-value-not-admitted",
         "value missing".into(),

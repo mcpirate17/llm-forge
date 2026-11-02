@@ -8,9 +8,8 @@ import importlib.metadata as importlib_metadata
 import json
 import os
 import re
-import secrets
+import stat
 import subprocess
-import sys
 import time
 import tomllib
 import traceback
@@ -377,10 +376,31 @@ def _inherited_lock_fd(lock_path: Path) -> int | None:
         if file_descriptor <= 2:
             return None
         inherited = os.fstat(file_descriptor)
-        expected = lock_path.stat()
-        if (inherited.st_dev, inherited.st_ino) != (expected.st_dev, expected.st_ino):
+        expected = lock_path.lstat()
+        parent = lock_path.parent.lstat()
+        if not (
+            stat.S_ISREG(inherited.st_mode)
+            and stat.S_ISREG(expected.st_mode)
+            and stat.S_ISDIR(parent.st_mode)
+            and inherited.st_nlink == expected.st_nlink == 1
+            and inherited.st_uid == expected.st_uid == parent.st_uid == os.geteuid()
+            and inherited.st_mode & 0o022 == expected.st_mode & 0o022 == 0
+            and parent.st_mode & 0o002 == 0
+            and (inherited.st_dev, inherited.st_ino) == (expected.st_dev, expected.st_ino)
+        ):
             return None
+        # An unlocked matching descriptor is not an inherited lease. Verify
+        # an independent shared acquisition is blocked before testing ownership.
+        with lock_path.open("a+") as verifier:
+            try:
+                fcntl.flock(verifier.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                pass
+            else:
+                fcntl.flock(verifier.fileno(), fcntl.LOCK_UN)
+                return None
         fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.set_inheritable(file_descriptor, False)
     except (OSError, ValueError):
         return None
     return file_descriptor
@@ -502,10 +522,12 @@ def governance_lock(
     """Hold the shared governance lock, reusing a verified commit-wrapper lease."""
 
     lock_path = _governance_lock_path(repo)
-    if not exclusive and (
-        _inherited_lock_fd(lock_path) is not None
-        or _inherited_lock_token_valid(lock_path)
-    ):
+    inherited_requested = (
+        INHERITED_LOCK_FD_ENV in os.environ or INHERITED_LOCK_TOKEN_ENV in os.environ
+    )
+    if inherited_requested:
+        if exclusive or _inherited_lock_fd(lock_path) is None:
+            raise RuntimeError("inherited governance lease requires a verified exclusive descriptor")
         yield lock_path
         return
     with _held_governance_lock(
@@ -1162,108 +1184,3 @@ def append_attestation(message_file: Path, repo: Path) -> dict[str, str]:
     trailer_text = "\n".join(f"{key}: {value}" for key, value in desired.items()) + "\n"
     message_file.write_text(message + suffix + trailer_text, encoding="utf-8")
     return desired
-
-
-def snapshot_working_tree(repo: Path, owner: str) -> str | None:
-    """Commit the entire working tree to a ref before anything can discard it.
-
-    `git commit` fires pre-commit, whose `staged_files_only` writes a patch and then
-    runs `git checkout -- .` across the WHOLE worktree to isolate the staged content.
-    That wipes every unstaged tracked modification, including files belonging to other
-    agents working in the same checkout, and it never captures untracked files at all.
-    If the process dies between the checkout and the restore -- OOM, prlimit kill,
-    Ctrl-C during a multi-minute review -- the only copy left is a patch file under
-    ~/.cache/pre-commit/.
-
-    So take a real snapshot first. A private GIT_INDEX_FILE keeps the repository's
-    shared index untouched (writing to it is itself a way to destroy a peer's staged
-    work), and the result is an ordinary commit object reachable from
-    refs/snapshots/<owner>/<timestamp>, recoverable with git checkout long after the
-    patch cache has been pruned.
-
-    Returns the ref, or None if the snapshot could not be taken -- the caller decides
-    whether that is fatal. It never raises: failing to snapshot must not be a new way
-    to fail a commit.
-    """
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    ref = f"refs/snapshots/{owner}/{stamp}"
-    # In a linked worktree `.git` is a FILE pointing at the real gitdir, so the index
-    # path has to be resolved by git rather than assembled from the repo root.
-    try:
-        git_dir = Path(
-            subprocess.run(
-                ["git", "rev-parse", "--absolute-git-dir"],
-                cwd=repo,
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip()
-        )
-    except (subprocess.CalledProcessError, OSError):
-        return None
-    index_file = git_dir / f"governance-snapshot-index-{os.getpid()}"
-    environment = {**os.environ, "GIT_INDEX_FILE": str(index_file)}
-
-    def run(*args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            ["git", *args],
-            cwd=repo,
-            env=environment,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-    try:
-        head = run("rev-parse", "HEAD").stdout.strip()
-        run("read-tree", head)
-        # -A picks up untracked files too; pre-commit's isolation never captures them.
-        run("add", "-A")
-        tree = run("write-tree").stdout.strip()
-        message = f"governance-commit snapshot for {owner} at {stamp}"
-        commit = run("commit-tree", tree, "-p", head, "-m", message).stdout.strip()
-        run("update-ref", ref, commit)
-        return ref
-    except (subprocess.CalledProcessError, OSError):
-        return None
-    finally:
-        index_file.unlink(missing_ok=True)
-
-
-def run_locked_git_commit(repo: Path, args: Sequence[str]) -> int:
-    if not args or args[0] != "commit":
-        raise ValueError(
-            "commit mutex wrapper accepts only arguments beginning with 'commit'"
-        )
-    owner = os.environ.get("GOVERNANCE_OWNER")
-    if owner is None:
-        owner = "unknown"
-    snapshot_ref = snapshot_working_tree(repo, owner)
-    if snapshot_ref:
-        print(
-            f"governance-commit: working tree snapshotted to {snapshot_ref}",
-            file=sys.stderr,
-        )
-    else:
-        print(
-            "governance-commit: WARNING -- could not snapshot the working tree; "
-            "uncommitted work is not recoverable if this commit's hooks discard it",
-            file=sys.stderr,
-        )
-    lease_token = secrets.token_hex(32)
-    with _held_governance_lock(
-        repo,
-        exclusive=True,
-        timeout_seconds=60.0,
-        lease_token=lease_token,
-    ) as (_lock_path, file_descriptor):
-        environment = os.environ.copy()
-        environment[INHERITED_LOCK_FD_ENV] = str(file_descriptor)
-        environment[INHERITED_LOCK_TOKEN_ENV] = lease_token
-        return subprocess.run(
-            ["git", *args],
-            cwd=repo,
-            env=environment,
-            pass_fds=(file_descriptor,),
-            check=False,
-        ).returncode

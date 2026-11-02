@@ -28,6 +28,8 @@ pub mod candidate_clang_tidy_cli;
 pub mod candidate_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_command;
+pub mod candidate_commit;
+pub(crate) mod candidate_commit_snapshot;
 pub mod candidate_config;
 #[cfg(target_os = "linux")]
 pub mod candidate_contract_cli;

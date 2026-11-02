@@ -1,10 +1,15 @@
-use super::{file_hash, store::seal, validate_hash, Manifest, Store, MAX_CHUNK_BYTES};
+use super::{
+    file_hash,
+    store::{seal, RefreshOrigin},
+    validate_hash, Manifest, Store, MAX_CHUNK_BYTES,
+};
 use crate::source_file::{Snapshot as Source, SourceRoot};
 use anyhow::{ensure, Context, Result};
 use conductor_native::vector_index::{Builder, Config, Space, MAX_ROWS, MAX_VECTOR_BYTES};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -42,6 +47,36 @@ pub(crate) fn build_checked(
     source: &Path,
     header: BuildHeader,
     rows: impl IntoIterator<Item = Result<EmbeddingRow>>,
+    checkpoint: impl FnMut() -> Result<()>,
+) -> Result<Manifest> {
+    build_inner(store, source, header, rows, None, None, checkpoint)
+}
+pub(crate) fn build_reusing_checked(
+    store: &Store,
+    source: &Path,
+    header: BuildHeader,
+    rows: impl IntoIterator<Item = Result<EmbeddingRow>>,
+    reused: &RefCell<Vec<bool>>,
+    mut final_check: impl FnMut() -> Result<()>,
+    checkpoint: impl FnMut() -> Result<()>,
+) -> Result<Manifest> {
+    build_inner(
+        store,
+        source,
+        header,
+        rows,
+        Some(reused),
+        Some(&mut final_check),
+        checkpoint,
+    )
+}
+fn build_inner(
+    store: &Store,
+    source: &Path,
+    header: BuildHeader,
+    rows: impl IntoIterator<Item = Result<EmbeddingRow>>,
+    reused: Option<&RefCell<Vec<bool>>>,
+    mut final_check: Option<&mut dyn FnMut() -> Result<()>>,
     mut checkpoint: impl FnMut() -> Result<()>,
 ) -> Result<Manifest> {
     checkpoint()?;
@@ -85,15 +120,31 @@ pub(crate) fn build_checked(
     connection.close().map_err(|(_, e)| e)?;
     seal(&database)?;
     let vectors_path = staging.path.join("vectors.bin");
-    let builder = Builder::new_checked(
-        header.space.clone(),
-        vectors,
-        header.config,
-        &mut checkpoint,
-    )?;
+    let builder = match reused {
+        Some(reused) => Builder::new_reusing_checked(
+            header.space.clone(),
+            vectors,
+            header.config,
+            &reused.borrow(),
+            &mut checkpoint,
+        )?,
+        None => Builder::new_checked(
+            header.space.clone(),
+            vectors,
+            header.config,
+            &mut checkpoint,
+        )?,
+    };
     builder.write(&vectors_path, source_set_sha256)?;
-    let manifest = Manifest {
+    let refresh_origin = reused.map(|_| RefreshOrigin {
         version: 1,
+        generation: staging.id.clone(),
+        source_root: source.clone(),
+        space: header.space.clone(),
+        source_set_sha256,
+    });
+    let manifest = Manifest {
+        version: if refresh_origin.is_some() { 2 } else { 1 },
         generation: staging.id.clone(),
         source_root: source,
         rows: header.rows,
@@ -102,9 +153,13 @@ pub(crate) fn build_checked(
         config: header.config,
         database_sha256: file_hash(&database)?,
         vectors_sha256: file_hash(&vectors_path)?,
+        refresh_origin,
     };
     checkpoint()?;
-    staging.publish(&manifest)
+    match final_check.as_mut() {
+        Some(check) => staging.publish_checked(&manifest, &mut checkpoint, *check),
+        None => staging.publish(&manifest),
+    }
 }
 
 fn create_database(path: &Path) -> Result<Connection> {

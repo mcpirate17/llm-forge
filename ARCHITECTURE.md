@@ -6,7 +6,7 @@ chronological implementation log; detailed contracts and historical receipts
 belong in the linked documents.
 
 The native migration remains active. The current live `src/` inventory
-contains 113 Python source files. The integration baseline before the native
+contains 111 Python source files. The integration baseline before the native
 review batch was `838474b`; validation scope is summarized under Evidence below.
 
 ## Mission and operating rules
@@ -164,7 +164,11 @@ source hashes at read time, drops stale candidates, atomically publishes
 immutable generations, and retains reader leases. New files are absent until refresh. A published index is an
 identified snapshot, not complete live-workspace coverage. The embedding client
 pins an operator-selected model artifact and recipe, but does not attest to a
-separately operated inference server.
+separately operated inference server. Refresh can reuse a prior vector only when
+the prior generation has a verified refresh origin and matching canonical source
+root and embedding space, and the source path, file hash, byte span and chunk text
+match exactly. Changed, new or unmatched chunks are embedded anew;
+`force_reembed` disables reuse for that refresh.
 
 A current measured synthetic retrieval workload used 4,096 Rust-file chunks,
 64-dimensional clustered vectors and 64 perturbed queries. Median query times
@@ -217,6 +221,17 @@ that an external analyzer examined every relevant input. Native Cargo audit,
 Cargo lint, clang-format, clang-tidy, cppcheck and scan capabilities have their
 own grants, scope and evidence contracts; link those contracts instead of
 repeating their detailed limits here.
+
+### Commit recovery
+
+The native commit wrapper captures a recovery ref before invoking Git and its
+normal hooks. The captured trees preserve staged index content and admitted
+worktree content as of snapshot capture. Snapshot capture itself does not modify
+the index bytes. The subsequent real Git command and hooks can update index
+metadata or files; the wrapper does not roll back those side effects. Fresh native
+attestation runs a fresh complete review through `forge candidate attest-message`;
+host hook configuration remains operator managed.
+See [native commit recovery](docs/native-commit-recovery.md).
 
 ### Context and recovery
 
@@ -275,11 +290,12 @@ cases passed using the freshly built external conductor extension. These
 overlapping selections are not additive totals. Full-gate receipts must still
 be bound to the committed tree by `forge check --all` and `forge verify --require-all`.
 
-The invariant leaf tests do not establish a positive full mutation-collector
-run. Legacy grandfathering still requires fixed historical LLM repository
-objects, and an external-invariant waiver needs a genuine automatic receipt
-bound to a manifest declaring that invariant. Portable clean-host baseline
-configuration and complete positive collector evidence remain unfinished.
+Mutation review defaults to strict behavior. Portable grandfathering requires an
+external operator grant pinning the repository commit, tree, inventory path and
+inventory SHA-256. Candidate policy cannot authorize its own exemptions.
+A positive external-invariant waiver still requires a genuine automatic receipt
+bound to a manifest declaring that invariant. That receipt evidence remains
+outstanding.
 
 Performance data must identify binary/source hashes, runtime, hardware,
 workload, warmup, repetitions and included operations. Values in this document

@@ -100,7 +100,7 @@ governance-fix:  ## Explicitly fix only FIX_PATHS='path ...' outside commit hook
 	$(PYTHON) -m conductor.candidate_review.cli fix --repo "$(CONDUCTOR_HOST_ROOT)" $(FIX_PATHS)
 
 governance-commit:  ## Hold the commit mutex; pass COMMIT_ARGS='-m ... path ...'
-	$(PYTHON) -m conductor.candidate_review.cli commit --repo "$(CONDUCTOR_HOST_ROOT)" -- $(COMMIT_ARGS)
+	"$(FORGE)" candidate commit --repo "$(CONDUCTOR_HOST_ROOT)" -- $(COMMIT_ARGS)
 
 governance-claim:  ## Claim exact paths; set CLAIM_PATHS and CLAIM_JUSTIFICATION (OWNER defaults to this lane)
 	@test -n "$(CLAIM_PATHS)" -a -n "$(CLAIM_JUSTIFICATION)" || { echo "Set CLAIM_PATHS and CLAIM_JUSTIFICATION"; exit 2; }

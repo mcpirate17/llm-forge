@@ -15,7 +15,7 @@ static OWNED: AtomicBool = AtomicBool::new(false);
 pub struct Interrupts {
     descriptor: OwnedFd,
     previous: libc::sigset_t,
-    received: Cell<bool>,
+    received: Cell<Option<i32>>,
     _same_thread: PhantomData<Rc<()>>,
 }
 
@@ -63,28 +63,34 @@ impl Interrupts {
             // SAFETY: fd is a newly created descriptor exclusively owned here.
             descriptor: unsafe { OwnedFd::from_raw_fd(fd) },
             previous,
-            received: Cell::new(false),
+            received: Cell::new(None),
             _same_thread: PhantomData,
         })
     }
 
     pub fn interrupted(&self) -> io::Result<bool> {
-        let mut buffer = [0u8; std::mem::size_of::<libc::signalfd_siginfo>()];
+        Ok(self.signal()?.is_some())
+    }
+
+    /// Drain interrupts and retain the first signal received by this supervisor.
+    pub fn signal(&self) -> io::Result<Option<i32>> {
         loop {
-            // SAFETY: the descriptor and exclusive destination buffer are valid.
+            let mut info: libc::signalfd_siginfo = unsafe { std::mem::zeroed() };
             let count = unsafe {
                 libc::read(
                     self.descriptor.as_raw_fd(),
-                    buffer.as_mut_ptr().cast(),
-                    buffer.len(),
+                    (&mut info as *mut libc::signalfd_siginfo).cast(),
+                    std::mem::size_of_val(&info),
                 )
             };
-            if count > 0 {
-                self.received.set(true);
+            if count == std::mem::size_of_val(&info) as isize {
+                if self.received.get().is_none() {
+                    self.received.set(Some(info.ssi_signo as i32));
+                }
                 continue;
             }
-            if count == 0 {
-                return Err(io::Error::other("interrupt descriptor closed"));
+            if count >= 0 {
+                return Err(io::Error::other("short interrupt descriptor read"));
             }
             let error = io::Error::last_os_error();
             match error.kind() {

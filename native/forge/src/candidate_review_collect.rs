@@ -207,6 +207,12 @@ fn run_mutation<'a>(
             today: context.selection.date(),
             runner,
             scratch_exclusions: std::slice::from_ref(&context.selection.grants.scratch_parent),
+            grandfather: context.selection.grants.mutation_grandfather.as_ref(),
+            waiver_policy_sha256: context
+                .selection
+                .grants
+                .mutation_waivers_policy_sha256
+                .as_deref(),
         })?;
         if !value.requests().is_empty() {
             let probe = value

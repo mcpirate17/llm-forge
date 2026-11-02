@@ -20,6 +20,9 @@ pub(super) struct Outputs {
     junit_out: Option<PathBuf>,
 }
 impl Outputs {
+    pub(super) fn is_empty(&self) -> bool {
+        self.receipt.is_none() && self.sarif_out.is_none() && self.junit_out.is_none()
+    }
     pub fn validate(&self) -> Result<()> {
         let mut destinations = BTreeSet::new();
         for path in [&self.receipt, &self.sarif_out, &self.junit_out]

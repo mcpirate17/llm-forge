@@ -27,8 +27,46 @@ pub(crate) struct Grants {
     pub python: Option<String>,
     pub batch: Option<BatchBudget>,
     pub cargo_audit_evidence: Option<conductor_native::candidate_cargo_evidence::EvidenceSpec>,
+    pub mutation_grandfather: Option<MutationGrandfather>,
+    pub mutation_waivers_policy_sha256: Option<String>,
     #[serde(skip)]
     digest: String,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MutationGrandfather {
+    pub commit: String,
+    pub tree: String,
+    pub inventory_path: String,
+    pub inventory_sha256: String,
+}
+impl MutationGrandfather {
+    pub(crate) fn validate(&self) -> Result<()> {
+        for oid in [&self.commit, &self.tree] {
+            ensure!(
+                oid.len() == 40
+                    && oid
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+                "grandfather Git identity must be full lowercase SHA-1"
+            );
+        }
+        ensure!(
+            self.inventory_sha256.len() == 64
+                && self
+                    .inventory_sha256
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+            "grandfather inventory digest must be lowercase SHA-256"
+        );
+        crate::candidate_source::safe_path(self.inventory_path.as_bytes())?;
+        ensure!(
+            self.inventory_path.ends_with(".json")
+                && !self.inventory_path.chars().any(char::is_control),
+            "invalid grandfather inventory path"
+        );
+        Ok(())
+    }
 }
 impl Grants {
     pub(crate) fn load(path: &Path, source: &Source) -> Result<Self> {
@@ -76,8 +114,24 @@ impl Grants {
     pub(crate) fn digest(&self) -> &str {
         &self.digest
     }
+    fn validate_mutation(&self) -> Result<()> {
+        if let Some(baseline) = &self.mutation_grandfather {
+            baseline.validate()?;
+        }
+        if let Some(hash) = &self.mutation_waivers_policy_sha256 {
+            ensure!(
+                hash.len() == 64
+                    && hash
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+                "mutation waiver policy pin must be lowercase SHA-256"
+            );
+        }
+        Ok(())
+    }
     fn validate(&mut self, source: &Source) -> Result<()> {
         ensure!(self.version == 1, "unsupported grants version");
+        self.validate_mutation()?;
         if let Some(budget) = &self.batch {
             budget.validate()?;
         }

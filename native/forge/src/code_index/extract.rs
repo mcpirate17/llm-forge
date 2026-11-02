@@ -1,6 +1,7 @@
 //! Bounded source planning and ordered, batched embedding refresh.
 use super::{
-    build::{build_checked, BuildHeader, EmbeddingRow},
+    build::{build_reusing_checked, BuildHeader, EmbeddingRow},
+    reuse::Reuse,
     Manifest, Store, MAX_CHUNK_BYTES,
 };
 use crate::{embedding, source_file::SourceRoot};
@@ -10,9 +11,10 @@ use conductor_native::{
     vector_index::{Config, MAX_ROWS, MAX_VECTOR_BYTES},
 };
 use serde::{Deserialize, Serialize};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -62,6 +64,9 @@ pub struct Refresh {
     #[serde(default)]
     pub graph: Config,
     pub deadline_seconds: u64,
+    /// Recompute every row even when an exact previous embedding exists.
+    #[serde(default)]
+    pub force_reembed: bool,
 }
 #[derive(Debug, Serialize)]
 pub struct Plan {
@@ -77,11 +82,13 @@ pub struct PlannedFile {
     pub spans: Vec<[usize; 2]>,
     pub syntax_error: Option<String>,
 }
-/// Completed preparation work only; never a retrieval outcome or in-flight cost.
+/// Completed reused and newly embedded rows; tokens are model-reported for new batches only.
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct RefreshProgress {
     pub batch: BatchPolicy,
     pub rows: u64,
+    pub reused_rows: u64,
+    pub new_rows: u64,
     pub batches: u64,
     pub input_tokens_total: u64,
 }
@@ -91,19 +98,21 @@ pub struct RefreshReport {
     pub manifest: Manifest,
     pub source_bytes: usize,
     pub diagnostics: Vec<(String, String)>,
+    pub reused_rows: u64,
+    pub new_rows: u64,
     pub batches: u64,
     pub input_tokens_total: u64,
 }
 
 /// Read-only planning: no embedding requests or index mutations.
 pub fn plan(source: &Path, options: &Options) -> Result<Plan> {
-    plan_checked(source, options, || Ok(()))
+    plan_checked(source, options, || Ok(())).map(|(plan, _)| plan)
 }
 fn plan_checked(
     source: &Path,
     options: &Options,
     mut checkpoint: impl FnMut() -> Result<()>,
-) -> Result<Plan> {
+) -> Result<(Plan, (u64, u64))> {
     ensure!(
         (128..=MAX_CHUNK_BYTES).contains(&options.chunk_bytes)
             && options.paths.len() <= 100000
@@ -119,6 +128,7 @@ fn plan_checked(
     );
     let source_root = source.canonicalize()?;
     let root = SourceRoot::open(&source_root)?;
+    let root_identity = root.identity()?;
     let mut plan = Plan {
         source_root,
         source_bytes: 0,
@@ -157,7 +167,7 @@ fn plan_checked(
             syntax_error: error,
         });
     }
-    Ok(plan)
+    Ok((plan, root_identity))
 }
 fn boundaries(
     source: &str,
@@ -208,10 +218,44 @@ fn split(source: &str, maximum: usize, ends: &BTreeSet<usize>) -> Vec<[usize; 2]
     spans
 }
 
+fn verify_plan_sources(
+    plan: &Plan,
+    source: &Path,
+    identity: (u64, u64),
+    deadline: Instant,
+) -> Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    ensure!(
+        source.canonicalize()? == plan.source_root,
+        "named source root changed"
+    );
+    let root = SourceRoot::open(source)?;
+    ensure!(
+        root.identity()? == identity,
+        "named source root identity changed"
+    );
+    for file in &plan.files {
+        ensure!(Instant::now() < deadline, "source refresh deadline expired");
+        ensure!(
+            root.read(Path::new(&file.path))?.sha256() == file.source_sha256,
+            "source changed before index publication: {}",
+            file.path
+        );
+    }
+    let current = std::fs::metadata(source)?;
+    ensure!(
+        source.canonicalize()? == plan.source_root
+            && (current.dev(), current.ino()) == identity
+            && root.identity()? == identity,
+        "named source root changed during final check"
+    );
+    ensure!(Instant::now() < deadline, "source refresh deadline expired");
+    Ok(())
+}
 pub fn refresh(store: &Store, source: &Path, settings: Refresh) -> Result<RefreshReport> {
     refresh_with_progress(store, source, settings, |_| Ok(()))
 }
-/// Observe only completed batches. Observer errors abort without publishing an index.
+/// Observe completed work. Observer errors abort without publishing an index.
 pub fn refresh_with_progress(
     store: &Store,
     source: &Path,
@@ -230,7 +274,8 @@ pub fn refresh_with_progress(
     settings.batch.validate(settings.sources.chunk_bytes)?;
     settings.graph.validate()?;
     let client = embedding::Client::new(settings.embedding)?;
-    let plan = plan_checked(source, &settings.sources, &mut checkpoint)?;
+    let (plan, source_identity) = plan_checked(source, &settings.sources, &mut checkpoint)?;
+    let plan = Rc::new(plan);
     let source_bytes = plan.source_bytes;
     let diagnostics: Vec<_> = plan
         .files
@@ -250,9 +295,19 @@ pub fn refresh_with_progress(
         "planned embeddings exceed 4 GiB"
     );
     let rows = plan.rows;
+    let reuse = Reuse::open(
+        store,
+        source,
+        client.space(),
+        settings.force_reembed,
+        &mut checkpoint,
+    )?;
+    let reuse_mask = RefCell::new(Vec::new());
     let metrics = Cell::new(RefreshProgress {
         batch: settings.batch,
         rows: 0,
+        reused_rows: 0,
+        new_rows: 0,
         batches: 0,
         input_tokens_total: 0,
     });
@@ -260,7 +315,9 @@ pub fn refresh_with_progress(
     let stream = EmbeddedRows {
         batch: settings.batch,
         client,
-        plan,
+        reuse,
+        reuse_mask: &reuse_mask,
+        plan: Rc::clone(&plan),
         root: SourceRoot::open(source)?,
         file: 0,
         span: 0,
@@ -276,13 +333,24 @@ pub fn refresh_with_progress(
         space: stream.client.space().clone(),
         config: settings.graph,
     };
-    let manifest = build_checked(store, source, header, stream, checkpoint)?;
+    let final_check = || verify_plan_sources(&plan, source, source_identity, deadline);
+    let manifest = build_reusing_checked(
+        store,
+        source,
+        header,
+        stream,
+        &reuse_mask,
+        final_check,
+        checkpoint,
+    )?;
     let progress = metrics.get();
     Ok(RefreshReport {
         batch: settings.batch,
         manifest,
         source_bytes,
         diagnostics,
+        reused_rows: progress.reused_rows,
+        new_rows: progress.new_rows,
         batches: progress.batches,
         input_tokens_total: progress.input_tokens_total,
     })
@@ -291,11 +359,13 @@ pub fn refresh_with_progress(
 struct EmbeddedRows<'a> {
     batch: BatchPolicy,
     client: embedding::Client,
-    plan: Plan,
+    reuse: Option<Reuse>,
+    reuse_mask: &'a RefCell<Vec<bool>>,
+    plan: Rc<Plan>,
     root: SourceRoot,
     file: usize,
     span: usize,
-    pending: VecDeque<EmbeddingRow>,
+    pending: VecDeque<(EmbeddingRow, bool)>,
     failed: bool,
     deadline: Instant,
     metrics: &'a Cell<RefreshProgress>,
@@ -305,6 +375,7 @@ impl EmbeddedRows<'_> {
     fn fill(&mut self) -> Result<()> {
         let mut items = Vec::new();
         let mut texts = Vec::new();
+        let mut misses = Vec::new();
         let mut bytes = 0;
         while self.file < self.plan.files.len() && items.len() < self.batch.max_inputs {
             let planned = &self.plan.files[self.file];
@@ -321,18 +392,37 @@ impl EmbeddedRows<'_> {
             );
             while self.span < planned.spans.len() && items.len() < self.batch.max_inputs {
                 let [start, end] = planned.spans[self.span];
-                if bytes + end - start > self.batch.max_bytes {
+                let text = &source.content()[start..end];
+                ensure!(
+                    !text.is_empty() && text.len() <= MAX_CHUNK_BYTES && !text.contains('\0'),
+                    "embedding input is empty, oversized, or contains NUL"
+                );
+                let reused = match &self.reuse {
+                    Some(reuse) => {
+                        reuse.get(&planned.path, &planned.source_sha256, start, end, text)?
+                    }
+                    None => None,
+                };
+                if reused.is_none() && bytes + text.len() > self.batch.max_bytes {
                     break;
                 }
-                texts.push(source.content()[start..end].to_owned());
-                bytes += end - start;
-                items.push(EmbeddingRow {
-                    path: planned.path.clone(),
-                    source_sha256: planned.source_sha256.clone(),
-                    start_byte: start,
-                    end_byte: end,
-                    vector: Vec::new(),
-                });
+                let flag = reused.is_some();
+                let vector = reused.unwrap_or_default();
+                if !flag {
+                    bytes += text.len();
+                    texts.push(text.to_owned());
+                    misses.push(items.len());
+                }
+                items.push((
+                    EmbeddingRow {
+                        path: planned.path.clone(),
+                        source_sha256: planned.source_sha256.clone(),
+                        start_byte: start,
+                        end_byte: end,
+                        vector,
+                    },
+                    flag,
+                ));
                 self.span += 1;
             }
             if self.span < planned.spans.len() {
@@ -346,25 +436,29 @@ impl EmbeddedRows<'_> {
             );
             return Ok(());
         }
-        let inputs: Vec<_> = texts.iter().map(String::as_str).collect();
-        let batch = self.client.embed_batch(&inputs, self.deadline)?;
-        ensure!(
-            batch.vectors.len() == items.len(),
-            "embedding batch lost row identity"
-        );
         let mut progress = self.metrics.get();
-        progress.batches += 1;
+        if !texts.is_empty() {
+            let inputs: Vec<_> = texts.iter().map(String::as_str).collect();
+            let batch = self.client.embed_batch(&inputs, self.deadline)?;
+            ensure!(
+                batch.vectors.len() == misses.len(),
+                "embedding batch lost row identity"
+            );
+            for (index, vector) in misses.iter().copied().zip(batch.vectors) {
+                items[index].0.vector = vector;
+            }
+            progress.batches += 1;
+            progress.input_tokens_total = progress
+                .input_tokens_total
+                .checked_add(batch.input_tokens_total)
+                .context("completed refresh input token total overflow")?;
+        }
         progress.rows += items.len() as u64;
-        progress.input_tokens_total = progress
-            .input_tokens_total
-            .checked_add(batch.input_tokens_total)
-            .context("completed refresh input token total overflow")?;
+        progress.new_rows += misses.len() as u64;
+        progress.reused_rows += (items.len() - misses.len()) as u64;
         self.metrics.set(progress);
         (self.observer)(progress)?;
-        for (mut row, vector) in items.into_iter().zip(batch.vectors) {
-            row.vector = vector;
-            self.pending.push_back(row);
-        }
+        self.pending.extend(items);
         Ok(())
     }
 }
@@ -380,6 +474,9 @@ impl Iterator for EmbeddedRows<'_> {
                 return Some(Err(error));
             }
         }
-        self.pending.pop_front().map(Ok)
+        self.pending.pop_front().map(|(row, reused)| {
+            self.reuse_mask.borrow_mut().push(reused);
+            Ok(row)
+        })
     }
 }

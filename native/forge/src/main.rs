@@ -336,9 +336,36 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
     match result {
         Ok(code) => ExitCode::from(code),
         Err(error) => {
+            if let Some(signal) = error.downcast_ref::<forge::candidate_commit::ChildSignal>() {
+                propagate_child_signal(signal.0);
+            }
             eprintln!("forge {label}: {error:#}");
             ExitCode::from(failure)
         }
+    }
+}
+
+// After the command returns its lease has been dropped. Reflect a Git signal as
+// a signal, not 128+signal or a generic wrapper failure.
+fn propagate_child_signal(signal: i32) {
+    unsafe {
+        if signal == libc::SIGKILL {
+            libc::raise(signal);
+            return;
+        }
+        let mut action: libc::sigaction = std::mem::zeroed();
+        action.sa_sigaction = libc::SIG_DFL;
+        libc::sigemptyset(&mut action.sa_mask);
+        if libc::sigaction(signal, &action, std::ptr::null_mut()) != 0 {
+            return;
+        }
+        let mut set: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut set);
+        libc::sigaddset(&mut set, signal);
+        if libc::sigprocmask(libc::SIG_UNBLOCK, &set, std::ptr::null_mut()) != 0 {
+            return;
+        }
+        libc::raise(signal);
     }
 }
 
