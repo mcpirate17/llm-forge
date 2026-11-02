@@ -25,6 +25,7 @@ cache-keys = [
   { file = "Cargo.lock" },
   { file = "../forge-cli/Cargo.toml" },
   { file = "../forge-cli/build.rs" },
+  { file = "../forge-cli/source_identity.rs" },
   { file = "src/**/*" },
   { file = "../../ledger/routing_policy.toml" },
   { file = "tests/fixtures/ledger/calibration.json" },

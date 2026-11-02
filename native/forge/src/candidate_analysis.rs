@@ -172,7 +172,11 @@ fn append_python_lines(
 }
 
 /// Git hunks count LF records; one record can contain several Python CR lines.
-fn project_git_lines(source: &str, ranges: &[LineRange], total: &mut usize) -> Result<Vec<u32>> {
+pub(crate) fn project_git_lines(
+    source: &str,
+    ranges: &[LineRange],
+    total: &mut usize,
+) -> Result<Vec<u32>> {
     if ranges.is_empty() {
         return Ok(Vec::new());
     }

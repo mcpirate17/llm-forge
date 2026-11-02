@@ -21,6 +21,127 @@ struct Launched {
     argv: Vec<String>,
 }
 impl Stage {
+    pub(crate) async fn execute_capture(
+        mut self,
+        grants: &Grants,
+        interrupts: &Interrupts,
+        request: crate::candidate_stage_artifact::Request<'_>,
+    ) -> Result<(
+        Value,
+        Report,
+        Vec<String>,
+        Option<crate::candidate_stage_artifact::Artifact>,
+    )> {
+        let signal = interrupts.register_reactor()?;
+        let interrupted = interrupts.interrupted()?;
+        interrupts.child_mask().configure(self.plan.command());
+        let (capture, receiver) = crate::candidate_stage_artifact::Capture::new(
+            self.workspace,
+            request.name,
+            request.maximum,
+            request.budget,
+        )?;
+        let group = Cgroup::create(&grants.cgroup_parent, grants.resources)?;
+        let execution = confined_execution::start_with_resources(
+            self.plan,
+            group,
+            self.limits,
+            Box::new(capture),
+        )?;
+        let wake = if interrupted {
+            execution.cancellation().cancel()
+        } else {
+            Ok(())
+        };
+        let report = await_report(execution, async {
+            let mut bytes = [0u8; std::mem::size_of::<libc::signalfd_siginfo>()];
+            ensure!(
+                signal.read(&mut bytes).await? > 0,
+                "interrupt descriptor closed"
+            );
+            Ok(())
+        })
+        .await?;
+        wake.with_context(|| format!("stage cancellation; cleanup: {}", report.errors.join("; ")))?;
+        let artifact = match receiver.await.context("stage artifact sender dropped")? {
+            Ok(artifact) => Some(artifact),
+            Err(_error)
+                if report.outcome != confined_execution::Outcome::Exited
+                    || report.exit_code != Some(0) =>
+            {
+                None
+            }
+            Err(error) => return Err(anyhow::Error::msg(error)),
+        };
+        let mut data = self.data;
+        data["report"] = serde_json::to_value(&report)?;
+        Ok((data, report, self.argv, artifact))
+    }
+    pub(crate) async fn execute_batch_capture(
+        mut self,
+        grants: &Grants,
+        mask: ChildSignalMask,
+        global: Arc<Cancellation>,
+        owners: Arc<Owners>,
+        capture: crate::candidate_stage_artifact::Request<'_>,
+    ) -> Result<(
+        Value,
+        Report,
+        Vec<String>,
+        Option<crate::candidate_stage_artifact::Artifact>,
+    )> {
+        ensure!(
+            !global.is_cancelled(),
+            "batch cancelled before stage launch"
+        );
+        mask.configure(self.plan.command());
+        let (capture, receiver) = crate::candidate_stage_artifact::Capture::new(
+            self.workspace,
+            capture.name,
+            capture.maximum,
+            capture.budget,
+        )?;
+        let group = Cgroup::create(&grants.cgroup_parent, grants.resources)?;
+        let execution = confined_execution::start_with_resources(
+            self.plan,
+            group,
+            self.limits,
+            Box::new(capture),
+        )?;
+        let guard = match owners.register(&execution) {
+            Ok(guard) => guard,
+            Err(error) => {
+                let wake = execution.cancellation().cancel();
+                let report = execution.wait().await?;
+                anyhow::bail!(
+                    "batch registration: {error:#}; cancellation: {wake:?}; cleanup: {:?}",
+                    report.errors
+                );
+            }
+        };
+        let result = await_report(execution, global.cancelled()).await;
+        let finished = guard.finish();
+        let report = result.context("captured stage observation failed")?;
+        finished.with_context(|| {
+            format!(
+                "captured stage resource cleanup: {}",
+                report.errors.join("; ")
+            )
+        })?;
+        let artifact = match receiver.await.context("stage artifact sender dropped")? {
+            Ok(artifact) => Some(artifact),
+            Err(_error)
+                if report.outcome != confined_execution::Outcome::Exited
+                    || report.exit_code != Some(0) =>
+            {
+                None
+            }
+            Err(error) => return Err(anyhow::Error::msg(error)),
+        };
+        let mut data = self.data;
+        data["report"] = serde_json::to_value(&report)?;
+        Ok((data, report, self.argv, artifact))
+    }
     pub(crate) fn dry_run(self) -> Result<Value> {
         drop(self.plan);
         self.workspace.discard()?;

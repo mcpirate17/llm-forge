@@ -83,7 +83,7 @@ pub fn run(args: BatchArgs) -> Result<Value> {
     Ok(report)
 }
 
-fn select(selection: &Selection, requested: &[String]) -> Result<Vec<Arc<CheckPlan>>> {
+pub(crate) fn select(selection: &Selection, requested: &[String]) -> Result<Vec<Arc<CheckPlan>>> {
     ensure!(requested.len() <= 256, "batch check selection exceeds 256");
     let ids: BTreeSet<_> = requested.iter().map(String::as_str).collect();
     ensure!(ids.len() == requested.len(), "duplicate requested check ID");
@@ -158,4 +158,15 @@ fn dry_run(
             Ok(row)
         })
         .collect()
+}
+
+/// Reuse the same owned scheduler for a coordinator's complete regular inventory.
+pub(crate) async fn execute_plans(
+    selection: Arc<Selection>,
+    plans: &[Arc<CheckPlan>],
+    parallelism: usize,
+    interrupts: &Interrupts,
+) -> Result<(Vec<Value>, bool)> {
+    let quota = Arc::new(output::Quota::new(&selection.output(), plans, true)?);
+    execution::run(selection, plans, parallelism, interrupts, quota).await
 }

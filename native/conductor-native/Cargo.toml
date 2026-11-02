@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.87"
+version = "0.1.88"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -106,7 +106,7 @@ zstd = "0.14.3"
 [features]
 default = ["source-analysis", "vector-search"]
 bundled-sqlite = ["rusqlite/bundled"]
-source-analysis = ["dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:tree-sitter", "dep:tree-sitter-c", "dep:tree-sitter-cpp", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-rust", "dep:tree-sitter-typescript"]
+source-analysis = ["dep:sha1", "dep:ruff_python_ast", "dep:ruff_python_parser", "dep:ruff_text_size", "dep:proc-macro2", "dep:tree-sitter", "dep:tree-sitter-c", "dep:tree-sitter-cpp", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-rust", "dep:tree-sitter-typescript"]
 vector-search = ["dep:memmap2"]
 # Embedded legacy contract discovery is native but not needed by default Forge.
 contract-registry = []

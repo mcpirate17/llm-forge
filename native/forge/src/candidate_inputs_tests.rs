@@ -26,6 +26,26 @@ fn blob(bytes: &[u8]) -> String {
 }
 
 #[test]
+fn external_pin_checks_real_path_digest_and_held_identity() {
+    let temp = tempfile::tempdir().unwrap();
+    let snap = temp.path().join("snapshot");
+    let operator = temp.path().join("operator");
+    mkdir(&snap).unwrap();
+    mkdir(&operator).unwrap();
+    let first = operator.join("first.so");
+    let second = operator.join("second.so");
+    write(&first, b"same").unwrap();
+    write(&second, b"same").unwrap();
+    let (bound, _) = external_with_tmp(&first, &sha(b"same"), 1024, &snap, None).unwrap();
+    bound.verify_external_pin(&first, &sha(b"same")).unwrap();
+    assert!(bound.verify_external_pin(&second, &sha(b"same")).is_err());
+    assert!(bound.verify_external_pin(&first, &sha(b"other")).is_err());
+    fs::remove_file(&first).unwrap();
+    write(&first, b"same").unwrap();
+    assert!(bound.verify_external_pin(&first, &sha(b"same")).is_err());
+}
+
+#[test]
 fn pinned_external_digest_and_parent_drift() {
     let temp = tempfile::tempdir().unwrap();
     let snap = temp.path().join("snapshot");

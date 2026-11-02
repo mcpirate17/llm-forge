@@ -7,6 +7,8 @@ use std::path::Path;
 use std::process::Command;
 #[path = "../forge/src/source_fingerprint.rs"]
 mod source_fingerprint;
+#[path = "source_identity.rs"]
+mod source_identity;
 
 fn git_text(args: &[&str]) -> Option<String> {
     Command::new("git")
@@ -45,6 +47,7 @@ fn main() {
         .parent()
         .and_then(Path::parent)
         .expect("native repository layout");
+    let full_head = source_identity::revision(root);
     let files =
         source_fingerprint::files(root).expect("inventory native source for build fingerprint");
     for path in &files {
@@ -56,8 +59,23 @@ fn main() {
             "cargo:rerun-if-changed={}",
             root.join("native").join(name).join("src").display()
         );
+        println!(
+            "cargo:rerun-if-changed={}",
+            root.join("native").join(name).join("build.rs").display()
+        );
     }
     let fingerprint = source_fingerprint::fingerprint(root, &files)
         .expect("hash native source for build fingerprint");
     println!("cargo:rustc-env=FORGE_SOURCE_SHA256={fingerprint}");
+    let clean = full_head
+        .as_deref()
+        .is_some_and(|head| source_identity::matches_head(root, head, &files, &fingerprint));
+    println!(
+        "cargo:rustc-env=FORGE_GIT_FULL_REV={}",
+        full_head.as_deref().unwrap_or("unknown")
+    );
+    println!(
+        "cargo:rustc-env=FORGE_SOURCE_MATCHES_GIT={}",
+        if clean { "1" } else { "0" }
+    );
 }

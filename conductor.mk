@@ -11,9 +11,8 @@
 #   include /path/to/llm-forge/conductor.mk
 #
 # and overrides the variables below to match its own layout instead of editing the
-# recipes. Every recipe invokes `$(PYTHON) -m conductor.<module>`, never a script
-# path, so it runs under whatever interpreter installed conductor-tooling rather
-# than an agent's ambient PATH.
+# recipes. Native review, claims and session commands invoke the explicit FORGE
+# executable; remaining Python maintenance commands use the installed module.
 
 UV ?= env -u VIRTUAL_ENV uv
 PYTHON ?= $(UV) run python
@@ -50,36 +49,40 @@ CONDUCTOR_REPORTS_DIR ?= reports
 	test-conductor-native test-slop-core test-forge forge-build
 
 # ── Governance: candidate review, claims, sessions ──────────────────────
-# Candidate review uses its existing adapter; claims and session close run
-# through native Forge. Host roots are explicit for callers outside the checkout.
+# Review executes the native coordinator and owned Stage mapping. Grants are an
+# explicit operator input outside the source tree, never synthesized by Make.
+# Extra native options include runner/registry/equivalence pins and --owner.
+CONDUCTOR_REVIEW_GRANTS ?=
+CONDUCTOR_REVIEW_ARGS ?=
 
-governance-check:  ## Run the exact candidate-index fast review
-	$(PYTHON) -m conductor.candidate_review.cli review --repo "$(CONDUCTOR_HOST_ROOT)" \
-		--surface manual --candidate index --profile fast
+governance-check:  ## Run the native candidate-index fast review
+	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" || { echo "Set CONDUCTOR_REVIEW_GRANTS to an operator-owned grants JSON file"; exit 2; }
+	"$(FORGE)" candidate review --repo "$(CONDUCTOR_HOST_ROOT)" \
+		--surface manual --kind index --profile fast --execute \
+		--grants "$(CONDUCTOR_REVIEW_GRANTS)" $(CONDUCTOR_REVIEW_ARGS)
 
-governance-audit:  ## Run the exact candidate-index full review and emit CI-format artifacts
+governance-audit:  ## Run the native full review and export this execution's artifacts
+	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" || { echo "Set CONDUCTOR_REVIEW_GRANTS to an operator-owned grants JSON file"; exit 2; }
 	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)"
-	$(PYTHON) -m conductor.candidate_review.cli review --repo "$(CONDUCTOR_HOST_ROOT)" \
-		--surface manual --candidate index --profile full \
-		--json-out "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/candidate_review.json" \
+	"$(FORGE)" candidate review --repo "$(CONDUCTOR_HOST_ROOT)" \
+		--surface manual --kind index --profile full --execute \
+		--grants "$(CONDUCTOR_REVIEW_GRANTS)" $(CONDUCTOR_REVIEW_ARGS) \
+		--receipt "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/candidate_review.json" \
 		--sarif-out "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/candidate_review.sarif" \
 		--junit-out "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/candidate_review.junit.xml"
 
 PREFLIGHT_REF ?= HEAD
 PREFLIGHT_BASE ?= origin/main
 
-governance-preflight:  ## Reproduce the CI review locally for PREFLIGHT_REF (default HEAD)
+governance-preflight:  ## Run the native CI review for PREFLIGHT_REF (default HEAD)
+	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" || { echo "Set CONDUCTOR_REVIEW_GRANTS to an operator-owned grants JSON file"; exit 2; }
 	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)"
-	$(PYTHON) -m conductor.candidate_review.cli review --repo "$(CONDUCTOR_HOST_ROOT)" \
-		--surface ci --candidate range --target-ref "$(PREFLIGHT_REF)" \
-		--base-ref "$(PREFLIGHT_BASE)" --profile full \
-		--json-out "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/preflight.json"
-	@echo "unexcepted blocking findings:"
-	@$(PYTHON) -c "import json,collections; \
-		f=[x for x in json.load(open('$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/preflight.json'))['findings'] \
-		   if x['severity'] in ('critical','high') and not x.get('exception_id')]; \
-		print(' total', len(f)); \
-		[print(f'  {v:3d}  {k}') for k,v in collections.Counter(x['check_id']+'/'+x['rule_id'] for x in f).most_common()]"
+	"$(FORGE)" candidate review --repo "$(CONDUCTOR_HOST_ROOT)" \
+		--surface ci --kind range --target-ref "$(PREFLIGHT_REF)" \
+		--base-ref "$(PREFLIGHT_BASE)" --profile full --execute \
+		--grants "$(CONDUCTOR_REVIEW_GRANTS)" $(CONDUCTOR_REVIEW_ARGS) \
+		--receipt "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/preflight.json"
+	"$(FORGE)" candidate report "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/preflight.json" --format human
 
 FIX_PATHS ?=
 COMMIT_ARGS ?=

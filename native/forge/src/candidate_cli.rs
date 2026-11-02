@@ -16,6 +16,10 @@ pub struct CandidateArgs {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Review the complete active policy using captured evidence and isolated native execution.
+    Review(Box<crate::candidate_review::ReviewArgs>),
+    /// Pin installed compatibility runner sources; never executes or approves them.
+    RunnerBundle(crate::candidate_runner_bundle_cli::BundleArgs),
     /// Validate captured configuration and inspect Python source with native analyzers.
     Analyze(crate::candidate_analysis_cli::AnalysisArgs),
     /// Compare captured crate production inputs, versions and installed metadata.
@@ -28,6 +32,11 @@ enum Action {
     ClangTidy(crate::candidate_clang_tidy_cli::TidyArgs),
     /// Plan or run Cargo lint tools; isolated execution belongs to the parent stage.
     CargoLint(crate::candidate_cargo_lint_cli::LintArgs),
+    CargoTest(crate::candidate_cargo_test_cli::CargoTestArgs),
+    PythonTest(crate::candidate_python_test_cli::PythonTestArgs),
+    ContractTest(crate::candidate_contract_cli::ContractArgs),
+    /// Measure one external invariant; the owning Stage requires explicit read-only /proc.
+    MutationInvariant(crate::candidate_mutation_external_cli::Args),
     /// Prepare or execute one isolated external check using operator grants.
     Execute(crate::candidate_execute::ExecuteArgs),
     /// Prepare or execute ordered regular commands within an operator batch budget.
@@ -50,20 +59,7 @@ enum Action {
         base_ref: Option<String>,
     },
     /// Create a private standalone snapshot from a full tree OID; never overwrites.
-    Materialize {
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        #[arg(long)]
-        tree: String,
-        #[arg(long)]
-        output: PathBuf,
-        #[arg(long)]
-        dry_run: bool,
-        #[arg(long, default_value_t = 64 * 1024 * 1024)]
-        max_blob_bytes: u64,
-        #[arg(long, default_value_t = 2 * 1024 * 1024 * 1024)]
-        max_tree_bytes: u64,
-    },
+    Materialize(MaterializeArgs),
     /// Verify receipt digest self-consistency, optionally binding an exact commit tree.
     VerifyReceipt {
         file: PathBuf,
@@ -74,6 +70,37 @@ enum Action {
         #[arg(long)]
         json: bool,
     },
+}
+
+#[derive(Args)]
+struct MaterializeArgs {
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
+    #[arg(long)]
+    tree: String,
+    #[arg(long)]
+    output: PathBuf,
+    #[arg(long)]
+    dry_run: bool,
+    #[arg(long, default_value_t = 64 * 1024 * 1024)]
+    max_blob_bytes: u64,
+    #[arg(long, default_value_t = 2 * 1024 * 1024 * 1024)]
+    max_tree_bytes: u64,
+}
+
+fn materialize(args: MaterializeArgs) -> Result<()> {
+    let source = Source::open(&args.repo)?;
+    let limits = candidate_snapshot::Limits {
+        max_blob_bytes: args.max_blob_bytes,
+        max_tree_bytes: args.max_tree_bytes,
+    };
+    let report = if args.dry_run {
+        candidate_snapshot::preflight(&source, &args.tree, &args.output, limits)?
+    } else {
+        candidate_snapshot::Snapshot::create(&source, &args.tree, &args.output, limits)?
+            .publish()?
+    };
+    print_json(&serde_json::to_value(report)?)
 }
 
 fn print_json(value: &Value) -> Result<()> {
@@ -87,13 +114,36 @@ fn print_json(value: &Value) -> Result<()> {
 }
 
 pub fn run(args: CandidateArgs) -> Result<u8> {
+    run_with_stamp(args, None)
+}
+
+pub fn run_with_stamp(
+    args: CandidateArgs,
+    stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
+) -> Result<u8> {
     match args.action {
+        Action::Review(args) => {
+            let report = crate::candidate_review::run(
+                *args,
+                stamp.context("review requires the CLI's compiled engine identity")?,
+            )?;
+            let failed = report["executed"] == true && report["decision"] != "pass";
+            print_json(&report)?;
+            return Ok(u8::from(failed));
+        }
+        Action::RunnerBundle(args) => crate::candidate_runner_bundle_cli::run(args)?,
         Action::Analyze(args) => return crate::candidate_analysis_cli::run(args),
         Action::CrateVersion(args) => return crate::candidate_crate_cli::run(args),
         Action::Scan(args) => return crate::candidate_scan_cli::run(args),
         Action::ClangFormat(args) => return crate::candidate_clang_format_cli::run(args),
         Action::ClangTidy(args) => return crate::candidate_clang_tidy_cli::run(args),
         Action::CargoLint(args) => return crate::candidate_cargo_lint_cli::run(args),
+        Action::CargoTest(args) => return crate::candidate_cargo_test_cli::run(args),
+        Action::PythonTest(args) => return crate::candidate_python_test_cli::run(args),
+        Action::ContractTest(args) => return crate::candidate_contract_cli::run(args),
+        Action::MutationInvariant(args) => {
+            return crate::candidate_mutation_external_cli::run(args)
+        }
         Action::Report(args) => crate::candidate_report_cli::run(args)?,
         Action::ExecuteBatch(args) => {
             let report = crate::candidate_batch::run(args)?;
@@ -123,26 +173,7 @@ pub fn run(args: CandidateArgs) -> Result<u8> {
             let candidate = Source::open(&repo)?.resolve(kind, &target_ref, base_ref.as_deref())?;
             print_json(&serde_json::to_value(candidate)?)?;
         }
-        Action::Materialize {
-            repo,
-            tree,
-            output,
-            dry_run,
-            max_blob_bytes,
-            max_tree_bytes,
-        } => {
-            let source = Source::open(&repo)?;
-            let limits = candidate_snapshot::Limits {
-                max_blob_bytes,
-                max_tree_bytes,
-            };
-            let report = if dry_run {
-                candidate_snapshot::preflight(&source, &tree, &output, limits)?
-            } else {
-                candidate_snapshot::Snapshot::create(&source, &tree, &output, limits)?.publish()?
-            };
-            print_json(&serde_json::to_value(report)?)?;
-        }
+        Action::Materialize(args) => materialize(args)?,
         Action::VerifyReceipt {
             file,
             repo,

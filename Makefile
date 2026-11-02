@@ -96,9 +96,11 @@ gate:  ## The governance gate: config self-check plus the CI-identical review
 		--base "$(GATE_BASE)" \
 		--profile "$(GATE_PROFILE)"
 
-candidate-review:  ## Run the candidate-index review over the working tree
-	$(UV) run python -m conductor.candidate_review.cli review \
-		--surface manual --candidate index --profile "$(REVIEW_PROFILE)" $(REVIEW_ARGS)
+candidate-review:  ## Run the native index review with explicit operator grants
+	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" || { echo "Set CONDUCTOR_REVIEW_GRANTS to an operator-owned grants JSON file"; exit 2; }
+	"$(FORGE)" candidate review --repo "$(CONDUCTOR_HOST_ROOT)" \
+		--surface manual --kind index --profile "$(REVIEW_PROFILE)" \
+		--grants "$(CONDUCTOR_REVIEW_GRANTS)" --execute $(REVIEW_ARGS)
 
 mutation-plan:  ## Show the campaigns mutation-generate would write for THIS BRANCH
 	$(UV) run python -m conductor.mutation_campaign_generate plan \

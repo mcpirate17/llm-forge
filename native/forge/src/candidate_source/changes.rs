@@ -3,7 +3,7 @@ use anyhow::{ensure, Context, Result};
 use git2::{Delta, DiffDelta, DiffFindOptions, DiffFormat, DiffOptions, Oid};
 
 impl Source {
-    pub(super) fn changes(&self, base: &str, target: &str) -> Result<Vec<Change>> {
+    pub(crate) fn changes(&self, base: &str, target: &str) -> Result<Vec<Change>> {
         // Validate/count tree metadata before libgit2 allocates the combined diff.
         self.list_tree(base)?;
         self.list_tree(target)?;

@@ -34,6 +34,8 @@ pub mod candidate_policy;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_python;
 #[cfg(feature = "source-analysis")]
+pub mod candidate_python_symbol_hash;
+#[cfg(feature = "source-analysis")]
 pub mod candidate_rust_artifact;
 #[cfg(feature = "source-analysis")]
 pub mod candidate_structure;
@@ -44,6 +46,7 @@ mod command_lex;
 pub mod context_projection;
 pub mod context_telemetry_aggregate;
 pub mod context_telemetry_usage;
+pub mod contract_registry;
 #[cfg(feature = "source-analysis")]
 pub mod dead_code;
 #[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
@@ -52,8 +55,8 @@ mod dead_tests;
 mod duplicate_bodies;
 #[cfg(feature = "source-analysis")]
 pub mod duplicate_fingerprints;
-#[cfg(feature = "python")]
-mod equivalence_targets;
+#[cfg(feature = "source-analysis")]
+pub mod equivalence_targets;
 pub mod fleet_status;
 pub mod forge_binary;
 #[cfg(feature = "python")]
@@ -76,15 +79,17 @@ pub mod memory_index;
 #[cfg(feature = "vector-search")]
 pub mod memory_index_sidecar;
 pub mod mutation_coverage;
-#[cfg(feature = "python")]
-mod mutation_evidence;
-#[cfg(all(feature = "source-analysis", any(feature = "python", test)))]
+#[cfg(feature = "source-analysis")]
+pub mod mutation_evidence;
+#[cfg(feature = "source-analysis")]
 mod mutation_manifest;
 pub mod mutation_plan;
-#[cfg(feature = "python")]
+#[cfg(feature = "source-analysis")]
 mod mutation_receipt;
 #[cfg(feature = "python")]
 mod mutation_value;
+#[cfg(feature = "source-analysis")]
+pub mod mutation_value_admission;
 pub mod mutation_value_inputs;
 #[cfg(target_os = "linux")]
 pub mod native_id;
@@ -115,7 +120,8 @@ pub mod vector_index;
 // each serves the Python recorder.
 #[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_config;
-#[cfg(feature = "python")]
+#[cfg(feature = "source-analysis")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_digest;
 #[cfg(feature = "python")]
 mod test_record_finish;
@@ -131,7 +137,8 @@ mod test_record_reuse;
 mod test_record_state;
 #[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_store;
-#[cfg(feature = "python")]
+#[cfg(feature = "source-analysis")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_untested;
 mod text_normalization;
 #[cfg(feature = "python")]
@@ -147,9 +154,14 @@ pub use text_normalization::normalized_text as normalize_a2a_text;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+#[cfg(all(feature = "python", target_os = "linux"))]
+mod invariant_probe;
+
 #[cfg(feature = "python")]
 #[pymodule]
 fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    #[cfg(target_os = "linux")]
+    invariant_probe::register(module)?;
     branch_policy::register(module)?;
     candidate_benchmark::register(module)?;
     candidate_checks::register(module)?;

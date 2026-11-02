@@ -136,3 +136,21 @@ mod python {
 
 #[cfg(feature = "python")]
 pub use python::register;
+
+/// Extract native test definitions exclusively from a complete captured crate inventory.
+pub fn native_test_definitions_captured(
+    source: &str,
+    path: &str,
+    root: &std::path::Path,
+    files: &std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>,
+) -> Result<serde_json::Value, String> {
+    if !path.ends_with(".rs") {
+        return ast::native_test_definitions(source, path, None);
+    }
+    let key = root.join(path);
+    if files.get(&key).map(Vec::as_slice) != Some(source.as_bytes()) {
+        return Err(format!("captured Rust source mismatch: {path}"));
+    }
+    ast::captured_rust_test_labels(root, std::path::Path::new(path), files)
+        .map(serde_json::Value::Object)
+}

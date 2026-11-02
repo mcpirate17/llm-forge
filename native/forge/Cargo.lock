@@ -401,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.87"
+version = "0.1.88"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -420,6 +420,7 @@ dependencies = [
  "rustsec",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "syn 2.0.119",
  "toml 0.8.23",
@@ -749,7 +750,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "forge"
-version = "0.8.12"
+version = "0.8.13"
 dependencies = [
  "anyhow",
  "axum",
@@ -766,6 +767,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "slop-core",
  "tempfile",
@@ -780,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "forge-cli"
-version = "0.8.12"
+version = "0.8.13"
 dependencies = [
  "anyhow",
  "axum",
@@ -793,6 +795,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "tokio",
  "toml 0.8.23",
@@ -2220,7 +2223,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "slop-core"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "chrono",

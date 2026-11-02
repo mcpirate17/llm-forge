@@ -180,6 +180,14 @@ pub fn candidate_policy_relative(config: &ProjectConfig) -> Result<(String, bool
     configured_value(config, spec)
 }
 
+/// Captured project configuration only; no ambient environment override or file read.
+pub fn mutation_registry_from_config(config: Option<&ProjectConfig>) -> Result<String, String> {
+    match config {
+        Some(config) => configured_value(config, PATHS[1]).map(|(path, _)| path),
+        None => Ok(PATHS[1].default.into()),
+    }
+}
+
 /// Resolve the crate roster from captured configuration without reopening files.
 pub fn crate_roster_relative(config: &ProjectConfig) -> Result<(String, bool), String> {
     let spec = PATHS[8];

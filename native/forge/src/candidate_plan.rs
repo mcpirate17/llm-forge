@@ -144,7 +144,7 @@ fn plan_checks(changes: &[Value], checks: &[Value]) -> Result<Vec<Value>> {
     Ok(planned)
 }
 
-fn baseline_receipts(
+pub(crate) fn baseline_receipts(
     snapshot: &Path,
     policy: &Value,
     profile: &str,

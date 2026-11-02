@@ -16,6 +16,7 @@ mod crg_refresh;
 mod current_work_guard;
 mod dispatch;
 mod doctor;
+use forge::equivalence_worker;
 mod graph_context;
 mod handlers;
 mod handoff;
@@ -94,6 +95,8 @@ struct Cli {
 enum Command {
     /// Check native workspace runtime behavior with bounded, opt-in live probes.
     WorkspaceRuntime(workspace_runtime::RuntimeArgs),
+    #[command(hide = true)]
+    EquivalenceWorker(equivalence_worker::EquivalenceWorkerArgs),
     /// Create, release, touch and inspect structured repository ownership claims.
     Claim(claims::ClaimArgs),
     /// Inspect Git candidates, materialize snapshots and verify receipt digests.
@@ -336,11 +339,27 @@ fn command_exit(label: &str, result: anyhow::Result<u8>, failure: u8) -> ExitCod
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::EquivalenceWorker(args) => command_exit(
+            "equivalence-worker",
+            equivalence_worker::run(args).map(|()| 0),
+            2,
+        ),
         Command::WorkspaceRuntime(args) => {
             command_exit("workspace-runtime", workspace_runtime::run(args), 2)
         }
         Command::Claim(args) => command_exit("claim", claims::run(args).map(|()| 0), 2),
-        Command::Candidate(args) => command_exit("candidate", forge::candidate_cli::run(args), 1),
+        Command::Candidate(args) => command_exit(
+            "candidate",
+            forge::candidate_cli::run_with_stamp(
+                args,
+                Some(&forge::candidate_engine_identity::BuildStamp {
+                    source_sha256: env!("FORGE_SOURCE_SHA256"),
+                    git_commit: env!("FORGE_GIT_FULL_REV"),
+                    source_matches_git: env!("FORGE_SOURCE_MATCHES_GIT"),
+                }),
+            ),
+            1,
+        ),
         Command::Memory(args) => command_exit("memory", forge::recall::cli::run(args), 2),
         Command::Cards(args) => command_exit("cards", forge::cards_cli::run(args), 2),
         Command::Clerk(args) => command_exit("clerk", forge::local_clerk::cli::run(args), 2),
@@ -395,80 +414,50 @@ fn main() -> ExitCode {
             MutationCommand::Results(args) => {
                 command_exit("mutation results", mutation_results::run(args), 2)
             }
-            MutationCommand::Plan(args) => match mutation_plan::run(*args) {
-                Ok(code) => ExitCode::from(code as u8),
-                Err(err) => {
-                    eprintln!("forge mutation plan: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
+            MutationCommand::Plan(args) => command_exit(
+                "mutation plan",
+                mutation_plan::run(*args).map(|code| code as u8),
+                1,
+            ),
         },
         Command::Receipt { action } => match action {
-            ReceiptCommand::Show(args) => match receipt_show::run(&args) {
-                Ok(code) => ExitCode::from(code),
-                Err(err) => {
-                    eprintln!("forge receipt show: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
+            ReceiptCommand::Show(args) => command_exit("receipt show", receipt_show::run(&args), 1),
         },
-        Command::Route(args) => match route::run(args) {
-            Ok(code) => ExitCode::from(code as u8),
-            Err(err) => {
-                eprintln!("forge route: {err:#}");
-                ExitCode::from(2)
-            }
-        },
-        Command::Hooks { action } => match hooks_install::run(action) {
-            Ok(code) => ExitCode::from(code),
-            Err(err) => {
-                eprintln!("forge hooks: {err:#}");
-                ExitCode::from(1)
-            }
-        },
-        Command::Session { action } => match action {
-            SessionCommand::Close(args) => {
-                command_exit("session close", session_close_cli::run(args), 2)
-            }
-            SessionCommand::Append(args) => {
-                command_exit("session append", session_status_cli::run(args), 2)
-            }
-            SessionCommand::Brief(args) => {
-                command_exit("session brief", session_brief::run(args), 2)
-            }
-            SessionCommand::Journal { host } => {
-                command_exit("session journal", obsidian_sync::run_journal(&host), 2)
-            }
-            SessionCommand::State(args) => match session_preamble::run_state(&args) {
-                Ok(code) => ExitCode::from(code),
-                Err(err) => {
-                    eprintln!("forge session state: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-            SessionCommand::Preamble(args) => match session_preamble::run_preamble(&args) {
-                Ok(code) => ExitCode::from(code),
-                Err(err) => {
-                    eprintln!("forge session preamble: {err:#}");
-                    ExitCode::from(1)
-                }
-            },
-        },
-        Command::Doctor(args) => match doctor::run(&args) {
-            Ok(code) => ExitCode::from(code),
-            Err(err) => {
-                eprintln!("forge doctor: {err:#}");
-                ExitCode::from(1)
-            }
-        },
-        Command::Notes { action } => match notes_index::run(action) {
-            Ok(code) => ExitCode::from(code),
-            Err(err) => {
-                eprintln!("forge notes: {err:#}");
-                ExitCode::from(1)
-            }
-        },
+        Command::Route(args) => command_exit("route", route::run(args).map(|code| code as u8), 2),
+        Command::Hooks { action } => command_exit("hooks", hooks_install::run(action), 1),
+        Command::Session { action } => run_session(action),
+        Command::Doctor(args) => command_exit("doctor", doctor::run(&args), 1),
+        Command::Notes { action } => command_exit("notes", notes_index::run(action), 1),
         Command::Ledger { action } => run_ledger(action),
+    }
+}
+
+fn run_session(action: SessionCommand) -> ExitCode {
+    match action {
+        SessionCommand::Close(args) => {
+            command_exit("session close", session_close_cli::run(args), 2)
+        }
+        SessionCommand::Append(args) => {
+            command_exit("session append", session_status_cli::run(args), 2)
+        }
+        SessionCommand::Brief(args) => command_exit("session brief", session_brief::run(args), 2),
+        SessionCommand::Journal { host } => {
+            command_exit("session journal", obsidian_sync::run_journal(&host), 2)
+        }
+        SessionCommand::State(args) => match session_preamble::run_state(&args) {
+            Ok(code) => ExitCode::from(code),
+            Err(err) => {
+                eprintln!("forge session state: {err:#}");
+                ExitCode::from(1)
+            }
+        },
+        SessionCommand::Preamble(args) => match session_preamble::run_preamble(&args) {
+            Ok(code) => ExitCode::from(code),
+            Err(err) => {
+                eprintln!("forge session preamble: {err:#}");
+                ExitCode::from(1)
+            }
+        },
     }
 }
 

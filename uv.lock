@@ -429,7 +429,7 @@ wheels = [
 
 [[package]]
 name = "conductor-native"
-version = "0.1.87"
+version = "0.1.88"
 source = { directory = "native/conductor-native" }
 
 [[package]]
@@ -2432,7 +2432,7 @@ wheels = [
 
 [[package]]
 name = "slop-core"
-version = "0.1.13"
+version = "0.1.14"
 source = { directory = "native/slop-core" }
 
 [[package]]

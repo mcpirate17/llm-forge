@@ -22,6 +22,7 @@
 //! compacted-and-back receipt is byte-identical to its author's format.
 
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::path::Path;
 
 #[cfg(feature = "python")]
@@ -114,10 +115,20 @@ pub fn expand_detail(detail: &Value) -> Result<Map<String, Value>, String> {
                 .get("blob")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "zstd+base64 detail lacks its blob".to_string())?;
+            if blob.len() > 32 * 1024 * 1024 {
+                return Err("detail encoded blob exceeds 32 MiB".into());
+            }
             let compressed = base64_decode(blob)
                 .map_err(|error| format!("detail blob is not valid base64: {error}"))?;
-            let raw = zstd::stream::decode_all(compressed.as_slice())
+            let mut decoder = zstd::stream::read::Decoder::new(compressed.as_slice())
                 .map_err(|error| format!("detail blob does not decompress: {error}"))?;
+            let mut raw = Vec::new();
+            std::io::Read::take(&mut decoder, 32 * 1024 * 1024 + 1)
+                .read_to_end(&mut raw)
+                .map_err(|error| format!("detail blob does not decompress: {error}"))?;
+            if raw.len() > 32 * 1024 * 1024 {
+                return Err("detail blob exceeds 32 MiB".into());
+            }
             let text =
                 String::from_utf8(raw).map_err(|_| "detail blob is not UTF-8 JSON".to_string())?;
             let value: Value = serde_json::from_str(&text)
@@ -197,40 +208,8 @@ pub fn compact_directory(
     root: &Path,
     keep: Option<&BTreeMap<String, String>>,
 ) -> Result<Value, String> {
-    let mut entries: Vec<(std::path::PathBuf, Value)> = Vec::new();
-    let read = std::fs::read_dir(root).map_err(|error| format!("{root:?}: {error}"))?;
-    for entry in read.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
-            continue;
-        }
-        let text = std::fs::read_to_string(&path)
-            .map_err(|error| format!("{}: {error}", path.display()))?;
-        let payload: Value =
-            serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
-        if payload.get("campaign_id").and_then(Value::as_str).is_none() {
-            return Err(format!("{}: receipt lacks campaign_id", path.display()));
-        }
-        entries.push((path, payload));
-    }
-    if let Some(map) = keep {
-        let names: std::collections::BTreeSet<String> = entries
-            .iter()
-            .map(|(path, _)| {
-                path.file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned()
-            })
-            .collect();
-        for (campaign, target) in map {
-            if !names.contains(target) {
-                return Err(format!(
-                    "keep-set names {target:?} for {campaign:?}, which is not a receipt in {root:?}"
-                ));
-            }
-        }
-    }
+    let mut entries = compact_entries(root)?;
+    compact_keep_names(&entries, keep, root)?;
     entries.sort_by(|a, b| a.0.file_name().cmp(&b.0.file_name()));
     // Heuristic keep-set: (passes-status, stamp, path, name) -- a
     // passing-status receipt always outranks a failing one however new (a
@@ -545,7 +524,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "python"))]
+#[cfg(all(test, feature = "source-analysis"))]
 mod evidence_gate_tests {
     //! The evidence gate meets slim receipts on disk. These tests drive the real
     //! validation rule (`receipt_errors`, not just the decoder above) through
@@ -643,6 +622,7 @@ mod evidence_gate_tests {
             "adapter_sha256": binding,
             "scope_guard_sha256": binding,
             "survivors": [],
+            "complete_campaign": true,
             "baseline": {"returncode": 0, "timed_out": false},
             "mutants": mutants,
             "outcome_counts": outcome_counts,
@@ -775,4 +755,50 @@ mod evidence_gate_tests {
         );
         assert_eq!(found[0].kind.as_str(), "decode_error");
     }
+}
+
+fn compact_entries(root: &Path) -> Result<Vec<(std::path::PathBuf, Value)>, String> {
+    let mut entries: Vec<(std::path::PathBuf, Value)> = Vec::new();
+    let read = std::fs::read_dir(root).map_err(|error| format!("{root:?}: {error}"))?;
+    for entry in read.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        let payload: Value =
+            serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
+        if payload.get("campaign_id").and_then(Value::as_str).is_none() {
+            return Err(format!("{}: receipt lacks campaign_id", path.display()));
+        }
+        entries.push((path, payload));
+    }
+    Ok(entries)
+}
+
+fn compact_keep_names(
+    entries: &[(std::path::PathBuf, Value)],
+    keep: Option<&BTreeMap<String, String>>,
+    root: &Path,
+) -> Result<(), String> {
+    if let Some(map) = keep {
+        let names: std::collections::BTreeSet<String> = entries
+            .iter()
+            .map(|(path, _)| {
+                path.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        for (campaign, target) in map {
+            if !names.contains(target) {
+                return Err(format!(
+                    "keep-set names {target:?} for {campaign:?}, which is not a receipt in {root:?}"
+                ));
+            }
+        }
+    }
+    Ok(())
 }

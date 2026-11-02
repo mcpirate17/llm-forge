@@ -1,4 +1,4 @@
-//! The equivalence probe's gate: one `conductor.equivalence_probe` child per target
+//! The equivalence probe's gate: one native guest probe child per target
 //! module, and what its findings mean.
 //!
 //! A target is a module and the units to ablate in it, each with the recorded tests that
@@ -13,9 +13,13 @@
 //! measured there, which a pass must not hide.
 
 use crate::index::TestIndex;
+#[path = "gate_io.rs"]
+mod io;
 use crate::{engine, index, rules};
 use anyhow::{bail, Context};
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -178,6 +182,7 @@ fn wait(child: &mut Child, timeout: Duration) -> anyhow::Result<Option<ExitStatu
 fn run(
     root: &Path,
     python: &str,
+    guest_path: Option<&Path>,
     plan: &Plan,
     workdir: &Path,
     timeout: Duration,
@@ -186,9 +191,16 @@ fn run(
     let report = workdir.join("report.json");
     let log = workdir.join("stderr.log");
     let mut command = Command::new(python);
-    command
-        .args(["-m", "conductor.equivalence_probe", plan.module])
-        .args(&plan.tests);
+    if let Some(path) = guest_path {
+        command.arg("-c").arg(r#"import importlib.util,sys; s=importlib.util.spec_from_file_location("slop_core",sys.argv.pop(1)); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.equivalence_probe_guest_cli()"#).arg(path).arg(plan.module);
+    } else {
+        command.args([
+            "-c",
+            "import slop_core; slop_core.equivalence_probe_guest_cli()",
+            plan.module,
+        ]);
+    }
+    command.args(&plan.tests);
     for (qualname, _, _) in plan.units {
         command.args(["--function", qualname]);
     }
@@ -207,10 +219,10 @@ fn run(
     let started = Instant::now();
     let mut child = command
         .spawn()
-        .with_context(|| format!("{python} -m conductor.equivalence_probe {}", plan.module))?;
+        .with_context(|| format!("{python} native equivalence guest {}", plan.module))?;
     let status = wait(&mut child, timeout)?;
     let took = started.elapsed();
-    let stderr = std::fs::read(&log).with_context(|| log.display().to_string())?;
+    let stderr = io::tail(&log, STDERR_TAIL_CHARS * 4)?;
     let module = plan.module;
     let Some(status) = status else {
         let description = format!(
@@ -238,7 +250,16 @@ fn run(
             &stderr,
         )));
     }
-    let text = match std::fs::read_to_string(&report) {
+    read_report(&report, module, took, &stderr)
+}
+
+fn read_report(
+    report: &Path,
+    module: &str,
+    took: Duration,
+    stderr: &[u8],
+) -> anyhow::Result<Outcome> {
+    let text = match io::read(report, 4 * 1024 * 1024) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let description =
@@ -249,12 +270,12 @@ fn run(
                 "probe-no-report",
                 description,
                 took,
-                &stderr,
+                stderr,
             )));
         }
         Err(error) => return Err(error).with_context(|| report.display().to_string()),
     };
-    Ok(match serde_json::from_str::<Vec<Value>>(&text) {
+    Ok(match serde_json::from_slice::<Vec<Value>>(&text) {
         Ok(findings) => Outcome::Findings(findings),
         Err(error) => {
             let description = format!(
@@ -265,7 +286,7 @@ fn run(
                 "probe-bad-report",
                 description,
                 took,
-                &stderr,
+                stderr,
             ))
         }
     })
@@ -275,6 +296,7 @@ fn run(
 fn probe(
     root: &Path,
     python: &str,
+    guest_path: Option<&Path>,
     plan: &Plan,
     slot: usize,
     timeout: Duration,
@@ -282,7 +304,7 @@ fn probe(
 ) -> anyhow::Result<Outcome> {
     let workdir = root.join(format!(".equivalence-gate-{}-{slot}", std::process::id()));
     std::fs::create_dir(&workdir).with_context(|| workdir.display().to_string())?;
-    let outcome = run(root, python, plan, &workdir, timeout, threads);
+    let outcome = run(root, python, guest_path, plan, &workdir, timeout, threads);
     std::fs::remove_dir_all(&workdir).with_context(|| workdir.display().to_string())?;
     outcome
 }
@@ -292,6 +314,7 @@ fn probe(
 fn probe_all(
     root: &Path,
     python: &str,
+    guest_path: Option<&Path>,
     plans: &[Plan],
     timeout: Duration,
     jobs: Option<usize>,
@@ -314,7 +337,7 @@ fn probe_all(
             scope.spawn(|| loop {
                 let at = next.fetch_add(1, Ordering::Relaxed);
                 let Some(plan) = plans.get(at) else { break };
-                let outcome = probe(root, python, plan, at, timeout, threads);
+                let outcome = probe(root, python, guest_path, plan, at, timeout, threads);
                 done.lock().expect("a probe worker panicked")[at] = Some(outcome);
             });
         }
@@ -491,6 +514,19 @@ pub fn gate(
     timeout: Duration,
     jobs: Option<usize>,
 ) -> anyhow::Result<Summary> {
+    gate_with_guest(root, python, None, targets, waivers, timeout, jobs)
+}
+
+/// Caller supplies the exact operator-held, SHA-pinned guest extension path.
+pub fn gate_with_guest(
+    root: &Path,
+    python: &str,
+    guest_path: Option<&Path>,
+    targets: &[Target],
+    waivers: Option<&Path>,
+    timeout: Duration,
+    jobs: Option<usize>,
+) -> anyhow::Result<Summary> {
     let waivers = match waivers {
         Some(path) => {
             let text = std::fs::read_to_string(path).with_context(|| path.display().to_string())?;
@@ -503,7 +539,7 @@ pub fn gate(
     let mut summary = Summary::default();
     let mut index = None;
     let plans = plans(root, targets, &mut index, &mut summary);
-    let outcomes = probe_all(root, python, &plans, timeout, jobs)?;
+    let outcomes = probe_all(root, python, guest_path, &plans, timeout, jobs)?;
     summarize(
         root,
         &plans,
@@ -517,6 +553,7 @@ pub fn gate(
 
 /// The summary, as JSON, of probing `targets` (conductor-native's
 /// `equivalence_targets_native`) under `root` with the interpreter `python`.
+#[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(signature = (root, python, targets, waivers=None, timeout=180.0, jobs=None))]
 pub fn equivalence_gate(

@@ -263,8 +263,8 @@ profiles = ["fast", "full"]
 # user-blessed *DO_NOT_DELETE* files. No class filter: the junk it rejects is
 # markdown and log output, which belong to no source class. Deletions are exempt
 # -- removing a junk file is the fix, not a violation.
-command = ["{python}", "-m", "conductor.check_root_junk", "{files}"]
-version_command = ["{python}", "--version"]
+command = ["forge", "analyze", "--root", "{snapshot}", "paths", "--check", "root-junk", "--", "{files}"]
+version_command = ["forge", "analyze", "paths", "--check", "root-junk", "--tool-version"]
 cache = true
 severity = "high"
 timeout_seconds = 60
@@ -278,8 +278,8 @@ profiles = ["fast", "full"]
 # .json/.jsonl/.csv directly inside it -- research/data/ for persistent inputs,
 # research/reports/ or tasks/audit/ for tool output. Subdirectories are exempt
 # by design: they are curated collections, not loose data drops.
-command = ["{python}", "-m", "conductor.check_json_in_notes", "{files}"]
-version_command = ["{python}", "--version"]
+command = ["forge", "analyze", "--root", "{snapshot}", "paths", "--check", "json-in-notes", "--", "{files}"]
+version_command = ["forge", "analyze", "paths", "--check", "json-in-notes", "--tool-version"]
 cache = true
 severity = "high"
 timeout_seconds = 60

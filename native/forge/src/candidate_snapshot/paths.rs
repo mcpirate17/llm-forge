@@ -77,7 +77,7 @@ pub(super) fn prepare(source: &Source, tree: &str, limits: Limits) -> Result<Pla
         .collect();
     let mut budget = ExpansionBudget::default();
     for (path, target) in &links {
-        resolve_link(path, target, &links, &modes, &mut budget)?;
+        resolve_link(path, target, &links, &modes, &mut budget, false)?;
     }
     Ok(Plan {
         entries,
@@ -125,12 +125,14 @@ fn resolve_link(
     links: &BTreeMap<String, String>,
     modes: &BTreeMap<&str, &str>,
     budget: &mut ExpansionBudget,
-) -> Result<()> {
+    capture: bool,
+) -> Result<Option<(String, Vec<String>)>> {
     let mut resolved: Vec<&str> = path.split('/').collect();
     resolved.pop();
     let mut resolved: Vec<String> = resolved.into_iter().map(str::to_owned).collect();
     let mut pending: VecDeque<String> = target.split('/').map(str::to_owned).collect();
-    let mut followed = 1usize;
+    let mut followed = usize::from(!path.is_empty());
+    let mut traversed = Vec::new();
     let mut examined = 0usize;
     while let Some(part) = pending.pop_front() {
         examined += 1;
@@ -173,6 +175,9 @@ fn resolve_link(
             "candidate symlink expanded path exceeds 4096 bytes"
         );
         if let Some(next) = links.get(&current) {
+            if capture {
+                traversed.push(current.clone());
+            }
             followed += 1;
             ensure!(
                 followed <= 40,
@@ -191,7 +196,62 @@ fn resolve_link(
             );
         }
     }
-    Ok(())
+    Ok(capture.then(|| (resolved.join("/"), traversed)))
+}
+
+pub(super) fn resolve_captured_file(
+    source: &Source,
+    entries: &[TreeEntry],
+    path: &str,
+) -> Result<(String, Vec<(String, String)>)> {
+    crate::candidate_source::safe_path(path.as_bytes())?;
+    if entries
+        .iter()
+        .any(|entry| entry.path == path && matches!(entry.mode.as_str(), "100644" | "100755"))
+    {
+        return Ok((path.to_owned(), Vec::new()));
+    }
+    let mut symlinks = Vec::new();
+    let mut total = 0u64;
+    for entry in entries.iter().filter(|entry| entry.mode == "120000") {
+        ensure!(
+            symlinks.len() < 4096,
+            "candidate policy symlink inventory exceeds 4096"
+        );
+        total = total
+            .checked_add(entry.size.unwrap_or(u64::MAX))
+            .context("candidate symlink byte overflow")?;
+        ensure!(
+            total <= 16 * 1024 * 1024,
+            "candidate policy symlink inventory exceeds 16 MiB"
+        );
+        symlinks.push(entry.clone());
+    }
+    let links = read_links(source, &symlinks)?;
+    let modes = entries
+        .iter()
+        .map(|entry| (entry.path.as_str(), entry.mode.as_str()))
+        .collect();
+    let (resolved, followed) = resolve_link(
+        "",
+        path,
+        &links,
+        &modes,
+        &mut ExpansionBudget::default(),
+        true,
+    )?
+    .context("captured policy resolution missing")?;
+    let selected = followed
+        .into_iter()
+        .map(|path| {
+            let target = links
+                .get(&path)
+                .context("captured policy symlink disappeared")?
+                .clone();
+            Ok((path, target))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok((resolved, selected))
 }
 
 #[cfg(test)]
@@ -206,13 +266,13 @@ mod tests {
             steps: 999_999,
             bytes: 0,
         };
-        resolve_link("first", "file", &links, &modes, &mut steps).unwrap();
-        assert!(resolve_link("second", "file", &links, &modes, &mut steps).is_err());
+        resolve_link("first", "file", &links, &modes, &mut steps, false).unwrap();
+        assert!(resolve_link("second", "file", &links, &modes, &mut steps, false).is_err());
         let mut bytes = ExpansionBudget {
             steps: 0,
             bytes: 64 * 1024 * 1024 - 4,
         };
-        resolve_link("first", "file", &links, &modes, &mut bytes).unwrap();
-        assert!(resolve_link("second", "file", &links, &modes, &mut bytes).is_err());
+        resolve_link("first", "file", &links, &modes, &mut bytes, false).unwrap();
+        assert!(resolve_link("second", "file", &links, &modes, &mut bytes, false).is_err());
     }
 }

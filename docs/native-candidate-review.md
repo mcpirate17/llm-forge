@@ -1,15 +1,25 @@
 # Native candidate review foundation
 
-The native candidate foundation exposes exact Git candidate metadata, safe
-materialization of a candidate tree, candidate policy classification, check
-planning, isolated execution of one external check, and candidate receipt digest
-verification. These commands provide inputs for review; they are not an
-end-to-end review gate. Full check orchestration,
-mutation evidence, attestation, claims, reporting, and approval workflows
-remain in the Python `conductor.candidate_review` package until their later
-native slices land.
+The native candidate CLI provides exact candidate metadata, bounded candidate
+snapshots, policy classification and planning, isolated check execution, and
+receipt digest verification. The `candidate review` coordinator also resolves
+the complete active profile, captures native-owned evidence, runs scheduled
+checks when explicitly requested, assesses only those observations, and can
+publish a digest-sealed report. Planning and review preparation do not execute
+checks, and a report is not an approval or authorization to land.
+
+The coordinator currently requires one complete profile. It records
+`review_complete`, `execution_verified`, `decision`, `incomplete`, `checks`,
+`findings`, `stages`, and provenance bindings. Missing obligations or
+incomplete observations fail closed. `approval` remains false. The checksum
+proves report self-consistency only; it is not authenticated approval or proof
+of an external analyzer's completeness. This page documents the current native
+slice and does not claim overall migration completion, production readiness,
+or final validation.
 
 ## Commands
+
+Existing foundation commands remain available:
 
 ```text
 forge candidate plan [--repo PATH] --kind index|commit|range
@@ -39,8 +49,48 @@ forge candidate materialize [--repo PATH] --tree FULL_TREE_OID
 forge candidate verify-receipt FILE [--repo PATH --ref REF] [--json]
 ```
 
-Planning, inspection, and materialization default `--repo` to the current
-directory. Receipt binding requires `--repo` and `--ref` together.
+The complete-profile coordinator is invoked separately:
+
+```text
+forge candidate review [--repo PATH] --kind index|commit|range
+    [--target-ref HEAD] [--base-ref REF] [--policy CANDIDATE_RELATIVE]
+    [--profile fast|full|nightly] [--today YYYY-MM-DD]
+    --grants ABSOLUTE_JSON_PATH [--expected-tree FULL_TREE_OID]
+    --surface pre-commit|post-commit|ci|manual [--execute] [--lock-timeout SECONDS]
+    [--owner ID] [--receipt PATH] [--sarif-out PATH] [--junit-out PATH]
+    [--registry PATH --registry-sha256 SHA256]
+    [--mutation-runner-bundle PATH --mutation-runner-sha256 SHA256]
+    [--equivalence-guest PATH --equivalence-guest-sha256 SHA256]
+    [--equivalence-store PATH --equivalence-store-sha256 SHA256]
+    [--equivalence-artifacts DIRECTORY]
+forge candidate runner-bundle --repo PATH --package-root ABSOLUTE_PATH
+    --output NEW_PATH [--lineage PATH]
+    [--external-invariant-probe ELF_PATH] [--exclude-root DIRECTORY ...]
+```
+
+`review` requires an explicit `--surface`, operator grants with a batch
+budget, and a selected profile. Without `--execute`, it resolves the candidate
+and reports the required checks and selected files without running them; the
+report says `executed: false`, `review_complete: false`,
+`execution_verified: false`, and `approval: false`. `--execute` opts into fresh
+execution. `--receipt` is available only with `--execute` and atomically
+publishes the completed report under an existing operator-controlled
+parent. `--owner` supplies the local lane identity for ownership observations;
+it grants no authority. An optional expected tree makes stale candidate
+selection an input error. Profile/date/policy defaults and the shared operator
+grants format are described in the existing sections below.
+
+The complete-profile report contains coordinator-owned results only. It
+includes reserved `engine-integrity` and `attestation` obligations alongside
+every active policy check; unsupported or missing observations remain
+incomplete and block a pass. The coordinator captures test selection, source
+evidence, ownership, mutation evidence, equivalence inputs, regular checks,
+and targeted checks where the selected policy schedules them. It rechecks
+held inputs and observations before reporting and removes its private snapshot
+before a successful report can be published. Cache hits are not accepted as
+fresh review evidence. A `pass` means the selected local observations met
+the configured policy for the named candidate/profile/surface; it does not
+assert that an external tool examined every relevant input or authorize merge.
 
 ### Plan candidate checks
 
@@ -195,9 +245,9 @@ limited to depth 32, 1 million nodes, and 64 MiB including accounting overhead.
 Normalized policy is limited to 4 MiB, grouped exception matching to 2 million
 pairs, and pattern/path matching to 100 million estimated work units.
 
-This remains an assessment of supplied data, not a complete review. Full check
-orchestration, cache provenance, evidence, and attestation remain in the existing
-workflow pending their native migrations.
+This command remains an assessment of supplied data, not a complete review.
+The separate `candidate review` command below assembles coordinator-owned
+observations for the complete active profile.
 
 ### Prepare or execute one external check
 
@@ -585,18 +635,146 @@ adds no execution, authorship, authentication or approval evidence.
 
 ## Current boundary
 
-The native commands can apply candidate policy, plan checks, and explicitly run
-one granted external check or a bounded selected batch. They do not orchestrate
-the complete review pipeline,
-admit or authenticate mutation
-evidence, issue attestations, acquire claims, produce a complete review, or
-decide whether work may land. Continue to use the existing candidate-review
-workflow for those decisions. The interdependent Python candidate-review
-package remains in place: its CLI and engine still call the Python command
-runner for the legacy complete-review workflow. The native execution paths
-do not silently replace those callers. Full orchestration, mutation evidence,
-attestation, claims, review-integrated reporting, and approval remain separate
-migration work. Standalone native report export is available as described above.
+The native CLI now includes a complete-active-profile review coordinator as
+documented above, alongside the foundation and single/batch execution paths.
+The coordinator uses native-owned evidence and supervised stages, but this
+does not establish authenticated execution of every installed compatibility
+source or completeness of external analyzer behavior. The legacy Python
+candidate-review workflow remains in place; native review does not silently
+replace its callers. Review reports record their scope and limitations, set
+`approval: false`, and do not decide whether work may land.
 
-This page records the native command contract only. It makes no build, test,
-parity, approval, or release-readiness claim.
+This page records the current native command contract only. It makes no build,
+test, parity, approval, migration-completion, or release-readiness claim.
+
+### Complete-profile review, runner bundles, and mutation invariants
+
+The review coordinator composes candidate selection, policy scheduling,
+operator grants, native evidence collectors, supervised stages, assessment,
+and report sealing. Its review path differs from `assess`, which evaluates
+caller-supplied rows, and `execute-batch`, which executes checks without
+assembling complete review evidence. Review always uses the complete active
+profile and rejects duplicate or reserved check identities. Its required set
+includes `engine-integrity` and `attestation`, even if the profile has no
+corresponding policy rows. Missing results, cancellation, check errors,
+baseline drift, cleanup failures, or failed rechecks prevent a complete
+passing decision. A dry-run is a plan only and cannot produce a review receipt.
+
+The receipt's `execution_verified` field means the coordinator completed its
+own required observation/execution protocol for this report. It is not a
+cryptographic attestation of arbitrary child behavior. The sealed digest
+supports corruption detection and optional exact-tree binding via
+`verify-receipt`; it does not authenticate who approved the candidate. The
+report always records `approval: false`. Review has no approval or promotion
+operation.
+
+#### Installed mutation runner bundle
+
+The optional `--mutation-runner-bundle` plus `--mutation-runner-sha256`
+provides a separately operator-selected compatibility-source manifest for
+mutation receipt and value verification. Generate a manifest with
+`candidate runner-bundle`; the package root must be a canonical absolute
+installed package directory outside the source checkout, Git common directory,
+snapshot, and scratch roots. The output must be new and inside an existing
+owned mode-0700 parent. The manifest pins the exact shipped inventory:
+eleven compatibility components, five core/scope/engine bindings, and
+optional lineage and external-invariant probe files. Each file is bound by
+SHA-256; inputs are held and rechecked while the bundle is captured. The
+schema uses the CPython 3.12 symbol-hash protocol. Bundle inputs are bounded
+to 32 MiB total (with per-source and probe limits).
+
+For example, after choosing the installed package and protected output parent:
+
+```text
+forge candidate runner-bundle --repo /path/to/source \
+  --package-root /canonical/installed/package \
+  --output /operator/private/bundle/runner.json \
+  --lineage /canonical/installed/package/lineage.json \
+  --external-invariant-probe /canonical/installed/package/probe/conductor_native.so
+```
+
+The command prints the manifest SHA-256 and path. Pass both path and digest
+to `candidate review`; the digest must match the manifest bytes. The pins
+prove which bytes were captured and detect drift. They do **not** prove those
+installed bytes were executed, loaded, or used to create a historical
+receipt. Review records this limitation explicitly; consistency and source
+binding are not execution authentication.
+
+#### Mutation invariant observations
+
+When mutation-evidence verification derives external invariant requests, a
+review needs the bundle's pinned native probe. The coordinator executes those
+requests through its granted and supervised stage, then binds the observation
+to the candidate tree, policy, request set, and held probe. The probe must be
+a pinned native ELF shared library named `conductor_native.so`. The external
+measurement observes requested runtime and coverage state; it is not proof
+of historical loading or a general guarantee that every invariant holds.
+
+The standalone `candidate mutation-invariant` subcommand is the worker
+protocol and requires an explicit `--execute`; normal use is through review's
+owned stage, which supplies its arguments internally. It binds execution to
+the candidate base/tree and original source, requires explicit grants for
+Forge, Python, pytest, coverage, and read-only `/proc`, and verifies the probe
+pin. Requests are bounded and each identifies a candidate test node, pinned
+Torch value, phase, and justification. Keep this command under the parent
+review supervisor; invoking it directly does not create complete candidate
+review evidence or issue approval.
+
+The probe directory precedes the captured project on `PYTHONPATH`; use a
+dedicated directory containing the probe so other installed modules cannot
+shadow project imports. The worker preserves the operator's pytest autoload
+setting. At each sample, the probe checks the loaded Torch module's version,
+canonical origin, and identity against the separately observed installation.
+Torch must originate outside the source checkout and captured snapshot.
+
+### Native Make review callers and report exports
+
+`--receipt FILE`, `--sarif-out FILE` and `--junit-out FILE` export the newly sealed
+in-memory receipt, including failed reviews. They require `--execute`, existing
+real parent directories, and distinct destinations. All requested formats render
+before publication. Each file is replaced atomically through the existing report
+store; multiple outputs are not a transaction. An export error fails the command
+and never falls back to an existing receipt. A failure before a new receipt is
+built does not overwrite an older artifact or label that artifact as fresh.
+
+The Make review front doors call this native coordinator directly:
+
+```sh
+make candidate-review CONDUCTOR_REVIEW_GRANTS=/operator/review-grants.json
+make governance-audit CONDUCTOR_REVIEW_GRANTS=/operator/review-grants.json
+make governance-preflight CONDUCTOR_REVIEW_GRANTS=/operator/review-grants.json
+```
+
+`FORGE` selects the executable. `REVIEW_ARGS` supplies additional native options
+for `candidate-review`; `CONDUCTOR_REVIEW_ARGS` supplies them for the three
+`governance-*` review targets. These options carry explicit owner, runtime bundle,
+registry and equivalence pins when required. Make never generates grants or
+silently runs the Python review if native admission fails. These manual/CI
+commands do not replace a host's pre-commit hook or locked commit protocol.
+
+## Remaining compatibility boundary
+
+The mutation collector currently preserves the legacy grandfather inventory:
+commit `61343f575215dd222a74fc2c060d0328692ded5e`, its fixed tree, and a
+SHA-bound inventory from the LLM repository. Changed-test review on a host
+without those objects fails this check. Portable baseline configuration remains
+unfinished. External-invariant waivers also require an actual campaign receipt
+bound to a manifest declaring the invariant; a successful probe alone does not
+satisfy the collector. No complete positive collector run is claimed from the
+leaf probe tests.
+
+The Python candidate-review package remains shipped for live compatibility APIs.
+`conductor.gate` and the legacy review benchmark still invoke its review CLI.
+`governance-commit` and `attest-message` still use its shared governance mutex,
+inherited lock token/descriptor, canonical pre-commit receipt lookup and commit
+message mutation. Those callers must switch with equivalent native lock and
+receipt-binding behavior before their engine/CLI code can be removed. Existing
+PyO compatibility drivers also call that code; retire them only with an explicit
+native coverage map, not by making imports fail.
+
+Executing native review holds the Git-common governance lock through selection,
+cleanup, and publication. `--lock-timeout` defaults to 30 seconds and accepts
+0–3600. Normal reviews hold a shared lease; a review invoked by a locked commit
+can retain an inherited exclusive descriptor. The parent must hold that lease
+until review returns. Token-only inheritance is refused because the token
+cannot retain the underlying lock. Dry runs acquire no governance lease.

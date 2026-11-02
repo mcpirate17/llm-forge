@@ -123,7 +123,6 @@ impl CampaignContract {
 }
 
 #[derive(Debug, Deserialize)]
-#[cfg(feature = "python")]
 struct CampaignLoadRequest {
     repo_root: String,
     manifest_path: String,
@@ -134,7 +133,6 @@ struct CampaignLoadRequest {
 }
 
 #[derive(Debug, Deserialize)]
-#[cfg(feature = "python")]
 struct RegistryLoadRequest {
     repo_root: String,
     registry_path: String,
@@ -284,6 +282,7 @@ fn object<'a>(value: Option<&'a Value>, label: &str) -> Result<&'a Map<String, V
         .ok_or_else(|| format!("{label} must be a JSON object"))
 }
 
+#[cfg(any(feature = "python", test))]
 fn sha256_file(path: &Path) -> Option<String> {
     fs::read(path)
         .ok()
@@ -297,9 +296,13 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+#[cfg(any(feature = "python", test))]
 fn patch_paths(path: &Path) -> Result<Vec<String>, String> {
     let text = fs::read_to_string(path)
         .map_err(|error| format!("cannot read mutation patch {}: {error}", path.display()))?;
+    parse_patch_paths(&text)
+}
+fn parse_patch_paths(text: &str) -> Result<Vec<String>, String> {
     let mut paths = Vec::new();
     let mut diff_paths = Vec::new();
     let mut old_paths = Vec::new();
@@ -346,10 +349,7 @@ fn patch_paths(path: &Path) -> Result<Vec<String>, String> {
         }
     }
     if paths.is_empty() {
-        return Err(format!(
-            "mutation patch contains no modified paths: {}",
-            path.display()
-        ));
+        return Err("mutation patch contains no modified paths".to_owned());
     }
     diff_paths.sort();
     paths.sort();
@@ -383,6 +383,15 @@ pub(crate) fn load_registry_manifest_paths(
         return Err("mutation registry must be inside the repository".to_owned());
     }
     let (_, payload) = read_json_object(&resolved, "mutation registry")?;
+    registry_contract(payload, canonical_patterns, || {
+        load_registry_fragments(&resolved)
+    })
+}
+pub(crate) fn registry_contract(
+    payload: Map<String, Value>,
+    canonical_patterns: Option<&[String]>,
+    fragments: impl FnOnce() -> Result<Vec<String>, String>,
+) -> Result<(Map<String, Value>, Vec<String>), String> {
     if payload.get("schema_version").and_then(Value::as_i64) != Some(1) {
         return Err(format!(
             "unsupported registry schema_version={}; expected 1",
@@ -418,7 +427,7 @@ pub(crate) fn load_registry_manifest_paths(
             &format!("registry.campaigns[{index}].manifest"),
         )?);
     }
-    manifests.extend(load_registry_fragments(&resolved)?);
+    manifests.extend(fragments()?);
     let mut seen = BTreeSet::new();
     manifests.retain(|manifest| seen.insert(manifest.clone()));
     if manifests.is_empty() {
@@ -569,13 +578,16 @@ fn validate_value_analysis(
     }))
 }
 
+#[cfg(test)]
 fn inventory_python_test_nodeids(root: &Path, relative: &str) -> Result<Vec<String>, String> {
     let source = fs::read_to_string(root.join(relative))
         .map_err(|error| format!("cannot inventory Python tests in {relative}: {error}"))?;
-    let statements = ruff_python_parser::parse_module(&source)
-        .map_err(|error| format!("cannot inventory Python tests in {relative}: {error}"))?
-        .into_syntax()
-        .body;
+    inventory_python_source(&source, relative)
+}
+fn inventory_python_source(source: &str, relative: &str) -> Result<Vec<String>, String> {
+    let document = crate::candidate_python::Document::parse(source)
+        .map_err(|error| format!("cannot inventory Python tests in {relative}: {error}"))?;
+    let statements = &document.module().body;
     let mut nodeids = Vec::new();
     for statement in statements {
         match statement {
@@ -583,7 +595,7 @@ fn inventory_python_test_nodeids(root: &Path, relative: &str) -> Result<Vec<Stri
                 nodeids.push(format!("{relative}::{}", function.name));
             }
             ast::Stmt::ClassDef(class) if class.name.starts_with("Test") => {
-                for child in class.body {
+                for child in &class.body {
                     if let ast::Stmt::FunctionDef(function) = child {
                         if function.name.starts_with("test_") {
                             nodeids.push(format!("{relative}::{}::{}", class.name, function.name));
@@ -674,9 +686,13 @@ fn classify_rust_attribute(path: &str) -> TestAttribute {
 
 /// Inventory `#[test]` functions in a Rust source file, in source order, as the
 /// `<path>::<fn>` nodeids a `cargo_test` scope declares.
+#[cfg(test)]
 fn inventory_rust_test_nodeids(root: &Path, relative: &str) -> Result<Vec<String>, String> {
     let source = fs::read_to_string(root.join(relative))
         .map_err(|error| format!("cannot inventory Rust tests in {relative}: {error}"))?;
+    inventory_rust_source(&source, relative)
+}
+fn inventory_rust_source(source: &str, relative: &str) -> Result<Vec<String>, String> {
     let lines: Vec<&str> = source.lines().collect();
     let mut names: Vec<String> = Vec::new();
     let mut pending: Option<usize> = None;
@@ -773,9 +789,13 @@ fn c_test_fn_name(line: &str) -> Option<String> {
 
 /// Inventory `static void test_*(void)` definitions in a C or C++ source file,
 /// in source order, as the `<path>::<fn>` nodeids a `c_test` scope declares.
+#[cfg(test)]
 fn inventory_c_test_nodeids(root: &Path, relative: &str) -> Result<Vec<String>, String> {
     let source = fs::read_to_string(root.join(relative))
         .map_err(|error| format!("cannot inventory C tests in {relative}: {error}"))?;
+    inventory_c_source(&source, relative)
+}
+fn inventory_c_source(source: &str, relative: &str) -> Result<Vec<String>, String> {
     let mut names: Vec<String> = Vec::new();
     for line in source.lines() {
         // Not trimmed: CMake registers cases with a `^static void`-anchored
@@ -860,12 +880,28 @@ fn digest_map(payload: &Map<String, Value>, key: &str) -> Result<Map<String, Val
 /// since no human chose the mutants. What remains is the part that actually pins evidence to
 /// code -- which tests ran, which sources were mutated, and which survivors were already
 /// accepted -- and that is what this reads.
+#[cfg(test)]
 fn generated_campaign_contract(
     root: &Path,
     payload: &Map<String, Value>,
     manifest_bytes: Vec<u8>,
     relative_manifest: &str,
     mutation_engine: &str,
+) -> Result<CampaignContract, String> {
+    generated_campaign_contract_with(
+        payload,
+        manifest_bytes,
+        relative_manifest,
+        mutation_engine,
+        |relative| sha256_file(&root.join(relative)),
+    )
+}
+pub(crate) fn generated_campaign_contract_with(
+    payload: &Map<String, Value>,
+    manifest_bytes: Vec<u8>,
+    relative_manifest: &str,
+    mutation_engine: &str,
+    hash: impl Fn(&str) -> Option<String>,
 ) -> Result<CampaignContract, String> {
     let generator = object(payload.get("generator"), "generator")?;
     let source_sha256 = digest_map(payload, "source_sha256")?;
@@ -894,26 +930,7 @@ fn generated_campaign_contract(
         ));
     }
 
-    let mut survivor_baseline = Vec::new();
-    match payload.get("survivor_baseline") {
-        Some(Value::Array(rows)) => {
-            for (index, row) in rows.iter().enumerate() {
-                let id = row
-                    .as_str()
-                    .filter(|value| !value.trim().is_empty())
-                    .ok_or_else(|| {
-                        format!("survivor_baseline[{index}] must be a non-empty string")
-                    })?;
-                survivor_baseline.push(id.to_owned());
-            }
-        }
-        _ => return Err("survivor_baseline must be a list".to_owned()),
-    }
-    let unique: BTreeSet<&String> = survivor_baseline.iter().collect();
-    if unique.len() != survivor_baseline.len() {
-        return Err("survivor_baseline contains duplicate mutant ids".to_owned());
-    }
-
+    let survivor_baseline = generated_survivors(payload)?;
     let timeout_seconds = generator
         .get("run_timeout_seconds")
         .and_then(Value::as_u64)
@@ -936,13 +953,10 @@ fn generated_campaign_contract(
         );
     }
 
-    let source_drifted =
-        source_sha256
-            .iter()
-            .chain(test_sha256.iter())
-            .any(|(relative, expected)| {
-                sha256_file(&root.join(relative)).as_deref() != expected.as_str()
-            });
+    let source_drifted = source_sha256
+        .iter()
+        .chain(test_sha256.iter())
+        .any(|(relative, expected)| hash(relative).as_deref() != expected.as_str());
 
     Ok(CampaignContract {
         campaign_id: required_string(payload, "campaign_id", "campaign_id")?,
@@ -974,10 +988,15 @@ fn generated_campaign_contract(
     })
 }
 
+#[path = "mutation_manifest_capture.rs"]
+mod capture;
+#[path = "mutation_manifest_legacy.rs"]
+mod legacy;
 include!("mutation_manifest_load.rs");
+pub(crate) use capture::load_captured as load_contract_captured;
 
 /// A registered campaign whose manifest could not be loaded, kept for reporting.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct BrokenCampaign {
     pub manifest: String,
     pub error: String,
@@ -1033,47 +1052,17 @@ fn parse_json<T: for<'de> Deserialize<'de>>(text: &str, label: &str) -> PyResult
 #[cfg(feature = "python")]
 #[pyfunction]
 pub fn load_mutation_campaign_native(request_json: &str) -> PyResult<String> {
-    let request: CampaignLoadRequest = parse_json(request_json, "campaign load request")?;
-    let root = lexical_absolute(Path::new(&request.repo_root)).map_err(value_error)?;
-    let manifest =
-        safe_relative(&request.manifest_path, "campaign manifest").map_err(value_error)?;
-    let campaign = load_campaign_contract(
-        &root,
-        &manifest,
-        &request.python_test_nodeids,
-        &request.symbol_hashes,
-        &BTreeSet::new(),
-        true,
-    )
-    .map_err(value_error)?;
-    serde_json::to_string(&campaign).map_err(|error| value_error(error.to_string()))
+    let request: Value = parse_json(request_json, "mutation input request")?;
+    let result = load_campaign_value(&request).map_err(value_error)?;
+    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 pub fn load_mutation_registry_native(request_json: &str) -> PyResult<String> {
-    let request: RegistryLoadRequest = parse_json(request_json, "registry load request")?;
-    let root = lexical_absolute(Path::new(&request.repo_root)).map_err(value_error)?;
-    let registry =
-        safe_relative(&request.registry_path, "mutation registry").map_err(value_error)?;
-    let (mut payload, manifests) = load_registry_manifest_paths(
-        &root,
-        &root.join(registry),
-        Some(&request.canonical_test_patterns),
-    )
-    .map_err(value_error)?;
-    // Hand back the resolved campaign list, not the raw array: fragments in `registry.d/` are
-    // registrations like any other, and a Python caller reading `campaigns` must see them too.
-    payload.insert(
-        "campaigns".to_owned(),
-        Value::Array(
-            manifests
-                .into_iter()
-                .map(|manifest| json!({ "manifest": manifest }))
-                .collect(),
-        ),
-    );
-    serde_json::to_string(&payload).map_err(|error| value_error(error.to_string()))
+    let request: Value = parse_json(request_json, "mutation input request")?;
+    let result = load_registry_value(&request).map_err(value_error)?;
+    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
 }
 
 #[cfg(feature = "python")]
@@ -1209,3 +1198,31 @@ include!("mutation_manifest_rust_inventory_tests.rs");
 include!("mutation_manifest_c_inventory_tests.rs");
 #[cfg(test)]
 include!("mutation_manifest_generated_campaign_tests.rs");
+
+fn generated_survivors(payload: &Map<String, Value>) -> Result<Vec<String>, String> {
+    let mut survivor_baseline = Vec::new();
+    match payload.get("survivor_baseline") {
+        Some(Value::Array(rows)) => {
+            for (index, row) in rows.iter().enumerate() {
+                let id = row
+                    .as_str()
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| {
+                        format!("survivor_baseline[{index}] must be a non-empty string")
+                    })?;
+                survivor_baseline.push(id.to_owned());
+            }
+        }
+        _ => return Err("survivor_baseline must be a list".to_owned()),
+    }
+    let unique: BTreeSet<&String> = survivor_baseline.iter().collect();
+    if unique.len() != survivor_baseline.len() {
+        return Err("survivor_baseline contains duplicate mutant ids".to_owned());
+    }
+
+    Ok(survivor_baseline)
+}
+
+#[path = "mutation_manifest_api.rs"]
+mod api;
+pub(crate) use api::{load_campaign_value, load_registry_value};

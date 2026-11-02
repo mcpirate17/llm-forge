@@ -10,6 +10,9 @@ use slop_core::{ablation, hot_loop_scan, rust_scan, style_scan, test_value_scan,
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+#[path = "analysis_path_policy.rs"]
+mod path_policy;
+
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Args)]
@@ -26,6 +29,8 @@ pub struct AnalysisArgs {
 enum Action {
     /// Show the exact native check and ablation registries.
     Rules,
+    /// Check selected lexical paths without opening their contents.
+    Paths(path_policy::PathArgs),
     /// Read selected files, report findings and source hashes; exit 1 on any finding.
     Scan(ScanArgs),
     /// Generate automatic source edits for inspection; does not execute or apply mutants.
@@ -63,6 +68,7 @@ struct AblationArgs {
 
 fn registry() -> Value {
     json!({"schema_version":1, "authority":"native-static-analysis",
+        "path_checks":["root-junk","json-in-notes"],
         "checks":{"style":style_scan::style_scan_rules(),"rust":rust_scan::rust_scan_rules(),
             "fallback":["failure/silent-fallback"],"test-value":test_value_scan::test_value_scan_rules(),
             "verbosity":verbosity_scan::verbosity_scan_rules(),"hot-loop":["perf/python-tensor-loop"]},
@@ -189,6 +195,7 @@ pub fn run(args: AnalysisArgs) -> Result<u8> {
     );
     let (value, code) = match args.action {
         Action::Rules => (registry(), 0),
+        Action::Paths(path_args) => path_policy::evaluate(&args.root, path_args)?,
         Action::Scan(scan_args) => scan(&SourceRoot::open(&args.root)?, scan_args)?,
         Action::Ablations(ablation_args) => {
             (ablations(&SourceRoot::open(&args.root)?, ablation_args)?, 0)

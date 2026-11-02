@@ -38,6 +38,10 @@ pub fn python_repr(path: &str) -> Result<String> {
         path.len() <= MAX_PATH_BYTES,
         "candidate path exceeds 4096 bytes"
     );
+    Ok(python_repr_bounded(path))
+}
+/// Shared CPython repr writer for inputs bounded by the caller.
+pub(crate) fn python_repr_bounded(path: &str) -> String {
     let quote = if path.contains('\'') && !path.contains('"') {
         '"'
     } else {
@@ -49,7 +53,7 @@ pub fn python_repr(path: &str) -> Result<String> {
         append_repr(&mut output, ch, quote);
     }
     output.push(quote);
-    Ok(output)
+    output
 }
 fn append_repr(out: &mut String, ch: char, quote: char) {
     match ch {

@@ -96,14 +96,25 @@ pub struct DirectoryBinding {
 
 impl DirectoryBinding {
     pub fn open(path: &Path, snapshot_exclusion: Option<&Path>) -> Result<Self> {
+        Self::open_mode(path, snapshot_exclusion, 0o022)
+    }
+
+    /// Read-only observations of shared Git metadata permit group write access.
+    /// These bytes never grant execution capabilities; identity and content are
+    /// rechecked. Operator grants retain the stricter `open` contract.
+    pub(crate) fn repository(path: &Path, snapshot_exclusion: Option<&Path>) -> Result<Self> {
+        Self::open_mode(path, snapshot_exclusion, 0o002)
+    }
+
+    fn open_mode(path: &Path, snapshot_exclusion: Option<&Path>, write_mask: u32) -> Result<Self> {
         canonical(path)?;
         exclude(path, snapshot_exclusion)?;
         let meta = fs::symlink_metadata(path)?;
         ensure!(
             meta.is_dir()
                 && (meta.uid() == 0 || meta.uid() == unsafe { libc::geteuid() })
-                && meta.mode() & 0o022 == 0,
-            "operator directory must be owned and not group/other writable"
+                && meta.mode() & write_mask == 0,
+            "input directory ownership or write permissions violate its trust boundary"
         );
         let dir = Dir::open_ambient_dir(path, cap_std::ambient_authority())?;
         let binding = Self {
@@ -236,6 +247,18 @@ fn capture(
 }
 
 impl BoundFile {
+    pub(crate) fn verify_external_pin(&self, path: &Path, sha256: &str) -> Result<()> {
+        canonical(path)?;
+        ensure!(
+            self.external && self.parent.path.join(&self.name) == path,
+            "external input path differs from held binding"
+        );
+        ensure!(
+            matches!(&self.expected, Expected::Sha256(value) if *value == expected_sha256(sha256)?),
+            "external input digest differs from held binding"
+        );
+        self.verify()
+    }
     pub fn verify(&self) -> Result<()> {
         self.parent.verify()?;
         ensure!(
@@ -267,7 +290,7 @@ fn filename(path: &Path) -> Result<String> {
     Ok(name.into())
 }
 
-fn external_with_tmp(
+pub(crate) fn external_with_tmp(
     path: &Path,
     hash: &str,
     maximum: usize,
@@ -328,6 +351,25 @@ pub fn observed(path: &Path, maximum: usize, snapshot: &Path) -> Result<(BoundFi
     exclude(path, Some(snapshot))?;
     let parent = DirectoryBinding::open(path.parent().context("metadata has no parent")?, None)?;
     capture(parent, filename(path)?, None, maximum, true)
+}
+
+/// Observe shared repository metadata without admitting it as an operator grant.
+pub(crate) fn repository_observed(
+    path: &Path,
+    maximum: usize,
+    snapshot: &Path,
+) -> Result<(BoundFile, Vec<u8>)> {
+    canonical(path)?;
+    exclude(path, Some(snapshot))?;
+    let parent =
+        DirectoryBinding::repository(path.parent().context("metadata has no parent")?, None)?;
+    let (held, bytes) = capture(parent, filename(path)?, None, maximum, false)?;
+    ensure!(
+        (held.stamp.identity.uid == 0 || held.stamp.identity.uid == unsafe { libc::geteuid() })
+            && held.stamp.identity.mode & 0o002 == 0,
+        "repository metadata must be owned and not world writable"
+    );
+    Ok((held, bytes))
 }
 
 #[cfg(test)]

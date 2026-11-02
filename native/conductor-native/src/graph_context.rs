@@ -43,6 +43,11 @@ pub struct GraphResult {
     pub status: String,
 }
 
+/// Shared conventional test-file predicate; does not claim execution coverage.
+pub fn is_test_path(path: &str) -> bool {
+    markdown::is_test_path(path)
+}
+
 fn string_field<'a>(input: &'a Value, name: &str) -> Result<&'a str, String> {
     input
         .get(name)

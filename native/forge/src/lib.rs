@@ -11,12 +11,15 @@ pub mod candidate_analysis_cli;
 pub mod candidate_assess_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_assessment;
+mod candidate_attestation;
 #[cfg(target_os = "linux")]
 pub mod candidate_batch;
 #[cfg(target_os = "linux")]
 mod candidate_builtin;
 #[cfg(target_os = "linux")]
 pub mod candidate_cargo_lint_cli;
+#[cfg(target_os = "linux")]
+pub mod candidate_cargo_test_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_clang_format_cli;
 #[cfg(target_os = "linux")]
@@ -27,7 +30,17 @@ pub mod candidate_cli;
 pub mod candidate_command;
 pub mod candidate_config;
 #[cfg(target_os = "linux")]
+pub mod candidate_contract_cli;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_contract_run;
+#[cfg(target_os = "linux")]
 pub mod candidate_crate_cli;
+#[cfg(target_os = "linux")]
+pub mod candidate_engine_identity;
+#[cfg(target_os = "linux")]
+mod candidate_equivalence_inputs;
+#[cfg(target_os = "linux")]
+mod candidate_equivalence_stage;
 #[cfg(target_os = "linux")]
 pub mod candidate_execute;
 #[cfg(target_os = "linux")]
@@ -42,9 +55,19 @@ mod candidate_inputs;
 mod candidate_installed;
 pub mod candidate_isolated_task;
 #[cfg(target_os = "linux")]
+pub(crate) mod candidate_mutation_external;
+#[cfg(target_os = "linux")]
+pub mod candidate_mutation_external_cli;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_mutation_runner;
+#[cfg(target_os = "linux")]
 pub mod candidate_plan;
 #[cfg(target_os = "linux")]
 pub mod candidate_policy;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_python_coverage;
+#[cfg(target_os = "linux")]
+pub mod candidate_python_test_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_receipt;
 #[cfg(target_os = "linux")]
@@ -53,12 +76,40 @@ pub mod candidate_report;
 pub mod candidate_report_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_report_store;
+pub mod candidate_review;
+pub(crate) mod candidate_review_evidence;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_review_lock;
+pub(crate) mod candidate_review_mutation;
+pub(crate) mod candidate_review_ownership;
+#[cfg(target_os = "linux")]
+pub mod candidate_runner_bundle;
+#[cfg(target_os = "linux")]
+pub mod candidate_runner_bundle_cli;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_rust_coverage;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_rust_coverage_run;
 #[cfg(target_os = "linux")]
 pub mod candidate_scan_cli;
 #[cfg(target_os = "linux")]
 pub mod candidate_snapshot;
 #[cfg(target_os = "linux")]
 pub mod candidate_source;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_stage_artifact;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_targeted_cargo;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_targeted_contract;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_targeted_execution;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_targeted_python;
+#[cfg(target_os = "linux")]
+pub(crate) mod candidate_targeted_rust_coverage;
+#[cfg(target_os = "linux")]
+pub mod candidate_test_selection;
 #[cfg(target_os = "linux")]
 pub mod cards;
 #[cfg(target_os = "linux")]
@@ -74,6 +125,7 @@ pub mod code_tools;
 pub mod embedding;
 #[cfg(target_os = "linux")]
 pub mod embedding_broker;
+pub mod equivalence_worker;
 #[cfg(target_os = "linux")]
 pub mod file_lock;
 #[cfg(target_os = "linux")]
@@ -105,6 +157,8 @@ pub mod session_brief;
 pub mod session_close;
 pub mod session_policy;
 pub mod session_status;
+#[cfg(target_os = "linux")]
+pub mod source_fingerprint;
 pub mod state_publish;
 #[cfg(target_os = "linux")]
 pub(crate) use conductor_native::native_id;

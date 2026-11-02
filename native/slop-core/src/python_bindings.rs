@@ -150,6 +150,14 @@ fn slop_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_test_index, m)?)?;
     m.add_function(wrap_pyfunction!(dotted_for, m)?)?;
     m.add_function(wrap_pyfunction!(gate::equivalence_gate, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        equivalence_guest::equivalence_probe_guest,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        equivalence_guest::equivalence_probe_guest_cli,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(gate_report::equivalence_report, m)?)?;
     m.add_function(wrap_pyfunction!(gate_report::equivalence_findings, m)?)?;
     m.add_function(wrap_pyfunction!(backlog::equivalence_backlog, m)?)?;

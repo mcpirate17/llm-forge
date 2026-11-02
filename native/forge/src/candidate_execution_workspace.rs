@@ -143,6 +143,28 @@ impl Workspace {
     pub(crate) fn runtime(&self) -> PathBuf {
         self.runtime.clone()
     }
+    pub(crate) fn artifact_root(&self) -> Result<Dir> {
+        let scratch = self.scratch.directory()?;
+        Ok(Dir::from_std_file(
+            scratch
+                .open_with(
+                    "runtime",
+                    OpenOptions::new()
+                        .read(true)
+                        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW),
+                )?
+                .into_std(),
+        ))
+    }
+    pub(crate) fn verify_artifact_root(&self, held: &Dir) -> Result<()> {
+        let current = self.scratch.directory()?.symlink_metadata("runtime")?;
+        let pinned = held.dir_metadata()?;
+        ensure!(
+            current.is_dir() && current.dev() == pinned.dev() && current.ino() == pinned.ino(),
+            "runtime directory changed"
+        );
+        Ok(())
+    }
     pub(crate) fn directory(&self) -> Result<Dir> {
         self.scratch.verify()?;
         self.snapshot

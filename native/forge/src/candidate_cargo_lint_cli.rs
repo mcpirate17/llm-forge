@@ -2,7 +2,7 @@
 #[path = "candidate_cargo_config.rs"]
 mod config;
 #[path = "candidate_cargo_runtime.rs"]
-mod runtime;
+pub(crate) mod runtime;
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::Dir;
 use clap::Args;

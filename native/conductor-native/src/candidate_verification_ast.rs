@@ -1,15 +1,23 @@
 //! Collectible Python definitions with decorator-inclusive source identity.
 
+#[path = "candidate_verification_rust_preflight.rs"]
+mod rust_preflight;
+
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use serde_json::{Map, Value};
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     rc::Rc,
 };
 use syn::spanned::Spanned;
+
+fn parse_rust(source: &str) -> Result<syn::File, String> {
+    rust_preflight::admit(source)?;
+    syn::parse_file(source).map_err(|error| error.to_string())
+}
 
 /// Extract actual native tests and their source identity, using language parsers.
 /// Rust labels are the names printed by libtest; C labels follow the existing
@@ -20,7 +28,7 @@ pub(super) fn native_test_definitions(
     root: Option<&Path>,
 ) -> Result<Value, String> {
     if path.ends_with(".rs") {
-        let file = syn::parse_file(source)
+        let file = parse_rust(source)
             .map_err(|error| format!("cannot parse native tests in {path}: {error}"))?;
         let mut definitions = Map::new();
         rust_tests(&file.items, source, "", false, &mut definitions)?;
@@ -115,7 +123,7 @@ fn rust_tests(
 }
 
 pub(super) fn rust_has_tests(source: &str) -> Result<bool, String> {
-    let file = syn::parse_file(source).map_err(|error| error.to_string())?;
+    let file = parse_rust(source)?;
     struct TestSurfaces(bool);
     impl<'ast> syn::visit::Visit<'ast> for TestSurfaces {
         fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
@@ -149,10 +157,19 @@ pub(super) fn rust_has_tests(source: &str) -> Result<bool, String> {
 /// Return a module prefix only when the source is reachable from this exact
 /// Cargo target. The caller separately binds the target to its invocation.
 pub(crate) fn target_prefix(entry: &Path, target: &Path) -> Result<String, String> {
-    let target = target.canonicalize().map_err(|e| e.to_string())?;
+    target_prefix_with(&AmbientReader, entry, target)
+}
+
+fn target_prefix_with(
+    reader: &impl RustReader,
+    entry: &Path,
+    target: &Path,
+) -> Result<String, String> {
+    let target = reader.canonicalize(target)?;
     let mut prefixes = BTreeSet::new();
     let mut seen = HashSet::new();
     visit_file(
+        reader,
         entry,
         entry.parent().ok_or("target has no parent")?,
         "",
@@ -174,7 +191,7 @@ pub(crate) fn target_test_labels(
 ) -> Result<Map<String, Value>, String> {
     let prefix = target_prefix(entry, target)?;
     let source = fs::read_to_string(target).map_err(|e| e.to_string())?;
-    let file = syn::parse_file(&source).map_err(|e| e.to_string())?;
+    let file = parse_rust(&source)?;
     let mut labels = Map::new();
     rust_tests(&file.items, &source, &prefix, false, &mut labels)?;
     Ok(labels)
@@ -293,7 +310,7 @@ fn role_visit(
         Rc::clone(parsed)
     } else {
         let text = fs::read_to_string(&file).map_err(|e| e.to_string())?;
-        let parsed = Rc::new(syn::parse_file(&text).map_err(|e| e.to_string())?);
+        let parsed = Rc::new(parse_rust(&text)?);
         cache.insert(file.clone(), Rc::clone(&parsed));
         parsed
     };
@@ -379,22 +396,173 @@ fn role_items(
     Ok(())
 }
 
+// Captured keys must describe a complete, bounded, symlink-free tree rooted at
+// `root`; absence is meaningful for Cargo target discovery. The caller owns
+// capture and must reject incomplete directory inventories before invoking us.
+trait RustReader {
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf, String>;
+    fn is_file(&self, path: &Path) -> bool;
+    fn is_dir(&self, path: &Path) -> bool;
+    fn entries(&self, path: &Path) -> Result<Vec<PathBuf>, String>;
+    fn read(&self, path: &Path) -> Result<String, String>;
+    fn requires_modules(&self) -> bool {
+        false
+    }
+}
+
+struct AmbientReader;
+impl RustReader for AmbientReader {
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf, String> {
+        path.canonicalize().map_err(|e| e.to_string())
+    }
+    fn is_file(&self, path: &Path) -> bool {
+        path.is_file()
+    }
+    fn is_dir(&self, path: &Path) -> bool {
+        path.is_dir()
+    }
+    fn entries(&self, path: &Path) -> Result<Vec<PathBuf>, String> {
+        fs::read_dir(path)
+            .map_err(|e| e.to_string())?
+            .map(|entry| entry.map(|e| e.path()).map_err(|e| e.to_string()))
+            .collect()
+    }
+    fn read(&self, path: &Path) -> Result<String, String> {
+        fs::read_to_string(path).map_err(|e| e.to_string())
+    }
+}
+
+struct CapturedReader<'a> {
+    root: &'a Path,
+    files: &'a BTreeMap<PathBuf, Vec<u8>>,
+}
+impl CapturedReader<'_> {
+    fn path(&self, path: &Path) -> Result<PathBuf, String> {
+        use std::path::Component;
+        let mut result = PathBuf::new();
+        for part in path.components() {
+            match part {
+                Component::RootDir => result.push(part.as_os_str()),
+                Component::Normal(name) => result.push(name),
+                Component::CurDir => {}
+                Component::ParentDir if result.starts_with(self.root) && result != self.root => {
+                    result.pop();
+                }
+                _ => return Err(format!("invalid captured Rust path: {}", path.display())),
+            }
+        }
+        if !result.starts_with(self.root) {
+            return Err(format!(
+                "Rust path escapes captured root: {}",
+                path.display()
+            ));
+        }
+        Ok(result)
+    }
+}
+impl RustReader for CapturedReader<'_> {
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf, String> {
+        let path = self.path(path)?;
+        if !self.files.contains_key(&path) {
+            return Err(format!("captured Rust file missing: {}", path.display()));
+        }
+        Ok(path)
+    }
+    fn is_file(&self, path: &Path) -> bool {
+        self.path(path)
+            .is_ok_and(|path| self.files.contains_key(&path))
+    }
+    fn is_dir(&self, path: &Path) -> bool {
+        self.path(path).is_ok_and(|path| {
+            self.files
+                .keys()
+                .any(|file| file.starts_with(&path) && file != &path)
+        })
+    }
+    fn entries(&self, path: &Path) -> Result<Vec<PathBuf>, String> {
+        let path = self.path(path)?;
+        let mut entries = BTreeSet::new();
+        for file in self.files.keys() {
+            if let Ok(rest) = file.strip_prefix(&path) {
+                if let Some(name) = rest.components().next() {
+                    entries.insert(path.join(name));
+                }
+            }
+        }
+        Ok(entries.into_iter().collect())
+    }
+    fn read(&self, path: &Path) -> Result<String, String> {
+        let path = self.canonicalize(path)?;
+        String::from_utf8(self.files[&path].clone()).map_err(|e| e.to_string())
+    }
+    fn requires_modules(&self) -> bool {
+        true
+    }
+}
+
+/// Computes identities using only a complete captured tree. No filesystem reads.
+pub(crate) fn captured_rust_test_labels(
+    root: &Path,
+    path: &Path,
+    files: &BTreeMap<PathBuf, Vec<u8>>,
+) -> Result<Map<String, Value>, String> {
+    const MAX_FILES: usize = 4_096;
+    const MAX_BYTES: usize = 32 * 1024 * 1024;
+    if !root.is_absolute() || files.len() > MAX_FILES {
+        return Err("invalid or oversized captured Rust tree".into());
+    }
+    let reader = CapturedReader { root, files };
+    let mut total = 0usize;
+    for (key, bytes) in files {
+        if reader.path(key)? != *key {
+            return Err(format!(
+                "noncanonical captured Rust path: {}",
+                key.display()
+            ));
+        }
+        if bytes.len() > 1024 * 1024 {
+            return Err(format!("captured Rust file too large: {}", key.display()));
+        }
+        total = total
+            .checked_add(bytes.len())
+            .ok_or("captured Rust tree too large")?;
+        if total > MAX_BYTES {
+            return Err("captured Rust tree too large".into());
+        }
+    }
+    let target = reader.canonicalize(&root.join(path))?;
+    let source = reader.read(&target)?;
+    let syntax = parse_rust(&source)?;
+    let mut labels = Map::new();
+    rust_tests(&syntax.items, &source, "", false, &mut labels)?;
+    if labels.is_empty() {
+        return Ok(labels);
+    }
+    let relative = target.strip_prefix(root).map_err(|e| e.to_string())?;
+    let relative = relative.to_str().ok_or("non-UTF-8 Rust path")?;
+    let prefix = rust_prefix_with(&reader, root, relative)?;
+    labels.clear();
+    rust_tests(&syntax.items, &source, &prefix, false, &mut labels)?;
+    Ok(labels)
+}
+
 fn rust_prefix(root: &Path, path: &str) -> Result<String, String> {
-    let target = root
-        .join(path)
-        .canonicalize()
+    rust_prefix_with(&AmbientReader, root, path)
+}
+
+fn rust_prefix_with(reader: &impl RustReader, root: &Path, path: &str) -> Result<String, String> {
+    let target = reader
+        .canonicalize(&root.join(path))
         .map_err(|error| format!("native module source unavailable {path}: {error}"))?;
     let crate_root = target
         .ancestors()
         .skip(1)
-        .find(|dir| dir.join("Cargo.toml").is_file())
+        .find(|dir| reader.is_file(&dir.join("Cargo.toml")))
         .ok_or_else(|| {
             format!("native Rust module identity unavailable: no Cargo.toml above {path}")
         })?;
-    let manifest: toml::Value = toml::from_str(
-        &fs::read_to_string(crate_root.join("Cargo.toml")).map_err(|error| error.to_string())?,
-    )
-    .map_err(|error| error.to_string())?;
+    let manifest: toml::Value = toml::from_str(&reader.read(&crate_root.join("Cargo.toml"))?)
+        .map_err(|error| error.to_string())?;
     let mut roots = BTreeSet::from([
         crate_root.join("src/lib.rs"),
         crate_root.join("src/main.rs"),
@@ -417,21 +585,21 @@ fn rust_prefix(root: &Path, path: &str) -> Result<String, String> {
     }
     for dir in ["tests", "benches", "src/bin"] {
         let directory = crate_root.join(dir);
-        if directory.is_dir() {
-            for entry in fs::read_dir(directory).map_err(|error| error.to_string())? {
-                let entry = entry.map_err(|error| error.to_string())?.path();
+        if reader.is_dir(&directory) {
+            for entry in reader.entries(&directory)? {
                 if entry.extension().is_some_and(|ext| ext == "rs") {
                     roots.insert(entry);
-                } else if entry.join("main.rs").is_file() {
+                } else if reader.is_file(&entry.join("main.rs")) {
                     roots.insert(entry.join("main.rs"));
                 }
             }
         }
     }
     let mut prefixes = BTreeSet::new();
-    for entry in roots.into_iter().filter(|p| p.is_file()) {
+    for entry in roots.into_iter().filter(|p| reader.is_file(p)) {
         let mut seen = HashSet::new();
         visit_file(
+            reader,
             &entry,
             entry.parent().unwrap(),
             "",
@@ -449,6 +617,7 @@ fn rust_prefix(root: &Path, path: &str) -> Result<String, String> {
 }
 
 fn visit_file(
+    reader: &impl RustReader,
     file: &Path,
     module_dir: &Path,
     prefix: &str,
@@ -456,17 +625,21 @@ fn visit_file(
     seen: &mut HashSet<PathBuf>,
     found: &mut BTreeSet<String>,
 ) -> Result<(), String> {
-    let file = file.canonicalize().map_err(|error| error.to_string())?;
+    let file = reader.canonicalize(file)?;
     if file == target {
         found.insert(prefix.into());
         return Ok(());
     }
+    if seen.len() >= 4_096 || prefix.len() > 4_096 {
+        return Err("native Rust module graph exceeds traversal bounds".into());
+    }
     if !seen.insert(file.clone()) {
         return Err("native Rust module graph has repeated or cyclic external modules; identity is unsupported".into());
     }
-    let source = fs::read_to_string(&file).map_err(|error| error.to_string())?;
-    let syntax = syn::parse_file(&source).map_err(|error| error.to_string())?;
+    let source = reader.read(&file)?;
+    let syntax = parse_rust(&source)?;
     visit_items(
+        reader,
         &syntax.items,
         (module_dir, file.parent().unwrap()),
         prefix,
@@ -477,6 +650,7 @@ fn visit_file(
 }
 
 fn visit_items(
+    reader: &impl RustReader,
     items: &[syn::Item],
     directories: (&Path, &Path),
     prefix: &str,
@@ -484,6 +658,9 @@ fn visit_items(
     seen: &mut HashSet<PathBuf>,
     found: &mut BTreeSet<String>,
 ) -> Result<(), String> {
+    if prefix.len() > 4_096 {
+        return Err("native Rust module nesting exceeds traversal bounds".into());
+    }
     let (module_dir, attribute_dir) = directories;
     for item in items {
         let syn::Item::Mod(module) = item else {
@@ -507,6 +684,7 @@ fn visit_items(
         let next_prefix = format!("{prefix}{name}::");
         if let Some((_, items)) = &module.content {
             visit_items(
+                reader,
                 items,
                 (&module_dir.join(&name), &attribute_dir.join(&name)),
                 &next_prefix,
@@ -531,19 +709,21 @@ fn visit_items(
         });
         let path = explicit.unwrap_or_else(|| {
             let flat = module_dir.join(format!("{name}.rs"));
-            if flat.is_file() {
+            if reader.is_file(&flat) {
                 flat
             } else {
                 module_dir.join(&name).join("mod.rs")
             }
         });
-        if path.is_file() {
+        if reader.is_file(&path) {
             let next_dir = if path.file_name().is_some_and(|n| n == "mod.rs") {
                 path.parent().unwrap().to_path_buf()
             } else {
                 path.with_extension("")
             };
-            visit_file(&path, &next_dir, &next_prefix, target, seen, found)?;
+            visit_file(reader, &path, &next_dir, &next_prefix, target, seen, found)?;
+        } else if reader.requires_modules() {
+            return Err(format!("captured Rust module missing: {}", path.display()));
         }
     }
     Ok(())
@@ -617,9 +797,9 @@ fn add_function(
 }
 
 pub(super) fn python_test_definitions(source: &str, path: &str) -> Result<Value, String> {
-    let module = ruff_python_parser::parse_module(source)
-        .map_err(|error| format!("cannot parse test definitions in {path}: {error}"))?
-        .into_syntax();
+    let document = crate::candidate_python::Document::parse(source)
+        .map_err(|error| format!("cannot parse test definitions in {path}: {error}"))?;
+    let module = document.module();
     let lines = Lines::new(source);
     let mut definitions = Map::new();
     for statement in &module.body {
@@ -643,4 +823,126 @@ pub(super) fn python_test_definitions(source: &str, path: &str) -> Result<Value,
         }
     }
     Ok(Value::Object(definitions))
+}
+
+#[cfg(test)]
+mod captured_reader_tests {
+    use super::*;
+
+    fn files(entries: &[(&str, &str)]) -> BTreeMap<PathBuf, Vec<u8>> {
+        entries
+            .iter()
+            .map(|(path, source)| (PathBuf::from(path), source.as_bytes().to_vec()))
+            .collect()
+    }
+
+    #[test]
+    fn captured_tree_finds_nested_identity_and_uses_captured_source() {
+        let root = Path::new("/capture");
+        let inventory = files(&[
+            (
+                "/capture/Cargo.toml",
+                "[package]\nname='x'\nversion='0.1.0'",
+            ),
+            ("/capture/src/lib.rs", "mod outer;"),
+            ("/capture/src/outer.rs", "mod inner;"),
+            ("/capture/src/outer/inner.rs", "#[test] fn works() {}"),
+        ]);
+        let labels =
+            captured_rust_test_labels(root, Path::new("src/outer/inner.rs"), &inventory).unwrap();
+        assert_eq!(
+            labels.keys().collect::<Vec<_>>(),
+            vec!["outer::inner::works"]
+        );
+        assert_eq!(labels["outer::inner::works"], "#[test] fn works() {}");
+    }
+
+    #[test]
+    fn captured_tree_rejects_missing_manifest_module_and_escape() {
+        let root = Path::new("/capture");
+        let target = ("/capture/src/test.rs", "#[test] fn works() {}");
+        assert!(
+            captured_rust_test_labels(root, Path::new("src/test.rs"), &files(&[target])).is_err()
+        );
+        let inventory = files(&[
+            (
+                "/capture/Cargo.toml",
+                "[package]\nname='x'\nversion='0.1.0'",
+            ),
+            ("/capture/src/lib.rs", "mod missing; mod test;"),
+            target,
+        ]);
+        assert!(
+            captured_rust_test_labels(root, Path::new("src/test.rs"), &inventory)
+                .unwrap_err()
+                .contains("module missing")
+        );
+        assert!(captured_rust_test_labels(root, Path::new("../outside.rs"), &inventory).is_err());
+    }
+
+    #[test]
+    fn captured_target_prefix_matches_ambient_traversal() {
+        let root = std::env::temp_dir().join(format!("forge-captured-ast-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let src = root.join("src");
+        std::fs::create_dir(&src).unwrap();
+        let lib = src.join("lib.rs");
+        let test = src.join("child.rs");
+        std::fs::write(&lib, "mod child;").unwrap();
+        std::fs::write(&test, "#[test] fn works() {}").unwrap();
+        let inventory = BTreeMap::from([
+            (lib.clone(), b"mod child;".to_vec()),
+            (test.clone(), b"#[test] fn works() {}".to_vec()),
+        ]);
+        let reader = CapturedReader {
+            root: &root,
+            files: &inventory,
+        };
+        assert_eq!(
+            target_prefix(&lib, &test).unwrap(),
+            target_prefix_with(&reader, &lib, &test).unwrap()
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+#[test]
+fn captured_excessive_expression_nesting_refuses_before_syn() {
+    let source = format!(
+        "#[test] fn test_deep() {{ let _ = {}0{}; }}",
+        "(".repeat(600),
+        ")".repeat(600)
+    );
+    let root = Path::new("/captured");
+    let inventory = BTreeMap::from([(root.join("src/lib.rs"), source.into_bytes())]);
+    let error = captured_rust_test_labels(root, Path::new("src/lib.rs"), &inventory).unwrap_err();
+    assert!(
+        error.contains("depth") || error.contains("budget"),
+        "{error}"
+    );
+}
+
+#[cfg(test)]
+mod rust_preflight_api_tests {
+    use super::*;
+    #[test]
+    fn every_ambient_entry_point_rejects_deep_source_before_syn() {
+        let source = format!(
+            "#[test] fn f() {{ let _ = {}0{}; }}",
+            "(".repeat(600),
+            ")".repeat(600)
+        );
+        assert!(native_test_definitions(&source, "src/lib.rs", None)
+            .unwrap_err()
+            .contains("depth"));
+        assert!(rust_has_tests(&source).unwrap_err().contains("depth"));
+        let root =
+            std::env::temp_dir().join(format!("forge-rust-preflight-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let target = root.join("lib.rs");
+        std::fs::write(&target, &source).unwrap();
+        assert!(target_test_labels(&target, &target)
+            .unwrap_err()
+            .contains("depth"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

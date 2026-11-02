@@ -214,6 +214,10 @@ fn native_tree(host: &support::Host) {
             "[package]\nname='forge-cli'\nversion='0.8.9'\n",
         ),
         ("native/forge-cli/build.rs", "fn main() {}\n"),
+        (
+            "native/forge-cli/source_identity.rs",
+            "pub fn identity() {}\n",
+        ),
         ("native/forge/src/main.rs", "fn main() {}\n"),
     ] {
         fs::create_dir_all(host.0.join(path).parent().unwrap()).unwrap();
@@ -261,6 +265,11 @@ fn source_identity_binds_cli_manifest_stamp_main_and_shared_workspace_lock() {
     for (path, before, after) in [
         ("native/forge-cli/Cargo.toml", "0.8.9", "0.8.8"),
         ("native/forge-cli/build.rs", "main", "noop"),
+        (
+            "native/forge-cli/source_identity.rs",
+            "identity",
+            "modified",
+        ),
         ("native/forge/src/main.rs", "main", "noop"),
         ("native/forge/Cargo.lock", "version = 4", "version = 3"),
     ] {
@@ -290,7 +299,11 @@ fn source_identity_binds_cli_manifest_stamp_main_and_shared_workspace_lock() {
 fn cli_manifest_and_stamp_are_required_even_with_shared_lock_and_source() {
     let host = host();
     native_tree(&host);
-    for path in ["native/forge-cli/Cargo.toml", "native/forge-cli/build.rs"] {
+    for path in [
+        "native/forge-cli/Cargo.toml",
+        "native/forge-cli/build.rs",
+        "native/forge-cli/source_identity.rs",
+    ] {
         let destination = host.0.join(path);
         let original = fs::read(&destination).unwrap();
         fs::remove_file(&destination).unwrap();

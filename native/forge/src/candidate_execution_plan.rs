@@ -50,6 +50,11 @@ pub(crate) struct SelectionArgs {
     #[arg(long, value_enum)]
     surface: Option<Surface>,
 }
+impl SelectionArgs {
+    pub(crate) fn repository(&self) -> &std::path::Path {
+        &self.repo
+    }
+}
 
 pub(crate) struct Selection {
     root: PathBuf,
@@ -72,6 +77,12 @@ pub(crate) struct CheckPlan {
 }
 
 impl Selection {
+    pub(crate) fn date(&self) -> &str {
+        &self.date
+    }
+    pub(crate) fn profile(&self) -> &str {
+        self.profile
+    }
     pub(crate) fn load(args: &SelectionArgs) -> Result<Self> {
         let date = args
             .today
@@ -160,7 +171,7 @@ impl Selection {
     }
 }
 
-fn limits(check: &Value, grants: &Grants) -> Result<Limits> {
+pub(crate) fn limits(check: &Value, grants: &Grants) -> Result<Limits> {
     let cpu = check["timeout_seconds"]
         .as_u64()
         .context("missing CPU timeout")?;

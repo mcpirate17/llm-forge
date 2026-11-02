@@ -13,7 +13,9 @@ use crate::candidate_structure::Lines;
 use crate::test_record_digest::blob_oid;
 use crate::test_record_store::open_read_only;
 use anyhow::Context;
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{walk_stmt, SourceOrderVisitor};
@@ -116,7 +118,8 @@ impl<'a> SourceOrderVisitor<'a> for Collector<'_> {
 
 /// Every function in `source`, nested ones and methods included, in source order.
 pub(crate) fn functions(source: &str) -> anyhow::Result<Vec<Function>> {
-    let module = ruff_python_parser::parse_module(source)?.into_syntax();
+    let document = crate::candidate_python::Document::parse(source)?;
+    let module = document.module();
     let lines = Lines::new(source);
     let mut collector = Collector {
         lines: &lines,
@@ -210,6 +213,7 @@ fn untested(
 /// `(changed, untested)` for `changes`, each a path relative to `root` and its
 /// changed line numbers: how many changed functions have something to test, and the
 /// `(path, qualname, def line)` of each one no run recorded in `store` executed.
+#[cfg(feature = "python")]
 #[pyfunction]
 pub(crate) fn test_record_untested_native(
     py: Python<'_>,

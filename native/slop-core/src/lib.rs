@@ -15,10 +15,12 @@ pub mod backlog;
 pub mod consolidation;
 pub mod detector_scan;
 pub mod engine;
+#[cfg(feature = "python")]
+mod equivalence_guest;
+pub mod equivalence_runtime;
 pub mod file_families;
 #[cfg(feature = "python")]
 pub mod file_profiles;
-#[cfg(feature = "python")]
 pub mod gate;
 pub mod gate_report;
 pub mod gate_types;

@@ -122,16 +122,7 @@ fn value_error(message: impl Into<String>) -> PyErr {
     PyValueError::new_err(message.into())
 }
 
-fn python_repr(value: Option<&Value>) -> String {
-    match value.unwrap_or(&Value::Null) {
-        Value::Null => "None".to_owned(),
-        Value::Bool(true) => "True".to_owned(),
-        Value::Bool(false) => "False".to_owned(),
-        Value::Number(number) => number.to_string(),
-        Value::String(text) => format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'")),
-        other => other.to_string(),
-    }
-}
+use crate::mutation_value_admission::python_repr;
 
 fn python_string_list(values: &[String]) -> String {
     format!(
@@ -189,39 +180,11 @@ fn is_in_module_test_path(path: &str) -> bool {
     path.ends_with(".rs")
 }
 
-fn load_spec(
-    value_json: &str,
-    mutation_pairs_json: &str,
+fn spec_contracts(
+    raw: &RawAnalysis,
     ranked_nodeids: &[String],
-    mutation_ids: &[String],
     source_paths: &[String],
-) -> Result<Option<ValueSpec>, String> {
-    let value: Value = serde_json::from_str(value_json)
-        .map_err(|error| format!("invalid value_analysis JSON: {error}"))?;
-    if value.is_null() {
-        return Ok(None);
-    }
-    required_object(&value, "value_analysis")?;
-    let raw: RawAnalysis = serde_json::from_value(value)
-        .map_err(|error| format!("value_analysis must be an object: {error}"))?;
-    if raw.enabled != Some(Value::Bool(true)) {
-        return Err("value_analysis.enabled must be true when present".to_owned());
-    }
-    let adapter = required_string(raw.adapter.as_ref(), "value_analysis.adapter")?;
-    if !ADAPTERS.contains(&adapter.as_str()) {
-        return Err(format!(
-            "value_analysis.adapter must be one of {}",
-            python_string_list(&ADAPTERS.map(str::to_owned))
-        ));
-    }
-    let repetitions = raw
-        .baseline_repetitions
-        .as_ref()
-        .and_then(Value::as_i64)
-        .filter(|value| (2..=5).contains(value))
-        .ok_or_else(|| "baseline_repetitions must be an integer in [2, 5]".to_owned())?
-        as usize;
-
+) -> Result<(Vec<ValueContract>, HashSet<String>), String> {
     let raw_contracts = raw
         .required_contracts
         .as_ref()
@@ -301,6 +264,14 @@ fn load_spec(
         return Err("required_contracts contains duplicate ids".to_owned());
     }
 
+    Ok((contracts, contract_ids))
+}
+
+fn spec_tests(
+    raw: &RawAnalysis,
+    ranked_nodeids: &[String],
+    contract_ids: &HashSet<String>,
+) -> Result<Vec<ValueTest>, String> {
     let raw_tests = raw
         .tests
         .as_ref()
@@ -355,6 +326,15 @@ fn load_spec(
         ));
     }
 
+    Ok(tests)
+}
+
+fn spec_mutations(
+    raw: &RawAnalysis,
+    mutation_pairs_json: &str,
+    mutation_ids: &[String],
+    contract_ids: &HashSet<String>,
+) -> Result<Vec<(String, String)>, String> {
     if !raw
         .mutation_contracts
         .as_ref()
@@ -396,6 +376,14 @@ fn load_spec(
             python_string_list(&unknown)
         ));
     }
+    Ok(mutation_contracts)
+}
+
+fn spec_completeness(
+    tests: &[ValueTest],
+    mutation_contracts: &[(String, String)],
+    contract_ids: &HashSet<String>,
+) -> Result<(), String> {
     let test_contracts: HashSet<&str> =
         tests.iter().map(|test| test.contract_id.as_str()).collect();
     let mutant_contracts: HashSet<&str> = mutation_contracts
@@ -421,6 +409,47 @@ fn load_spec(
             python_string_list(&missing_mutants)
         ));
     }
+    Ok(())
+}
+
+fn load_spec(
+    value_json: &str,
+    mutation_pairs_json: &str,
+    ranked_nodeids: &[String],
+    mutation_ids: &[String],
+    source_paths: &[String],
+) -> Result<Option<ValueSpec>, String> {
+    let value: Value = serde_json::from_str(value_json)
+        .map_err(|error| format!("invalid value_analysis JSON: {error}"))?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    required_object(&value, "value_analysis")?;
+    let raw: RawAnalysis = serde_json::from_value(value)
+        .map_err(|error| format!("value_analysis must be an object: {error}"))?;
+    if raw.enabled != Some(Value::Bool(true)) {
+        return Err("value_analysis.enabled must be true when present".to_owned());
+    }
+    let adapter = required_string(raw.adapter.as_ref(), "value_analysis.adapter")?;
+    if !ADAPTERS.contains(&adapter.as_str()) {
+        return Err(format!(
+            "value_analysis.adapter must be one of {}",
+            python_string_list(&ADAPTERS.map(str::to_owned))
+        ));
+    }
+    let repetitions = raw
+        .baseline_repetitions
+        .as_ref()
+        .and_then(Value::as_i64)
+        .filter(|value| (2..=5).contains(value))
+        .ok_or_else(|| "baseline_repetitions must be an integer in [2, 5]".to_owned())?
+        as usize;
+
+    let (contracts, contract_ids) = spec_contracts(&raw, ranked_nodeids, source_paths)?;
+    let tests = spec_tests(&raw, ranked_nodeids, &contract_ids)?;
+    let mutation_contracts =
+        spec_mutations(&raw, mutation_pairs_json, mutation_ids, &contract_ids)?;
+    spec_completeness(&tests, &mutation_contracts, &contract_ids)?;
     Ok(Some(ValueSpec {
         adapter,
         baseline_repetitions: repetitions,
@@ -452,21 +481,16 @@ fn report_tests(report: &Value) -> Option<&Map<String, Value>> {
     report.get("tests").and_then(Value::as_object)
 }
 
-fn analyze(
-    spec: ValueSpec,
-    baseline_reports: Vec<Value>,
-    mutant_evidence: Vec<MutantEvidence>,
-) -> AnalysisOutput {
-    let nodeids = spec
-        .tests
-        .iter()
-        .map(|test| test.nodeid.clone())
-        .collect::<Vec<_>>();
-    let tests_by_nodeid = spec
-        .tests
-        .iter()
-        .map(|test| (test.nodeid.as_str(), test))
-        .collect::<HashMap<_, _>>();
+type Outcomes = HashMap<String, Vec<String>>;
+type Durations = HashMap<String, Vec<f64>>;
+type Kills = HashMap<String, HashSet<String>>;
+
+fn baseline(
+    spec: &ValueSpec,
+    nodeids: &[String],
+    baseline_reports: &[Value],
+    errors: &mut Vec<String>,
+) -> (Outcomes, Durations) {
     let mut baseline_outcomes = nodeids
         .iter()
         .map(|nodeid| (nodeid.clone(), Vec::new()))
@@ -475,7 +499,6 @@ fn analyze(
         .iter()
         .map(|nodeid| (nodeid.clone(), Vec::new()))
         .collect::<HashMap<_, Vec<f64>>>();
-    let mut errors = Vec::new();
     if baseline_reports.len() != spec.baseline_repetitions {
         errors.push(format!(
             "baseline repetition count mismatch: expected={}, actual={}",
@@ -491,7 +514,7 @@ fn analyze(
             errors.push(format!("baseline report {} has no test map", index + 1));
             continue;
         };
-        for nodeid in &nodeids {
+        for nodeid in nodeids {
             let Some(row) = tests.get(nodeid).and_then(Value::as_object) else {
                 continue;
             };
@@ -525,6 +548,20 @@ fn analyze(
         ));
     }
 
+    (baseline_outcomes, baseline_durations)
+}
+
+fn mutant_kills(
+    spec: &ValueSpec,
+    nodeids: &[String],
+    mutant_evidence: Vec<MutantEvidence>,
+    errors: &mut Vec<String>,
+) -> (Kills, Vec<(String, Vec<String>)>) {
+    let tests_by_nodeid = spec
+        .tests
+        .iter()
+        .map(|test| (test.nodeid.as_str(), test))
+        .collect::<HashMap<_, _>>();
     let mut kills_by_test = nodeids
         .iter()
         .map(|nodeid| (nodeid.clone(), HashSet::new()))
@@ -589,6 +626,10 @@ fn analyze(
         killers_by_mutant.push((mutation_id.clone(), killers));
     }
 
+    (kills_by_test, killers_by_mutant)
+}
+
+fn coverage_bits(spec: &ValueSpec, kills_by_test: &Kills) -> (Vec<u64>, Vec<Vec<u64>>) {
     let contract_index = spec
         .contracts
         .iter()
@@ -624,11 +665,18 @@ fn analyze(
             bits
         })
         .collect::<Vec<_>>();
-    let runtimes = nodeids
-        .iter()
-        .map(|nodeid| median(&baseline_durations[nodeid]))
-        .collect::<Vec<_>>();
-    let mut uncovered = universe.clone();
+    (universe, coverage)
+}
+
+fn select_core(
+    nodeids: &[String],
+    universe: &[u64],
+    coverage: &[Vec<u64>],
+    runtimes: &[Option<f64>],
+    errors: &mut Vec<String>,
+) -> Vec<usize> {
+    let word_count = universe.len();
+    let mut uncovered = universe.to_vec();
     let mut core_indices = Vec::new();
     while uncovered.iter().any(|word| *word != 0) {
         let best = (0..nodeids.len())
@@ -691,10 +739,31 @@ fn analyze(
         errors.push("no retained test set covers every contract and mutant".to_owned());
     }
 
+    core_indices
+}
+
+struct RowContext<'a> {
+    nodeids: &'a [String],
+    kills_by_test: &'a Kills,
+    killers_by_mutant: &'a [(String, Vec<String>)],
+    coverage: &'a [Vec<u64>],
+    runtimes: &'a [Option<f64>],
+    core_indices: &'a [usize],
+    baseline_outcomes: &'a Outcomes,
+}
+fn test_rows(spec: &ValueSpec, context: RowContext<'_>) -> Vec<TestRow> {
+    let RowContext {
+        nodeids,
+        kills_by_test,
+        killers_by_mutant,
+        coverage,
+        runtimes,
+        core_indices,
+        baseline_outcomes,
+    } = context;
     let core_set = core_indices.iter().copied().collect::<HashSet<_>>();
     let killer_map = killers_by_mutant.iter().cloned().collect::<HashMap<_, _>>();
-    let rows = spec
-        .tests
+    spec.tests
         .iter()
         .enumerate()
         .map(|(test_index, test)| {
@@ -749,7 +818,42 @@ fn analyze(
                 dominated_by,
             }
         })
+        .collect::<Vec<_>>()
+}
+
+fn analyze(
+    spec: ValueSpec,
+    baseline_reports: Vec<Value>,
+    mutant_evidence: Vec<MutantEvidence>,
+) -> AnalysisOutput {
+    let nodeids = spec
+        .tests
+        .iter()
+        .map(|test| test.nodeid.clone())
         .collect::<Vec<_>>();
+    let mut errors = Vec::new();
+    let (baseline_outcomes, baseline_durations) =
+        baseline(&spec, &nodeids, &baseline_reports, &mut errors);
+    let (kills_by_test, killers_by_mutant) =
+        mutant_kills(&spec, &nodeids, mutant_evidence, &mut errors);
+    let (universe, coverage) = coverage_bits(&spec, &kills_by_test);
+    let runtimes = nodeids
+        .iter()
+        .map(|nodeid| median(&baseline_durations[nodeid]))
+        .collect::<Vec<_>>();
+    let core_indices = select_core(&nodeids, &universe, &coverage, &runtimes, &mut errors);
+    let rows = test_rows(
+        &spec,
+        RowContext {
+            nodeids: &nodeids,
+            kills_by_test: &kills_by_test,
+            killers_by_mutant: &killers_by_mutant,
+            coverage: &coverage,
+            runtimes: &runtimes,
+            core_indices: &core_indices,
+            baseline_outcomes: &baseline_outcomes,
+        },
+    );
     let counts = CLASSIFICATIONS
         .iter()
         .map(|classification| {
@@ -856,53 +960,8 @@ fn admission_errors_native(
     required_nodeids: Vec<String>,
 ) -> PyResult<Vec<String>> {
     let value = parse_json(value_json, "test_value evidence")?;
-    let Some(payload) = value.as_object() else {
-        return Ok(vec!["receipt has no test_value evidence".to_owned()]);
-    };
-    let mut errors = Vec::new();
-    if payload.get("schema_version").and_then(Value::as_str) != Some(VALUE_SCHEMA) {
-        errors.push("test_value schema is not current".to_owned());
-    }
-    if payload.get("status").and_then(Value::as_str) != Some("PASS") {
-        errors.push(format!(
-            "test_value status={}",
-            python_repr(payload.get("status"))
-        ));
-    }
-    let Some(rows) = payload.get("tests").and_then(Value::as_array) else {
-        errors.push("test_value.tests must be a list".to_owned());
-        return Ok(errors);
-    };
-    let by_nodeid = rows
-        .iter()
-        .filter_map(|row| row.as_object())
-        .filter_map(|row| {
-            row.get("nodeid")
-                .and_then(Value::as_str)
-                .map(|nodeid| (nodeid, row))
-        })
-        .collect::<HashMap<_, _>>();
-    for nodeid in required_nodeids {
-        let Some(row) = by_nodeid.get(nodeid.as_str()) else {
-            errors.push(format!(
-                "new test {} has no value classification",
-                python_repr(Some(&Value::String(nodeid)))
-            ));
-            continue;
-        };
-        let classification = row.get("classification");
-        if !classification
-            .and_then(Value::as_str)
-            .is_some_and(|value| value == "CORE" || value == "INTENTIONAL_REDUNDANCY")
-        {
-            errors.push(format!(
-                "new test {} is classified {}; only CORE or INTENTIONAL_REDUNDANCY may be added",
-                python_repr(Some(&Value::String(nodeid))),
-                python_repr(classification)
-            ));
-        }
-    }
-    Ok(errors)
+    crate::mutation_value_admission::admission_errors(&value, &required_nodeids)
+        .map_err(value_error)
 }
 
 #[pyfunction]

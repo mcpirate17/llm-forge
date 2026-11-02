@@ -48,6 +48,7 @@ pub fn files(root: &Path) -> io::Result<Vec<PathBuf>> {
         // its manifest/stamp script are independent required build inputs.
         "native/forge-cli/Cargo.toml",
         "native/forge-cli/build.rs",
+        "native/forge-cli/source_identity.rs",
         "ledger/routing_policy.toml",
         "native/forge/tests/fixtures/ledger/calibration.json",
     ] {
@@ -57,10 +58,46 @@ pub fn files(root: &Path) -> io::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
+/// Shared framing for a sorted source inventory, including Git-object readers.
+pub struct Fingerprint {
+    hash: Sha256,
+    total: usize,
+}
+impl Default for Fingerprint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl Fingerprint {
+    pub fn new() -> Self {
+        let mut hash = Sha256::new();
+        hash.update(b"forge-native-source-v1\0");
+        Self { hash, total: 0 }
+    }
+    pub fn add(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        self.total = self
+            .total
+            .checked_add(bytes.len())
+            .ok_or_else(|| error("native source byte overflow"))?;
+        if bytes.len() > 2 * 1024 * 1024 || self.total > 64 * 1024 * 1024 {
+            return Err(error("native source byte budget exceeded"));
+        }
+        let name = path
+            .to_str()
+            .ok_or_else(|| error("native source path is not UTF-8"))?;
+        self.hash.update((name.len() as u64).to_le_bytes());
+        self.hash.update(name.as_bytes());
+        self.hash.update((bytes.len() as u64).to_le_bytes());
+        self.hash.update(bytes);
+        Ok(())
+    }
+    pub fn finish(self) -> String {
+        format!("{:x}", self.hash.finalize())
+    }
+}
+
 pub fn fingerprint(root: &Path, files: &[PathBuf]) -> io::Result<String> {
-    let mut hash = Sha256::new();
-    hash.update(b"forge-native-source-v1\0");
-    let mut total = 0usize;
+    let mut fingerprint = Fingerprint::new();
     for path in files {
         let file = fs::File::open(root.join(path))?;
         let meta = file.metadata()?;
@@ -69,17 +106,7 @@ pub fn fingerprint(root: &Path, files: &[PathBuf]) -> io::Result<String> {
         }
         let mut bytes = Vec::new();
         file.take(2 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
-        total += bytes.len();
-        if bytes.len() > 2 * 1024 * 1024 || total > 64 * 1024 * 1024 {
-            return Err(error("native source byte budget exceeded"));
-        }
-        let name = path
-            .to_str()
-            .ok_or_else(|| error("native source path is not UTF-8"))?;
-        hash.update((name.len() as u64).to_le_bytes());
-        hash.update(name.as_bytes());
-        hash.update((bytes.len() as u64).to_le_bytes());
-        hash.update(bytes);
+        fingerprint.add(path, &bytes)?;
     }
-    Ok(format!("{:x}", hash.finalize()))
+    Ok(fingerprint.finish())
 }

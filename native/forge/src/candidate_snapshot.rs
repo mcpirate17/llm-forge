@@ -124,6 +124,14 @@ pub struct Snapshot {
     keep: bool,
 }
 
+pub(crate) fn resolve_captured_file(
+    source: &Source,
+    entries: &[TreeEntry],
+    path: &str,
+) -> Result<(String, Vec<(String, String)>)> {
+    paths::resolve_captured_file(source, entries, path)
+}
+
 pub fn preflight(source: &Source, tree: &str, output: &Path, limits: Limits) -> Result<Report> {
     let destination = Destination::open(output)?;
     let plan = paths::prepare(source, tree, limits)?;

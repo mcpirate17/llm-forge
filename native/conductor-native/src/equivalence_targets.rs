@@ -15,7 +15,9 @@ use crate::test_record_digest::blob_oid;
 use crate::test_record_store::open_read_only;
 use crate::test_record_untested::{functions, nested, Function};
 use anyhow::Context;
+#[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
@@ -265,10 +267,10 @@ type Unit = (String, usize, Vec<String>);
 /// A unit no driver fits the budget of: `(qualname, def line, why)`.
 type Refused = (String, usize, String);
 /// A change: `(path, whole file, units, refused units)`.
-type Target = (String, bool, Vec<Unit>, Vec<Refused>);
+pub type Target = (String, bool, Vec<Unit>, Vec<Refused>);
 
 /// Per change, its target, the drivers of each file within `timeout`'s driving share.
-fn targets(
+pub fn targets(
     root: &Path,
     store: Option<&Path>,
     changes: &[(String, Option<Vec<usize>>)],
@@ -312,6 +314,7 @@ fn targets(
 /// the `(qualname, def line, driver nodeids)` of one the probe ablates, its drivers
 /// from the runs recorded in `store` and none without one, and each unit whose drivers
 /// do not fit a probe killed at `timeout` seconds `(qualname, def line, why)`.
+#[cfg(feature = "python")]
 #[pyfunction]
 pub(crate) fn equivalence_targets_native(
     py: Python<'_>,

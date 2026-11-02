@@ -32,6 +32,7 @@ pub struct Runtime {
 enum Mode {
     Fmt,
     Clippy,
+    Test,
 }
 struct State {
     parent: Dir,
@@ -277,6 +278,7 @@ impl Runtime {
         let mode = match mode {
             "fmt" => Mode::Fmt,
             "clippy" => Mode::Clippy,
+            "test" => Mode::Test,
             _ => bail!("unknown cargo lint mode"),
         };
         let candidate = absolute_dir(candidate, "candidate root")?;
@@ -301,6 +303,7 @@ impl Runtime {
                 tool(&bin, "cargo-clippy")?;
                 tool(&bin, "clippy-driver")?;
             }
+            Mode::Test => {}
         }
         let paths = extra_paths(std::env::var_os("FORGE_CARGO_EXTRA_PATH"), &candidate, &tmp)?;
         let mut state = State::new(&tmp)?;

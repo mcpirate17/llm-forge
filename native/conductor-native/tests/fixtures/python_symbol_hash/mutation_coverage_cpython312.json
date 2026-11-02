@@ -1,0 +1,16 @@
+{
+  "_github_output": "dd0328b224e692ec6ed6a8213adda0634eca9752a42222ff1a9c86d15b206a68",
+  "_json_print": "b464c631eb0919c63579e1650284b66ea02d078754000c8efe44a721f66a8594",
+  "_native_or_campaign": "14dcbd7b1cd147fc11760639fcb4d6f32bd142aa6043ae9e68709eb88790b5af",
+  "_safe_relative_path": "a9bc3810e56e4f4cef45a32cbdd78e8ee5ee2235cc8c608b03d7213dc74fe4ea",
+  "_should_skip": "318ded50c592703f824162574e599b115f7f610d534d3e01f95abccbcc62ba92",
+  "canary_report": "85c2ef3b9ca3e8b1b4c1a6b2abe48987b63816716c5a1fa6b92c7989b0aac442",
+  "coverage_report": "da6100c7e4a6b6be80a38a0dd690b729364364bfbdb457174892150629e06588",
+  "discover_test_paths": "68f7ced529649003463dc4ee638fbc740596edc5de8c17077fb55bc0a3cfcc38",
+  "evidence_exit_code": "bb6d5ed85f112004023f8a9e2488dc806cb08afd0d99b8966743a17e173e7403",
+  "git_changed_test_paths": "b63d255454dfb76896928c8dca5f01f368221594b98151a391e048d33043aa99",
+  "is_rust_test_surface": "d8ca33af113d9c26cd58746d7ab99a74132edeea33fcc9c6ce4a5259ac2521d9",
+  "is_test_path": "065199c8991397498bd9e93d021ecd462bdbbd9a0387e60d06131e163a0b3aaf",
+  "main": "fbc3ab679a31933f92ee249ce500cee0bd71d266aa12043e493d62b4f7a33b2d",
+  "verify_changed": "2affa82fe2c0bfc04c657127717d586a637ef05b203208c1f162e94eeb6e8f9d"
+}

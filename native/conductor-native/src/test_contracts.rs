@@ -3,52 +3,25 @@
 //! Selection stays separate from pytest. This module returns data and argv;
 //! callers decide when and how to execute the Cargo command.
 
+use crate::contract_registry::{
+    corpus_source, fixture_source, parse_registry, patch_fixture_source, python_fixture_source,
+    Registry, TEST_DIR,
+};
 use crate::regular_file::require_regular_file;
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use syn::visit::Visit;
 
 const MANIFEST: &str = "native/conductor-native/Cargo.toml";
-const TEST_DIR: &str = "native/conductor-native/tests";
 const REGISTRY_PATH: &str = "native/conductor-native/src/python_contract_targets.tsv";
 const REGISTRY_EXTENSION_PATH: &str =
     "native/conductor-native/src/python_contract_targets_extra.tsv";
 const REGISTRY_EXTENSION_DIRECTIVE: &str = "# include: python_contract_targets_extra.tsv";
 const COMPILED_REGISTRY: &str = include_str!("python_contract_targets.tsv");
 const COMPILED_REGISTRY_EXTENSION: &str = include_str!("python_contract_targets_extra.tsv");
-
-fn native_source(path: &str) -> bool {
-    ["native/conductor-native/src/", "native/slop-core/src/"]
-        .iter()
-        .any(|prefix| {
-            path.strip_prefix(*prefix)
-                .is_some_and(|name| name.ends_with(".rs") && !name.contains('/'))
-        })
-        || path
-            .strip_prefix("native/forge/src/")
-            .is_some_and(|name| name.ends_with(".rs"))
-}
-
-fn fixture_source(path: &str) -> bool {
-    path.starts_with(&format!("{TEST_DIR}/fixtures/")) && path.ends_with(".rs")
-}
-
-fn corpus_source(path: &str) -> bool {
-    path.ends_with(".json")
-}
-
-fn patch_fixture_source(path: &str) -> bool {
-    path.starts_with("src/conductor/testdata/") && path.ends_with(".patch")
-}
-
-fn python_fixture_source(path: &str) -> bool {
-    (path.starts_with("src/conductor/testdata/")
-        || path.starts_with(&format!("{TEST_DIR}/fixtures/")))
-        && path.ends_with(".py")
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CargoCommand {
@@ -65,75 +38,6 @@ pub struct ContractPlan {
     pub targets: Vec<String>,
     pub test_paths: Vec<String>,
     pub commands: Vec<CargoCommand>,
-}
-
-#[derive(Default)]
-struct Registry {
-    by_source: BTreeMap<String, BTreeSet<String>>,
-    targets: BTreeSet<String>,
-}
-
-fn parse_registry(contents: &str) -> Result<Registry> {
-    let mut entries = Registry::default();
-    for (index, line) in contents.lines().enumerate() {
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let (source, target) = line
-            .split_once('\t')
-            .with_context(|| format!("contract registry line {} has no tab", index + 1))?;
-        let source_file = (source.starts_with("src/")
-            && !python_fixture_source(source)
-            && [".py", ".json", ".sh", ".toml"]
-                .iter()
-                .any(|suffix| source.ends_with(suffix)))
-            || source == ".claude/hooks/dispatch.py";
-        let helper = source.starts_with(&format!("{TEST_DIR}/python_contracts/"))
-            && source.ends_with(".rs")
-            && !source
-                .trim_start_matches(&format!("{TEST_DIR}/python_contracts/"))
-                .contains('/');
-        if !(source_file
-            || helper
-            || native_source(source)
-            || fixture_source(source)
-            || corpus_source(source)
-            || patch_fixture_source(source)
-            || python_fixture_source(source))
-            || source.contains("..")
-            || source.contains('\\')
-            || source.chars().any(char::is_control)
-            || source.split('/').any(|part| part.is_empty() || part == ".")
-        {
-            bail!(
-                "invalid contract path on registry line {}: {source}",
-                index + 1
-            );
-        }
-        if !target.starts_with("python_contracts_")
-            || !target
-                .bytes()
-                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-        {
-            bail!(
-                "invalid contract target on registry line {}: {target}",
-                index + 1
-            );
-        }
-        if !entries
-            .by_source
-            .entry(source.to_owned())
-            .or_default()
-            .insert(target.to_owned())
-        {
-            bail!("duplicate contract mapping on registry line {}", index + 1);
-        }
-        entries.targets.insert(target.to_owned());
-    }
-    if entries.targets.is_empty() {
-        bail!("contract registry is empty");
-    }
-    Ok(entries)
 }
 
 fn registry() -> Result<Registry> {

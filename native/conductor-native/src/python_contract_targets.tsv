@@ -45,8 +45,6 @@ src/conductor/candidate_review/verification.py	python_contracts_contract_runner
 src/conductor/candidate_review/verification.py	python_contracts_mutation_gate_edges
 src/conductor/candidate_review/vulture_baseline_init.py	python_contracts_candidate_vulture
 src/conductor/check_generated_mutants.py	python_contracts_mutation_guard
-src/conductor/check_json_in_notes.py	python_contracts_repo_utilities
-src/conductor/check_root_junk.py	python_contracts_repo_utilities
 src/conductor/codex_journal.py	python_contracts_codex_journal
 src/conductor/dead_tests.py	python_contracts_dead_tests
 src/conductor/graph_test_select.py	python_contracts_graph_test_select
