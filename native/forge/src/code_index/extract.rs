@@ -24,10 +24,40 @@ pub struct Options {
     #[serde(default)]
     pub allow_syntax_errors: bool,
 }
+/// Operator limits within the embedding client's fixed request admission bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BatchPolicy {
+    pub max_inputs: usize,
+    /// Sum of UTF-8 input bytes, excluding JSON framing.
+    pub max_bytes: usize,
+}
+impl Default for BatchPolicy {
+    fn default() -> Self {
+        Self {
+            max_inputs: 32,
+            max_bytes: 65536,
+        }
+    }
+}
+impl BatchPolicy {
+    /// Admit every possible planned chunk before source reads or HTTP requests.
+    pub fn validate(&self, chunk_bytes: usize) -> Result<()> {
+        ensure!(
+            (1..=32).contains(&self.max_inputs)
+                && (128..=MAX_CHUNK_BYTES).contains(&chunk_bytes)
+                && (chunk_bytes..=65536).contains(&self.max_bytes),
+            "invalid embedding batch limits: require 1..32 inputs and chunk_bytes <= max_bytes <= 65536"
+        );
+        Ok(())
+    }
+}
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Refresh {
     pub sources: Options,
+    #[serde(default)]
+    pub batch: BatchPolicy,
     pub embedding: embedding::Config,
     #[serde(default)]
     pub graph: Config,
@@ -47,8 +77,17 @@ pub struct PlannedFile {
     pub spans: Vec<[usize; 2]>,
     pub syntax_error: Option<String>,
 }
+/// Completed preparation work only; never a retrieval outcome or in-flight cost.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct RefreshProgress {
+    pub batch: BatchPolicy,
+    pub rows: u64,
+    pub batches: u64,
+    pub input_tokens_total: u64,
+}
 #[derive(Debug, Serialize)]
 pub struct RefreshReport {
+    pub batch: BatchPolicy,
     pub manifest: Manifest,
     pub source_bytes: usize,
     pub diagnostics: Vec<(String, String)>,
@@ -170,6 +209,15 @@ fn split(source: &str, maximum: usize, ends: &BTreeSet<usize>) -> Vec<[usize; 2]
 }
 
 pub fn refresh(store: &Store, source: &Path, settings: Refresh) -> Result<RefreshReport> {
+    refresh_with_progress(store, source, settings, |_| Ok(()))
+}
+/// Observe only completed batches. Observer errors abort without publishing an index.
+pub fn refresh_with_progress(
+    store: &Store,
+    source: &Path,
+    settings: Refresh,
+    mut observer: impl FnMut(RefreshProgress) -> Result<()>,
+) -> Result<RefreshReport> {
     ensure!(
         (1..=3600).contains(&settings.deadline_seconds),
         "refresh deadline must be 1..3600 seconds"
@@ -179,6 +227,7 @@ pub fn refresh(store: &Store, source: &Path, settings: Refresh) -> Result<Refres
         ensure!(Instant::now() < deadline, "source refresh deadline expired");
         Ok(())
     };
+    settings.batch.validate(settings.sources.chunk_bytes)?;
     settings.graph.validate()?;
     let client = embedding::Client::new(settings.embedding)?;
     let plan = plan_checked(source, &settings.sources, &mut checkpoint)?;
@@ -201,8 +250,15 @@ pub fn refresh(store: &Store, source: &Path, settings: Refresh) -> Result<Refres
         "planned embeddings exceed 4 GiB"
     );
     let rows = plan.rows;
-    let metrics = Cell::new((0u64, 0u64));
+    let metrics = Cell::new(RefreshProgress {
+        batch: settings.batch,
+        rows: 0,
+        batches: 0,
+        input_tokens_total: 0,
+    });
+    observer(metrics.get())?;
     let stream = EmbeddedRows {
+        batch: settings.batch,
         client,
         plan,
         root: SourceRoot::open(source)?,
@@ -212,6 +268,7 @@ pub fn refresh(store: &Store, source: &Path, settings: Refresh) -> Result<Refres
         failed: false,
         deadline,
         metrics: &metrics,
+        observer: &mut observer,
     };
     let header = BuildHeader {
         version: 1,
@@ -220,17 +277,19 @@ pub fn refresh(store: &Store, source: &Path, settings: Refresh) -> Result<Refres
         config: settings.graph,
     };
     let manifest = build_checked(store, source, header, stream, checkpoint)?;
-    let (batches, input_tokens_total) = metrics.get();
+    let progress = metrics.get();
     Ok(RefreshReport {
+        batch: settings.batch,
         manifest,
         source_bytes,
         diagnostics,
-        batches,
-        input_tokens_total,
+        batches: progress.batches,
+        input_tokens_total: progress.input_tokens_total,
     })
 }
 
 struct EmbeddedRows<'a> {
+    batch: BatchPolicy,
     client: embedding::Client,
     plan: Plan,
     root: SourceRoot,
@@ -239,14 +298,15 @@ struct EmbeddedRows<'a> {
     pending: VecDeque<EmbeddingRow>,
     failed: bool,
     deadline: Instant,
-    metrics: &'a Cell<(u64, u64)>,
+    metrics: &'a Cell<RefreshProgress>,
+    observer: &'a mut dyn FnMut(RefreshProgress) -> Result<()>,
 }
 impl EmbeddedRows<'_> {
     fn fill(&mut self) -> Result<()> {
         let mut items = Vec::new();
         let mut texts = Vec::new();
         let mut bytes = 0;
-        while self.file < self.plan.files.len() && items.len() < 32 {
+        while self.file < self.plan.files.len() && items.len() < self.batch.max_inputs {
             let planned = &self.plan.files[self.file];
             if self.span == planned.spans.len() {
                 self.file += 1;
@@ -259,9 +319,9 @@ impl EmbeddedRows<'_> {
                 "source changed after planning: {}",
                 planned.path
             );
-            while self.span < planned.spans.len() && items.len() < 32 {
+            while self.span < planned.spans.len() && items.len() < self.batch.max_inputs {
                 let [start, end] = planned.spans[self.span];
-                if bytes + end - start > 65536 {
+                if bytes + end - start > self.batch.max_bytes {
                     break;
                 }
                 texts.push(source.content()[start..end].to_owned());
@@ -280,17 +340,27 @@ impl EmbeddedRows<'_> {
             }
         }
         if items.is_empty() {
+            ensure!(
+                self.file == self.plan.files.len(),
+                "embedding batching stalled before completing source plan"
+            );
             return Ok(());
         }
         let inputs: Vec<_> = texts.iter().map(String::as_str).collect();
         let batch = self.client.embed_batch(&inputs, self.deadline)?;
-        let (batches, tokens) = self.metrics.get();
-        self.metrics
-            .set((batches + 1, tokens + batch.input_tokens_total));
         ensure!(
             batch.vectors.len() == items.len(),
             "embedding batch lost row identity"
         );
+        let mut progress = self.metrics.get();
+        progress.batches += 1;
+        progress.rows += items.len() as u64;
+        progress.input_tokens_total = progress
+            .input_tokens_total
+            .checked_add(batch.input_tokens_total)
+            .context("completed refresh input token total overflow")?;
+        self.metrics.set(progress);
+        (self.observer)(progress)?;
         for (mut row, vector) in items.into_iter().zip(batch.vectors) {
             row.vector = vector;
             self.pending.push_back(row);

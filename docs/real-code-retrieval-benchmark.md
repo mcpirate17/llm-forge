@@ -13,10 +13,17 @@ was performed and leaves all requested retrievals unstarted.
 The targeted fixture contains 24 queries (q17–q24 cross module) with agent-authored,
 source-inspected labels frozen before retrieval. Luna authored the labels from source
 inspection before embeddings or rankings were examined; no human authored or
-adjudicated them. Source revision is
-`bbe78a53e2363d7190a5dbc45e8522fbb55a005b`; each labeled file has a SHA-256 binding.
-Do not change labels after viewing rankings. Hash drift fails the run, requiring a
-separate prospective workload revision rather than silent relabeling or query removal.
+adjudicated them. Each labeled file has a SHA-256 binding. The current prospective
+fixture revision is `674d258ad2dc9653b883a2923f40932178a49798+embedding-batch-controls-v2`:
+the commit identifies its base; the file hashes identify the exact reviewed source.
+The initial attempt timed out during embedding with all 144 retrievals unstarted.
+Before any rankings existed, v2 rebound only `code_index/extract.rs` and q11's
+line ranges to the same planning and refresh implementations, including the new
+progress helper. Every query text, ID, path, symbol and rationale is unchanged.
+The original fixture remains reproducible from commit `674d258`.
+Never change a fixture in response to its rankings. Hash drift fails the run;
+future source changes require a separate, source-reviewed prospective revision
+before measuring that revision. Preserve each prior fixture and run record.
 Scoring is deterministic path/span overlap; no model judges retrieved results.
 
 All labeled files are indexed, followed by the first 100 additional regular Rust files
@@ -38,8 +45,21 @@ an inference service. Independently verify the local inventory before running. T
 fixture pins `qwen3-embed-cpu:latest`, 1024 dimensions, artifact
 `fdf7067d896175e871d925acacde4df653a1e6900a946710342ce972372dcf81`.
 The native client verifies that model identity before embedding. Runtime options are
-`num_gpu=0`, `num_thread=2`, `num_ctx=8192`, with at most 32 inputs per batch and a
-60-second request deadline. Source chunks are at most 4096 bytes in this recipe.
+`num_gpu=0`, `num_thread=2`, `num_ctx=8192`, with a
+60-second request deadline. The operator recipe below selects at most 2 inputs
+and 8192 UTF-8 input bytes per refresh or query-preparation batch for this CPU preparation attempt.
+This is a batch-size choice, not a measured throughput claim. Omitted `batch`
+retains the existing 32-input/65536-byte defaults. `max_inputs` must be 1..32;
+`max_bytes` must be at least `chunk_bytes` and at most 65536. Invalid limits
+fail before HTTP, including a byte budget unable to admit one full chunk.
+Effective limits are recorded in planned/final/failure reports and refresh evidence.
+The same policy batches all 24 query embeddings in their original order; query
+batch count and summed input tokens are reported separately from refresh work.
+Each completed refresh or query batch also writes a JSON `refresh_progress` or
+`query_preparation_progress` event to the stderr journal, with cumulative
+completed batches, rows and input tokens. These
+are preparation observations, not retrieval successes or in-flight token costs.
+A later failure retains prior events; it does not imply index publication. Source chunks are at most 4096 bytes in this recipe.
 The benchmark's total deadline defaults to 600 seconds (explicit maximum 3600 seconds); an outer process timeout bounds
 planning, filesystem calls and process shutdown too.
 
@@ -62,7 +82,8 @@ Choose an unused index path for every attempt, including failed attempts:
     "timeout_seconds": 60
   },
   "deadline_seconds": 600,
-  "chunk_bytes": 4096
+  "chunk_bytes": 4096,
+  "batch": {"max_inputs": 2, "max_bytes": 8192}
 }
 ```
 

@@ -1,11 +1,13 @@
 #[path = "support/embedding_fixture.rs"]
 mod fixture;
+#[path = "../benches/real_code_index/embedding.rs"]
+mod query_embedding;
 #[allow(dead_code)]
 mod support;
 use conductor_native::vector_index::Config;
 use fixture::*;
 use forge::code_index::{
-    extract::{self, Options, Refresh},
+    extract::{self, BatchPolicy, Options, Refresh},
     QueryRequest, Reader, SearchMode, Store,
 };
 use serde_json::{json, Value};
@@ -43,6 +45,7 @@ fn sequence(vectors: Vec<Vec<f32>>) -> Vec<Reply> {
 fn settings(endpoint: String, paths: &[&str]) -> Refresh {
     Refresh {
         sources: options(paths, 512),
+        batch: BatchPolicy::default(),
         embedding: config(endpoint),
         graph: Config::default(),
         deadline_seconds: 10,
@@ -105,6 +108,7 @@ fn source_refresh_batches_in_order_and_matches_embedding_recipe() {
     assert_eq!(report.manifest.rows, 2);
     assert_eq!(report.manifest.space, expected);
     assert_eq!(report.batches, 1);
+    assert_eq!(report.batch, BatchPolicy::default());
     assert_eq!(report.input_tokens_total, 10);
     assert!(report.diagnostics.is_empty());
     let calls = worker.join().unwrap();
@@ -172,29 +176,55 @@ fn construction_checkpoints_abort_without_publishing_vectors() {
 
 #[test]
 fn refresh_respects_both_batch_count_and_input_byte_limits_without_losing_spans() {
-    for (chunk_bytes, repeats) in [(512, 4000), (16384, 22000)] {
+    for (chunk_bytes, repeats, max_inputs, max_bytes) in [
+        (512, 4000, 32, 65536),
+        (16384, 22000, 32, 65536),
+        (512, 500, 3, 65536),
+        (512, 500, 32, 1024),
+        (512, 500, 1, 512),
+    ] {
         let host = support::Host::new();
         let source = host.0.join("source");
         fs::create_dir(&source).unwrap();
-        let text = "alpha ".repeat(repeats);
+        let text: String = (0..repeats).map(|i| format!("{i:05} α ")).collect();
         fs::write(source.join("code.txt"), &text).unwrap();
         let opts = options(&["code.txt"], chunk_bytes);
         let plan = extract::plan(&source, &opts).unwrap();
-        let batch_rows = 32.min(65536 / chunk_bytes);
-        let mut responses = Vec::new();
-        for start in (0..plan.rows).step_by(batch_rows) {
-            responses.extend(sequence(vec![
-                vec![1.0, 0.0];
-                batch_rows.min(plan.rows - start)
-            ]));
+        let mut sizes = Vec::new();
+        let (mut rows, mut bytes) = (0, 0);
+        for &[start, end] in &plan.files[0].spans {
+            if rows == max_inputs || bytes + end - start > max_bytes {
+                sizes.push(rows);
+                (rows, bytes) = (0, 0);
+            }
+            rows += 1;
+            bytes += end - start;
         }
+        if rows > 0 {
+            sizes.push(rows);
+        }
+        let responses = sizes
+            .iter()
+            .flat_map(|&n| sequence(vec![vec![1.0, 0.0]; n]))
+            .collect();
         let (endpoint, worker) = server(responses);
         let mut cfg = settings(endpoint, &["code.txt"]);
         cfg.sources = opts;
+        cfg.batch = BatchPolicy {
+            max_inputs,
+            max_bytes,
+        };
         let report =
             extract::refresh(&Store::create(&host.0.join("index")).unwrap(), &source, cfg).unwrap();
+        assert_eq!(
+            report.batch,
+            BatchPolicy {
+                max_inputs,
+                max_bytes
+            }
+        );
         assert_eq!(report.manifest.rows, plan.rows);
-        assert_eq!(report.batches as usize, plan.rows.div_ceil(batch_rows));
+        assert_eq!(report.batches as usize, sizes.len());
         let mut recovered = String::new();
         for (request, body) in worker.join().unwrap() {
             if !request.starts_with("POST") {
@@ -202,9 +232,9 @@ fn refresh_respects_both_batch_count_and_input_byte_limits_without_losing_spans(
             }
             let data: Value = serde_json::from_slice(&body).unwrap();
             let inputs = data["input"].as_array().unwrap();
-            assert!(inputs.len() <= 32);
+            assert!(!inputs.is_empty() && inputs.len() <= max_inputs);
             let bytes: usize = inputs.iter().map(|s| s.as_str().unwrap().len()).sum();
-            assert!(bytes <= 65536);
+            assert!(bytes <= max_bytes);
             for input in inputs {
                 recovered.push_str(input.as_str().unwrap());
             }
@@ -247,11 +277,12 @@ fn cli_planning_is_read_only_and_refresh_uses_only_the_configured_native_client(
     assert!(!index.exists());
     let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
     let config_path = host.0.join("refresh.json");
-    fs::write(
-        &config_path,
-        serde_json::to_vec(&settings(endpoint, &["a.rs"])).unwrap(),
-    )
-    .unwrap();
+    let mut cfg = settings(endpoint, &["a.rs"]);
+    cfg.batch = BatchPolicy {
+        max_inputs: 1,
+        max_bytes: 512,
+    };
+    fs::write(&config_path, serde_json::to_vec(&cfg).unwrap()).unwrap();
     let mut command = std::process::Command::new(support::forge_binary::path());
     command
         .env_clear()
@@ -273,4 +304,340 @@ fn cli_planning_is_read_only_and_refresh_uses_only_the_configured_native_client(
     let data: Value = serde_json::from_slice(&result.stdout).unwrap();
     assert_eq!(data["manifest"]["rows"], 1);
     assert_eq!(data["batches"], 1);
+    assert_eq!(data["batch"], json!({"max_inputs": 1, "max_bytes": 512}));
+}
+
+#[test]
+fn invalid_batch_policy_is_rejected_before_any_http_or_index_publication() {
+    use std::net::TcpListener;
+    let host = support::Host::new();
+    fs::write(host.0.join("code.txt"), "hello source").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    for (max_inputs, max_bytes) in [(0, 65536), (33, 65536), (1, 0), (1, 511), (1, 65537)] {
+        let mut cfg = settings(endpoint.clone(), &["code.txt"]);
+        cfg.batch = BatchPolicy {
+            max_inputs,
+            max_bytes,
+        };
+        let error = extract::refresh(&store, &host.0, cfg).unwrap_err();
+        assert!(
+            error.to_string().contains("invalid embedding batch limits"),
+            "{error:#}"
+        );
+        assert!(matches!(listener.accept(), Err(e) if e.kind() == std::io::ErrorKind::WouldBlock));
+        assert!(store.current().is_err());
+    }
+}
+
+#[test]
+fn refresh_json_preserves_legacy_defaults_and_admits_explicit_smaller_limits() {
+    let mut value = serde_json::to_value(settings("http://127.0.0.1:1".into(), &[])).unwrap();
+    value.as_object_mut().unwrap().remove("batch");
+    let legacy: Refresh = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(legacy.batch, BatchPolicy::default());
+    value["batch"] = json!({"max_inputs": 2, "max_bytes": 1024});
+    let smaller: Refresh = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(
+        smaller.batch,
+        BatchPolicy {
+            max_inputs: 2,
+            max_bytes: 1024
+        }
+    );
+    smaller.batch.validate(smaller.sources.chunk_bytes).unwrap();
+    value["batch"] = json!({"max_inputs": 2});
+    let partial: Refresh = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(partial.batch.max_bytes, 65536);
+    value["batch"]["unknown_limit"] = json!(3);
+    assert!(serde_json::from_value::<Refresh>(value).is_err());
+}
+
+#[test]
+fn failed_later_batch_preserves_completed_progress_without_publishing_partial_index() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.txt"), "first").unwrap();
+    fs::write(source.join("b.txt"), "second").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let mut replies = sequence(vec![vec![1.0, 0.0]]);
+    replies.push(reply("/api/tags", inventory(7)));
+    let mut failed = reply("/api/embed", json!({"error":"later batch failed"}));
+    failed.status = 500;
+    replies.push(failed);
+    let (endpoint, worker) = server(replies);
+    let mut cfg = settings(endpoint, &["b.txt", "a.txt"]);
+    cfg.batch.max_inputs = 1;
+    let mut observations = Vec::new();
+    let error = extract::refresh_with_progress(&store, &source, cfg, |progress| {
+        observations.push(progress);
+        Ok(())
+    })
+    .unwrap_err();
+    assert!(format!("{error:#}").contains("500"), "{error:#}");
+    let calls = worker.join().unwrap();
+    let first: Value = serde_json::from_slice(&calls[1].1).unwrap();
+    assert_eq!(first["input"], json!(["first"]));
+    assert_eq!(observations.len(), 2);
+    assert_eq!(
+        (
+            observations[0].batches,
+            observations[0].rows,
+            observations[0].input_tokens_total
+        ),
+        (0, 0, 0)
+    );
+    assert_eq!(
+        (
+            observations[1].batches,
+            observations[1].rows,
+            observations[1].input_tokens_total
+        ),
+        (1, 1, 10)
+    );
+    assert_eq!(observations[1].batch.max_inputs, 1);
+    assert!(store.current().is_err());
+}
+
+#[test]
+fn observer_failure_refuses_publication_after_completed_preparation() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.txt"), "first").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let mut last_rows = 0;
+    let result = extract::refresh_with_progress(
+        &store,
+        &source,
+        settings(endpoint, &["a.txt"]),
+        |progress| {
+            last_rows = progress.rows;
+            anyhow::ensure!(progress.batches == 0, "progress journal failed");
+            Ok(())
+        },
+    );
+    let error = result.unwrap_err();
+    assert!(
+        format!("{error:#}").contains("progress journal failed"),
+        "{error:#}"
+    );
+    assert_eq!(last_rows, 1);
+    worker.join().unwrap();
+    assert!(store.current().is_err());
+}
+
+#[test]
+fn query_preparation_preserves_all_24_vectors_order_and_sums_batch_tokens() {
+    use std::time::{Duration, Instant};
+    let texts: Vec<_> = (0..24)
+        .map(|i| format!("{i:02}:{}", "q".repeat(198)))
+        .collect();
+    let inputs: Vec<_> = texts.iter().map(String::as_str).collect();
+    for (policy, batch_rows) in [
+        (
+            BatchPolicy {
+                max_inputs: 3,
+                max_bytes: 65536,
+            },
+            3,
+        ),
+        (
+            BatchPolicy {
+                max_inputs: 32,
+                max_bytes: 512,
+            },
+            2,
+        ),
+    ] {
+        let mut replies = Vec::new();
+        for start in (0..24).step_by(batch_rows) {
+            replies.extend(sequence(
+                (start..start + batch_rows)
+                    .map(|i| vec![1.0, (i + 1) as f32])
+                    .collect(),
+            ));
+        }
+        let (endpoint, worker) = server(replies);
+        let client = forge::embedding::Client::new(config(endpoint)).unwrap();
+        let mut progress = Vec::new();
+        let (batch, batches) = query_embedding::queries(
+            &client,
+            &inputs,
+            policy,
+            Instant::now() + Duration::from_secs(10),
+            |p| {
+                progress.push(p);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(batch.vectors.len(), 24);
+        assert_eq!(batches, (24 / batch_rows) as u64);
+        assert_eq!(batch.input_tokens_total, batches * 10);
+        assert_eq!(progress.len(), batches as usize + 1);
+        for (i, p) in progress.iter().enumerate() {
+            assert_eq!(
+                (p.rows, p.batches, p.input_tokens_total),
+                ((i * batch_rows) as u64, i as u64, (i * 10) as u64)
+            );
+            assert_eq!(p.batch, policy);
+        }
+        for (i, vector) in batch.vectors.iter().enumerate() {
+            assert!((vector[1] / vector[0] - (i + 1) as f32).abs() < 0.0001);
+        }
+        let mut recovered = Vec::new();
+        for (request, body) in worker.join().unwrap() {
+            if !request.starts_with("POST") {
+                continue;
+            }
+            let body: Value = serde_json::from_slice(&body).unwrap();
+            let sent = body["input"].as_array().unwrap();
+            assert!(sent.len() <= policy.max_inputs);
+            assert!(
+                sent.iter()
+                    .map(|s| s.as_str().unwrap().len())
+                    .sum::<usize>()
+                    <= policy.max_bytes
+            );
+            recovered.extend(sent.iter().map(|s| s.as_str().unwrap().to_owned()));
+        }
+        assert_eq!(recovered, texts);
+    }
+}
+
+#[test]
+fn oversized_query_is_rejected_before_any_http() {
+    use std::net::TcpListener;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let client =
+        forge::embedding::Client::new(config(format!("http://{}", listener.local_addr().unwrap())))
+            .unwrap();
+    let large = "x".repeat(513);
+    let result = query_embedding::queries(
+        &client,
+        &["valid", &large],
+        BatchPolicy {
+            max_inputs: 2,
+            max_bytes: 512,
+        },
+        std::time::Instant::now(),
+        |_| Ok(()),
+    );
+    assert!(result.is_err());
+    assert!(matches!(listener.accept(), Err(e) if e.kind() == std::io::ErrorKind::WouldBlock));
+}
+
+fn excessive_later_token_count() -> Vec<Reply> {
+    let mut responses = sequence(vec![vec![1.0, 0.0]]);
+    responses.push(reply("/api/tags", inventory(7)));
+    responses.push(reply(
+        "/api/embed",
+        json!({"model":"local-embed:test",
+        "embeddings":[[1.0,0.0]], "prompt_eval_count":u64::MAX}),
+    ));
+    responses
+}
+
+#[test]
+fn later_overflow_sized_server_count_refuses_refresh_and_preserves_previous_index() {
+    let host = support::Host::new();
+    let source = host.0.join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("a.txt"), "first").unwrap();
+    fs::write(source.join("b.txt"), "second").unwrap();
+    let store = Store::create(&host.0.join("index")).unwrap();
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let original = extract::refresh(&store, &source, settings(endpoint, &["a.txt"]))
+        .unwrap()
+        .manifest
+        .generation;
+    worker.join().unwrap();
+    let (endpoint, worker) = server(excessive_later_token_count());
+    let mut cfg = settings(endpoint, &["a.txt", "b.txt"]);
+    cfg.batch.max_inputs = 1;
+    let mut seen = Vec::new();
+    let result = extract::refresh_with_progress(&store, &source, cfg, |p| {
+        seen.push(p);
+        Ok(())
+    });
+    assert!(format!("{:#}", result.unwrap_err()).contains("embedding token usage"));
+    worker.join().unwrap();
+    assert_eq!(store.current().unwrap(), original);
+    assert_eq!(seen.len(), 2);
+    assert_eq!(
+        (seen[1].rows, seen[1].batches, seen[1].input_tokens_total),
+        (1, 1, 10)
+    );
+}
+
+#[test]
+fn later_overflow_sized_query_count_refuses_result_and_retains_completed_progress() {
+    let (endpoint, worker) = server(excessive_later_token_count());
+    let client = forge::embedding::Client::new(config(endpoint)).unwrap();
+    let mut seen = Vec::new();
+    let result = query_embedding::queries(
+        &client,
+        &["first", "second"],
+        BatchPolicy {
+            max_inputs: 1,
+            max_bytes: 512,
+        },
+        std::time::Instant::now() + std::time::Duration::from_secs(10),
+        |p| {
+            seen.push(p);
+            Ok(())
+        },
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("embedding token usage"));
+    worker.join().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert_eq!(
+        (seen[0].rows, seen[0].batches, seen[0].input_tokens_total),
+        (0, 0, 0)
+    );
+    assert_eq!(
+        (seen[1].rows, seen[1].batches, seen[1].input_tokens_total),
+        (1, 1, 10)
+    );
+    assert_eq!(
+        seen[1].batch,
+        BatchPolicy {
+            max_inputs: 1,
+            max_bytes: 512
+        }
+    );
+}
+
+#[test]
+fn query_observer_error_is_explicit_and_stops_before_the_next_request() {
+    let (endpoint, worker) = server(sequence(vec![vec![1.0, 0.0]]));
+    let client = forge::embedding::Client::new(config(endpoint)).unwrap();
+    let mut seen = Vec::new();
+    let result = query_embedding::queries(
+        &client,
+        &["first", "second"],
+        BatchPolicy {
+            max_inputs: 1,
+            max_bytes: 512,
+        },
+        std::time::Instant::now() + std::time::Duration::from_secs(10),
+        |p| {
+            seen.push(p);
+            anyhow::ensure!(p.batches == 0, "query preparation journal failed");
+            Ok(())
+        },
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("query preparation journal failed"));
+    assert_eq!(worker.join().unwrap().len(), 3);
+    assert_eq!(seen.len(), 2);
+    assert_eq!(
+        (seen[1].rows, seen[1].batches, seen[1].input_tokens_total),
+        (1, 1, 10)
+    );
 }

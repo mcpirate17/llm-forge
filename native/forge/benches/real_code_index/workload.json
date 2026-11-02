@@ -1,5 +1,5 @@
 {
-  "revision": "bbe78a53e2363d7190a5dbc45e8522fbb55a005b",
+  "revision": "674d258ad2dc9653b883a2923f40932178a49798+embedding-batch-controls-v2",
   "files": {
     "native/conductor-native/src/syntax.rs": "f162fc5aea73745aa03dddec4ef931be7191505c0d5b3d4e25aa8c66399f9617",
     "native/conductor-native/src/vector_index/search.rs": "a9bb89afb365dcef33730aef98040d778ecba45f8062774ebf0badd7e841f796",
@@ -9,7 +9,7 @@
     "native/forge/src/candidate_review_receipt.rs": "851decf94c3d7479884f134a82fc1fdaa0e29d5e6a7f0aad5938c17b71610130",
     "native/forge/src/candidate_test_selection.rs": "ab944a932ccbe1c03671b483c046b038b1dbaf1e2533a350f58053598466323e",
     "native/forge/src/cgroup.rs": "6c8ceaaf07fc4c17895d3e522086243f84640e329719f388a9d3f566ebf7769b",
-    "native/forge/src/code_index/extract.rs": "c6218e1b7641a2f31e582dc11f89b64f3bd89a55b7203fc99ac085301ab6740a",
+    "native/forge/src/code_index/extract.rs": "a30187c3822f3c51a6acd901b31d12bb615e59d8556cd18ea93ef31af8da8c98",
     "native/forge/src/code_index/search.rs": "c6552ec0ec1052e753e55238b1d2560858b1f14db740992328dd796c5dfce795",
     "native/forge/src/code_index/store.rs": "0dee7dd4c5294ae700f2f9049a261eb14e7e2324300e0a4f3938a7c0926f2dde",
     "native/forge/src/code_tools.rs": "9e7a14e1cdcd3120b63eebd0c2c4cfa37f9c6467511c076501b54d678a761efb",
@@ -179,15 +179,15 @@
         {
           "path": "native/forge/src/code_index/extract.rs",
           "symbol": "plan",
-          "line_start": 60,
-          "line_end": 170,
+          "line_start": 99,
+          "line_end": 209,
           "reason": "Plans bounded chunks with source hashes and syntax-aware boundaries."
         },
         {
           "path": "native/forge/src/code_index/extract.rs",
           "symbol": "refresh",
-          "line_start": 172,
-          "line_end": 315,
+          "line_start": 211,
+          "line_end": 385,
           "reason": "Coordinates embedding, source rechecks and index publication."
         }
       ]

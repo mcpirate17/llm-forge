@@ -1,6 +1,8 @@
 //! Opt-in, bounded real-source benchmark; never contacts a model without --run.
 #[path = "real_code_index/metrics.rs"]
 mod metrics;
+#[path = "real_code_index/embedding.rs"]
+mod query_embedding;
 use anyhow::{ensure, Context, Result};
 use conductor_native::vector_index::{Query, QueryWorkspace, Snapshot};
 use forge::{
@@ -35,6 +37,8 @@ struct Recipe {
     #[serde(default = "default_deadline")]
     deadline_seconds: u64,
     chunk_bytes: usize,
+    #[serde(default)]
+    batch: extract::BatchPolicy,
 }
 fn default_deadline() -> u64 {
     600
@@ -111,6 +115,7 @@ fn validate_recipe(recipe: &Recipe) -> Result<()> {
         (128..=16384).contains(&recipe.chunk_bytes),
         "invalid chunk byte limit"
     );
+    recipe.batch.validate(recipe.chunk_bytes)?;
     metrics::validated_index_path(&recipe.source_root, &recipe.index)?;
     Ok(())
 }
@@ -526,6 +531,35 @@ fn prepare(
     };
     Ok((bench, coverage, selection, snapshot, options))
 }
+fn refresh_index(
+    bench: &Bench,
+    recipe: &Recipe,
+    options: extract::Options,
+    deadline: Instant,
+) -> Result<extract::RefreshReport> {
+    extract::refresh_with_progress(
+        &bench.store,
+        &bench.root,
+        extract::Refresh {
+            sources: options,
+            batch: recipe.batch,
+            embedding: recipe.embedding.clone(),
+            graph: Default::default(),
+            deadline_seconds: recipe
+                .deadline_seconds
+                .min(deadline.saturating_duration_since(Instant::now()).as_secs()),
+        },
+        |progress| {
+            let mut journal = std::io::stderr().lock();
+            serde_json::to_writer(
+                &mut journal,
+                &json!({"event":"refresh_progress", "preparation":progress}),
+            )?;
+            writeln!(journal)?;
+            Ok(())
+        },
+    )
+}
 fn run(recipe: Recipe, recipe_hash: &str, execute: bool) -> Result<bool> {
     validate_recipe(&recipe)?;
     let started = Instant::now();
@@ -539,7 +573,7 @@ fn run(recipe: Recipe, recipe_hash: &str, execute: bool) -> Result<bool> {
             json!({"status":"planned","measurement_performed":false,
             "recipe_sha256":recipe_hash,"workload_sha256":hash(work_text.as_bytes()),
             "benchmark_binary_sha256":executable_hash()?,"coverage":coverage,
-            "selection":selection,"index":bench.store.root(),
+            "selection":selection,"index":bench.store.root(),"batch_policy":recipe.batch,
             "frozen_source_manifest_sha256":hash(&snapshot),"requested_queries":24,
             "requested_retrievals":144,"counts":totals()})
         );
@@ -547,18 +581,7 @@ fn run(recipe: Recipe, recipe_hash: &str, execute: bool) -> Result<bool> {
     }
     let client = embedding::Client::new(recipe.embedding.clone())?;
     let refresh_start = Instant::now();
-    let refresh = extract::refresh(
-        &bench.store,
-        &bench.root,
-        extract::Refresh {
-            sources: options,
-            embedding: recipe.embedding.clone(),
-            graph: Default::default(),
-            deadline_seconds: recipe
-                .deadline_seconds
-                .min(deadline.saturating_duration_since(Instant::now()).as_secs()),
-        },
-    )?;
+    let refresh = refresh_index(&bench, &recipe, options, deadline)?;
     let refresh_ms = refresh_start.elapsed().as_secs_f64() * 1e3;
     ensure!(
         Instant::now() < deadline,
@@ -573,7 +596,16 @@ fn run(recipe: Recipe, recipe_hash: &str, execute: bool) -> Result<bool> {
         .iter()
         .map(|q| q.query.as_str())
         .collect();
-    let batch = client.embed_batch(&texts, deadline)?;
+    let (batch, query_batches) =
+        query_embedding::queries(&client, &texts, recipe.batch, deadline, |progress| {
+            let mut journal = std::io::stderr().lock();
+            serde_json::to_writer(
+                &mut journal,
+                &json!({"event":"query_preparation_progress", "preparation":progress}),
+            )?;
+            writeln!(journal)?;
+            Ok(())
+        })?;
     ensure!(batch.vectors.len() == 24, "missing query embeddings");
     let embedding_ms = query_start.elapsed().as_secs_f64() * 1e3;
     ensure!(
@@ -592,9 +624,9 @@ fn run(recipe: Recipe, recipe_hash: &str, execute: bool) -> Result<bool> {
         "{}",
         json!({"workload":"frozen_real_code_retrieval_v1","workload_sha256":hash(work_text.as_bytes()),
         "label_revision":bench.workload.revision,"recipe_sha256":recipe_hash,"embedding_recipe":recipe.embedding,
-        "benchmark_binary_sha256":executable_hash()?,
+        "benchmark_binary_sha256":executable_hash()?,"batch_policy":recipe.batch,
         "coverage":coverage,"selection":selection,"frozen_source_manifest_sha256":hash(&snapshot),"refresh":refresh,"refresh_ms":refresh_ms,"query_embedding_ms":embedding_ms,
-        "query_input_tokens":batch.input_tokens_total,"queries":24,"top_k":K,"candidates":64,"ef":256,
+        "query_embedding_batches":query_batches,"query_input_tokens":batch.input_tokens_total,"queries":24,"top_k":K,"candidates":64,"ef":256,
         "vector_hnsw_recall":recall,"measurements":measurements,"counts":totals(),
         "overall_budget_status":if Instant::now()<deadline {"within_deadline"} else {"censored_overrun"},
         "process_memory":rss()?,"elapsed_ms":started.elapsed().as_secs_f64()*1e3,
@@ -617,11 +649,9 @@ fn main() -> Result<()> {
         "opt-in: real_code_index --plan|--run /absolute/recipe.json"
     );
     let raw = bounded(Path::new(&args[1]), 65536)?;
-    match run(
-        serde_json::from_slice(&raw)?,
-        &hash(&raw),
-        args[0] == "--run",
-    ) {
+    let recipe: Recipe = serde_json::from_slice(&raw)?;
+    let batch_policy = recipe.batch;
+    match run(recipe, &hash(&raw), args[0] == "--run") {
         Ok(true) => Ok(()),
         Ok(false) => {
             anyhow::bail!("benchmark incomplete, censored, failed, or outside its deadline")
@@ -630,7 +660,7 @@ fn main() -> Result<()> {
             eprintln!(
                 "{}",
                 json!({"status":"failed","requested_queries":24,"requested_retrievals":144,
-                "counts":totals(),"error":format!("{error:#}")})
+                "counts":totals(),"batch_policy":batch_policy,"error":format!("{error:#}")})
             );
             Err(error)
         }
