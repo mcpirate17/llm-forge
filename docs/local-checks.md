@@ -13,8 +13,10 @@ make local-verify
 [`.forge/local-check.toml`](../.forge/local-check.toml): CPU and memory admission,
 an isolated native installation, relocated/installed executable smoke tests,
 and formatting, strict Clippy and release tests for the native libraries and CLI.
-Rust 1.98.0 is selected explicitly. CUDA is masked, Cargo uses at most two jobs,
-and each Rust test harness uses at most two concurrent tests. SQLite is bundled
+Rust 1.98.0 is selected explicitly. CUDA is masked, and Cargo workers are bounded
+by the effective base policy and admitted CPU/memory capacity (up to eight with
+the shipped policy). Each Rust test harness uses at most two concurrent tests,
+reduced further for a one-CPU check reservation. SQLite is bundled
 for the conductor and Forge builds. The initial install can fetch Cargo
 dependencies; subsequent checks use `--offline --locked`.
 
@@ -152,13 +154,42 @@ and incremental hashes; failure tails read at most 64 KiB. Maximum RSS is the
 largest measured process, not simultaneous process-tree memory. See
 [performance.md](performance.md) for numerical benchmarks and optional profilers.
 
-Checks run serially by default. `forge check --all --jobs 2` allows independent
-checks to overlap within a two-CPU budget. Policy `[schedule.<check-name>]`
-entries declare `cpus`, `resources` and `depends_on`. Unspecified checks reserve
-both CPUs and `shared-environment`; setup always runs serially. Overlapping
-resource names prevent concurrency. Unknown dependencies, cycles and impossible
-CPU requests fail before execution. A failed prerequisite skips dependents and
-prevents a blocking PASS.
+Checks run serially by default. `forge check --all --jobs 2` permits at most two
+independent checks; it does not select Cargo compiler workers or test threads.
+The effective base policy's existing `CARGO_BUILD_JOBS` is the maximum compiler
+worker count (positive decimal 1–64, absent defaults to 2). The shipped policy
+requests up to eight. For maxima above two, native resource admission selects
+at most the floored effective CPU capacity and one worker per 4096 MiB currently
+available host/cgroup RAM, retaining the existing two-CPU/8192-MiB baseline.
+Maxima one/two retain the legacy fixed plan and setup admission without a new
+host probe. `RUST_TEST_THREADS` remains at most two under the shipped policy; an explicit
+one-CPU check receives one test thread. Shipping
+release optimization, thin LTO, codegen settings and check obligations are unchanged.
+
+Policy `[schedule.<check-name>]` entries declare `cpus`, `resources` and
+`depends_on`. Omitted CPU reservations take the whole admitted pool (at least
+two CPUs for the test-thread baseline) plus the existing default
+`shared-environment` resource; setup remains serial. Explicit CPU reservations
+are exact: requests beyond policy authority or observed admission refuse before
+setup. Each check's Cargo workers and test-thread count are capped to its CPU
+reservation. Both settings use bounded positive decimal values and reject
+duplicate owned environment entries. Overlapping
+resource names prevent concurrency, and summed reservations cannot exceed the
+admitted pool. Unknown dependencies/cycles still fail before execution; a failed
+prerequisite skips dependents and prevents a blocking PASS.
+
+The selected worker count is passed consistently through Cargo and Make;
+standalone Make defaults to `CARGO_BUILD_JOBS=2` and `RUST_TEST_THREADS=2`,
+and honors the selected/inherited values instead of overriding one-CPU caps.
+`build-resources.json` beside the receipt records the requested/selected values
+and optional resource observation. Its path and digest are printed, but it is
+supplementary advisory metadata, not new approval authority or a verified
+measurement receipt. Existing policy/source/step/log binding remains unchanged.
+Admission observes availability; it neither reserves resources nor imposes OS
+quotas. The authoritative base policy still wins over a changed HEAD policy or
+inherited worker setting, so an unlanded policy edit cannot authorize its own
+higher worker count. The separate scheduled sweep retains its existing resource
+and two-worker policy.
 
 The optional [sweep policy](../.forge/sweep.toml) runs native checks, installs
 into a fresh prefix, exercises the installed binary, and audits all three Cargo

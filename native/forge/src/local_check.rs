@@ -22,6 +22,8 @@ const DEFAULT_BASE_REF: &str = "origin/main";
 #[path = "local_check_preview.rs"]
 mod preview_command;
 pub use preview_command::{preview, PreviewArgs};
+#[path = "local_check_resources.rs"]
+mod build_resources;
 #[path = "local_check_schedule.rs"]
 mod schedule;
 
@@ -33,7 +35,7 @@ pub struct CheckArgs {
     /// Override the policy's local target ref (for offline or test use).
     #[arg(long)]
     pub base_ref: Option<String>,
-    /// Maximum concurrent checks; named resources and a 2-CPU budget still apply.
+    /// Maximum concurrent checks; named resources and the admitted build CPU budget still apply.
     #[arg(long, default_value_t = 1)]
     pub jobs: usize,
 }
@@ -101,6 +103,8 @@ impl Policy {
                 bail!("path_prepend must stay inside the checkout: {dir}");
             }
         }
+        build_resources::maximum(&policy.env)?;
+        build_resources::test_threads(&policy.env)?;
         schedule::validate(&policy)?;
         Ok(policy)
     }
@@ -475,7 +479,27 @@ fn execute(
     let changed_py = dir.join("changed-python.txt");
     let python_bytes = changed_python(root, &source.merge_base)?;
     fs::write(&changed_py, &python_bytes)?;
-    let env = environment(root, policy, source, &changed, &changed_py, all)?;
+    let resources = build_resources::admit(build_resources::maximum(&policy.env)?)?;
+    schedule::validate_capacity(policy, resources.cpu_budget)?;
+    let bytes = serde_json::to_vec_pretty(&resources)?;
+    evidence::write_atomic(&dir.join("build-resources.json"), &bytes)?;
+    println!(
+        "forge check: build maximum={} workers={} CPU budget={} advisory={} sha256={}",
+        resources.maximum,
+        resources.workers,
+        resources.cpu_budget,
+        dir.join("build-resources.json").display(),
+        evidence::sha256(&bytes)
+    );
+    let mut env = build_resources::cap_environment(
+        &environment(root, policy, source, &changed, &changed_py, all)?,
+        resources.cpu_budget,
+    )?;
+    env.retain(|(key, _)| key != "FORGE_CHECK_CPU_BUDGET");
+    env.push((
+        "FORGE_CHECK_CPU_BUDGET".into(),
+        resources.cpu_budget.to_string(),
+    ));
     let mut records = Vec::new();
     let mut setup_ok = true;
     for step in &policy.setup {
@@ -499,6 +523,7 @@ fn execute(
         env: &env,
         dir,
         jobs,
+        cpu_budget: resources.cpu_budget,
     })?);
     if fs::read(&changed)? != changed_bytes || fs::read(&changed_py)? != python_bytes {
         bail!("changed-path input files changed during local checks");

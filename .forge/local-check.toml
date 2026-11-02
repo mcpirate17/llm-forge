@@ -8,14 +8,14 @@ resources = []
 
 [env]
 CUDA_VISIBLE_DEVICES = ""
-CARGO_BUILD_JOBS = "2"
+CARGO_BUILD_JOBS = "8"
 RUST_TEST_THREADS = "2"
 RUSTUP_TOOLCHAIN = "1.98.0"
 PYO3_PYTHON = "/nonexistent/forbidden-python"
 
 [[setup]]
 name = "resource-preflight"
-run = '"$FORGE_CHECK_BIN" task resources --cpus 2 --memory-mib 8192'
+run = '"$FORGE_CHECK_BIN" task resources --cpus "$FORGE_CHECK_CPU_BUDGET" --memory-mib "$FORGE_CHECK_BUILD_MEMORY_MIB"'
 timeout_s = 30
 
 [[setup]]
@@ -31,7 +31,7 @@ timeout_s = 30
 [[check]]
 name = "installed-runtime"
 paths = ['^native/', '^Makefile$', '^\.forge/']
-run = 'cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --test install_packaging -- --include-ignored'
+run = 'cargo +1.98.0 test --release --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/forge/Cargo.toml --test install_packaging -- --include-ignored'
 timeout_s = 900
 
 [[check]]
@@ -43,13 +43,13 @@ timeout_s = 60
 [[check]]
 name = "rust-forge-clippy"
 paths = ['^native/', '^\.forge/', '^Makefile$']
-run = 'cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --all-targets -- -D warnings'
+run = 'cargo +1.98.0 clippy --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/forge/Cargo.toml --all-targets -- -D warnings'
 timeout_s = 1800
 
 [[check]]
 name = "rust-forge-tests"
 paths = ['^native/', '^\.forge/', '^Makefile$', '^ledger/']
-run = 'cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml'
+run = 'cargo +1.98.0 test --release --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/forge/Cargo.toml'
 timeout_s = 2400
 
 [[check]]
@@ -61,13 +61,13 @@ timeout_s = 60
 [[check]]
 name = "rust-conductor-clippy"
 paths = ['^native/conductor-native/', '^\.forge/']
-run = 'cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --all-targets --features bundled-sqlite,contract-registry -- -D warnings'
+run = 'cargo +1.98.0 clippy --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/conductor-native/Cargo.toml --all-targets --features bundled-sqlite,contract-registry -- -D warnings'
 timeout_s = 1800
 
 [[check]]
 name = "rust-conductor-tests"
 paths = ['^native/conductor-native/', '^\.forge/']
-run = 'cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite'
+run = 'cargo +1.98.0 test --release --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite'
 timeout_s = 2400
 
 [[check]]
@@ -85,11 +85,11 @@ timeout_s = 60
 [[check]]
 name = "rust-slop-clippy"
 paths = ['^native/slop-core/', '^\.forge/']
-run = 'cargo +1.98.0 clippy --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml --all-targets -- -D warnings'
+run = 'cargo +1.98.0 clippy --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/slop-core/Cargo.toml --all-targets -- -D warnings'
 timeout_s = 1800
 
 [[check]]
 name = "rust-slop-tests"
 paths = ['^native/slop-core/', '^\.forge/']
-run = 'cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml'
+run = 'cargo +1.98.0 test --release --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/slop-core/Cargo.toml'
 timeout_s = 1800

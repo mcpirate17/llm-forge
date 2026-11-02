@@ -60,38 +60,40 @@ INSTALL_ROOT ?= $(CURDIR)/target/install
 FORGE_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/forge/target)
 # Keep the registry feature matrix out of the default cdylib/rlib output paths.
 CONTRACT_REGISTRY_TARGET_ROOT = $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(CURDIR)/native/conductor-native/target)/contract-registry
-NATIVE_ENV = CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 RUSTUP_TOOLCHAIN=1.98.0 PYO3_PYTHON=/nonexistent/forbidden-python
+CARGO_BUILD_JOBS ?= 2
+RUST_TEST_THREADS ?= 2
+NATIVE_ENV = CUDA_VISIBLE_DEVICES= CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUST_TEST_THREADS="$(RUST_TEST_THREADS)" RUSTUP_TOOLCHAIN=1.98.0 PYO3_PYTHON=/nonexistent/forbidden-python
 
 build:  ## Build the release executable and its native core libraries
-	$(NATIVE_ENV) cargo +1.98.0 build --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --bin forge --target-dir "$(FORGE_TARGET_ROOT)"
+	$(NATIVE_ENV) cargo +1.98.0 build --release --locked --jobs "$(CARGO_BUILD_JOBS)" --manifest-path native/forge/Cargo.toml --bin forge --target-dir "$(FORGE_TARGET_ROOT)"
 
 install:  ## Install the native executable into INSTALL_ROOT (default target/install)
-	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge-cli --bin forge --locked --jobs 2 --force --root "$(INSTALL_ROOT)" --target-dir "$(FORGE_TARGET_ROOT)"
+	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge-cli --bin forge --locked --jobs "$(CARGO_BUILD_JOBS)" --force --root "$(INSTALL_ROOT)" --target-dir "$(FORGE_TARGET_ROOT)"
 
 test-install: build
-	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge-cli --bin forge --locked --jobs 2 --force --root "$(FORGE_TARGET_ROOT)/test-install" --target-dir "$(FORGE_TARGET_ROOT)"
+	$(NATIVE_ENV) cargo +1.98.0 install --path native/forge-cli --bin forge --locked --jobs "$(CARGO_BUILD_JOBS)" --force --root "$(FORGE_TARGET_ROOT)/test-install" --target-dir "$(FORGE_TARGET_ROOT)"
 
 test: test-install  ## Run all default native release tests without interpreter discovery
-	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite
+	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs "$(CARGO_BUILD_JOBS)" --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite
 	$(MAKE) test-contract-registry
-	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/slop-core/Cargo.toml
-	$(NATIVE_ENV) FORGE_TEST_BIN="$$(cd "$(FORGE_TARGET_ROOT)/test-install" && pwd -P)/bin/forge" cargo +1.98.0 test --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --target-dir "$(FORGE_TARGET_ROOT)"
+	$(NATIVE_ENV) cargo +1.98.0 test --release --locked --jobs "$(CARGO_BUILD_JOBS)" --manifest-path native/slop-core/Cargo.toml
+	$(NATIVE_ENV) FORGE_TEST_BIN="$$(cd "$(FORGE_TARGET_ROOT)/test-install" && pwd -P)/bin/forge" cargo +1.98.0 test --release --locked --jobs "$(CARGO_BUILD_JOBS)" --manifest-path native/forge/Cargo.toml --target-dir "$(FORGE_TARGET_ROOT)"
 
 # This native feature matrix retains all 33 discovery cases and the library's
 # Slop-consumer registry assertion; it never enables python/python-compat-tests.
 test-contract-registry:  ## Check embedded contract discovery without Python
-	$(NATIVE_ENV) cargo +1.98.0 test --release --offline --locked --jobs 2 --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite,contract-registry --lib --test python_contracts_discovery --target-dir "$(CONTRACT_REGISTRY_TARGET_ROOT)"
+	$(NATIVE_ENV) cargo +1.98.0 test --release --offline --locked --jobs "$(CARGO_BUILD_JOBS)" --manifest-path native/conductor-native/Cargo.toml --features bundled-sqlite,contract-registry --lib --test python_contracts_discovery --target-dir "$(CONTRACT_REGISTRY_TARGET_ROOT)"
 
 native: build  ## Build native Forge; test fixtures compile natively on demand
 
 local-preview:  ## Plan dirty-source tests; LOCAL_PREVIEW_ARGS='--execute' runs isolated targets
-	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- preview $(LOCAL_PREVIEW_ARGS)
+	CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- preview $(LOCAL_PREVIEW_ARGS)
 
 local-check:  ## Check the committed checkout before opening or merging a PR (full by default)
-	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- check $(LOCAL_CHECK_ARGS)
+	CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- check $(LOCAL_CHECK_ARGS)
 
 local-verify:  ## Revalidate the latest source-bound full local-check receipt
-	CARGO_BUILD_JOBS=2 cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- verify --require-all
+	CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" cargo +1.98.0 run --offline --locked --manifest-path native/forge/Cargo.toml -- verify --require-all
 
 gate:  ## The governance gate: config self-check plus the CI-identical review
 	@test -n "$(CONDUCTOR_REVIEW_GRANTS)" -a -n "$(CONDUCTOR_MUTATION_GIT)" -a -n "$(CONDUCTOR_MUTATION_GIT_SHA256)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE)" -a -n "$(CONDUCTOR_MUTATION_GIT_BUILD_PROFILE_SHA256)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_BUNDLE)" -a -n "$(CONDUCTOR_MUTATION_RUNNER_SHA256)" || { echo "Set operator review grants and pinned Git, Git build profile and mutation runner bundle paths and SHA-256 values"; exit 2; }

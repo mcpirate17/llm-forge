@@ -212,3 +212,26 @@ fn launch_clean_observer() {
     assert!(observed.contains("clean-build-environment-observed"));
     println!("clean-build-environment-observed");
 }
+
+#[test]
+fn old_policy_defaults_and_shipped_build_budget_preserve_test_parallelism() {
+    let old = Policy::parse(POLICY).unwrap();
+    assert_eq!(build_resources::maximum(&old.env).unwrap(), 2);
+    let old_plan = build_resources::legacy(2).unwrap();
+    assert_eq!(old_plan.cpu_budget, 2);
+    assert!(old_plan.snapshot.is_none());
+    let shipped = Policy::parse(include_str!("../../../.forge/local-check.toml")).unwrap();
+    assert_eq!(build_resources::maximum(&shipped.env).unwrap(), 8);
+    assert_eq!(shipped.env["RUST_TEST_THREADS"], "2");
+    for step in shipped.setup.iter().chain(&shipped.checks) {
+        assert!(
+            !step.run.contains("--jobs 2"),
+            "literal jobs override in {}",
+            step.name
+        );
+    }
+    for value in ["0", "-1", "unlimited", "65"] {
+        let changed = format!("{}\n[env]\nCARGO_BUILD_JOBS={value:?}\n", POLICY);
+        assert!(Policy::parse(&changed).is_err());
+    }
+}
