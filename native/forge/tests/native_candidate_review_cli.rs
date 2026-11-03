@@ -239,3 +239,27 @@ fn review_exports_require_execution_and_refuse_colliding_destinations_before_wri
         b"preserve this old artifact"
     );
 }
+
+#[test]
+fn admission_refusal_does_not_publish_or_replace_review_artifacts() {
+    let case = fixture();
+    case.staged_policy(|_| "not valid TOML = [".into());
+    let receipt = case.fixture.root.join("review.json");
+    let sarif = case.fixture.root.join("review.sarif");
+    let junit = case.fixture.root.join("review.xml");
+    std::fs::write(&receipt, b"previous artifact").unwrap();
+    let mut command = case.command_for("review", "index", &[]);
+    command
+        .args(["--surface", "manual", "--execute", "--receipt"])
+        .arg(&receipt)
+        .arg("--sarif-out")
+        .arg(&sarif)
+        .arg("--junit-out")
+        .arg(&junit);
+    let result =
+        forge::process_probe::run(&mut command, Duration::from_secs(20), 1024 * 1024).unwrap();
+    assert!(!result.status.success());
+    assert_eq!(std::fs::read(receipt).unwrap(), b"previous artifact");
+    assert!(!sarif.exists());
+    assert!(!junit.exists());
+}

@@ -144,7 +144,7 @@ mod test_record_state;
 mod test_record_store;
 #[cfg(feature = "source-analysis")]
 #[cfg_attr(not(feature = "python"), allow(dead_code))]
-mod test_record_untested;
+pub mod test_record_untested;
 mod text_normalization;
 #[cfg(feature = "python")]
 mod tooling_boundary;

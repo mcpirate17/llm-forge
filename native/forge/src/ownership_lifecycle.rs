@@ -91,6 +91,15 @@ fn fields(claim: &OwnershipClaim) -> Value {
 pub fn stored_claim(claim: &OwnershipClaim) -> Value {
     fields(claim)
 }
+/// Legacy claim report includes an explicit null for an absent estimate; the
+/// on-disk representation deliberately omits it and remains unchanged.
+pub fn reported_claim(claim: &OwnershipClaim) -> Value {
+    let mut value = fields(claim);
+    if claim.expected_at.is_none() {
+        value["expected_at"] = Value::Null;
+    }
+    value
+}
 fn publish(repo: &Path, claims: &[OwnershipClaim]) -> Result<()> {
     let path = ownership::checked_claim_path(repo, "ownership-claims.json")?
         .context("repository has no Git common directory")?;

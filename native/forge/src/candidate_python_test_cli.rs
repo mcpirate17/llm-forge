@@ -35,6 +35,11 @@ pub struct PythonTestArgs {
     bindings: Vec<String>,
     #[arg(long)]
     coverage: bool,
+    /// Supervised parent requests the existing recorder's per-shard private artifact.
+    #[arg(long, requires = "coverage")]
+    record_owned: bool,
+    #[arg(long, requires = "record_owned")]
+    record_config: Option<String>,
     #[arg(long)]
     execute: bool,
     #[arg(long, conflicts_with = "execute")]
@@ -93,6 +98,23 @@ fn admit(args: &PythonTestArgs) -> Result<Inputs> {
         !args.tests.is_empty() && args.tests.len() <= 4096 && args.bindings.len() <= 4096,
         "invalid Python test selection count"
     );
+    if args.record_owned {
+        let config = args
+            .record_config
+            .as_ref()
+            .context("owned record config required")?;
+        ensure!(
+            args.bindings.contains(config),
+            "owned record config must be bound"
+        );
+        crate::candidate_source::safe_path(config.as_bytes())?;
+        ensure!(
+            std::path::Path::new(config)
+                .file_name()
+                .is_some_and(|n| n == "pyproject.toml"),
+            "invalid recorder configuration"
+        );
+    }
     let root = args.repo.canonicalize()?;
     let (source, _, binding) = Source::tool_context(&root, &args.base, &args.tree)?;
     let entries: BTreeMap<_, _> = source
@@ -183,6 +205,31 @@ fn run_shard(args: &PythonTestArgs) -> Result<()> {
         file.sync_all()?;
     }
     let mut cmd = command(args);
+    // Host environment cannot choose a store for the supervised shard.
+    cmd.env_remove("FORGE_TEST_RECORD_ROOT")
+        .env_remove("FORGE_TEST_RECORD_CONFIG")
+        .env_remove("FORGE_TEST_RECORD_STORE")
+        .env_remove("FORGE_TEST_RECORD_REUSE")
+        .env_remove("FORGE_TEST_RECORD_REUSE_REPORT");
+    if args.record_owned {
+        cmd.env("FORGE_TEST_RECORD", "1")
+            .env("FORGE_TEST_RECORD_ROOT", &args.repo)
+            .env(
+                "FORGE_TEST_RECORD_CONFIG",
+                args.repo.join(
+                    args.record_config
+                        .as_ref()
+                        .context("owned record config required")?,
+                ),
+            )
+            .env(
+                "FORGE_TEST_RECORD_STORE",
+                runtime.join("test-record.sqlite"),
+            );
+    } else {
+        // Do not let a configured recorder write to a host-selected store.
+        cmd.env("FORGE_TEST_RECORD", "0");
+    }
     cmd.arg("-P");
     if args.coverage {
         cmd.arg(

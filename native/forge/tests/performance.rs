@@ -221,7 +221,7 @@ fn dirty_preview_only_plans_affected_targets_and_does_not_create_gate_state() {
 #[test]
 fn preview_reports_excluded_interpreter_contracts_and_keeps_native_dependents() {
     let root = fixture();
-    let path = "native/conductor-native/tests/python_contracts_candidate_cli.rs";
+    let path = "native/conductor-native/tests/python_contracts_gate_rollout.rs";
     let run = forge(&root, &["preview", "--path", path]);
     assert!(
         run.status.success(),
@@ -246,7 +246,7 @@ fn preview_reports_excluded_interpreter_contracts_and_keeps_native_dependents() 
             .as_array()
             .unwrap()
             .iter()
-            .any(|v| v == "python_contracts_candidate_cli"));
+            .any(|v| v == "python_contracts_gate_rollout"));
     }
     let native = forge(
         &root,
@@ -259,15 +259,13 @@ fn preview_reports_excluded_interpreter_contracts_and_keeps_native_dependents() 
     assert!(native.status.success());
     let plan: Value = serde_json::from_slice(&native.stdout).unwrap();
     assert_eq!(plan["excluded_compatibility_tests"], serde_json::json!([]));
-    assert!(plan["targets"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|row| row["selector"]
+    assert!(plan["targets"].as_array().unwrap().iter().any(|row| {
+        row["selector"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|v| v == "python_contracts_discovery")));
+            .any(|v| v == "python_contracts_discovery")
+    }));
     assert!(!root.join(".git/forge-previews").exists());
     fs::remove_dir_all(root).unwrap();
 }

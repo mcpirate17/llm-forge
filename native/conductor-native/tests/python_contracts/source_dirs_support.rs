@@ -4,7 +4,7 @@
 use super::support::{module, AttrPatch, Case};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub const HOST_PYPROJECT: &str =
@@ -32,7 +32,7 @@ pub fn targets_main_scans(
     py: Python<'_>,
     module_name: &str,
     scan: &str,
-    root: &PathBuf,
+    root: &Path,
 ) -> Vec<String> {
     let probe = PyModule::from_code(
         py,

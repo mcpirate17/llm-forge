@@ -6,7 +6,7 @@ chronological implementation log; detailed contracts and historical receipts
 belong in the linked documents.
 
 The native migration remains active. The current live `src/` inventory
-contains 107 Python source files, including fixtures under
+contains 86 Python source files, including fixtures under
 `src/conductor/testdata/`; this is not a count of remaining production cores.
 The integration baseline before the native review batch was `838474b`;
 validation scope is summarized under Evidence below.
@@ -268,9 +268,17 @@ read-only source access, bound hierarchical configuration and exact bounded
 output. All filters must succeed before native validated edits are published.
 Publication uses one cooperating-writer lock, retained Git recovery blobs and
 sequential renames with guarded rollback; it is not filesystem-wide atomic
-visibility. The displaced Python fix subcommand is removed, while other Python
-candidate-review callers remain. See
+visibility. The displaced Python fix subcommand is removed. The Python review
+entry point and execution graph are also retired; ownership, identity, Git/model
+and Vulture helpers still serve other interpreted callers. See
 [native candidate fixes](docs/native-candidate-fix.md).
+
+Targeted full review captures each enabled shard's private recorder database after
+verified child cleanup. The nearest captured configuration governs each test;
+all shards use candidate-root source paths. Native evaluation matches source
+blobs and intersects missed functions across fixture/test windows, with bounded
+SQLite queries and decompression. Missing or disabled recording is explicitly
+not evaluated. See [review retirement](docs/native-review-cli-retirement.md).
 
 ### Commit recovery
 
@@ -366,7 +374,7 @@ latency claim is supported.
 
 ## Remaining migration
 
-The native migration remains open. The live source inventory is 107 Python
+The native migration remains open. The live source inventory is 86 Python
 files under `src/`, including testdata fixtures; that count says nothing by
 itself about reachability,
 behavioral coverage or runtime usage. Remaining work is tracked by live

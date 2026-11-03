@@ -31,7 +31,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -366,19 +366,14 @@ def _git_in_quiet(repo: Path, *args: str) -> str:
 
 
 def _claim_store() -> list[dict[str, object]]:
-    """Every claim the store holds. Both claim checks read the same query.
-
-    Used to answer by spawning ``.venv/bin/python -m conductor.candidate_review.cli
-    claims`` with ``cwd=ROOT``: a second interpreter per query, and once the
-    package lived under ``src/`` a relative ``.venv/bin/python`` resolved
-    against ``src/`` and the query stopped working at all. The CLI's own rows --
-    ``load_claims`` serialized exactly as its ``claims`` command prints them --
-    answer in-process with no subprocess.
-    """
-    from conductor.candidate_review.cli import _stored_fields
-
+    """Read validated claims in process and omit the activity sidecar field."""
     claims, _digest = load_claims(ROOT)
-    return [_stored_fields(claim) for claim in claims]
+    rows = []
+    for claim in claims:
+        row = asdict(claim)
+        row.pop("last_seen", None)
+        rows.append(row)
+    return rows
 
 
 def expired_claims() -> list[dict[str, str]]:

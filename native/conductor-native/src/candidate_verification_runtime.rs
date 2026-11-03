@@ -15,8 +15,6 @@ const SLOP_CONSUMERS: &[&str] = &[
     "python_contracts_native_ablations",
     "python_contracts_policy_engine_crash",
     "python_contracts_probe_budget",
-    "python_contracts_candidate_call_evidence",
-    "python_contracts_candidate_review_isolation",
     "python_contracts_equivalence_gate",
     "python_contracts_import_ablation",
     "python_contracts_reuse_inventory",

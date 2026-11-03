@@ -38,22 +38,6 @@ fn git(root: &Path, args: &[&str]) {
 }
 
 #[test]
-fn review_resolves_a_fragment_registered_campaign() {
-    let case = Case::new();
-    let manifest = format!("{CAMPAIGNS}/c.json");
-    fragment_only_registry(&case, CAMPAIGNS, &manifest);
-    case.write(&manifest, r#"{"campaign_id": "frag-only"}"#);
-    Python::attach(|py| {
-        let found = module(py, "conductor.candidate_review.verification")
-            .getattr("_manifest_for_campaign")
-            .unwrap()
-            .call1((path(py, case.root()), "frag-only"))
-            .unwrap();
-        assert_eq!(text(&found.get_item("campaign_id").unwrap()), "frag-only");
-    });
-}
-
-#[test]
 fn drift_scans_a_fragment_registered_campaign() {
     let case = Case::new();
     let manifest = format!("{CAMPAIGNS}/c.json");

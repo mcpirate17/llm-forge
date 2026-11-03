@@ -35,9 +35,8 @@ dependencies = [
   "pyyaml>=6.0",
   # conductor/candidate_review/vulture_audit.py shells out to the `vulture` binary
   # and raises VultureAuditError (fail-closed, not a skip) when it is missing from
-  # PATH. That module ships inside src/conductor and is reachable from the
-  # `candidate_review` console script, so vulture is a runtime dependency of the
-  # shipped package, not a CI-only tool -- KB-CI-01's exact shape.
+  # PATH. The retained vulture baseline command uses it, so vulture remains a
+  # runtime dependency of the shipped package.
   "vulture>=2.11",
 ]
 
@@ -58,7 +57,6 @@ graph = ["code-review-graph==2.3.8"]
 # conductor/_native.py, which decides its absence once at import time.
 
 [project.scripts]
-candidate_review = "conductor.candidate_review.cli:main"
 # The mutation front door is the automatic path. `mutation_testing` inspects and
 # verifies; it cannot run anything -- the hand runner was removed 2026-09-08.
 mutation_testing = "conductor.mutation_testing:main"

@@ -12,6 +12,8 @@ fn plan(full: bool) -> Plan {
         grants: "3".repeat(64),
         candidate: "4".repeat(64),
         full,
+        record_owned: false,
+        record_configs: vec![None],
         workers: 1,
         interpreter: "/operator/python".into(),
         pytest: "/operator/pytest".into(),
@@ -57,9 +59,10 @@ fn obs(
     artifact: Option<crate::candidate_stage_artifact::Artifact>,
 ) -> Observation {
     Observation {
-        data: json!({"scope":"captured_pytest_shard","index":0,"version":version,"candidate_sha256":plan.candidate,"tree":plan.tree,"policy_sha256":plan.policy,"grants_sha256":plan.grants,"interpreter":plan.interpreter,"pytest":plan.pytest,"coverage_tool":plan.coverage_tool,"tests":plan.shards[0],"bindings":plan.bindings,"full":plan.full,"snapshot_root":"/owned/one"}),
+        data: json!({"scope":"captured_pytest_shard","index":0,"version":version,"candidate_sha256":plan.candidate,"tree":plan.tree,"policy_sha256":plan.policy,"grants_sha256":plan.grants,"interpreter":plan.interpreter,"pytest":plan.pytest,"coverage_tool":plan.coverage_tool,"tests":plan.shards[0],"bindings":plan.bindings,"full":plan.full,"record_owned":plan.record_owned,"record_config":plan.record_configs[0],"snapshot_root":"/owned/one"}),
         report,
         artifact,
+        record: None,
     }
 }
 #[test]
@@ -99,7 +102,7 @@ fn captured_coverage_is_bound_and_failures_do_not_become_success() {
         sha256: format!("{:x}", Sha256::digest(&bytes)),
         bytes,
     };
-    let (findings, _, captured) = collect(
+    let (findings, _, captured, _) = collect(
         &p,
         "targeted-tests-full",
         vec![obs(
@@ -124,7 +127,7 @@ fn captured_coverage_is_bound_and_failures_do_not_become_success() {
         (Outcome::Exited, Some(0), false),
         (Outcome::Exited, Some(1), true),
     ] {
-        let (findings, _, _) = collect(
+        let (findings, _, _, _) = collect(
             &p,
             "targeted-tests-full",
             vec![obs(&p, false, report(outcome, code, clean), None)],
@@ -147,4 +150,152 @@ fn captured_coverage_is_bound_and_failures_do_not_become_success() {
         )]
     )
     .is_err());
+}
+
+#[test]
+fn configured_record_requires_every_successful_shard_and_digest_binding() {
+    let mut p = plan(true);
+    p.record_owned = true;
+    p.record_configs[0] = Some(RecordConfig {
+        path: "pyproject.toml".into(),
+        oid: "a".repeat(40),
+        lines: true,
+    });
+    let artifact = crate::candidate_stage_artifact::Artifact {
+        bytes: br#"{"files":{}}"#.to_vec(),
+        sha256: format!("{:x}", Sha256::digest(br#"{"files":{}}"#)),
+    };
+    let mut row = obs(
+        &p,
+        false,
+        report(Outcome::Exited, Some(0), true),
+        Some(artifact),
+    );
+    assert!(collect(&p, "targeted-tests-full", vec![row]).is_err());
+    let artifact = crate::candidate_stage_artifact::Artifact {
+        bytes: br#"{"files":{}}"#.to_vec(),
+        sha256: format!("{:x}", Sha256::digest(br#"{"files":{}}"#)),
+    };
+    row = obs(
+        &p,
+        false,
+        report(Outcome::Exited, Some(0), true),
+        Some(artifact),
+    );
+    row.record = Some(crate::candidate_stage_artifact::Artifact {
+        bytes: b"bytes".to_vec(),
+        sha256: "wrong".into(),
+    });
+    assert!(collect(&p, "targeted-tests-full", vec![row]).is_err());
+}
+
+#[test]
+fn complete_owned_shards_retain_both_record_artifacts() {
+    let mut p = plan(true);
+    p.record_owned = true;
+    p.record_configs[0] = Some(RecordConfig {
+        path: "pyproject.toml".into(),
+        oid: "a".repeat(40),
+        lines: true,
+    });
+    p.tests.push("tests/test_b.py".into());
+    p.shards.push(vec!["tests/test_b.py".into()]);
+    p.record_configs.push(p.record_configs[0].clone());
+    let make = |index: usize| {
+        let bytes = br#"{"files":{}}"#.to_vec();
+        let coverage = crate::candidate_stage_artifact::Artifact {
+            sha256: format!("{:x}", Sha256::digest(&bytes)),
+            bytes,
+        };
+        let mut value = obs(
+            &p,
+            false,
+            report(Outcome::Exited, Some(0), true),
+            Some(coverage),
+        );
+        value.data["index"] = json!(index);
+        value.data["tests"] = json!(p.shards[index]);
+        let bytes = format!("record-{index}").into_bytes();
+        value.record = Some(crate::candidate_stage_artifact::Artifact {
+            sha256: format!("{:x}", Sha256::digest(&bytes)),
+            bytes,
+        });
+        value
+    };
+    let (findings, rows, coverage, records) =
+        collect(&p, "targeted-tests-full", vec![make(1), make(0)]).unwrap();
+    assert!(findings.is_empty());
+    assert_eq!(rows.len(), 2);
+    assert_eq!(coverage.len(), 2);
+    assert_eq!(records.len(), 2);
+    assert!(rows.iter().all(|row| row["test_record_sha256"].is_string()));
+}
+
+#[test]
+fn function_is_untested_only_when_every_owned_shard_misses_it() {
+    let hit_in_first = ("a.py".into(), "first".into(), 1);
+    let hit_in_second = ("a.py".into(), "second".into(), 4);
+    let missed = ("a.py".into(), "missed".into(), 7);
+    let first = BTreeSet::from([hit_in_second.clone(), missed.clone()]);
+    let second = BTreeSet::from([hit_in_first, missed.clone()]);
+    assert_eq!(
+        intersect_missing(Some(first), second),
+        BTreeSet::from([missed])
+    );
+}
+
+#[test]
+fn root_recorder_setting_distinguishes_disabled_missing_and_malformed() {
+    assert_eq!(record_setting(b"[tool.other]\na=1\n").unwrap(), None);
+    assert_eq!(
+        record_setting(b"[tool.forge.test_record]\nstore='x'\n").unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        record_setting(b"[tool.forge.test_record]\nstore='x'\nlines=false\n").unwrap(),
+        Some(false)
+    );
+    assert!(record_setting(b"[tool.forge.test_record]\nlines=true\n").is_err());
+    assert!(record_setting(b"[tool.forge.test_record]\nstore='x'\nlines='yes'\n").is_err());
+}
+
+#[test]
+fn nearest_configs_partition_shards_without_dropping_disabled_or_unconfigured_tests() {
+    let root = RecordConfig {
+        path: "pyproject.toml".into(),
+        oid: "a".repeat(40),
+        lines: true,
+    };
+    let nested = RecordConfig {
+        path: "pkg/pyproject.toml".into(),
+        oid: "b".repeat(40),
+        lines: false,
+    };
+    let settings = BTreeMap::from([
+        (root.path.clone(), root.clone()),
+        (nested.path.clone(), nested.clone()),
+    ]);
+    let tests = vec![
+        "test_root.py".into(),
+        "pkg/test_a.py".into(),
+        "pkg/sub/test_b.py".into(),
+    ];
+    let (groups, configs) = group_record_shards(&tests, 1, &settings).unwrap();
+    assert_eq!(groups.len(), 3);
+    for (group, config) in groups.iter().zip(&configs) {
+        let expected = if group[0].starts_with("pkg/") {
+            &nested
+        } else {
+            &root
+        };
+        assert_eq!(config.as_ref(), Some(expected));
+    }
+    let (groups, configs) = group_record_shards(&tests, 10, &BTreeMap::new()).unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(configs, [None]);
+    let only_nested = BTreeMap::from([(nested.path.clone(), nested.clone())]);
+    let (groups, configs) = group_record_shards(&tests, 10, &only_nested).unwrap();
+    assert_eq!(groups.len(), 2);
+    assert!(configs.contains(&None));
+    assert!(configs.contains(&Some(nested)));
 }

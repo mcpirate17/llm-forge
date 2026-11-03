@@ -99,6 +99,11 @@ fn missing_graph_uses_full_candidate_inventory_and_held_files_detect_drift() {
     f.write("pkg/source.py", "value=1\n");
     f.write("tests/test_a.py", "def test_a(): pass\n");
     f.write("tests/test_b.py", "def test_b(): pass\n");
+    fs::write(
+        f.root.join("repo/tests/test_live_scratch.py"),
+        "def test_scratch(): pass\n",
+    )
+    .unwrap();
     let (source, snapshot, mut candidate, policy) = f.captured();
     candidate.changes.push(change("pkg/source.py", "low"));
     let selection = collect(&source, &snapshot, &candidate, &policy, "2026-11-01", None).unwrap();
@@ -343,4 +348,23 @@ fn public_selection_output_mutation_is_rejected_for_every_consumer() {
     assert!(selection
         .selected_evidence_paths(&source, &snapshot, &other, &policy)
         .is_err());
+}
+
+#[test]
+fn integration_test_file_is_selected_without_inline_test_marker() {
+    let f = Fixture::new();
+    f.write(
+        "crate/Cargo.toml",
+        "[package]\nname='fixture'\nversion='0.1.0'\n",
+    );
+    f.write("crate/src/lib.rs", "pub fn f() {}\n");
+    f.write("crate/tests/check.rs", "pub fn fixture() {}\n");
+    let (source, snapshot, mut candidate, policy) = f.captured();
+    candidate.changes.push(change("crate/src/lib.rs", "normal"));
+    let selection = collect(&source, &snapshot, &candidate, &policy, "2026-11-01", None).unwrap();
+    assert_eq!(
+        selection.native_tests["crate/src/lib.rs"],
+        json!(["crate/tests/check.rs"])
+    );
+    assert_eq!(selection.evidence["test_execution_verified"], false);
 }

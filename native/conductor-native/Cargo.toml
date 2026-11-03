@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.92"
+version = "0.1.93"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -153,23 +153,7 @@ name = "python_contracts_campaign_plan"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_candidate_call_evidence"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_cli"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_engine"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_candidate_files"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_performance"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -181,14 +165,6 @@ name = "python_contracts_candidate_policy_regressions"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_candidate_review_claims_view"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_review_evidence"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_candidate_review_flow_a"
 required-features = ["python-compat-tests"]
 
@@ -197,27 +173,7 @@ name = "python_contracts_candidate_review_flow_b"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_candidate_review_hardening"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_review_isolation"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_review_scan"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_review_waivers"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_candidate_runtime_a"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_candidate_runtime_b"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -249,10 +205,6 @@ name = "python_contracts_complete_scope_drift"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_contextual_mutation_evidence"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_contract_runner"
 required-features = ["python-compat-tests"]
 
@@ -281,10 +233,6 @@ name = "python_contracts_equivalence_probe"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_external_invariants"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_finding_attribution"
 required-features = ["python-compat-tests"]
 
@@ -294,14 +242,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_governance_identity"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_governance_lock"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_graph_selection"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -362,10 +302,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_mutation_engine_mull_run"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_mutation_gate_edges"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -473,10 +409,6 @@ name = "python_contracts_native_ablations"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_native_test_selection"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_ownership_claim_expiry"
 required-features = ["python-compat-tests"]
 
@@ -485,19 +417,11 @@ name = "python_contracts_policy_engine_crash"
 required-features = ["python-compat-tests"]
 
 [[test]]
-name = "python_contracts_policy_path"
-required-features = ["python-compat-tests"]
-
-[[test]]
 name = "python_contracts_probe_budget"
 required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_project_paths"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_receipt_scope"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -574,10 +498,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_uncurated_kill_rate"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_value_gate_scope"
 required-features = ["python-compat-tests"]
 
 [[test]]

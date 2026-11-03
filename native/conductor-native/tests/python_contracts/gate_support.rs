@@ -1,8 +1,8 @@
 //! Rust fixtures for the gate and gate-rollout Python API contract targets.
 
-use crate::support::{module, AttrPatch, Case};
+use crate::support::{AttrPatch, Case};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyModule};
+use pyo3::types::{PyAny, PyModule};
 use serde_json::Value;
 use std::env;
 use std::fs;
@@ -37,38 +37,6 @@ pub fn isolated_case() -> Case {
     case.set_env("GIT_CONFIG_GLOBAL", "/dev/null");
     case.set_env("GIT_CONFIG_SYSTEM", "/dev/null");
     case
-}
-
-pub fn default_tool(py: Python<'_>) -> Bound<'_, PyAny> {
-    tool(py, "sample", "sample", "1.2.3", &["fast", "full"])
-}
-
-pub fn tool<'py>(
-    py: Python<'py>,
-    tool_id: &str,
-    executable: &str,
-    expected_version: &str,
-    required_profiles: &[&str],
-) -> Bound<'py, PyAny> {
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("tool_id", tool_id).unwrap();
-    kwargs.set_item("executable", executable).unwrap();
-    kwargs
-        .set_item("version_command", (executable, "--version"))
-        .unwrap();
-    kwargs
-        .set_item("expected_version", expected_version)
-        .unwrap();
-    kwargs
-        .set_item("required_profiles", required_profiles)
-        .unwrap();
-    kwargs.set_item("provided_by", "test fixture").unwrap();
-    kwargs.set_item("rationale", "test fixture").unwrap();
-    module(py, "conductor.candidate_review.policy")
-        .getattr("ToolPolicy")
-        .unwrap()
-        .call((), Some(&kwargs))
-        .unwrap()
 }
 
 pub fn fake_executable(directory: &Path, name: &str, output: &str, exit_code: i32) -> PathBuf {

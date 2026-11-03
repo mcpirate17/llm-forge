@@ -12,7 +12,7 @@
 use crate::candidate_structure::Lines;
 use crate::test_record_digest::blob_oid;
 use crate::test_record_store::open_read_only;
-use anyhow::Context;
+use anyhow::{ensure, Context};
 #[cfg(feature = "python")]
 use pyo3::exceptions::PyRuntimeError;
 #[cfg(feature = "python")]
@@ -20,7 +20,9 @@ use pyo3::prelude::*;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{walk_stmt, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextSize};
+use rusqlite::{limits::Limit, Connection, OpenFlags};
 use std::collections::{BTreeSet, HashMap};
+use std::io::Read;
 use std::path::Path;
 
 pub(crate) struct Function {
@@ -137,8 +139,174 @@ pub(crate) fn nested(functions: &[Function], index: usize) -> &[Function] {
     &after[..after.partition_point(|inner| inner.start <= end)]
 }
 
+/// Only the recorder's concrete windows table is accepted. Candidate-controlled
+/// SQLite views, generated columns and virtual tables cannot execute as evidence.
+fn open_owned_record(path: &Path, deadline: std::time::Instant) -> anyhow::Result<Connection> {
+    let metadata = std::fs::metadata(path)?;
+    ensure!(
+        metadata.is_file() && metadata.len() <= 4 * 1024 * 1024,
+        "owned record database exceeds limit"
+    );
+    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection.set_limit(Limit::SQLITE_LIMIT_LENGTH, 4 * 1024 * 1024);
+    connection.set_limit(Limit::SQLITE_LIMIT_SQL_LENGTH, 64 * 1024);
+    connection.set_limit(Limit::SQLITE_LIMIT_COLUMN, 64);
+    connection.set_limit(Limit::SQLITE_LIMIT_EXPR_DEPTH, 100);
+    connection.set_limit(Limit::SQLITE_LIMIT_VDBE_OP, 100_000);
+    connection.set_limit(Limit::SQLITE_LIMIT_ATTACHED, 0);
+    connection.set_limit(Limit::SQLITE_LIMIT_WORKER_THREADS, 0);
+    connection.busy_timeout(std::time::Duration::from_millis(250))?;
+    connection.progress_handler(10_000, Some(move || std::time::Instant::now() >= deadline));
+    connection.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA query_only=ON;")?;
+    let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    ensure!(
+        version == crate::test_record_store::SCHEMA_VERSION,
+        "unexpected record schema version"
+    );
+    let (kind, sql): (String, String) = connection.query_row(
+        "SELECT type,sql FROM sqlite_schema WHERE name='windows'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let expected = concat!(
+        "CREATE TABLE windows (\n",
+        "    digest TEXT PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, opaque TEXT,\n",
+        "    deps BLOB NOT NULL, lines BLOB NOT NULL)"
+    );
+    ensure!(
+        kind == "table" && sql == expected,
+        "record windows schema is not the native recorder schema"
+    );
+    Ok(connection)
+}
+
 /// Per repository path, the lines fixture and test windows executed while the file
 /// had the blob oid `wanted` gives it.
+fn executed_owned(
+    store: &Path,
+    wanted: &HashMap<&str, String>,
+    deadline: std::time::Instant,
+) -> anyhow::Result<HashMap<String, BTreeSet<usize>>> {
+    let mut hits: HashMap<String, BTreeSet<usize>> = HashMap::new();
+    let connection = open_owned_record(store, deadline)?;
+    let mut windows =
+        connection.prepare("SELECT lines FROM windows WHERE kind IN ('fixture', 'test')")?;
+    let mut rows = windows.query([])?;
+    let mut windows_seen = 0usize;
+    let mut decoded_total = 0usize;
+    let mut line_total = 0usize;
+    while let Some(row) = rows.next()? {
+        ensure!(
+            std::time::Instant::now() < deadline,
+            "owned record evaluation deadline exceeded"
+        );
+        windows_seen += 1;
+        ensure!(windows_seen <= 100_000, "record windows exceed limit");
+        let blob: Vec<u8> = row.get(0)?;
+        ensure!(blob.len() <= 4 * 1024 * 1024, "record window exceeds limit");
+        let mut decoded = Vec::new();
+        zstd::stream::read::Decoder::new(blob.as_slice())?
+            .take(16 * 1024 * 1024 + 1)
+            .read_to_end(&mut decoded)?;
+        ensure!(
+            decoded.len() <= 16 * 1024 * 1024,
+            "record decoded window exceeds limit"
+        );
+        decoded_total = decoded_total
+            .checked_add(decoded.len())
+            .context("record byte overflow")?;
+        ensure!(
+            decoded_total <= 64 * 1024 * 1024,
+            "record decoded total exceeds limit"
+        );
+        ensure!(
+            std::time::Instant::now() < deadline,
+            "owned record evaluation deadline exceeded"
+        );
+        let entries: Vec<(String, String, Vec<usize>)> = serde_json::from_slice(&decoded)?;
+        ensure!(
+            std::time::Instant::now() < deadline,
+            "owned record evaluation deadline exceeded"
+        );
+        ensure!(
+            entries.len() <= 4096,
+            "record window path count exceeds limit"
+        );
+        for (label, oid, lines) in entries {
+            line_total = line_total
+                .checked_add(lines.len())
+                .context("record line overflow")?;
+            ensure!(
+                line_total <= 2_000_000 && label.len() <= 4096 && oid.len() <= 128,
+                "record line or identity budget exceeded"
+            );
+            if wanted.get(label.as_str()) == Some(&oid) {
+                hits.entry(label).or_default().extend(lines);
+            }
+        }
+    }
+    Ok(hits)
+}
+
+/// A changed function no recorded test executed: `(path, qualname, def line)`.
+pub type Untested = (String, String, usize);
+
+/// How many functions with something to test the changes touch, and which of them
+/// no recorded test executed. Each change is a path relative to `root` and its
+/// changed line numbers in the file there.
+pub fn untested_owned(
+    root: &Path,
+    store: &Path,
+    changes: &[(String, Vec<usize>)],
+) -> anyhow::Result<(usize, Vec<Untested>)> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    ensure!(changes.len() <= 4096, "changed source count exceeds limit");
+    let mut files = Vec::with_capacity(changes.len());
+    let mut wanted = HashMap::new();
+    let mut source_bytes = 0usize;
+    let mut changed_lines = 0usize;
+    for (path, changed) in changes {
+        ensure!(
+            std::time::Instant::now() < deadline,
+            "owned record evaluation deadline exceeded"
+        );
+        ensure!(
+            !path.is_empty()
+                && path.len() <= 4096
+                && Path::new(path)
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_))),
+            "invalid changed source path"
+        );
+        changed_lines = changed_lines
+            .checked_add(changed.len())
+            .context("changed line overflow")?;
+        ensure!(changed_lines <= 1_000_000, "changed lines exceed limit");
+        let mut bytes = Vec::new();
+        std::fs::File::open(root.join(path))
+            .with_context(|| path.clone())?
+            .take(1024 * 1024 + 1)
+            .read_to_end(&mut bytes)?;
+        source_bytes = source_bytes
+            .checked_add(bytes.len())
+            .context("source size overflow")?;
+        ensure!(
+            bytes.len() <= 1024 * 1024 && source_bytes <= 32 * 1024 * 1024,
+            "changed source bytes exceed limit"
+        );
+        wanted.insert(path.as_str(), blob_oid(&bytes));
+        let source = String::from_utf8(bytes).with_context(|| path.clone())?;
+        files.push((
+            path,
+            changed,
+            functions(&source).with_context(|| path.clone())?,
+        ));
+    }
+    let hits = executed_owned(store, &wanted, deadline)?;
+    evaluate_functions(files, &hits, Some(deadline))
+}
+
+// Legacy Python API retains its existing store and source bounds.
 fn executed(
     store: &Path,
     wanted: &HashMap<&str, String>,
@@ -163,12 +331,6 @@ fn executed(
     Ok(hits)
 }
 
-/// A changed function no recorded test executed: `(path, qualname, def line)`.
-type Untested = (String, String, usize);
-
-/// How many functions with something to test the changes touch, and which of them
-/// no recorded test executed. Each change is a path relative to `root` and its
-/// changed line numbers in the file there.
 fn untested(
     root: &Path,
     store: &Path,
@@ -187,12 +349,26 @@ fn untested(
         ));
     }
     let hits = executed(store, &wanted)?;
+    evaluate_functions(files, &hits, None)
+}
+
+fn evaluate_functions(
+    files: Vec<(&String, &Vec<usize>, Vec<Function>)>,
+    hits: &HashMap<String, BTreeSet<usize>>,
+    deadline: Option<std::time::Instant>,
+) -> anyhow::Result<(usize, Vec<Untested>)> {
     let none = BTreeSet::new();
     let mut count = 0;
     let mut out = Vec::new();
     for (path, changed, functions) in files {
         let hit = hits.get(path.as_str()).unwrap_or(&none);
         for (index, function) in functions.iter().enumerate() {
+            if let Some(deadline) = deadline {
+                ensure!(
+                    std::time::Instant::now() < deadline,
+                    "owned record evaluation deadline exceeded"
+                );
+            }
             let Some(runs) = function.runs else { continue };
             let inner = nested(&functions, index);
             if !changed.iter().any(|line| function.owns(*line, inner)) {
@@ -203,9 +379,18 @@ fn untested(
                 .range(runs..=function.end)
                 .any(|line| function.owns(*line, inner))
             {
+                if deadline.is_some() {
+                    ensure!(out.len() < 4096, "untested function findings exceed limit");
+                }
                 out.push((path.clone(), function.qualname.clone(), function.line));
             }
         }
+    }
+    if let Some(deadline) = deadline {
+        ensure!(
+            std::time::Instant::now() < deadline,
+            "owned record evaluation deadline exceeded"
+        );
     }
     Ok((count, out))
 }
@@ -272,6 +457,113 @@ def untouched():
             deps: json!([]),
             lines,
         }
+    }
+
+    #[test]
+    fn owned_shards_combine_only_real_fixture_and_test_windows() {
+        let root = std::env::temp_dir().join(format!("owned-window-shards-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let source = "def fixture_hit():\n    return 1\n\ndef test_hit():\n    return 2\n\ndef collect_only():\n    return 3\n\ndef stale_only():\n    return 4\n";
+        std::fs::write(root.join("m.py"), source).unwrap();
+        let oid = blob_oid(source.as_bytes());
+        let session = SessionRow {
+            started: 0.0,
+            finished: 1.0,
+            root: "/r".into(),
+            env_digest: "env".into(),
+            env_data: json!({}),
+            argv: "[]".into(),
+            unstable: 0,
+        };
+        let first = root.join("first.sqlite");
+        let second = root.join("second.sqlite");
+        store::write(
+            &first,
+            &session,
+            &[
+                window("fixture", "fixture", json!([["m.py", oid, [2]]])),
+                window("collect", "collect", json!([["m.py", oid, [8]]])),
+            ],
+            &[],
+        )
+        .unwrap();
+        store::write(
+            &second,
+            &session,
+            &[
+                window("test", "test", json!([["m.py", oid, [5]]])),
+                window("stale", "test", json!([["m.py", blob_oid(b"stale"), [11]]])),
+            ],
+            &[],
+        )
+        .unwrap();
+        let changed = [("m.py".to_owned(), vec![2, 5, 8, 11])];
+        let (count1, missing1) = untested_owned(&root, &first, &changed).unwrap();
+        let (count2, missing2) = untested_owned(&root, &second, &changed).unwrap();
+        assert_eq!((count1, count2), (4, 4));
+        let a: BTreeSet<_> = missing1.into_iter().collect();
+        let b: BTreeSet<_> = missing2.into_iter().collect();
+        let combined: Vec<_> = a.intersection(&b).cloned().collect();
+        assert_eq!(
+            combined,
+            vec![
+                ("m.py".into(), "collect_only".into(), 7),
+                ("m.py".into(), "stale_only".into(), 10)
+            ]
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn untested_api_refuses_escaping_and_excessive_inputs() {
+        let root = std::env::temp_dir();
+        assert!(untested_owned(
+            &root,
+            &root.join("absent-forge-test.sqlite"),
+            &[("../escape.py".into(), vec![1])]
+        )
+        .is_err());
+        let too_many = vec![("x.py".to_owned(), Vec::new()); 4097];
+        assert!(untested_owned(&root, &root.join("absent-forge-test.sqlite"), &too_many).is_err());
+    }
+
+    #[test]
+    fn owned_record_refuses_recursive_view_before_reading_windows() {
+        let root = std::env::temp_dir().join(format!("record-view-refusal-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("m.py"), "def f():\n    return 1\n").unwrap();
+        let db = root.join("record.sqlite");
+        let connection = Connection::open(&db).unwrap();
+        connection.execute_batch("PRAGMA user_version=1; CREATE VIEW windows AS WITH RECURSIVE x(v) AS (VALUES(1) UNION ALL SELECT v+1 FROM x) SELECT 'test' AS kind, zeroblob(5000000) AS lines FROM x;").unwrap();
+        drop(connection);
+        let error = untested_owned(&root, &db, &[("m.py".into(), vec![2])]).unwrap_err();
+        assert!(format!("{error:#}").contains("native recorder schema"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn historical_python_api_does_not_inherit_owned_artifact_cap() {
+        let root = std::env::temp_dir().join(format!("record-legacy-large-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("m.py"), "def f():\n    return 1\n").unwrap();
+        let db = root.join("record.sqlite");
+        let session = SessionRow {
+            started: 0.0,
+            finished: 1.0,
+            root: "/r".into(),
+            env_digest: "env".into(),
+            env_data: json!({}),
+            argv: "[]".into(),
+            unstable: 0,
+        };
+        store::write(&db, &session, &[], &[]).unwrap();
+        let connection = Connection::open(&db).unwrap();
+        connection.execute_batch("CREATE TABLE padding (data BLOB); INSERT INTO padding VALUES (zeroblob(5242880)); PRAGMA wal_checkpoint(TRUNCATE);").unwrap();
+        drop(connection);
+        let changed = [("m.py".into(), vec![2])];
+        assert_eq!(untested(&root, &db, &changed).unwrap().0, 1);
+        assert!(untested_owned(&root, &db, &changed).is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

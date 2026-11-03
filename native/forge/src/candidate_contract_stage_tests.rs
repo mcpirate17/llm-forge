@@ -11,9 +11,12 @@ const SLOP_MANIFEST: &str = "[package]\nname='slop-core'\nversion='0.1.0'\nediti
 const FORGE_MANIFEST: &str = "[package]\nname='forge'\nversion='0.1.0'\nedition='2021'\n";
 const CONTRACT: &str = r#"#[test] fn imports_candidate_extensions_and_forge() {
  let python=std::env::var("PYO3_PYTHON").unwrap();
- assert!(std::process::Command::new(python).args(["-c","import conductor_native, slop_core; assert conductor_native.__name__ == 'conductor_native'; assert slop_core.__name__ == 'slop_core'"]).status().unwrap().success());
- let forge=std::env::var("FORGE_TEST_BIN").unwrap();
- assert!(std::process::Command::new(forge).arg("--version").status().unwrap().success());
+ let check="import os,pathlib,conductor,conductor._native,conductor_native,slop_core; root=pathlib.Path(os.environ['FORGE_BIN']).parent; assert conductor.MARKER=='candidate'; assert conductor._native.native is conductor_native; assert pathlib.Path(conductor_native.__file__)==root/'contract-extension/conductor_native.so'; assert pathlib.Path(slop_core.__file__)==root/'contract-extension/slop_core.so'";
+ assert!(std::process::Command::new(python).args(["-c",check]).status().unwrap().success());
+ let forge=std::env::var("FORGE_BIN").unwrap();
+ let out=std::process::Command::new(forge).output().unwrap();
+ assert!(out.status.success());
+ assert_eq!(String::from_utf8(out.stdout).unwrap().trim(),"candidate fixture");
 }"#;
 fn module(name: &str) -> String {
     r#"use std::ffi::{c_char,c_void};
@@ -51,6 +54,19 @@ fn candidate(f: &Fixture, with_slop: bool) -> (String, Vec<u8>) {
             "native/conductor-native/tests/python_contracts_sample.rs",
             CONTRACT.into(),
         ),
+        ("src/conductor/__init__.py", "MARKER='candidate'\n".into()),
+        (
+            "src/conductor/_native.py",
+            "import conductor_native as native\n".into(),
+        ),
+        (
+            "src/conductor_native.py",
+            "raise AssertionError('ambient native selected')\n".into(),
+        ),
+        (
+            "src/slop_core.py",
+            "raise AssertionError('ambient slop selected')\n".into(),
+        ),
         ("native/slop-core/Cargo.toml", SLOP_MANIFEST.into()),
         ("native/slop-core/Cargo.lock", lock("slop-core")),
         ("native/slop-core/src/lib.rs", module("slop_core")),
@@ -67,7 +83,10 @@ fn candidate(f: &Fixture, with_slop: bool) -> (String, Vec<u8>) {
             .iter_mut()
             .find(|(path, _)| path.ends_with("python_contracts_sample.rs"))
             .unwrap();
-        row.1=CONTRACT.replace("import conductor_native, slop_core; assert conductor_native.__name__ == 'conductor_native'; assert slop_core.__name__ == 'slop_core'", "import conductor_native; assert conductor_native.__name__ == 'conductor_native'");
+        row.1 = CONTRACT.replace(",slop_core", "").replace(
+            "; assert pathlib.Path(slop_core.__file__)==root/'contract-extension/slop_core.so'",
+            "",
+        );
     }
     let repository = git2::Repository::open(&f.host).unwrap();
     let mut index = repository.index().unwrap();

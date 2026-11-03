@@ -16,6 +16,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyCFunction, PyDict, PyModule};
 use serde_json::{Map, Value};
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use support::{assert_error, module, path, text, AttrPatch, Case};
@@ -239,17 +240,7 @@ fn manifest_state_uses_the_configured_registry() {
     });
 }
 
-#[test]
-fn idle_claims_resolve_claim_paths_from_repository_root() {
-    let case = Case::new();
-    let repo = seeded_repo(case.root(), "claims", "main", None);
-    let quiet_epoch = (SystemTime::now() - Duration::from_secs(100 * 60))
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
-    let quiet =
-        chrono::DateTime::<chrono::Utc>::from(UNIX_EPOCH + Duration::from_secs(quiet_epoch as u64))
-            .to_rfc3339();
+fn create_hygiene_claim(repo: &Path) {
     Python::attach(|py| {
         let ownership = module(py, "conductor.candidate_review.ownership");
         let kwargs = PyDict::new(py);
@@ -263,9 +254,23 @@ fn idle_claims_resolve_claim_paths_from_repository_root() {
         ownership
             .getattr("create_claim")
             .unwrap()
-            .call((path(py, &repo),), Some(&kwargs))
+            .call((path(py, repo),), Some(&kwargs))
             .unwrap();
     });
+}
+
+#[test]
+fn idle_claims_resolve_claim_paths_from_repository_root() {
+    let case = Case::new();
+    let repo = seeded_repo(case.root(), "claims", "main", None);
+    let quiet_epoch = (SystemTime::now() - Duration::from_secs(100 * 60))
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let quiet =
+        chrono::DateTime::<chrono::Utc>::from(UNIX_EPOCH + Duration::from_secs(quiet_epoch as u64))
+            .to_rfc3339();
+    create_hygiene_claim(&repo);
     write(&repo.join("tracked.txt"), "aged\n");
     set_mtime(&repo.join("tracked.txt"), quiet_epoch);
     let store = repo.join(".git/governance/ownership-claims.json");
@@ -305,9 +310,41 @@ fn idle_claims_resolve_claim_paths_from_repository_root() {
         );
     });
     fs::write(&store, payload.to_string()).unwrap();
+    let shadow_dir = repo.join(".tools/bin");
+    fs::create_dir_all(&shadow_dir).unwrap();
+    let shadow = shadow_dir.join("forge");
+    let marker = repo.join("shadow-ran");
+    fs::write(
+        &shadow,
+        format!(
+            "#!/bin/sh\ntouch '{}'\nprintf '{{\"claims\":[]}}'\n",
+            marker.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&shadow, fs::Permissions::from_mode(0o755)).unwrap();
     Python::attach(|py| {
         let subject = hygiene(py);
         let _root = AttrPatch::replace(subject.as_any(), "ROOT", path(py, &repo).as_any());
+        let os = subject.getattr("os").unwrap();
+        let env = os.getattr("environ").unwrap().call_method0("copy").unwrap();
+        env.set_item("FORGE_BIN", shadow.to_str().unwrap()).unwrap();
+        let inherited_path = text(&env.get_item("PATH").unwrap());
+        env.set_item("PATH", format!("{}:{inherited_path}", shadow_dir.display()))
+            .unwrap();
+        let _env = AttrPatch::replace(&os, "environ", &env);
+        let stored = subject.getattr("_claim_store").unwrap().call0().unwrap();
+        assert_eq!(stored.len().unwrap(), 1);
+        let first_stored = stored.get_item(0).unwrap();
+        assert_eq!(
+            text(&first_stored.get_item("claim_id").unwrap()),
+            payload["claims"][0]["claim_id"].as_str().unwrap()
+        );
+        assert!(!first_stored.contains("last_seen").unwrap());
+        assert!(first_stored.contains("expected_at").unwrap());
+        assert!(!marker.exists(), "shadow forge executed");
+        // idle_claims invokes git, so restore PATH before that independent control.
+        drop(_env);
         let rows = subject.getattr("idle_claims").unwrap().call0().unwrap();
         assert!(rows.len().unwrap() > 0);
         let first = rows.get_item(0).unwrap();

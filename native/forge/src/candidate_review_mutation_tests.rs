@@ -461,3 +461,146 @@ fn contextual_failed_or_stale_originals_cannot_admit_source() {
         1
     );
 }
+
+fn contextual_witness(
+    source: &str,
+    class: &str,
+    stamp: &str,
+) -> conductor_native::mutation_evidence::CapturedAttempt {
+    let node = "tests/test_flow.py::test_flow";
+    conductor_native::mutation_evidence::CapturedAttempt {
+        campaign_id: source.into(),
+        manifest: "manifest".into(),
+        receipt: "receipt".into(),
+        sha256: "a".repeat(64),
+        valid: true,
+        bindings_current: true,
+        errors: json!([]),
+        expanded: json!({"campaign_id": source, "manifest_sha256": "a", "source_sha256": {source: "a"},
+            "test_sha256": {"tests/test_flow.py": "a"}, "runner_sha256": "a", "runner_components_sha256": {},
+            "generated_at": stamp, "status": "PASS", "baseline": {"returncode": 0, "timed_out": false},
+            "outcome_counts": {"KILLED": 1, "NO_COVERAGE": 0, "SURVIVED": 0, "TIMED_OUT": 0, "ERROR": 0, "UNVIABLE": 0},
+            "attribution": {"status": "ATTRIBUTED", "attributed_mutants": 1, "killed_mutants": 1},
+            "mutants": [{"id": "m", "path": source, "outcome": "KILLED"}],
+            "test_value": {"schema_version": "llm.mutation-testing.test-value.v1", "status": "PASS",
+                "tests": [{"nodeid": node, "classification": class, "killed_mutants": ["m"]}]}}),
+    }
+}
+
+#[test]
+fn contextual_sources_require_independent_current_positive_witnesses() {
+    let node = "tests/test_flow.py::test_flow";
+    let a = contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00");
+    let b = contextual_witness("selection.py", "MERGE", "2026-10-05T01:00:00+00:00");
+    assert!(context::errors(
+        node,
+        &["train.py".into()],
+        &[
+            contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00"),
+            contextual_witness("selection.py", "MERGE", "2026-10-05T01:00:00+00:00")
+        ]
+    )
+    .unwrap()
+    .is_empty());
+    let debt = context::errors(
+        node,
+        &["train.py".into(), "selection.py".into()],
+        &[
+            contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00"),
+            b,
+        ],
+    )
+    .unwrap();
+    assert_eq!(debt.len(), 1);
+    assert!(debt[0].contains("selection.py"));
+    let mut stale = a;
+    stale.bindings_current = false;
+    assert_eq!(
+        context::errors(node, &["train.py".into()], &[stale])
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn contextual_latest_failed_and_contradictory_witnesses_fail_closed() {
+    let node = "tests/test_flow.py::test_flow";
+    let a = contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00");
+    let mut failed = contextual_witness("train.py", "CORE", "2026-10-05T01:00:00+00:00");
+    failed.valid = false;
+    assert_eq!(
+        context::errors(
+            node,
+            &["train.py".into()],
+            &[
+                contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00"),
+                failed
+            ]
+        )
+        .unwrap()
+        .len(),
+        1
+    );
+    let contradictory = contextual_witness("train.py", "MERGE", "2026-10-05T00:00:00+00:00");
+    let errors = context::errors(node, &["train.py".into()], &[a, contradictory]).unwrap();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].contains("conflicting"));
+}
+
+#[test]
+fn contextual_missing_node_and_incomplete_attribution_do_not_admit() {
+    let node = "tests/test_flow.py::test_flow";
+    let mut missing = contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00");
+    missing.expanded["test_value"]["tests"] = json!([]);
+    assert_eq!(
+        context::errors(node, &["train.py".into()], &[missing])
+            .unwrap()
+            .len(),
+        1
+    );
+    let mut partial = contextual_witness("train.py", "CORE", "2026-10-05T00:00:00+00:00");
+    partial.expanded["outcome_counts"]["TIMED_OUT"] = json!(1);
+    partial.expanded["attribution"]["status"] = json!("NO_ATTRIBUTION");
+    assert!(!context::complete(&partial.expanded).is_empty());
+    assert_eq!(
+        context::errors(node, &["train.py".into()], &[partial])
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn mutation_waiver_reads_captured_test_and_source_hashes_and_base() {
+    let f = Fixture::new();
+    f.write("tests/test_a.py", "test bytes\n");
+    f.write("src/dependency.py", "source bytes\n");
+    let (source, snapshot, _, policy) = f.captured();
+    let candidate = source.resolve(Kind::Index, "HEAD", Some("HEAD")).unwrap();
+    let mut waiver_policy = Policy {
+        path: policy.path.clone(),
+        digest: policy.digest.clone(),
+        document: policy.document.clone(),
+    };
+    waiver_policy.document["mutation_waivers"] = json!([{
+        "waiver_id": "fixture", "path": "tests/test_a.py", "sha256": hex(b"test bytes\n"),
+        "integration_base": candidate.waiver_base().unwrap(), "expires": "2099-12-31",
+        "sources": [{"path": "src/dependency.py", "sha256": hex(b"source bytes\n")}]
+    }]);
+    let run = |waiver: &Policy| {
+        let mut capture =
+            inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+        waivers::receipt_states(&mut capture, &candidate, waiver).unwrap()
+    };
+    assert_eq!(run(&waiver_policy)[0]["active"], true);
+    waiver_policy.document["mutation_waivers"][0]["sources"][0]["sha256"] = json!("0".repeat(64));
+    assert_eq!(run(&waiver_policy)[0]["active"], false);
+    waiver_policy.document["mutation_waivers"][0]["sources"][0]["sha256"] =
+        json!(hex(b"source bytes\n"));
+    waiver_policy.document["mutation_waivers"][0]["sha256"] = json!("0".repeat(64));
+    assert_eq!(run(&waiver_policy)[0]["active"], false);
+    waiver_policy.document["mutation_waivers"][0]["sha256"] = json!(hex(b"test bytes\n"));
+    waiver_policy.document["mutation_waivers"][0]["integration_base"] = json!("0".repeat(40));
+    assert_eq!(run(&waiver_policy)[0]["active"], false);
+}

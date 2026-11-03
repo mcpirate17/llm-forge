@@ -6,8 +6,6 @@
 #[allow(dead_code)]
 mod support;
 
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet};
 use rusqlite::Connection;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -15,7 +13,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-use support::{module, path, text, AttrPatch, Case};
+use support::Case;
 
 const PYPROJECT: &str = "[project]\nname = \"scratch\"\nversion = \"0\"\n\n\
 [tool.forge.test_record]\nstore = \"record/test_record.sqlite\"\nenvironment = [\"RECORD_KEY\"]\n";
@@ -539,70 +537,13 @@ fn a_rebuilt_distribution_reruns_only_the_tests_that_loaded_it() {
 }
 
 #[test]
-fn a_changed_function_no_recorded_test_ran_is_reported() {
+fn explicit_store_transport_redirects_only_enabled_recording() {
     let case = Case::new();
     project(&case);
-    case.write(
-        "pkg/more.py",
-        "def used():\n    return 1\n\n\ndef unused():\n    return 2\n",
-    );
-    case.write(
-        "tests/test_more.py",
-        "from pkg.more import used\n\n\ndef test_used():\n    assert used() == 1\n",
-    );
-    pytest(case.root(), &[]);
-    Python::attach(|py| {
-        let glue = module(py, "conductor.candidate_review.untested_changes");
-        // `unused` was imported at collection but never called; `double`'s line 3
-        // ran in test_fails.
-        let changed = PyDict::new(py);
-        changed
-            .set_item("pkg/more.py", PySet::new(py, [2, 6]).unwrap())
-            .unwrap();
-        changed
-            .set_item("pkg/helpers.py", PySet::new(py, [3]).unwrap())
-            .unwrap();
-        let mock_args = PyDict::new(py);
-        mock_args.set_item("return_value", changed).unwrap();
-        let lines = module(py, "unittest.mock")
-            .getattr("Mock")
-            .unwrap()
-            .call((), Some(&mock_args))
-            .unwrap();
-        let _guard = AttrPatch::replace(&glue, "changed_source_lines", &lines);
-        let context_args = PyDict::new(py);
-        context_args
-            .set_item("snapshot", path(py, case.root()))
-            .unwrap();
-        let context = module(py, "types")
-            .getattr("SimpleNamespace")
-            .unwrap()
-            .call((), Some(&context_args))
-            .unwrap();
-        let (findings, metrics): (Vec<Bound<'_, PyAny>>, BTreeMap<String, usize>) = glue
-            .getattr("untested_changes")
-            .unwrap()
-            .call1((context, "targeted-tests-full"))
-            .unwrap()
-            .extract()
-            .unwrap();
-        assert_eq!(
-            metrics,
-            BTreeMap::from([
-                ("changed_functions".to_owned(), 3),
-                ("untested_changed_functions".to_owned(), 1),
-            ])
-        );
-        assert_eq!(findings.len(), 1);
-        let finding = &findings[0];
-        assert_eq!(
-            text(&finding.getattr("rule_id").unwrap()),
-            "untested-changed-function"
-        );
-        assert_eq!(text(&finding.getattr("severity").unwrap()), "medium");
-        assert_eq!(
-            text(&finding.getattr("message").unwrap()),
-            "1 of 3 changed functions ran in no recorded test: pkg/more.py:5 unused"
-        );
-    });
+    let store = case.root().join("owned-record.sqlite");
+    let path = store.to_str().unwrap();
+    pytest(case.root(), &[("FORGE_TEST_RECORD_STORE", path)]);
+    assert!(store.is_file());
+    assert!(!case.root().join("record/test_record.sqlite").exists());
+    assert!(runs(&store).contains_key("tests/test_pkg.py::test_fixture"));
 }

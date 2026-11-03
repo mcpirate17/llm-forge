@@ -25,6 +25,8 @@ pub(crate) struct Plan {
     pub(crate) grants: String,
     pub(crate) candidate: String,
     pub(crate) full: bool,
+    pub(crate) record_owned: bool,
+    pub(crate) record_configs: Vec<Option<RecordConfig>>,
     pub(crate) workers: usize,
     pub(crate) interpreter: String,
     pub(crate) pytest: String,
@@ -32,6 +34,13 @@ pub(crate) struct Plan {
     pub(crate) threshold: f64,
     pub(crate) high_threshold: f64,
 }
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+pub(crate) struct RecordConfig {
+    path: String,
+    oid: String,
+    lines: bool,
+}
+type RecordShards = (Vec<Vec<String>>, Vec<Option<RecordConfig>>);
 fn shards(tests: &[String], maximum: usize) -> Result<Vec<Vec<String>>> {
     ensure!(
         !tests.is_empty() && tests.len() <= 4096,
@@ -146,6 +155,114 @@ fn checked_paths(
     }
     Ok(result)
 }
+fn record_setting(bytes: &[u8]) -> Result<Option<bool>> {
+    let parsed: toml::Value = toml::from_str(std::str::from_utf8(bytes)?)?;
+    let table = parsed
+        .get("tool")
+        .and_then(|v| v.get("forge"))
+        .and_then(|v| v.get("test_record"));
+    let Some(value) = table else { return Ok(None) };
+    let table = value.as_table().context("test_record must be a table")?;
+    table
+        .get("store")
+        .and_then(toml::Value::as_str)
+        .context("test_record store missing")?;
+    Ok(Some(match table.get("lines") {
+        None => true,
+        Some(v) => v.as_bool().context("test_record lines must be boolean")?,
+    }))
+}
+
+fn record_groups(
+    execution: &Execution,
+    entries: &BTreeMap<String, TreeEntry>,
+    tests: &[String],
+    maximum: usize,
+    bindings: &mut Vec<(String, String)>,
+) -> Result<RecordShards> {
+    let source = execution.source()?;
+    let workspace = Workspace::new(&source, &execution.candidate.tree_oid, &execution.grants)?;
+    let mut paths = BTreeSet::from(["pyproject.toml".to_owned()]);
+    for test in tests {
+        let mut parent = std::path::Path::new(test).parent();
+        while let Some(dir) = parent {
+            if dir.as_os_str().is_empty() {
+                break;
+            }
+            paths.insert(format!("{}/pyproject.toml", dir.display()));
+            parent = dir.parent();
+        }
+    }
+    ensure!(
+        paths.len() <= 4096,
+        "recorder configuration inventory exceeds limit"
+    );
+    let mut settings = BTreeMap::new();
+    let mut held = Vec::new();
+    for path in paths {
+        if !entries.contains_key(&path) {
+            continue;
+        }
+        let (_, oid) = regular(entries, &path)?;
+        let (binding, bytes) =
+            crate::candidate_inputs::snapshot(&workspace.path(), &path, &oid, 1024 * 1024)?;
+        if let Some(lines) = record_setting(&bytes)? {
+            settings.insert(
+                path.clone(),
+                RecordConfig {
+                    path: path.clone(),
+                    oid: oid.clone(),
+                    lines,
+                },
+            );
+        }
+        if !bindings.iter().any(|(existing, _)| existing == &path) {
+            bindings.push((path, oid));
+        }
+        held.push(binding);
+    }
+    let groups = group_record_shards(tests, maximum, &settings)?;
+    for binding in held {
+        binding.verify()?;
+    }
+    workspace.discard()?;
+    Ok(groups)
+}
+fn group_record_shards(
+    tests: &[String],
+    maximum: usize,
+    settings: &BTreeMap<String, RecordConfig>,
+) -> Result<RecordShards> {
+    let mut groups: BTreeMap<Option<RecordConfig>, Vec<String>> = BTreeMap::new();
+    for test in tests {
+        let mut parent = std::path::Path::new(test).parent();
+        let mut chosen = None;
+        while let Some(dir) = parent {
+            let key = if dir.as_os_str().is_empty() {
+                "pyproject.toml".to_owned()
+            } else {
+                format!("{}/pyproject.toml", dir.display())
+            };
+            if let Some(config) = settings.get(&key) {
+                chosen = Some(config.clone());
+                break;
+            }
+            parent = dir.parent();
+        }
+        groups.entry(chosen).or_default().push(test.clone());
+    }
+    let mut output = Vec::new();
+    let mut configs = Vec::new();
+    for (config, paths) in groups {
+        for group in shards(&paths, maximum)? {
+            output.push(group);
+            configs.push(config.clone());
+        }
+    }
+    ensure!(output.len() <= 256, "Python test shard count exceeds 256");
+    Ok((output, configs))
+}
+
 fn changed_files(execution: &Execution, bindings: &[(String, String)]) -> Result<Vec<ChangedFile>> {
     let source = execution.source()?;
     let paths: Vec<_> = execution
@@ -239,15 +356,30 @@ pub(crate) fn plan(
     )?;
     ensure!((1..=32).contains(&workers), "invalid shard worker count");
     let tests = selected.python_tests.clone();
-    let shards = shards(&tests, maximum)?;
     let source = execution.source()?;
     let entries = source
         .list_tree(&execution.candidate.tree_oid)?
         .into_iter()
         .map(|v| (v.path.clone(), v))
         .collect();
-    let bindings = checked_paths(execution, selected, &entries)?;
+    let mut bindings = checked_paths(execution, selected, &entries)?;
     let full = check_id == "targeted-tests-full";
+    let (shards, record_configs) = if full {
+        record_groups(execution, &entries, &tests, maximum, &mut bindings)?
+    } else {
+        let shards = shards(&tests, maximum)?;
+        let configs = vec![None; shards.len()];
+        (shards, configs)
+    };
+    let record_owned = record_configs
+        .iter()
+        .any(|config| config.as_ref().is_some_and(|c| c.lines));
+    if full && entries.contains_key("pyproject.toml") {
+        let config = regular(&entries, "pyproject.toml")?;
+        if !bindings.iter().any(|item| item.0 == config.0) {
+            bindings.push(config);
+        }
+    }
     let changed = if full {
         changed_files(execution, &bindings)?
     } else {
@@ -270,6 +402,8 @@ pub(crate) fn plan(
         grants: execution.grants.digest().into(),
         candidate,
         full,
+        record_owned,
+        record_configs,
         workers,
         interpreter,
         pytest,
@@ -327,7 +461,7 @@ pub(crate) fn stage_owned(
         .context("targeted policy missing")?;
     let source = execution.source()?;
     let workspace = Workspace::new(&source, &plan.tree, &execution.grants)?;
-    let argv = stage_argv(execution, plan, tests, &workspace.path(), version)?;
+    let argv = stage_argv(execution, plan, tests, index, &workspace.path(), version)?;
     let command = workspace.plan(
         &PreparedArgv {
             argv: argv.clone(),
@@ -350,13 +484,14 @@ pub(crate) fn stage_owned(
         plan: command,
         limits,
         argv,
-        data: json!({"scope":"captured_pytest_shard", "index":index,"version":version,"candidate_sha256":plan.candidate,"tree":plan.tree,"policy_sha256":plan.policy,"grants_sha256":plan.grants,"interpreter":plan.interpreter,"pytest":plan.pytest,"coverage_tool":plan.coverage_tool,"tests":tests,"bindings":plan.bindings,"full":plan.full,"snapshot_root":snapshot_root}),
+        data: json!({"scope":"captured_pytest_shard", "index":index,"version":version,"candidate_sha256":plan.candidate,"tree":plan.tree,"policy_sha256":plan.policy,"grants_sha256":plan.grants,"interpreter":plan.interpreter,"pytest":plan.pytest,"coverage_tool":plan.coverage_tool,"tests":tests,"bindings":plan.bindings,"full":plan.full,"record_owned":plan.record_owned,"record_config":plan.record_configs[index],"snapshot_root":snapshot_root}),
     })
 }
 fn stage_argv(
     execution: &Execution,
     plan: &Plan,
     tests: &[String],
+    index: usize,
     snapshot: &std::path::Path,
     version: bool,
 ) -> Result<Vec<String>> {
@@ -383,6 +518,13 @@ fn stage_argv(
                 .clone()
                 .context("coverage grant missing")?,
         );
+    }
+    if !version {
+        if let Some(config) = plan.record_configs[index].as_ref().filter(|c| c.lines) {
+            argv.push("--record-owned".into());
+            argv.push("--record-config".into());
+            argv.push(config.path.clone());
+        }
     }
     argv.push(if version {
         "--tool-version".into()
@@ -417,6 +559,7 @@ pub(crate) struct Observation {
     data: Value,
     report: crate::confined_execution::Report,
     artifact: Option<crate::candidate_stage_artifact::Artifact>,
+    record: Option<crate::candidate_stage_artifact::Artifact>,
 }
 fn verify_observation(plan: &Plan, observation: &Observation) -> Result<(usize, bool)> {
     let data = &observation.data;
@@ -442,7 +585,9 @@ fn verify_observation(plan: &Plan, observation: &Observation) -> Result<(usize, 
             && data["coverage_tool"] == serde_json::to_value(&plan.coverage_tool)?
             && data["tests"] == serde_json::to_value(tests)?
             && data["bindings"] == serde_json::to_value(&plan.bindings)?
-            && data["full"] == plan.full,
+            && data["full"] == plan.full
+            && data["record_owned"] == plan.record_owned
+            && data["record_config"] == serde_json::to_value(&plan.record_configs[index])?,
         "Python observation differs from plan"
     );
     Ok((index, version))
@@ -461,7 +606,40 @@ pub(crate) async fn run_stage(
     let version = stage.data["version"]
         .as_bool()
         .context("missing Python stage role")?;
-    if full && !version {
+    if full && !version && stage.data["record_config"]["lines"] == true {
+        let (data, report, _, artifacts) = stage
+            .execute_batch_capture_pair(
+                &execution.grants,
+                mask,
+                cancel,
+                owners,
+                crate::candidate_stage_artifact::Request {
+                    name: "coverage.json",
+                    maximum: 4 * 1024 * 1024,
+                    budget: budget.clone(),
+                },
+                crate::candidate_stage_artifact::Request {
+                    name: "test-record.sqlite",
+                    maximum: 4 * 1024 * 1024,
+                    budget,
+                },
+            )
+            .await?;
+        let (artifact, record) = match artifacts {
+            Some(mut rows) => {
+                ensure!(rows.len() == 2, "expected two Python artifacts");
+                let record = rows.pop();
+                (rows.pop(), record)
+            }
+            None => (None, None),
+        };
+        Ok(Observation {
+            data,
+            report,
+            artifact,
+            record,
+        })
+    } else if full && !version {
         let (data, report, _, artifact) = stage
             .execute_batch_capture(
                 &execution.grants,
@@ -479,6 +657,7 @@ pub(crate) async fn run_stage(
             data,
             report,
             artifact,
+            record: None,
         })
     } else {
         let (data, report, _) = stage
@@ -488,13 +667,14 @@ pub(crate) async fn run_stage(
             data,
             report,
             artifact: None,
+            record: None,
         })
     }
 }
 pub(crate) fn version_permit(plan: &Plan, observation: &Observation) -> Result<VersionPermit> {
     let (_, version) = verify_observation(plan, observation)?;
     ensure!(
-        version && observation.artifact.is_none(),
+        version && observation.artifact.is_none() && observation.record.is_none(),
         "Python version observation required"
     );
     let report = &observation.report;
@@ -541,6 +721,7 @@ pub(crate) fn finish(
     plan: &Plan,
     permit: &VersionPermit,
     observations: Vec<Observation>,
+    interrupts: &crate::process_signals::Interrupts,
 ) -> Result<(crate::candidate_assessment::CheckResult, Value)> {
     ensure!(
         crate::candidate_targeted_cargo::check_binding(execution, selected)? == plan.candidate
@@ -565,8 +746,9 @@ pub(crate) fn finish(
     } else {
         "targeted-tests"
     };
-    let (mut findings, rows, captured) = collect(plan, id, observations)?;
+    let (mut findings, rows, captured, records) = collect(plan, id, observations)?;
     let mut coverage = None;
+    let mut function_metrics = serde_json::Map::new();
     if plan.full && findings.is_empty() {
         ensure!(
             captured.len() == plan.shards.len(),
@@ -586,19 +768,28 @@ pub(crate) fn finish(
             ));
         }
         coverage = Some(serde_json::to_value(result)?);
+        if plan
+            .record_configs
+            .iter()
+            .all(|c| c.as_ref().is_some_and(|c| c.lines))
+        {
+            function_metrics =
+                record_findings(execution, plan, &records, id, &mut findings, interrupts)?;
+        }
     }
     let status = if findings.is_empty() {
         crate::candidate_assessment::CheckStatus::Passed
     } else if findings.iter().all(|f| {
         matches!(
             f.rule_id.as_str(),
-            "targeted-test-failed" | "changed-code-coverage"
+            "targeted-test-failed" | "changed-code-coverage" | "untested-changed-function"
         )
     }) {
         crate::candidate_assessment::CheckStatus::Failed
     } else {
         crate::candidate_assessment::CheckStatus::Error
     };
+    let record_evaluated = function_metrics.contains_key("changed_functions");
     let result = crate::candidate_assessment::CheckResult {
         check_id: id.into(),
         status,
@@ -613,23 +804,84 @@ pub(crate) fn finish(
         skipped_reason: None,
         stdout_tail: String::new(),
         stderr_tail: String::new(),
-        metrics: serde_json::Map::new(),
+        metrics: function_metrics,
     };
     Ok((
         result,
-        json!({"scope":"captured_pytest_shards","candidate_tree":plan.tree,"candidate_sha256":plan.candidate,"policy_sha256":plan.policy,"grants_sha256":plan.grants,"interpreter":plan.interpreter,"pytest":plan.pytest,"coverage_tool":plan.coverage_tool,"version":permit.version,"bindings":plan.bindings,"shards":rows,"coverage":coverage,"review_complete":false}),
+        json!({"scope":"captured_pytest_shards","candidate_tree":plan.tree,"candidate_sha256":plan.candidate,"policy_sha256":plan.policy,"grants_sha256":plan.grants,"interpreter":plan.interpreter,"pytest":plan.pytest,"coverage_tool":plan.coverage_tool,"version":permit.version,"bindings":plan.bindings,"shards":rows,"coverage":coverage,"record_scope":if record_evaluated { Some("fresh owned shard test and fixture windows; blob-matched, not execution authentication") } else if plan.full { Some("not evaluated: shard results unavailable or line recording disabled") } else { None },"record_evaluated":record_evaluated,"record_configs":plan.record_configs,"review_complete":false}),
     ))
+}
+
+fn record_findings(
+    execution: &Execution,
+    plan: &Plan,
+    records: &[Vec<u8>],
+    id: &str,
+    findings: &mut Vec<crate::candidate_assessment::Finding>,
+    interrupts: &crate::process_signals::Interrupts,
+) -> Result<serde_json::Map<String, Value>> {
+    ensure!(
+        records.len() == plan.shards.len(),
+        "test-record shard incomplete"
+    );
+    let (count, untested) = owned_untested(execution, plan, records, interrupts)?;
+    let mut metrics = serde_json::Map::new();
+    metrics.insert("changed_functions".into(), json!(count));
+    metrics.insert("untested_changed_functions".into(), json!(untested.len()));
+    if !untested.is_empty() {
+        let names: Vec<_> = untested
+            .iter()
+            .take(20)
+            .map(|(path, name, line)| format!("{path}:{line} {name}"))
+            .collect();
+        let extra = if untested.len() > 20 {
+            format!(", and {} more", untested.len() - 20)
+        } else {
+            String::new()
+        };
+        let mut finding = crate::candidate_assessment::Finding {
+            check_id: id.into(),
+            rule_id: "untested-changed-function".into(),
+            severity: crate::candidate_assessment::Severity::Medium,
+            message: format!(
+                "{} of {} changed functions ran in no recorded test: {}{}",
+                untested.len(),
+                count,
+                names.join(", "),
+                extra
+            ),
+            path: None,
+            line: None,
+            column: None,
+            help: None,
+            evidence: serde_json::Map::from_iter([(
+                "untested".into(),
+                json!(untested
+                    .iter()
+                    .map(|(path, name, line)| json!({"path":path,"qualname":name,"line":line}))
+                    .collect::<Vec<_>>()),
+            )]),
+            fingerprint: String::new(),
+            exception_id: None,
+            inherited: false,
+        };
+        crate::candidate_assessment::finalize_finding(&mut finding);
+        findings.push(finding);
+    }
+    Ok(metrics)
 }
 
 type Collected = (
     Vec<crate::candidate_assessment::Finding>,
     Vec<Value>,
     Vec<(Vec<u8>, String)>,
+    Vec<Vec<u8>>,
 );
 fn collect(plan: &Plan, id: &str, observations: Vec<Observation>) -> Result<Collected> {
     let mut findings = Vec::new();
     let mut rows = Vec::new();
     let mut captured = Vec::new();
+    let mut records = Vec::new();
     let mut seen = BTreeSet::new();
     for observation in observations {
         let (index, version) = verify_observation(plan, &observation)?;
@@ -659,10 +911,158 @@ fn collect(plan: &Plan, id: &str, observations: Vec<Observation>) -> Result<Coll
         } else if plan.full && succeeded {
             anyhow::bail!("successful Python shard has no coverage artifact");
         }
-        rows.push(json!({"index":index,"tests":plan.shards[index],"outcome":observation.report.outcome,"exit_code":observation.report.exit_code,"cleanup_complete":observation.report.cleanup_complete,"resource_verified":observation.report.resources.verified,"coverage_sha256":artifact_sha}));
+        let record_sha = if let Some(record) = observation.record {
+            use sha2::{Digest, Sha256};
+            ensure!(
+                plan.record_configs[index].as_ref().is_some_and(|c| c.lines)
+                    && succeeded
+                    && format!("{:x}", Sha256::digest(&record.bytes)) == record.sha256,
+                "Python test-record artifact binding changed"
+            );
+            let sha = record.sha256.clone();
+            records.push(record.bytes);
+            Some(sha)
+        } else {
+            ensure!(
+                !plan.record_configs[index].as_ref().is_some_and(|c| c.lines) || !succeeded,
+                "successful shard lacks its test-record artifact"
+            );
+            None
+        };
+        rows.push(json!({"index":index,"tests":plan.shards[index],"outcome":observation.report.outcome,"exit_code":observation.report.exit_code,"cleanup_complete":observation.report.cleanup_complete,"resource_verified":observation.report.resources.verified,"coverage_sha256":artifact_sha,"test_record_sha256":record_sha,"record_config":plan.record_configs[index]}));
     }
     rows.sort_by_key(|row| row["index"].as_u64().unwrap_or(u64::MAX));
-    Ok((findings, rows, captured))
+    Ok((findings, rows, captured, records))
+}
+
+pub(crate) fn intersect_missing(
+    previous: Option<BTreeSet<(String, String, usize)>>,
+    current: BTreeSet<(String, String, usize)>,
+) -> BTreeSet<(String, String, usize)> {
+    match previous {
+        None => current,
+        Some(previous) => previous.intersection(&current).cloned().collect(),
+    }
+}
+
+type ChangedRecordLines = Vec<(String, Vec<usize>)>;
+fn record_inputs(
+    workspace: &Workspace,
+    plan: &Plan,
+) -> Result<(Vec<crate::candidate_inputs::BoundFile>, ChangedRecordLines)> {
+    let mut held = Vec::new();
+    let oids: BTreeMap<_, _> = plan
+        .bindings
+        .iter()
+        .map(|(p, o)| (p.as_str(), o.as_str()))
+        .collect();
+    let mut changed = Vec::new();
+    for file in &plan.changed {
+        let oid = oids
+            .get(file.path.as_str())
+            .context("changed source blob missing")?;
+        held.push(
+            crate::candidate_inputs::snapshot(&workspace.path(), &file.path, oid, 1024 * 1024)?.0,
+        );
+        changed.push((
+            file.path.clone(),
+            file.lines.iter().map(|n| *n as usize).collect::<Vec<_>>(),
+        ));
+    }
+    Ok((held, changed))
+}
+
+/// Rehydrate only owned shard records in a private workspace and compare windows
+/// against candidate blob bytes. No historical host database is consulted.
+fn owned_untested(
+    execution: &Execution,
+    plan: &Plan,
+    records: &[Vec<u8>],
+    interrupts: &crate::process_signals::Interrupts,
+) -> Result<(usize, Vec<conductor_native::test_record_untested::Untested>)> {
+    use cap_std::fs::{OpenOptions, OpenOptionsExt};
+    use std::io::Write;
+    ensure!(
+        !records.is_empty() && records.len() <= 256,
+        "invalid test-record shards"
+    );
+    let source = execution.source()?;
+    let workspace = Workspace::new(&source, &plan.tree, &execution.grants)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let result = (|| -> Result<_> {
+        let (held, changed) = record_inputs(&workspace, plan)?;
+        let root = workspace.artifact_root()?;
+        let mut missing: Option<BTreeSet<(String, String, usize)>> = None;
+        let mut count = None;
+        for (index, bytes) in records.iter().enumerate() {
+            ensure!(
+                !interrupts.interrupted()?,
+                "test-record evaluation interrupted"
+            );
+            ensure!(
+                std::time::Instant::now() < deadline,
+                "test-record evaluation exceeded deadline"
+            );
+            let name = format!("record-{index}.sqlite");
+            let mut file = root.open_with(
+                &name,
+                OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o600)
+                    .custom_flags(libc::O_NOFOLLOW),
+            )?;
+            file.write_all(bytes)?;
+            file.sync_all()?;
+            workspace.verify_artifact_root(&root)?;
+            let (current, untested) = conductor_native::test_record_untested::untested_owned(
+                &workspace.path(),
+                &workspace.runtime().join(&name),
+                &changed,
+            )?;
+            if let Some(previous) = count {
+                ensure!(previous == current, "changed function count drift");
+            }
+            count = Some(current);
+            let current: BTreeSet<_> = untested.into_iter().collect();
+            missing = Some(intersect_missing(missing, current));
+        }
+        ensure!(
+            !interrupts.interrupted()?,
+            "test-record evaluation interrupted"
+        );
+        ensure!(
+            std::time::Instant::now() < deadline,
+            "test-record evaluation exceeded deadline"
+        );
+        for file in held {
+            file.verify()?;
+        }
+        workspace.verify_artifact_root(&root)?;
+        Ok((
+            count.unwrap_or(0),
+            missing.unwrap_or_default().into_iter().collect(),
+        ))
+    })();
+    let cleanup = workspace.discard();
+    match (result, cleanup) {
+        (Ok(value), Ok(())) => {
+            ensure!(
+                !interrupts.interrupted()?,
+                "test-record cleanup interrupted"
+            );
+            ensure!(
+                std::time::Instant::now() < deadline,
+                "test-record evaluation exceeded deadline"
+            );
+            Ok(value)
+        }
+        (result, cleanup) => anyhow::bail!(
+            "test-record evaluation={:?}; workspace cleanup={:?}",
+            result.err(),
+            cleanup.err()
+        ),
+    }
 }
 
 #[cfg(test)]

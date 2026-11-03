@@ -9,7 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 use support::{assert_error, module, path, text, Case};
 
 const MAIN_BRANCH: &str = "codex/audit-rust-20260903";
@@ -106,52 +106,6 @@ fn resolved(py: Python<'_>, repo: &Path, entries: &[(&str, &str)]) -> String {
             .call1((path(py, repo), environment(py, entries)))
             .unwrap(),
     )
-}
-
-fn claim_cli(py: Python<'_>, repo: &Path, owner: Option<&str>) -> Output {
-    let executable: String = PyModule::import(py, "sys")
-        .unwrap()
-        .getattr("executable")
-        .unwrap()
-        .extract()
-        .unwrap();
-    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join("src")
-        .canonicalize()
-        .unwrap();
-    let mut python_path = source.into_os_string();
-    if let Some(inherited) = std::env::var_os("PYTHONPATH") {
-        python_path.push(":");
-        python_path.push(inherited);
-    }
-    let mut command = Command::new(executable);
-    command
-        .args(["-m", "conductor.candidate_review.cli", "claim", "--repo"])
-        .arg(repo)
-        .args([
-            "--justification",
-            "identity contract",
-            "--expected-minutes",
-            "5",
-            "--max-minutes",
-            "10",
-        ])
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("PYTHONPATH", python_path)
-        .env("GOVERNANCE_OWNER", "")
-        .env("PYTHONDONTWRITEBYTECODE", "1")
-        .env("CUDA_VISIBLE_DEVICES", "")
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_COMMON_DIR")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_OBJECT_DIRECTORY")
-        .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES");
-    if let Some(owner) = owner {
-        command.args(["--owner", owner]);
-    }
-    command.arg("pkg/mod.py").output().expect("run claim CLI")
 }
 
 #[test]
@@ -351,42 +305,5 @@ fn the_legacy_vendor_of_a_lane_survives_a_bare_shell() {
                 expected
             );
         }
-    });
-}
-
-#[test]
-fn a_claim_defaults_to_the_lane_that_will_write_it() {
-    let case = isolated_case();
-    let repo = main_checkout(&case);
-    Python::attach(|py| {
-        let output = claim_cli(py, &repo, None);
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        assert!(String::from_utf8_lossy(&output.stdout).contains("owner=codex-audit-rust-20260903"));
-    });
-}
-
-#[test]
-fn claiming_as_another_lane_is_refused() {
-    let case = isolated_case();
-    let repo = main_checkout(&case);
-    Python::attach(|py| {
-        let output = claim_cli(py, &repo, Some(TREE_NAME));
-        assert_eq!(output.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&output.stderr).contains("is not this lane"));
-    });
-}
-
-#[test]
-fn claiming_as_a_bare_vendor_is_refused() {
-    let case = isolated_case();
-    let repo = main_checkout(&case);
-    Python::attach(|py| {
-        let output = claim_cli(py, &repo, Some("codex"));
-        assert_eq!(output.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&output.stderr).contains("names a vendor"));
     });
 }

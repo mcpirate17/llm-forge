@@ -78,10 +78,28 @@ def _start(config: pytest.Config) -> None:
     global _recorder, _owner, _store, _tool
     from conductor_native import TestRecorder, test_record_config_native
 
-    resolved = test_record_config_native(str(config.rootpath))
+    # Supervised review selects the captured declaration independently from
+    # pytest discovery; all windows use the candidate-root path namespace.
+    owned_root = os.environ.get("FORGE_TEST_RECORD_ROOT")
+    owned_config = os.environ.get("FORGE_TEST_RECORD_CONFIG")
+    if bool(owned_root) != bool(owned_config):
+        raise pytest.UsageError("owned test recording requires root and config")
+    config_dir = os.path.dirname(owned_config) if owned_config else str(config.rootpath)
+    resolved = test_record_config_native(config_dir)
+    if owned_root and (resolved is None or not resolved[2]):
+        raise pytest.UsageError("owned test recording requires enabled line recording")
     if resolved is None:
         return
     root, store, lines, environment = resolved
+    if owned_root:
+        if (not os.path.isabs(owned_root) or not os.path.isabs(owned_config)
+                or os.path.realpath(os.path.join(root, "pyproject.toml")) != os.path.realpath(owned_config)
+                or os.path.commonpath((os.path.realpath(owned_root), root)) != os.path.realpath(owned_root)):
+            raise pytest.UsageError("owned recorder declaration differs from selected candidate config")
+        root = os.path.realpath(owned_root)
+    # The native supervised shard can select its own private output; enablement
+    # remains the captured project configuration and recording stays native.
+    store = os.environ.get("FORGE_TEST_RECORD_STORE", store)
     monitoring = sys.monitoring
     free = [tool for tool in _TOOL_IDS if monitoring.get_tool(tool) is None]
     if not free:

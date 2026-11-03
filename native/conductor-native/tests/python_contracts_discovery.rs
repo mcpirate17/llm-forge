@@ -541,12 +541,7 @@ fn final_candidate_helpers_select_their_exact_rust_targets() {
     let candidate = [
         "python_contracts_candidate_review_flow_a",
         "python_contracts_candidate_review_flow_b",
-        "python_contracts_candidate_review_evidence",
-        "python_contracts_candidate_review_waivers",
-        "python_contracts_candidate_review_hardening",
-        "python_contracts_candidate_review_scan",
         "python_contracts_candidate_runtime_a",
-        "python_contracts_candidate_runtime_b",
     ];
     let audit = [
         "python_contracts_mutation_patch_audit_a",
@@ -556,13 +551,12 @@ fn final_candidate_helpers_select_their_exact_rust_targets() {
     let all = candidate
         .iter()
         .copied()
-        .chain(["python_contracts_candidate_call_evidence"])
         .chain(audit)
         .collect::<std::collections::BTreeSet<_>>();
     for (helper, expected) in [
         ("candidate_review_support.rs", candidate.as_slice()),
         ("git_fixture_support.rs", candidate.as_slice()),
-        ("candidate_runtime_support.rs", &candidate[6..]),
+        ("candidate_runtime_support.rs", &candidate[2..]),
         ("mutation_audit_support.rs", audit.as_slice()),
         ("support.rs", &[][..]),
     ] {
@@ -733,8 +727,6 @@ fn changed_rust_contract_and_shared_helper_select_their_cargo_targets() {
             "python_contracts_mutation_support_process",
             "python_contracts_mutation_testing_core",
             "python_contracts_mutation_testing_evidence",
-            "python_contracts_native_test_selection",
-            "python_contracts_receipt_scope",
             "python_contracts_reuse_audit_inventory",
             "python_contracts_reuse_consolidation",
             "python_contracts_reuse_file_families",

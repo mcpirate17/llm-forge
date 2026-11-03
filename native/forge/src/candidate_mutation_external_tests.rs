@@ -112,3 +112,57 @@ fn only_added_production_lines_or_sampled_native_mappings_block() {
         .admitted
     );
 }
+
+#[test]
+fn invariant_artifact_must_bind_exact_torch_node_phase_and_probe() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let req = request();
+    let probe = Probe {
+        path: root.join("probe"),
+        sha256: "a".repeat(64),
+    };
+    let data = json!({"snapshot_root": root});
+    let valid = json!({"schema_version": 1, "nodeid": req.nodeid, "phase": "baseline",
+        "torch_version": req.pinned_torch, "probe_sha256": probe.sha256,
+        "coverage": {"files": {}}, "native": []});
+    let artifact = |value: &Value| {
+        let bytes = serde_json::to_vec(value).unwrap();
+        crate::candidate_stage_artifact::Artifact {
+            sha256: format!("{:x}", Sha256::digest(&bytes)),
+            bytes,
+        }
+    };
+    assert!(decode(
+        &req,
+        "baseline",
+        &probe,
+        &data,
+        artifact(&valid),
+        root,
+        &BTreeSet::new()
+    )
+    .is_ok());
+    for (key, wrong) in [
+        ("torch_version", "stale"),
+        ("nodeid", "tests/other.py::test_x"),
+        ("phase", "node"),
+        ("probe_sha256", "wrong"),
+    ] {
+        let mut invalid = valid.clone();
+        invalid[key] = json!(wrong);
+        assert!(
+            decode(
+                &req,
+                "baseline",
+                &probe,
+                &data,
+                artifact(&invalid),
+                root,
+                &BTreeSet::new()
+            )
+            .is_err(),
+            "{key}"
+        );
+    }
+}

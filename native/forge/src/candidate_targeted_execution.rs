@@ -309,6 +309,7 @@ pub(crate) async fn run(
             plan,
             &permit,
             python_rows,
+            interrupts,
         )?),
         (None, None) => None,
         _ => anyhow::bail!("Python completion missing"),
