@@ -42,9 +42,7 @@ impl Preflight {
             "invalid checkout branch"
         );
         ensure!(
-            target.starts_with("refs/")
-                && git2::Reference::is_valid_name(target)
-                && target != branch,
+            target.starts_with("refs/") && git2::Reference::is_valid_name(target),
             "invalid integration ref"
         );
         let old = repo

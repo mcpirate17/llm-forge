@@ -157,6 +157,31 @@ fn actual_binary_even_and_ahead_outcomes_are_distinct() {
     assert_eq!(blocked["fast_forwardable"], false);
 }
 #[test]
+fn actual_binary_current_branch_target_and_local_fallback_are_even() {
+    let fixture = Fixture::new();
+    let before = image(&fixture.root);
+    for arguments in [
+        vec!["--target", "refs/heads/main", "--dry-run", "--json"],
+        vec!["--target", "main", "--json"],
+    ] {
+        let result = json(&fixture.run(&arguments), 0);
+        assert_eq!(result["outcome"], "even");
+        assert_eq!(result["target"], "refs/heads/main");
+        assert_eq!(result["old"], result["new"]);
+        assert_eq!(image(&fixture.root), before);
+    }
+    let repo = Repository::open(&fixture.root).unwrap();
+    repo.find_reference("refs/remotes/origin/main")
+        .unwrap()
+        .delete()
+        .unwrap();
+    let before = image(&fixture.root);
+    let result = json(&fixture.run(&["--dry-run", "--json"]), 0);
+    assert_eq!(result["outcome"], "even");
+    assert_eq!(result["target"], "refs/heads/main");
+    assert_eq!(image(&fixture.root), before);
+}
+#[test]
 fn actual_binary_interrupt_while_waiting_for_lease_emits_one_error_and_propagates_signal() {
     use std::{
         io::Read,
