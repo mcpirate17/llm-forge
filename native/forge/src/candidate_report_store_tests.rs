@@ -79,7 +79,9 @@ fn concurrent_cooperating_publishers_leave_one_complete_report() {
         jobs.push(std::thread::spawn(move || {
             let bytes = vec![value; 64 * 1024];
             barrier.wait();
-            publish(&path, &bytes).unwrap();
+            for _ in 0..16 {
+                publish(&path, &bytes).unwrap();
+            }
         }));
     }
     for job in jobs {
@@ -89,6 +91,32 @@ fn concurrent_cooperating_publishers_leave_one_complete_report() {
     assert_eq!(result.len(), 64 * 1024);
     assert!(result.iter().all(|byte| *byte == result[0]));
     assert_eq!(fs::read_dir(&root.0).unwrap().count(), 1);
+}
+
+#[test]
+fn parent_lease_serializes_publishers_and_releases_after_success_or_failure() {
+    let root = Fixture::new();
+    let output = root.0.join("report");
+    for fail in [false, true] {
+        let result = publish_locked(&output, b"complete", |parent| {
+            assert!(crate::file_lock::Exclusive::try_new(
+                parent.open(".")?.into_std(),
+                "contending report publisher",
+            )
+            .is_err());
+            ensure!(!fail, "injected pre-publication failure");
+            Ok(())
+        });
+        assert_eq!(result.is_err(), fail);
+        let lease = crate::file_lock::Exclusive::try_new(
+            fs::File::open(&root.0).unwrap(),
+            "subsequent report publisher",
+        )
+        .unwrap();
+        assert_eq!(fs::read(&output).unwrap(), b"complete");
+        assert_eq!(fs::read_dir(&root.0).unwrap().count(), 1);
+        drop(lease);
+    }
 }
 
 #[test]

@@ -1,4 +1,5 @@
-//! Nonblocking exclusive flock ownership. Explicit unlock matters even with
+//! Exclusive flock ownership, with explicit nonblocking and blocking admission.
+//! Explicit unlock matters even with
 //! CLOEXEC: a duplicate or a concurrent fork can keep the open-file description
 //! alive after the owner closes its descriptor.
 use anyhow::{ensure, Context, Result};
@@ -15,6 +16,21 @@ pub struct Lease {
 pub type Exclusive = Lease;
 
 impl Lease {
+    /// Serialize cooperating publishers on an independently opened descriptor.
+    /// Callers must not already hold a lock on the same inode through another
+    /// open-file description; flock does not provide recursive acquisition.
+    pub fn blocking(file: File, purpose: &'static str) -> Result<Self> {
+        loop {
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
+                return Ok(Self { file, purpose });
+            }
+            let error = std::io::Error::last_os_error();
+            if error.kind() != std::io::ErrorKind::Interrupted {
+                return Err(error).with_context(|| format!("lock {purpose}"));
+            }
+        }
+    }
+
     pub fn try_new(file: File, purpose: &'static str) -> Result<Self> {
         ensure!(
             unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,

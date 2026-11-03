@@ -1,4 +1,6 @@
 //! Atomic report exports under an operator-controlled directory tree.
+//! Cooperating publishers serialize with a parent-directory flock. This may
+//! wait for another publisher; callers must not already hold that directory lock.
 //! Parent components are pinned without following symlinks. Moving or replacing
 //! a pinned parent, or swapping final entries between checks, by the same UID is
 //! outside the trusted-parent contract; rename never opens or truncates the leaf.
@@ -64,7 +66,8 @@ fn check_destination(parent: &Dir, name: &OsStr) -> Result<()> {
         Ok(meta) => {
             ensure!(
                 meta.is_file() && meta.uid() == unsafe { libc::geteuid() } && meta.nlink() == 1,
-                "existing report must be an owned singly linked regular file"
+                "existing report must be an owned singly linked regular file (mode={:o}, uid={}, links={})",
+                meta.mode(), meta.uid(), meta.nlink()
             );
             Ok(())
         }
@@ -116,8 +119,23 @@ fn cleanup(parent: &Dir, name: &OsStr, file: &File) -> Result<()> {
 
 /// Atomically replace an owned report with at most 16 MiB of complete bytes.
 pub fn publish(path: &Path, bytes: &[u8]) -> Result<()> {
+    publish_locked(path, bytes, |_| Ok(()))
+}
+
+fn publish_locked(
+    path: &Path,
+    bytes: &[u8],
+    after_lock: impl FnOnce(&Dir) -> Result<()>,
+) -> Result<()> {
     ensure!(bytes.len() <= MAX_BYTES, "report exceeds 16 MiB");
     let (parent, name) = open_parent(path)?;
+    // Reopening gives this publisher its own open-file description; cloning a
+    // descriptor shared with a peer would not serialize their flock ownership.
+    let _lease = crate::file_lock::Exclusive::blocking(
+        parent.open(".")?.into_std(),
+        "report parent directory",
+    )?;
+    after_lock(&parent)?;
     check_destination(&parent, &name)?;
     let (stage_name, held) = stage(&parent, bytes)?;
     let result = (|| -> Result<()> {
