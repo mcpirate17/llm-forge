@@ -507,7 +507,3 @@ required-features = ["python-compat-tests"]
 [[test]]
 name = "python_contracts_worktree_reap"
 required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_worktree_runtime"
-required-features = ["python-compat-tests"]

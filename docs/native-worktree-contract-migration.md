@@ -1,25 +1,23 @@
 # Worktree contract migration
 
-This cohort gives Rust ownership of the assertions and fixture data for four
-Python API contract suites. The production Python APIs remain the compatibility
-subjects called through PyO3. None of the Rust targets imports `conftest.py` or
-a Python test module.
+This cohort originally gave Rust ownership of the assertions and fixture data
+for four Python API contract suites. Console-launcher relocation is now fully
+native through `forge worktree-runtime`; its production Python API and PyO3
+parity target are retired. The other three production Python APIs remain
+compatibility subjects called through PyO3. None of those Rust targets imports
+`conftest.py` or a Python test module.
 
 | Python source | Rust target | Expanded cases |
 | --- | --- | ---: |
-| `src/conductor/test_worktree_runtime.py` | `python_contracts_worktree_runtime` | 3 |
 | `src/conductor/test_worktree_lease.py` | `python_contracts_worktree_lease` | 11 |
 | `src/conductor/test_snapshot_worktree.py` | `python_contracts_snapshot_worktree` | 7 |
 | `src/conductor/test_crg_seed_worktree.py` | `python_contracts_crg_seed_worktree` | 7 |
-| **Total** | | **28** |
+| **Remaining PyO3 total** | | **25** |
 
 ## Case map
 
 | Python case | Rust case |
 | --- | --- |
-| `test_relocation_is_idempotent_and_leaves_non_python_or_nonregular_entries_linked` | `relocation_is_idempotent_and_leaves_non_python_or_nonregular_entries_linked` |
-| `test_relocation_refuses_the_same_or_incomplete_venv` | `relocation_refuses_same_or_incomplete_venv` |
-| `test_relocation_refuses_a_destination_bin_symlink_to_the_source` | `relocation_refuses_destination_bin_symlink_without_touching_source` |
 | `test_a_lease_records_the_owner_purpose_and_a_deadline_it_computed` | `lease_records_trimmed_owner_purpose_and_computed_deadline` |
 | `test_an_unexplained_or_unowned_lease_is_refused` | `unexplained_or_unowned_lease_is_refused_without_file` |
 | `test_a_lease_longer_than_a_week_or_no_time_at_all_is_refused[0.0]` | `lease_hours_refuses_zero` |
@@ -65,8 +63,6 @@ construction still run.
 The provider rows for the registry are:
 
 ```text
-src/conductor/worktree_runtime.py	python_contracts_worktree_runtime
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_worktree_runtime
 src/conductor/worktree_lease.py	python_contracts_worktree_lease
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_worktree_lease
 native/conductor-native/tests/python_contracts/worktree_migration_support.rs	python_contracts_worktree_lease
@@ -97,3 +93,16 @@ An executable source audit found no imports of the four Python test modules
 outside their own files; pytest collection is their only executable importer.
 The target-to-case map above records the assertions retained when the four
 Python originals are retired from this cohort.
+
+## Native console-launcher relocation
+
+`forge worktree-runtime SOURCE_VENV DESTINATION_VENV [--json]` replaces the retired
+`python -m conductor.worktree_runtime` surface. It only repairs launchers in two
+existing environments; it does not create worktrees, clone environments or run
+interpreters. Native unit and binary tests replace the former three PyO3 cases,
+including hardlink copy-on-write, destination permissions, exact shebang matching,
+CRLF, idempotence, skipped links/binaries/nonregular entries, and refusal of same,
+incomplete or symlinked operands. Additional controls exercise metadata-only
+interpreter symlinks, bounds, cancellation and preservation of raced foreign data.
+See [native runtime relocation](native-runtime-relocation.md) for the result
+contract and publication boundary.

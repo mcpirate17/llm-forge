@@ -291,3 +291,8 @@ pub(crate) mod workspace_hygiene_inputs;
 pub mod workspace_hygiene_report;
 #[cfg(target_os = "linux")]
 pub mod workspace_integration;
+
+#[cfg(target_os = "linux")]
+pub mod worktree_runtime;
+#[cfg(target_os = "linux")]
+pub mod worktree_runtime_cli;

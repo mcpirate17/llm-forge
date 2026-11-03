@@ -94,6 +94,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Relocate exact console-script shebangs between two existing virtualenvs.
+    #[cfg(target_os = "linux")]
+    WorktreeRuntime(forge::worktree_runtime_cli::RuntimeArgs),
     /// Preserve dirty layers while fast-forwarding, or conditionally recover a journal.
     #[cfg(target_os = "linux")]
     CheckoutSync(forge::checkout_sync_cli::CheckoutSyncArgs),
@@ -388,6 +391,8 @@ fn main() -> ExitCode {
     let cli = Cli::parse_from(mutation_receipt_verify::normalize_args(std::env::args_os()));
     match cli.command {
         #[cfg(target_os = "linux")]
+        Command::WorktreeRuntime(args) => run_worktree_runtime(args),
+        #[cfg(target_os = "linux")]
         Command::CheckoutSync(args) => run_checkout_sync(args),
         #[cfg(target_os = "linux")]
         Command::WorkspaceHygiene(args) => run_workspace_hygiene(args),
@@ -493,6 +498,15 @@ fn run_workspace_hygiene(args: forge::workspace_hygiene_report::HygieneArgs) -> 
     command_exit(
         "workspace-hygiene",
         forge::workspace_hygiene_report::run(args),
+        2,
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn run_worktree_runtime(args: forge::worktree_runtime_cli::RuntimeArgs) -> ExitCode {
+    command_exit(
+        "worktree-runtime",
+        forge::worktree_runtime_cli::run(args),
         2,
     )
 }

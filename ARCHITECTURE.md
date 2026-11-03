@@ -6,7 +6,7 @@ chronological implementation log; detailed contracts and historical receipts
 belong in the linked documents.
 
 The native migration remains active. The current live `src/` inventory
-contains 84 Python source files, including fixtures under
+contains 83 Python source files, including fixtures under
 `src/conductor/testdata/`; this is not a count of remaining production cores.
 The integration baseline before the native review batch was `838474b`;
 validation scope is summarized under Evidence below.
@@ -272,6 +272,15 @@ durable phase records detect intervention; affected path writers must honor the
 cooperative lease. The native CLI and Make target replace the deleted Python
 actor. See [native checkout sync](docs/native-checkout-sync.md).
 
+`forge worktree-runtime` repairs console launchers in two explicitly named,
+existing environments without creating worktrees or launching an interpreter.
+Native copy-on-write publication preserves hardlinked source files, destination
+modes and script bodies. Bounded capability-relative access and cooperative
+directory locks reject unsafe paths and retain detected raced entries; the
+operation is not a batch transaction or hostile same-UID isolation. The Python
+adapter and its compatibility test are deleted. See
+[native runtime relocation](docs/native-runtime-relocation.md).
+
 `make governance-fix` invokes `forge candidate fix` with a JSON paths file,
 operator grants and a SHA-pinned native Ruff executable. The default CLI path
 only admits inputs; explicit execution supervises Ruff 0.16.5 stdin filters with
@@ -385,7 +394,7 @@ latency claim is supported.
 
 ## Remaining migration
 
-The native migration remains open. The live source inventory is 84 Python
+The native migration remains open. The live source inventory is 83 Python
 files under `src/`, including testdata fixtures; that count says nothing by
 itself about reachability,
 behavioral coverage or runtime usage. Remaining work is tracked by live
