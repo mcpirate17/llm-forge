@@ -178,22 +178,41 @@ fn python_fixture_and_toml_provider_select_their_contracts_and_stay_safe() {
 }
 
 #[test]
-fn rust_fixture_include_selects_the_corpus_and_requires_its_registry_row() {
+fn rust_fixture_include_selects_target_and_requires_its_registry_row() {
     let fixture = Fixture::new();
-    let path = "native/conductor-native/tests/fixtures/workspace_exposure_corpus.rs";
-    let selected = plan(&fixture.root, &[path.to_owned()]).unwrap();
-    assert_eq!(
-        selected.targets,
-        ["python_contracts_workspace_exposure_corpus"]
-    );
+    let path = "native/conductor-native/tests/fixtures/include_probe.rs";
     let file = fixture.root.join(path);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "pub fn fixture_probe() {}\n").unwrap();
+    let target = fixture
+        .root
+        .join(TEST_DIR)
+        .join("python_contracts_gate_rollout.rs");
+    fs::write(
+        &target,
+        format!(
+            "{}\n#[path = \"fixtures/include_probe.rs\"] mod include_probe;\n",
+            fs::read_to_string(&target).unwrap()
+        ),
+    )
+    .unwrap();
+    let registry = fixture.root.join(REGISTRY_EXTENSION_PATH);
+    fs::write(
+        &registry,
+        format!(
+            "{}\n{path}\tpython_contracts_gate_rollout\n",
+            fs::read_to_string(&registry).unwrap()
+        ),
+    )
+    .unwrap();
+    let selected = plan(&fixture.root, &[path.to_owned()]).unwrap();
+    assert_eq!(selected.targets, ["python_contracts_gate_rollout"]);
     fs::remove_file(&file).unwrap();
     assert!(plan(&fixture.root, &[path.to_owned()])
         .unwrap_err()
         .to_string()
         .contains("mapped contract file missing"));
-    fs::copy(repo_root().join(path), &file).unwrap();
-    let registry = fixture.root.join(REGISTRY_EXTENSION_PATH);
+    fs::write(&file, "pub fn fixture_probe() {}\n").unwrap();
     let rows = fs::read_to_string(&registry).unwrap();
     fs::write(
         &registry,
@@ -203,13 +222,13 @@ fn rust_fixture_include_selects_the_corpus_and_requires_its_registry_row() {
             .join("\n"),
     )
     .unwrap();
-    assert!(plan(
-        &fixture.root,
-        &["src/conductor/workspace_hygiene.py".to_owned()]
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("contract fixture include missing from registry"));
+    let error = plan(&fixture.root, &["src/conductor/gate_rollout.py".to_owned()]).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("contract fixture include missing from registry"),
+        "{error:#}"
+    );
 }
 
 #[test]

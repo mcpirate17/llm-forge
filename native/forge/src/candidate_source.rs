@@ -85,7 +85,7 @@ pub struct Source {
     common_dir: PathBuf,
 }
 
-pub(super) fn safe_path(raw: &[u8]) -> Result<&str> {
+pub(crate) fn safe_path(raw: &[u8]) -> Result<&str> {
     let path = std::str::from_utf8(raw).context("non-UTF-8 Git paths are unsupported")?;
     ensure!(
         !path.is_empty()

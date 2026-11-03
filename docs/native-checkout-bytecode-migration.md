@@ -1,5 +1,10 @@
 # Bytecode isolation, checkout sync, and policy crash test migration
 
+The checkout-sync portion below records an earlier test migration. Its Python
+implementation and compatibility target are now deleted; the replacement and
+current native controls are documented in [native checkout sync](native-checkout-sync.md).
+The bytecode and policy-crash targets remain separate, live compatibility tests.
+
 The 23 test cases in three Python test modules now have Rust-owned drivers. They call the shipped Python APIs through PyO3 where behavior depends on Python, use temporary fixture repositories or directories, and retain the exact Python input programs needed to test bytecode caching and traceback frames. They do not import the retired Python test modules or `conftest.py`.
 
 | Retired Python module | Rust target | Cases |

@@ -1,5 +1,10 @@
 # Workspace and exposure corpus contract migration
 
+The hygiene and Python exposure targets below record an earlier migration and
+have now been deleted with the Python hygiene implementation. The full
+[native report](native-workspace-hygiene.md) and frozen native exposure corpus
+cover those surfaces. The worktree-reaper compatibility target remains live.
+
 Rust owns fixtures, process and Git setup, callbacks, control flow, and
 assertions. PyO3 calls the shipped Python APIs directly. The two Conductor
 Python test files (49 cases) retired after the native target selection was

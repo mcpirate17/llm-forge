@@ -341,8 +341,8 @@ crg-probe crg-check:  ## Verify the native MCP binding; MCP_SOCKET must name the
 
 # ── Workspace / branch hygiene ───────────────────────────────────────────
 
-workspace-hygiene:  ## Read-only: what is safe to delete (branches, worktrees, claims) and what breaks a clean clone
-	$(PYTHON) -m conductor.workspace_hygiene
+workspace-hygiene:  ## Read-only native claims, imports, checkout drift and workspace exposure report
+	"$(FORGE)" workspace-hygiene --repo "$(CONDUCTOR_HOST_ROOT)"
 
 branch-policy branch-policy-status:  ## Branch binding status: live claim/branch pairs, age, PR number, staleness
 	"$(FORGE)" branch-policy --repo "$(CONDUCTOR_HOST_ROOT)" status
@@ -350,8 +350,12 @@ branch-policy branch-policy-status:  ## Branch binding status: live claim/branch
 branch-policy-audit:  ## Check every branch-policy rule decidable without a push; exits 1 on violations
 	"$(FORGE)" branch-policy --repo "$(CONDUCTOR_HOST_ROOT)" audit
 
-checkout-sync:  ## Snapshot the dirty tree, then fast-forward this checkout onto the remote line
-	$(PYTHON) -m conductor.checkout_sync --repo "$(CONDUCTOR_HOST_ROOT)"
+# Explicit operator-controlled private recovery parent; dry runs need no parent.
+CHECKOUT_SYNC_RECOVERY_DIR ?=
+CHECKOUT_SYNC_ARGS ?=
+checkout-sync:  ## Native guarded dirty-layer fast-forward (set CHECKOUT_SYNC_RECOVERY_DIR)
+	"$(FORGE)" checkout-sync --repo "$(CONDUCTOR_HOST_ROOT)" \
+		$(if $(CHECKOUT_SYNC_RECOVERY_DIR),--recovery-dir "$(CHECKOUT_SYNC_RECOVERY_DIR)") $(CHECKOUT_SYNC_ARGS)
 
 dead-tests:  ## Import-closure dead-test finder: broken tests, test-only targets, unreferenced sources
 	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)"

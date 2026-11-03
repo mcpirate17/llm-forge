@@ -8,7 +8,7 @@ mod support;
 use pyo3::prelude::*;
 use std::path::Path;
 use std::process::Command;
-use support::{module, path, text, AttrPatch, Case};
+use support::{module, path, Case};
 
 const CAMPAIGNS: &str = "conductor/mutation_campaigns";
 const TEST_FILE: &str = "research/tests/test_thing.py";
@@ -72,24 +72,6 @@ fn drift_scans_a_fragment_registered_campaign() {
             .extract()
             .unwrap();
         assert_eq!(missing, [format!("{TEST_FILE}::test_b")]);
-    });
-}
-
-#[test]
-fn hygiene_does_not_orphan_fragment_registered_manifests() {
-    let case = Case::new();
-    Python::attach(|py| {
-        let subject = module(py, "conductor.workspace_hygiene");
-        let directory = text(&subject.getattr("CAMPAIGN_DIR").unwrap());
-        fragment_only_registry(&case, &directory, &format!("{directory}/reg.json"));
-        case.write(&format!("{directory}/reg.json"), "{}");
-        case.write(&format!("{directory}/stray.json"), "{}");
-        let _root = AttrPatch::replace(subject.as_any(), "ROOT", path(py, case.root()).as_any());
-        let state = subject.getattr("manifest_state").unwrap().call0().unwrap();
-        let orphans: Vec<String> = state.get_item(0).unwrap().extract().unwrap();
-        let dangling: Vec<String> = state.get_item(1).unwrap().extract().unwrap();
-        assert_eq!(orphans, [format!("{directory}/stray.json")]);
-        assert!(dangling.is_empty());
     });
 }
 

@@ -33,15 +33,9 @@ pub(super) fn probe(
     crate::process_probe::run(&mut command, Duration::from_secs(seconds), 1024 * 1024)
 }
 pub(super) fn git(root: &Path, args: &[&str]) -> Result<String> {
-    let output = probe(root, Path::new("git"), args, 15)?;
-    anyhow::ensure!(
-        output.status.success(),
-        "git {} failed: {}",
-        args.join(" "),
-        String::from_utf8_lossy(&output.stderr).trim()
-    );
-    Ok(String::from_utf8(output.stdout)?)
+    crate::workspace_integration::git(root, args)
 }
+
 pub(super) fn gh() -> Option<PathBuf> {
     let path = std::env::var_os("PATH").unwrap_or_else(|| "/bin:/usr/bin".into());
     for directory in std::env::split_paths(&path) {
@@ -246,7 +240,7 @@ fn branches(root: &Path, live: &str, now: f64) -> Result<(Value, bool, Vec<Strin
     }
     Ok((json!(rows), program.is_some(), errors))
 }
-pub(super) fn data(
+pub(crate) fn data(
     root: &Path,
     operation: &str,
     live: Option<&str>,
@@ -293,7 +287,7 @@ pub(super) fn data(
 pub(super) fn report(root: &Path) -> Result<Value> {
     data(root, "report", None, 24.0)
 }
-pub(super) fn render(report: &Value) -> Result<String> {
+pub(crate) fn render(report: &Value) -> Result<String> {
     let rows = |key: &str| {
         report[key]
             .as_array()

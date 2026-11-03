@@ -115,11 +115,13 @@ prevent a cleanup suggestion. Suggestions can include containment, merged PR,
 gone remote branch, expired lease, idle files or stale registration; they do not
 remove registrations, paths, refs or claims.
 
-The remaining Python `workspace_hygiene` command still handles its other hygiene
-surfaces. Its exposure functions transport requests to the native report and
-renderer; that Python adapter has not been retired. `make workspace-hygiene`
-still invokes it. The native branch-policy CLI and its Make targets no longer
-invoke the deleted Python branch-policy module.
+The full [native workspace hygiene report](native-workspace-hygiene.md) now reads
+claims and all report inputs in process; `make workspace-hygiene` routes directly
+to it. The Python module and old exposure transport still remain for the legacy
+checkout-sync dependency and compatibility callers. Their complete retirement
+requires the guarded checkout-sync actor; this report does not implement it.
+The native branch-policy CLI and its Make targets do not invoke the deleted
+Python branch-policy module.
 
 ## Evidence boundary
 

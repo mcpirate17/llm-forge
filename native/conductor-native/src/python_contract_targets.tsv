@@ -389,14 +389,6 @@ native/conductor-native/tests/python_contracts/support.rs	python_contracts_sandb
 native/conductor-native/tests/python_contracts/agent_comm_support.rs	python_contracts_sandbox
 src/conductor/bytecode_isolation.py	python_contracts_bytecode_isolation
 native/conductor-native/tests/python_contracts/support.rs	python_contracts_bytecode_isolation
-src/conductor/checkout_sync.py	python_contracts_checkout_sync
-src/conductor/workspace_hygiene.py	python_contracts_checkout_sync
-src/conductor/worktree_reap.py	python_contracts_checkout_sync
-src/conductor/project_paths.py	python_contracts_checkout_sync
-src/conductor/_native.py	python_contracts_checkout_sync
-native/conductor-native/src/project_paths.rs	python_contracts_checkout_sync
-native/conductor-native/src/lib.rs	python_contracts_checkout_sync
-native/conductor-native/tests/python_contracts/support.rs	python_contracts_checkout_sync
 src/conductor/equivalence_gate.py	python_contracts_policy_engine_crash
 native/slop-core/src/gate_report.rs	python_contracts_policy_engine_crash
 src/conductor/_native.py	python_contracts_policy_engine_crash

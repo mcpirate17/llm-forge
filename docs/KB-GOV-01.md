@@ -27,8 +27,8 @@ Two independent safety nets, and both are load-bearing:
   outside its scope changed, then release it. A released claim frees the paths for the
   next agent immediately; an abandoned one blocks them until it expires.
 * llm-forge ships the primitives a claim registry is built from —
-  `conductor.worktree_lease` (per-worktree lease state), `conductor.workspace_hygiene`
-  (reports stale or unleased trees), `conductor.checkout_sync` (keeps a shared checkout
+  `conductor.worktree_lease` (per-worktree lease state), `forge workspace-hygiene`
+  (reports stale or unleased trees), `forge checkout-sync` (keeps a shared checkout
   even with the integration branch) — a host project wires these into its own
   `make governance-claim` / `make governance-check` / `make governance-release-claim`
   style targets, the way this repository wires `make gate` around `forge candidate gate`.

@@ -1,6 +1,6 @@
 [package]
 name = "forge"
-version = "0.8.20"
+version = "0.8.21"
 edition = "2021"
 description = "Native hooks, resource-aware task execution, audit and cost tooling for AI agents"
 autobins = false
@@ -96,6 +96,8 @@ regex = "1"
 walkdir = "2"
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = "0.10"
+# Checksum rewritten Git index bytes when discarding the reconstructible TREE cache.
+sha1 = "0.10"
 libc = "0.2"
 landlock = "0.4.7"
 toml = "0.8"
@@ -120,7 +122,6 @@ lto = "thin"
 codegen-units = 1
 
 [dev-dependencies]
-sha1 = "0.10"
 tempfile = "3"
 quick-xml = "0.41"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

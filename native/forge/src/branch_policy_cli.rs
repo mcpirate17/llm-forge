@@ -1,6 +1,6 @@
 //! Branch reports and atomic claim-binding metadata. Never mutates Git refs.
 #[path = "branch_policy_exposure.rs"]
-mod exposure;
+pub(crate) mod exposure;
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 use conductor_native::branch_policy_runtime as core;

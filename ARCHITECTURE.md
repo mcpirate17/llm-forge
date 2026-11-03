@@ -6,7 +6,7 @@ chronological implementation log; detailed contracts and historical receipts
 belong in the linked documents.
 
 The native migration remains active. The current live `src/` inventory
-contains 86 Python source files, including fixtures under
+contains 84 Python source files, including fixtures under
 `src/conductor/testdata/`; this is not a count of remaining production cores.
 The integration baseline before the native review batch was `838474b`;
 validation scope is summarized under Evidence below.
@@ -257,9 +257,20 @@ The branch status/audit Make targets call it directly. Bind/unbind update only
 locked common-Git-dir metadata; exposure provides PR/claim/commit/dirty/worktree
 rows and a conservative cleanup preview. It does not mutate Git refs or remove
 worktrees. Optional GitHub observations use the operator's `gh`; missing or
-failed observations remain visible. The Python `workspace_hygiene` command and
-its native exposure transport still remain. See
-[native branch policy](docs/native-branch-policy.md).
+failed observations remain visible. `forge workspace-hygiene` owns the full
+report, including validated in-process claims, registry fragments, import
+closure, leases and checkout drift. Its Python implementation has been deleted.
+See [native branch policy](docs/native-branch-policy.md) and
+[native workspace hygiene](docs/native-workspace-hygiene.md).
+
+`forge checkout-sync` owns offline preview, staged/unstaged reconciliation,
+guarded index/worktree/ref publication and conditional journal recovery. Preview
+shares planning with execution and creates no Git objects or snapshots. Applying
+transactions require an explicit private recovery parent outside the checkout
+and Git directories. Git lock reacquisition, inode/content observations and
+durable phase records detect intervention; affected path writers must honor the
+cooperative lease. The native CLI and Make target replace the deleted Python
+actor. See [native checkout sync](docs/native-checkout-sync.md).
 
 `make governance-fix` invokes `forge candidate fix` with a JSON paths file,
 operator grants and a SHA-pinned native Ruff executable. The default CLI path
@@ -374,7 +385,7 @@ latency claim is supported.
 
 ## Remaining migration
 
-The native migration remains open. The live source inventory is 86 Python
+The native migration remains open. The live source inventory is 84 Python
 files under `src/`, including testdata fixtures; that count says nothing by
 itself about reachability,
 behavioral coverage or runtime usage. Remaining work is tracked by live

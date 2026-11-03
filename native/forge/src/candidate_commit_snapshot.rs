@@ -401,6 +401,11 @@ fn commit_tree(
         .repository()
         .commit(None, &sig, &sig, message, &tree, parents)?)
 }
+/// Check bounded index shape and unsupported staged flags without writing it.
+pub(crate) fn validate_checkout_index(source: &Source) -> Result<()> {
+    let _ = index_state(source)?;
+    Ok(())
+}
 /// Captures staged and worktree trees, then creates one non-overwriting recovery ref.
 /// The staged tree is REF^1^{tree}; the worktree tree is REF^2^{tree}.
 pub(crate) fn create(source: &Source, limits: Limits) -> Result<Recovery> {
@@ -410,6 +415,29 @@ fn create_inner(
     source: &Source,
     limits: Limits,
     on_captured: impl FnOnce() -> Result<()>,
+) -> Result<Recovery> {
+    create_named_inner(source, limits, None, on_captured, |_, _| Ok(()))
+}
+/// Capture with a caller-selected recovery ref. The callback must durably
+/// journal the exact name and commit immediately before ref publication.
+pub(crate) fn create_named(
+    source: &Source,
+    limits: Limits,
+    reference: &str,
+    before_reference: impl FnOnce(&str, Oid) -> Result<()>,
+) -> Result<Recovery> {
+    ensure!(
+        reference.starts_with("refs/snapshots/") && git2::Reference::is_valid_name(reference),
+        "invalid snapshot ref"
+    );
+    create_named_inner(source, limits, Some(reference), || Ok(()), before_reference)
+}
+fn create_named_inner(
+    source: &Source,
+    limits: Limits,
+    selected_ref: Option<&str>,
+    on_captured: impl FnOnce() -> Result<()>,
+    before_reference: impl FnOnce(&str, Oid) -> Result<()>,
 ) -> Result<Recovery> {
     ensure!(
         limits.max_entries > 0 && limits.max_entries <= 100_000,
@@ -477,10 +505,14 @@ fn create_inner(
     )?;
     capture.verify()?;
     verify_binding(source, &head_state, &index_observation)?;
-    let reference = format!(
-        "refs/snapshots/forge/{}",
-        crate::native_id::new("snapshot")?
-    );
+    let reference = match selected_ref {
+        Some(reference) => reference.to_owned(),
+        None => format!(
+            "refs/snapshots/forge/{}",
+            crate::native_id::new("snapshot")?
+        ),
+    };
+    before_reference(&reference, merge)?;
     source
         .repository()
         .reference(&reference, merge, false, "Forge recovery snapshot")?;
@@ -490,6 +522,9 @@ fn create_inner(
         worktree_tree: worktree_oid,
     })
 }
+#[cfg(test)]
+#[path = "checkout_sync_snapshot_tests.rs"]
+mod checkout_sync_tests;
 #[cfg(test)]
 #[path = "candidate_commit_snapshot_tests.rs"]
 mod tests;

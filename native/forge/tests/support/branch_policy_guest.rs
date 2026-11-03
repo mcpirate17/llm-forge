@@ -20,7 +20,15 @@ fn main() -> io::Result<()> {
         }
         return Ok(());
     }
-    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    let all_args = std::env::args().skip(1).collect::<Vec<_>>();
+    let mut args = all_args.as_slice();
+    // Native read-only probes pass ordinary Git -c controls before the command.
+    while args.first().is_some_and(|value| value == "-c") {
+        if args.len() < 2 {
+            return Err(io::Error::other("missing Git config override"));
+        }
+        args = &args[2..];
+    }
     if args.starts_with(&["worktree".into(), "list".into()]) {
         let bytes = fs::read(std::env::var_os("FORGE_BRANCH_WORKTREE_INVENTORY").unwrap())?;
         io::stdout().write_all(&bytes)?;

@@ -1,6 +1,6 @@
 [package]
 name = "conductor-native"
-version = "0.1.93"
+version = "0.1.94"
 edition = "2021"
 description = "Native core of the conductor agent tooling: mutation campaigns, receipts, evidence and dead-test closure"
 
@@ -186,10 +186,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_check_protected_deletes"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_checkout_sync"
 required-features = ["python-compat-tests"]
 
 [[test]]
@@ -502,14 +498,6 @@ required-features = ["python-compat-tests"]
 
 [[test]]
 name = "python_contracts_vulture_audit"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_exposure_corpus"
-required-features = ["python-compat-tests"]
-
-[[test]]
-name = "python_contracts_workspace_hygiene"
 required-features = ["python-compat-tests"]
 
 [[test]]

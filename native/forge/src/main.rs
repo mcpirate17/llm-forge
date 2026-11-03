@@ -94,6 +94,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Preserve dirty layers while fast-forwarding, or conditionally recover a journal.
+    #[cfg(target_os = "linux")]
+    CheckoutSync(forge::checkout_sync_cli::CheckoutSyncArgs),
+    /// Full read-only workspace policy, ownership and checkout exposure report.
+    #[cfg(target_os = "linux")]
+    WorkspaceHygiene(forge::workspace_hygiene_report::HygieneArgs),
     /// Check native workspace runtime behavior with bounded, opt-in live probes.
     WorkspaceRuntime(workspace_runtime::RuntimeArgs),
     #[command(hide = true)]
@@ -381,6 +387,10 @@ fn propagate_child_signal(signal: i32) {
 fn main() -> ExitCode {
     let cli = Cli::parse_from(mutation_receipt_verify::normalize_args(std::env::args_os()));
     match cli.command {
+        #[cfg(target_os = "linux")]
+        Command::CheckoutSync(args) => run_checkout_sync(args),
+        #[cfg(target_os = "linux")]
+        Command::WorkspaceHygiene(args) => run_workspace_hygiene(args),
         Command::EquivalenceWorker(args) => command_exit(
             "equivalence-worker",
             equivalence_worker::run(args).map(|()| 0),
@@ -471,6 +481,20 @@ fn main() -> ExitCode {
         Command::Notes { action } => command_exit("notes", notes_index::run(action), 1),
         Command::Ledger { action } => run_ledger(action),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn run_checkout_sync(args: forge::checkout_sync_cli::CheckoutSyncArgs) -> ExitCode {
+    command_exit("checkout-sync", forge::checkout_sync_cli::run(args), 2)
+}
+
+#[cfg(target_os = "linux")]
+fn run_workspace_hygiene(args: forge::workspace_hygiene_report::HygieneArgs) -> ExitCode {
+    command_exit(
+        "workspace-hygiene",
+        forge::workspace_hygiene_report::run(args),
+        2,
+    )
 }
 
 fn run_mutation(action: MutationCommand) -> ExitCode {

@@ -12,14 +12,13 @@
 //! repository states from the same recipes, and compares Rust's own
 //! computation against it directly.
 //!
-//! `python_contracts_workspace_exposure_corpus.rs` checks the shipped Python
-//! implementation against the same expected lines. Both Rust tests rebuild
-//! the recipes with one shared fixture. The original Python test remains
-//! active until the test-selection policy retires it.
+//! The original Python implementation and its compatibility target have been
+//! retired. The shared native fixture and frozen expected lines continue to
+//! cover the original exposure contract without an interpreter.
 //!
-//! This crate has no lib target: `workspace_hygiene.rs` is pulled in via
-//! `#[path]`, the same way every other parity test in this crate includes its
-//! module under test.
+//! The session surface is included via `#[path]`; its shared resolver is now
+//! a native Forge library API. Historical expected data remains unchanged:
+//! only its explicitly retired command suffix is mapped to the native command.
 
 #[path = "../../conductor-native/tests/fixtures/workspace_exposure_corpus.rs"]
 mod corpus_fixture;
@@ -97,7 +96,13 @@ fn workspace_exposure_native_line_matches_the_frozen_corpus() {
         let expected_line = expected
             .get(id)
             .unwrap_or_else(|| panic!("no frozen expected line for case {id:?}"));
-        if &actual != expected_line {
+        let expected_line = format!(
+            "{}forge workspace-hygiene",
+            expected_line
+                .strip_suffix("python -m conductor.workspace_hygiene")
+                .expect("historical oracle must end with its old command hint")
+        );
+        if actual != expected_line {
             failures.push(format!(
                 "case {id:?}:\n  rust=    {actual}\n  expected={expected_line}"
             ));

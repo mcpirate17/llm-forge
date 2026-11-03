@@ -1,9 +1,8 @@
 //! Port of `conductor.workspace_hygiene`'s SessionStart surface: the cheap
 //! EXPOSED counts and the one-line inject they render
 //! (`workspace_hygiene.exposure_line`, which `session_preamble._exposure_line`
-//! used to embed). The full `--json` report stays in Python -- it needs `gh`
-//! per feature branch, the AST-based untracked-import closure, and the whole
-//! reaper engine -- none of which belongs on a sub-20ms SessionStart path.
+//! used to embed). The full native report is the explicit
+//! `forge workspace-hygiene` command; expensive observations stay off SessionStart.
 //!
 //! Git discipline: at most one invocation per fact. The local-only commit
 //! count is one `for-each-ref` (both exclusion namespaces at once; Python's
@@ -23,6 +22,7 @@
 
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
+#[cfg(test)]
 use std::process::Command;
 use std::time::SystemTime;
 
@@ -38,58 +38,32 @@ pub const DEFAULT_STALE_HOURS: f64 = 24.0;
 #[cfg(test)]
 pub(crate) static INTEGRATION_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+fn git_output(repo: &Path, args: &[&str]) -> Result<std::process::Output> {
+    forge::workspace_integration::probe(repo, args)
+}
 fn git_out(repo: &Path, args: &[&str]) -> Result<String> {
-    let done = Command::new("git")
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .map_err(|err| anyhow!("git {} failed to start: {err}", args.join(" ")))?;
+    let done = git_output(repo, args)?;
     if !done.status.success() {
-        let stderr = String::from_utf8_lossy(&done.stderr);
-        return Err(anyhow!("git {} failed: {}", args.join(" "), stderr.trim()));
+        return Err(anyhow!(
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&done.stderr).trim()
+        ));
     }
     Ok(String::from_utf8_lossy(&done.stdout).into_owned())
+}
+fn git_query(repo: &Path, args: &[&str]) -> Result<Option<String>> {
+    let done = git_output(repo, args)?;
+    Ok(done
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&done.stdout).into_owned()))
 }
 
 /// A probe whose nonzero exit is an answer ("absent"), not a failure -- the
 /// equivalent of Python's `_git_in_quiet`/`_run(...).returncode` checks.
 fn git_quiet(repo: &Path, args: &[&str]) -> Option<String> {
-    let done = Command::new("git")
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .ok()?;
-    if done.status.success() {
-        Some(String::from_utf8_lossy(&done.stdout).into_owned())
-    } else {
-        None
-    }
-}
-
-/// The nearest ancestor (inclusive) holding `.git` -- Python's
-/// `project_paths.enclosing_repo`.
-fn enclosing_repo(start: &Path) -> Option<PathBuf> {
-    let mut candidate = start;
-    while let Some(parent) = candidate.parent() {
-        if candidate.join(".git").exists() {
-            return Some(candidate.to_path_buf());
-        }
-        candidate = parent; // one step up
-    }
-    None // the filesystem root is never a repo
-}
-
-/// Python's `project_paths.host_root`: the enclosing repo, else the start
-/// itself (symlinks resolved the way `Path.resolve()` does).
-fn host_root(start: &Path) -> PathBuf {
-    let resolved = std::fs::canonicalize(start).unwrap_or_else(|_| start.to_path_buf());
-    enclosing_repo(&resolved).unwrap_or(resolved)
-}
-
-/// Shared bounded native configuration, with the explicit environment override
-/// and legacy host-data fallback implemented centrally in project_paths.
-fn configured_integration_branch(root: &Path) -> Result<String> {
-    conductor_native::project_paths::integration_branch(root).map_err(anyhow::Error::msg)
+    git_query(repo, args).ok().flatten()
 }
 
 /// The line containment is judged against, resolved exactly as
@@ -102,90 +76,7 @@ fn configured_integration_branch(root: &Path) -> Result<String> {
 /// explicit command) allows it; `cheap_exposure_counts` and the SessionStart
 /// path pass false so session start never opens a connection.
 pub fn default_integration_ref(repo: &Path, allow_network: bool) -> Result<String> {
-    let branch = configured_integration_branch(&host_root(repo))?;
-    let candidates = [format!("origin/{branch}"), branch];
-    for refname in &candidates {
-        if git_quiet(repo, &["rev-parse", "--verify", "--quiet", refname]).is_some() {
-            return Ok(refname.clone());
-        }
-    }
-    if let Some(bound) = git_quiet(
-        repo,
-        &["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"],
-    ) {
-        // Python: `stdout.strip().removeprefix("refs/remotes/")` kept only
-        // when truthy -- an empty target falls through to the advertisement.
-        // Written empty-first (no `!`) so the guard cannot be quietly deleted
-        // by a single-token mutation.
-        let line = bound
-            .trim()
-            .strip_prefix("refs/remotes/")
-            .unwrap_or(bound.trim());
-        if line.is_empty() {
-            // fall through to the remote's own advertisement
-        } else {
-            return Ok(line.to_string());
-        }
-    }
-    // Offline: a repo whose line is conventional (master or main) and whose
-    // fetch already created the remote-tracking ref needs no network to name
-    // it. Exactly one answers; both present is ambiguous and falls through --
-    // guessing between them could judge containment against the wrong line.
-    let conventional = conventional_remote_refs(repo);
-    if conventional.len() == 1 {
-        return Ok(conventional[0].clone());
-    }
-    if !allow_network {
-        return Err(anyhow!(
-            "{}: no integration line to judge containment against \
-             (tried {}, {}; origin HEAD symref unavailable; \
-             network advertisement skipped)",
-            repo.display(),
-            candidates[0],
-            candidates[1]
-        ));
-    }
-    if let Some(advertised) = git_quiet(repo, &["ls-remote", "--symref", "origin", "HEAD"]) {
-        for line in advertised.lines() {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.first() == Some(&"ref:") {
-                if let Some(head) = parts
-                    .get(1)
-                    .and_then(|refname| refname.strip_prefix("refs/heads/"))
-                {
-                    return Ok(format!("origin/{head}"));
-                }
-            }
-        }
-    }
-    Err(anyhow!(
-        "{}: no integration line to judge containment against \
-         (tried {}, {}; origin HEAD symref unavailable)",
-        repo.display(),
-        candidates[0],
-        candidates[1]
-    ))
-}
-
-/// The conventional `origin/{master,main}` remote-tracking refs that exist,
-/// short-named -- the offline leg of `default_integration_ref`.
-fn conventional_remote_refs(repo: &Path) -> Vec<String> {
-    git_quiet(
-        repo,
-        &[
-            "for-each-ref",
-            "--format=%(refname:short)",
-            "refs/remotes/origin/master",
-            "refs/remotes/origin/main",
-        ],
-    )
-    .map(|listed| {
-        listed
-            .split_whitespace()
-            .map(str::to_owned)
-            .collect::<Vec<String>>()
-    })
-    .unwrap_or_default()
+    forge::workspace_integration::default_integration_ref(repo, allow_network)
 }
 
 /// Commits on HEAD reachable from no `refs/remotes/*` or `refs/snapshots/**`
@@ -372,7 +263,8 @@ fn upstream_was_deleted(repo: &Path, branch: &str) -> bool {
         "refs/remotes/{remote}/{}",
         merge.trim_start_matches("refs/heads/")
     );
-    git_quiet(repo, &["rev-parse", "--verify", "--quiet", &tracked]).is_none()
+    git_query(repo, &["rev-parse", "--verify", "--quiet", &tracked])
+        .is_ok_and(|found| found.is_none())
 }
 
 /// Worktrees that have finished: clean, non-primary, and holding nothing the
@@ -462,7 +354,7 @@ pub fn cheap_exposure_counts(repo: &Path) -> Result<(usize, usize, Option<usize>
 /// than crashing the hook or silently disappearing.
 pub fn exposure_line(repo: &Path) -> String {
     match cheap_exposure_counts(repo) {
-        Err(err) => format!("EXPOSED: unavailable ({err}). python -m conductor.workspace_hygiene"),
+        Err(err) => format!("EXPOSED: unavailable ({err}). forge workspace-hygiene"),
         Ok((local_only_commits, stale_dirty_files, landed, skipped)) => {
             let landed_text = match (landed, &skipped) {
                 (Some(count), None) => count.to_string(),
@@ -473,7 +365,7 @@ pub fn exposure_line(repo: &Path) -> String {
                  {stale_dirty_files} stale dirty file(s), \
                  {landed_text} finished worktree(s) to remove, \
                  branches skipped (needs gh). \
-                 python -m conductor.workspace_hygiene"
+                 forge workspace-hygiene"
             )
         }
     }
