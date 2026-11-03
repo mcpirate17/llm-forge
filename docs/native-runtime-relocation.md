@@ -34,6 +34,20 @@ symlinks are never opened for reading or publication. The command takes
 nonblocking cooperative flocks on the two pinned `bin` directories and reports a
 busy operation rather than waiting or creating a persistent lock file.
 
+The bounded initial directory walk retains its ancestor descriptors and normalized
+single-component bindings for the invocation. Rechecks inspect each binding
+relative to its held parent without following symlinks, then check the held bin
+identity. Replacing an ancestor, virtualenv root or bin causes refusal; pathname
+reopening is not needed for each script. Initial `..` processing still opens and
+validates each traversed component before discarding it. At most 256 ancestor
+handles plus the bin handle are retained per operand; the two lease handles are
+additional. A low `RLIMIT_NOFILE` can therefore refuse valid deep paths sooner
+than sequential pathname reopening. Exhaustion while retaining this chain is an
+explicit admission error before script publication. All are released when the
+invocation returns, including errors.
+The per-script synchronization/durability protocol is unchanged; this capability
+cache has no measured speedup claim until a matched benchmark is rerun.
+
 Interpreter discovery has one narrow read-only exception: source Python symlink
 names may be followed for metadata only to confirm a regular-file target. The OS
 symlink-depth limit applies. The link identity, literal target and resolved target
