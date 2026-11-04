@@ -93,3 +93,27 @@ name = "rust-slop-tests"
 paths = ['^native/slop-core/', '^\.forge/']
 run = 'cargo +1.98.0 test --release --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/slop-core/Cargo.toml'
 timeout_s = 1800
+
+[[check]]
+name = "rust-product-value-format"
+paths = ['^native/product-value/', '^\.forge/']
+run = 'cargo +1.98.0 fmt --manifest-path native/product-value/Cargo.toml --check'
+timeout_s = 60
+
+[[check]]
+name = "rust-product-value-clippy"
+paths = ['^native/product-value/', '^native/conductor-native/', '^\.forge/']
+run = 'cargo +1.98.0 clippy --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/product-value/Cargo.toml --all-targets -- -D warnings'
+timeout_s = 1800
+
+[[check]]
+name = "rust-product-value-tests"
+paths = ['^native/product-value/', '^native/conductor-native/', '^\.forge/']
+run = 'cargo +1.98.0 test --release --offline --locked --jobs "$CARGO_BUILD_JOBS" --manifest-path native/product-value/Cargo.toml --all-targets'
+timeout_s = 1800
+
+[[check]]
+name = "rust-dependency-audit"
+paths = ['^native/.*Cargo\.(lock|toml)$', '^\.forge/']
+run = 'for manifest in forge conductor-native slop-core product-value; do cargo audit --file "native/$manifest/Cargo.lock" || exit "$?"; done'
+timeout_s = 600

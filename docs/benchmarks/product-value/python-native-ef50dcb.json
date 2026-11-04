@@ -1,0 +1,5964 @@
+{
+  "schema": "forge-product-value-v1",
+  "complete": true,
+  "host_before": {
+    "isolation": "shared unisolated host; no affinity/governor/service changes",
+    "loadavg": "0.30 0.36 1.30 1/4671 3561165\n",
+    "cpu_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=486577913\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+    "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=12856563\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=12768243\n",
+    "affinity": "Cpus_allowed_list:\t0-31",
+    "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-kitty-7407.scope\n",
+    "cpu_max": "max 100000\n",
+    "cpuset_effective": null,
+    "kernel": "7.0.0-38-generic\n"
+  },
+  "relocation": [
+    {
+      "scripts": 16,
+      "body_bytes_per_script": 128,
+      "raw": [
+        {
+          "variant": "native",
+          "iteration": 0,
+          "pair_position": 0,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.711319,
+                "cpu_ms": 1.654,
+                "max_rss_bytes": 14376960
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.899047000000003,
+              "cpu_ms": 3.318,
+              "max_rss_bytes": 14819328
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 0,
+          "pair_position": 1,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.045194,
+                "cpu_ms": 14.942,
+                "max_rss_bytes": 13459456
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 16.339431,
+              "cpu_ms": 16.284,
+              "max_rss_bytes": 13250560
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 1,
+          "pair_position": 0,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.345896,
+                "cpu_ms": 15.264,
+                "max_rss_bytes": 13197312
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 17.319145000000002,
+              "cpu_ms": 17.234,
+              "max_rss_bytes": 13148160
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 1,
+          "pair_position": 1,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.92224,
+                "cpu_ms": 1.867,
+                "max_rss_bytes": 14266368
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 22.272999000000002,
+              "cpu_ms": 3.794,
+              "max_rss_bytes": 14880768
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 2,
+          "pair_position": 0,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.776139,
+                "cpu_ms": 1.696,
+                "max_rss_bytes": 13832192
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.380605,
+              "cpu_ms": 3.324,
+              "max_rss_bytes": 14258176
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 2,
+          "pair_position": 1,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.38405,
+                "cpu_ms": 14.315,
+                "max_rss_bytes": 13479936
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.084055000000001,
+              "cpu_ms": 15.03,
+              "max_rss_bytes": 13418496
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 3,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 16.400851,
+                "cpu_ms": 16.34,
+                "max_rss_bytes": 13066240
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.100804,
+              "cpu_ms": 15.016,
+              "max_rss_bytes": 13234176
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 3,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.739339,
+                "cpu_ms": 1.687,
+                "max_rss_bytes": 13975552
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 22.603241,
+              "cpu_ms": 3.808,
+              "max_rss_bytes": 14774272
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 4,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 2.03072,
+                "cpu_ms": 1.972,
+                "max_rss_bytes": 13918208
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.676827,
+              "cpu_ms": 3.2,
+              "max_rss_bytes": 14577664
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 4,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.771101999999999,
+                "cpu_ms": 14.709,
+                "max_rss_bytes": 13545472
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.932637999999999,
+              "cpu_ms": 15.873,
+              "max_rss_bytes": 12914688
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 5,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.336686,
+                "cpu_ms": 15.253,
+                "max_rss_bytes": 13217792
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 16.623401,
+              "cpu_ms": 16.572,
+              "max_rss_bytes": 13291520
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 5,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.685499,
+                "cpu_ms": 1.635,
+                "max_rss_bytes": 14004224
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 22.437481,
+              "cpu_ms": 3.552,
+              "max_rss_bytes": 14876672
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 6,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.768109,
+                "cpu_ms": 1.706,
+                "max_rss_bytes": 14376960
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 22.107249,
+              "cpu_ms": 3.112,
+              "max_rss_bytes": 14618624
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 6,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.978414,
+                "cpu_ms": 14.921,
+                "max_rss_bytes": 13365248
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.616507,
+              "cpu_ms": 15.562,
+              "max_rss_bytes": 13017088
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 7,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.041904,
+                "cpu_ms": 14.987,
+                "max_rss_bytes": 13213696
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.495136,
+              "cpu_ms": 15.438,
+              "max_rss_bytes": 13283328
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 7,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 2.4054520000000004,
+                "cpu_ms": 2.332,
+                "max_rss_bytes": 13803520
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 23.715996,
+              "cpu_ms": 4.184,
+              "max_rss_bytes": 14344192
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 8,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.713429,
+                "cpu_ms": 1.652,
+                "max_rss_bytes": 13975552
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 22.001018000000002,
+              "cpu_ms": 3.235,
+              "max_rss_bytes": 14565376
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 8,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.704892000000001,
+                "cpu_ms": 14.649,
+                "max_rss_bytes": 13254656
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 16.26735,
+              "cpu_ms": 16.21,
+              "max_rss_bytes": 13332480
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 9,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.761322999999999,
+                "cpu_ms": 14.711,
+                "max_rss_bytes": 13221888
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.688346999999998,
+              "cpu_ms": 15.626,
+              "max_rss_bytes": 13193216
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 9,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.6734980000000002,
+                "cpu_ms": 1.622,
+                "max_rss_bytes": 13946880
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 22.441601,
+              "cpu_ms": 3.326,
+              "max_rss_bytes": 14987264
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 10,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.760709,
+                "cpu_ms": 1.674,
+                "max_rss_bytes": 14106624
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.757237,
+              "cpu_ms": 3.292,
+              "max_rss_bytes": 14471168
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 10,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.100945,
+                "cpu_ms": 15.04,
+                "max_rss_bytes": 13197312
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.237195,
+              "cpu_ms": 15.181,
+              "max_rss_bytes": 13529088
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 11,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.915697999999999,
+                "cpu_ms": 15.829,
+                "max_rss_bytes": 12689408
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.786057999999999,
+              "cpu_ms": 15.725,
+              "max_rss_bytes": 13250560
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 11,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.6954889999999998,
+                "cpu_ms": 1.618,
+                "max_rss_bytes": 13996032
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 20.781682,
+              "cpu_ms": 3.12,
+              "max_rss_bytes": 14786560
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 12,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.687319,
+                "cpu_ms": 1.628,
+                "max_rss_bytes": 13660160
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 20.749081999999998,
+              "cpu_ms": 3.102,
+              "max_rss_bytes": 14483456
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 12,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.451106,
+                "cpu_ms": 15.379,
+                "max_rss_bytes": 13217792
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.448516000000001,
+              "cpu_ms": 15.389,
+              "max_rss_bytes": 13484032
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 13,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.543806,
+                "cpu_ms": 15.472,
+                "max_rss_bytes": 13217792
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.749158,
+              "cpu_ms": 15.684,
+              "max_rss_bytes": 13512704
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 13,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.717788,
+                "cpu_ms": 1.662,
+                "max_rss_bytes": 14376960
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.486786000000002,
+              "cpu_ms": 3.529,
+              "max_rss_bytes": 14598144
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 14,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.724008,
+                "cpu_ms": 1.663,
+                "max_rss_bytes": 13791232
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.572796,
+              "cpu_ms": 3.441,
+              "max_rss_bytes": 14401536
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 14,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.397251,
+                "cpu_ms": 14.33,
+                "max_rss_bytes": 13479936
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.624297,
+              "cpu_ms": 15.568,
+              "max_rss_bytes": 13475840
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 15,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.937978,
+                "cpu_ms": 15.877,
+                "max_rss_bytes": 12779520
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.012944000000001,
+              "cpu_ms": 14.958,
+              "max_rss_bytes": 13418496
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 15,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.964159,
+                "cpu_ms": 1.894,
+                "max_rss_bytes": 13963264
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.696476999999998,
+              "cpu_ms": 3.826,
+              "max_rss_bytes": 14045184
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 16,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.751768,
+                "cpu_ms": 1.694,
+                "max_rss_bytes": 14225408
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.359375,
+              "cpu_ms": 3.396,
+              "max_rss_bytes": 14548992
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 16,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 16.039609,
+                "cpu_ms": 15.961,
+                "max_rss_bytes": 12480512
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 16.341890000000003,
+              "cpu_ms": 16.275,
+              "max_rss_bytes": 13082624
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 17,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.083064,
+                "cpu_ms": 15.032,
+                "max_rss_bytes": 13189120
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.918308,
+              "cpu_ms": 15.864,
+              "max_rss_bytes": 13320192
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 17,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 2.9407449999999997,
+                "cpu_ms": 2.886,
+                "max_rss_bytes": 13996032
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.891057,
+              "cpu_ms": 3.811,
+              "max_rss_bytes": 14303232
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 18,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.727878,
+                "cpu_ms": 1.666,
+                "max_rss_bytes": 14286848
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.464666,
+              "cpu_ms": 3.372,
+              "max_rss_bytes": 14561280
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 18,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.355835,
+                "cpu_ms": 15.267,
+                "max_rss_bytes": 13156352
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 16.28015,
+              "cpu_ms": 16.21,
+              "max_rss_bytes": 13209600
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 19,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.798377999999998,
+                "cpu_ms": 15.692,
+                "max_rss_bytes": 12709888
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 17.336385,
+              "cpu_ms": 17.256,
+              "max_rss_bytes": 13492224
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 19,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.866019,
+                "cpu_ms": 1.78,
+                "max_rss_bytes": 13656064
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.727397,
+              "cpu_ms": 3.372,
+              "max_rss_bytes": 14929920
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 20,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.688849,
+                "cpu_ms": 1.628,
+                "max_rss_bytes": 13828096
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.117953,
+              "cpu_ms": 3.156,
+              "max_rss_bytes": 14958592
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 20,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.931678000000002,
+                "cpu_ms": 15.867,
+                "max_rss_bytes": 12967936
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.474256,
+              "cpu_ms": 15.408,
+              "max_rss_bytes": 13283328
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 21,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 16.20645,
+                "cpu_ms": 16.097,
+                "max_rss_bytes": 12713984
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 17.215184,
+              "cpu_ms": 17.118,
+              "max_rss_bytes": 13074432
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 21,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.682279,
+                "cpu_ms": 1.626,
+                "max_rss_bytes": 13979648
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.481296,
+              "cpu_ms": 3.394,
+              "max_rss_bytes": 14270464
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 22,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.7422279999999999,
+                "cpu_ms": 1.658,
+                "max_rss_bytes": 13926400
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.117814,
+              "cpu_ms": 3.156,
+              "max_rss_bytes": 14778368
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 22,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 15.011633999999999,
+                "cpu_ms": 14.952,
+                "max_rss_bytes": 13238272
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 15.301324999999999,
+              "cpu_ms": 15.241,
+              "max_rss_bytes": 13467648
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 23,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 14.572592,
+                "cpu_ms": 14.518,
+                "max_rss_bytes": 13479936
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 16.24305,
+              "cpu_ms": 16.186,
+              "max_rss_bytes": 13238272
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 23,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 1.7004979999999998,
+                "cpu_ms": 1.645,
+                "max_rss_bytes": 14270464
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 21.595166,
+              "cpu_ms": 3.656,
+              "max_rss_bytes": 14639104
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 38,
+            "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        }
+      ],
+      "complete": true,
+      "timing_scope": "CLI spawn/startup plus relocation; reset, validation and replay excluded",
+      "filesystem": "warm filesystem; fresh hardlinked destination; alternating pair order",
+      "fixture": {
+        "source_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-I2XS7U/fixture-16/source-env",
+        "destination_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-I2XS7U/fixture-16/guest-env",
+        "source_image_dev_inode_mode_sha256": {
+          "binary": [
+            66307,
+            52845058,
+            33204,
+            "1548c1c4099cd9e2374c076fece3cd0cbbac1b17ecc1509ba8b89161dfb2f6aa"
+          ],
+          "foreign": [
+            66307,
+            52845056,
+            33204,
+            "b12a45c8eeddc0cde9d4c1443073ce3ba874736af9336d643ca60076b4842527"
+          ],
+          "python3.12": [
+            66307,
+            52845039,
+            33204,
+            "109af4d90d818debf9e9d0a0f8139ccc1e5231fd0b393292db324ad226b09619"
+          ],
+          "script-0000": [
+            66307,
+            52845040,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0001": [
+            66307,
+            52845041,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0002": [
+            66307,
+            52845042,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0003": [
+            66307,
+            52845043,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0004": [
+            66307,
+            52845044,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0005": [
+            66307,
+            52845045,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0006": [
+            66307,
+            52845046,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0007": [
+            66307,
+            52845047,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0008": [
+            66307,
+            52845048,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0009": [
+            66307,
+            52845049,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0010": [
+            66307,
+            52845050,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0011": [
+            66307,
+            52845051,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0012": [
+            66307,
+            52845052,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0013": [
+            66307,
+            52845053,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "script-0014": [
+            66307,
+            52845054,
+            33257,
+            "e4331be11432dad0c8d9b05d0aa5245be98625798aa2d066d73b2ed00e39e582"
+          ],
+          "script-0015": [
+            66307,
+            52845055,
+            33257,
+            "410f88f9839903a4956e8d1689afda5a552eba10cba013e6c0eac84f101e703c"
+          ],
+          "shell": [
+            66307,
+            52845057,
+            33204,
+            "148cfec8ae5c4870abaa6370af0a87e2f023c83bd10550e5a941b8e737e8c8c0"
+          ]
+        },
+        "body_sha256": "2ae0c14ebd3360d2a6344470fe59e258323703ac746f19890e3956150b2e86c4",
+        "hardlinks_reset_before_each_candidate": true,
+        "script_modes": "0751",
+        "shebangs": "alternating LF/CRLF; exact source Python3.12 alias",
+        "symlink": {
+          "alias": "script-0000"
+        }
+      },
+      "native": {
+        "p50_ms": 21.676827,
+        "p95_ms": 22.603241,
+        "cpu_p50_ms": 3.372,
+        "max_rss_bytes": 14987264,
+        "cpu_p95_ms": 3.826,
+        "rss_p95_bytes": 14958592.0
+      },
+      "python": {
+        "p50_ms": 15.749158,
+        "p95_ms": 17.215184,
+        "cpu_p50_ms": 15.684,
+        "max_rss_bytes": 13529088,
+        "cpu_p95_ms": 17.118,
+        "rss_p95_bytes": 13512704.0
+      },
+      "python_over_native_median_wall_ratio": 0.726543511188238
+    },
+    {
+      "scripts": 256,
+      "body_bytes_per_script": 4096,
+      "raw": [
+        {
+          "variant": "native",
+          "iteration": 0,
+          "pair_position": 0,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.965374,
+                "cpu_ms": 6.847,
+                "max_rss_bytes": 14290944
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 320.98798899999997,
+              "cpu_ms": 33.782,
+              "max_rss_bytes": 21409792
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 0,
+          "pair_position": 1,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.637002,
+                "cpu_ms": 18.565,
+                "max_rss_bytes": 13201408
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 31.965997,
+              "cpu_ms": 31.877,
+              "max_rss_bytes": 13234176
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 1,
+          "pair_position": 0,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.466716,
+                "cpu_ms": 17.386,
+                "max_rss_bytes": 13479936
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.747727,
+              "cpu_ms": 29.674,
+              "max_rss_bytes": 13811712
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 1,
+          "pair_position": 1,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.350922,
+                "cpu_ms": 6.229,
+                "max_rss_bytes": 14221312
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 321.1138,
+              "cpu_ms": 33.272,
+              "max_rss_bytes": 21090304
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 2,
+          "pair_position": 0,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.547322,
+                "cpu_ms": 6.436,
+                "max_rss_bytes": 14020608
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 322.614627,
+              "cpu_ms": 34.854,
+              "max_rss_bytes": 20692992
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 2,
+          "pair_position": 1,
+          "warmup": true,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.34577,
+                "cpu_ms": 18.267,
+                "max_rss_bytes": 12972032
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.583546,
+              "cpu_ms": 29.49,
+              "max_rss_bytes": 13692928
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 3,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.18768,
+                "cpu_ms": 18.088,
+                "max_rss_bytes": 13115392
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.249578999999997,
+              "cpu_ms": 30.143,
+              "max_rss_bytes": 13238272
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 3,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.474492,
+                "cpu_ms": 6.376,
+                "max_rss_bytes": 14057472
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 320.877688,
+              "cpu_ms": 32.955,
+              "max_rss_bytes": 21114880
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 4,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.459822,
+                "cpu_ms": 6.361,
+                "max_rss_bytes": 13930496
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 342.992958,
+              "cpu_ms": 32.852,
+              "max_rss_bytes": 21131264
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 4,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.695742000000003,
+                "cpu_ms": 18.617,
+                "max_rss_bytes": 13180928
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.219274,
+              "cpu_ms": 29.119,
+              "max_rss_bytes": 13443072
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 5,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.21214,
+                "cpu_ms": 18.127,
+                "max_rss_bytes": 13340672
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.893012000000002,
+              "cpu_ms": 30.778,
+              "max_rss_bytes": 13688832
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 5,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.400030999999999,
+                "cpu_ms": 6.292,
+                "max_rss_bytes": 14065664
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 316.715839,
+              "cpu_ms": 33.477,
+              "max_rss_bytes": 20983808
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 6,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.495572,
+                "cpu_ms": 6.39,
+                "max_rss_bytes": 13967360
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 329.452881,
+              "cpu_ms": 33.496,
+              "max_rss_bytes": 21381120
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 6,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.589845999999998,
+                "cpu_ms": 17.447,
+                "max_rss_bytes": 13221888
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.535746000000003,
+              "cpu_ms": 29.444,
+              "max_rss_bytes": 13733888
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 7,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.808493,
+                "cpu_ms": 18.718,
+                "max_rss_bytes": 12984320
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.910678,
+              "cpu_ms": 29.829,
+              "max_rss_bytes": 13459456
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 7,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.25176,
+                "cpu_ms": 6.136,
+                "max_rss_bytes": 14155776
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 321.716752,
+              "cpu_ms": 34.687,
+              "max_rss_bytes": 21356544
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 8,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.328091,
+                "cpu_ms": 6.221,
+                "max_rss_bytes": 14008320
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 315.745254,
+              "cpu_ms": 33.847,
+              "max_rss_bytes": 20676608
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 8,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.393741000000002,
+                "cpu_ms": 18.303,
+                "max_rss_bytes": 12763136
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.851692,
+              "cpu_ms": 30.762,
+              "max_rss_bytes": 13160448
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 9,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 19.161644,
+                "cpu_ms": 19.079,
+                "max_rss_bytes": 13230080
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.901231000000003,
+              "cpu_ms": 30.811,
+              "max_rss_bytes": 13189120
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 9,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.361291,
+                "cpu_ms": 6.249,
+                "max_rss_bytes": 14061568
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 317.19883999999996,
+              "cpu_ms": 33.071,
+              "max_rss_bytes": 21532672
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 10,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.508992,
+                "cpu_ms": 6.399,
+                "max_rss_bytes": 13987840
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 321.62057300000004,
+              "cpu_ms": 33.614,
+              "max_rss_bytes": 21409792
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 10,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.499006,
+                "cpu_ms": 17.417,
+                "max_rss_bytes": 13459456
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.876607,
+              "cpu_ms": 29.801,
+              "max_rss_bytes": 13578240
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 11,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 19.088884,
+                "cpu_ms": 18.991,
+                "max_rss_bytes": 13037568
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.51313,
+              "cpu_ms": 30.423,
+              "max_rss_bytes": 13545472
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 11,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.688043,
+                "cpu_ms": 6.592,
+                "max_rss_bytes": 14450688
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 331.732822,
+              "cpu_ms": 35.65,
+              "max_rss_bytes": 21438464
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 12,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.629842,
+                "cpu_ms": 6.524,
+                "max_rss_bytes": 13418496
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 329.045299,
+              "cpu_ms": 33.575,
+              "max_rss_bytes": 21602304
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 12,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 19.096564,
+                "cpu_ms": 19.008,
+                "max_rss_bytes": 13168640
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.734917,
+              "cpu_ms": 29.634,
+              "max_rss_bytes": 13766656
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 13,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.824592000000003,
+                "cpu_ms": 18.756,
+                "max_rss_bytes": 13164544
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.487256,
+              "cpu_ms": 29.412,
+              "max_rss_bytes": 14061568
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 13,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.328751,
+                "cpu_ms": 6.229,
+                "max_rss_bytes": 13963264
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 315.813654,
+              "cpu_ms": 34.921,
+              "max_rss_bytes": 20955136
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 14,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.771883,
+                "cpu_ms": 6.632,
+                "max_rss_bytes": 14229504
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 329.73391200000003,
+              "cpu_ms": 32.975,
+              "max_rss_bytes": 21098496
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 14,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.11856,
+                "cpu_ms": 18.002,
+                "max_rss_bytes": 13451264
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.924543,
+              "cpu_ms": 30.819,
+              "max_rss_bytes": 13238272
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 15,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.612137,
+                "cpu_ms": 17.534,
+                "max_rss_bytes": 13500416
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.63625,
+              "cpu_ms": 30.544,
+              "max_rss_bytes": 13742080
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 15,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.463392,
+                "cpu_ms": 6.365,
+                "max_rss_bytes": 13856768
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 320.109045,
+              "cpu_ms": 34.658,
+              "max_rss_bytes": 20672512
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 16,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 5.912039,
+                "cpu_ms": 5.808,
+                "max_rss_bytes": 13971456
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 322.673188,
+              "cpu_ms": 33.633,
+              "max_rss_bytes": 21184512
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 16,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.538486,
+                "cpu_ms": 17.451,
+                "max_rss_bytes": 13447168
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.191813,
+              "cpu_ms": 29.077,
+              "max_rss_bytes": 13815808
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 17,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 19.153554,
+                "cpu_ms": 19.07,
+                "max_rss_bytes": 13189120
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.701671,
+              "cpu_ms": 30.601,
+              "max_rss_bytes": 13221888
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 17,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.2304200000000005,
+                "cpu_ms": 6.123,
+                "max_rss_bytes": 14016512
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 324.094985,
+              "cpu_ms": 33.805,
+              "max_rss_bytes": 20905984
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 18,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 5.978539,
+                "cpu_ms": 5.859,
+                "max_rss_bytes": 14286848
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 317.934054,
+              "cpu_ms": 33.469,
+              "max_rss_bytes": 21176320
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 18,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.703452,
+                "cpu_ms": 18.625,
+                "max_rss_bytes": 13250560
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.851322,
+              "cpu_ms": 30.747,
+              "max_rss_bytes": 13742080
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 19,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.907259,
+                "cpu_ms": 17.821,
+                "max_rss_bytes": 13332480
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.528365,
+              "cpu_ms": 29.436,
+              "max_rss_bytes": 13422592
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 19,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 7.081715,
+                "cpu_ms": 6.949,
+                "max_rss_bytes": 14184448
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 334.869598,
+              "cpu_ms": 35.785,
+              "max_rss_bytes": 20844544
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 20,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.354721,
+                "cpu_ms": 6.241,
+                "max_rss_bytes": 13975552
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 322.009554,
+              "cpu_ms": 33.252,
+              "max_rss_bytes": 21045248
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 20,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 18.31162,
+                "cpu_ms": 18.229,
+                "max_rss_bytes": 13213696
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.172114,
+              "cpu_ms": 29.095,
+              "max_rss_bytes": 13991936
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 21,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 17.485056,
+                "cpu_ms": 17.415,
+                "max_rss_bytes": 13492224
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 29.519745999999998,
+              "cpu_ms": 29.448,
+              "max_rss_bytes": 13553664
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 21,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 5.876149,
+                "cpu_ms": 5.772,
+                "max_rss_bytes": 14163968
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 320.73879900000003,
+              "cpu_ms": 32.472,
+              "max_rss_bytes": 21086208
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 22,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.481382,
+                "cpu_ms": 6.374,
+                "max_rss_bytes": 14053376
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 332.051714,
+              "cpu_ms": 35.144,
+              "max_rss_bytes": 20881408
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 22,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 19.512876,
+                "cpu_ms": 19.42,
+                "max_rss_bytes": 12894208
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.011368,
+              "cpu_ms": 29.932,
+              "max_rss_bytes": 14069760
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "python",
+          "iteration": 23,
+          "pair_position": 0,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 19.551386,
+                "cpu_ms": 19.465,
+                "max_rss_bytes": 12468224
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 30.909552,
+              "cpu_ms": 30.837,
+              "max_rss_bytes": 13742080
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "native",
+          "iteration": 23,
+          "pair_position": 1,
+          "warmup": false,
+          "status": "completed",
+          "correctness": "completed",
+          "idempotence": {
+            "status": "completed",
+            "observation": {
+              "sample": {
+                "wall_ms": 6.623912,
+                "cpu_ms": 6.524,
+                "max_rss_bytes": 14725120
+              },
+              "exit_code": 0,
+              "signal": null,
+              "timed_out": false,
+              "cancelled": false,
+              "stdout_bytes": 37,
+              "stdout_sha256": "06e26161f5583ec3b2681287bdd43cbd6517073ea4b17a1b9669ddba0240aa0e",
+              "stderr_bytes": 0,
+              "stderr": ""
+            }
+          },
+          "phase": "idempotence",
+          "observation": {
+            "sample": {
+              "wall_ms": 319.801763,
+              "cpu_ms": 34.366,
+              "max_rss_bytes": 20938752
+            },
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "cancelled": false,
+            "stdout_bytes": 39,
+            "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+            "stderr_bytes": 0,
+            "stderr": ""
+          }
+        }
+      ],
+      "complete": true,
+      "timing_scope": "CLI spawn/startup plus relocation; reset, validation and replay excluded",
+      "filesystem": "warm filesystem; fresh hardlinked destination; alternating pair order",
+      "fixture": {
+        "source_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-I2XS7U/fixture-256/source-env",
+        "destination_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-I2XS7U/fixture-256/guest-env",
+        "source_image_dev_inode_mode_sha256": {
+          "binary": [
+            66307,
+            52845341,
+            33204,
+            "1548c1c4099cd9e2374c076fece3cd0cbbac1b17ecc1509ba8b89161dfb2f6aa"
+          ],
+          "foreign": [
+            66307,
+            52845339,
+            33204,
+            "b12a45c8eeddc0cde9d4c1443073ce3ba874736af9336d643ca60076b4842527"
+          ],
+          "python3.12": [
+            66307,
+            52845082,
+            33204,
+            "109af4d90d818debf9e9d0a0f8139ccc1e5231fd0b393292db324ad226b09619"
+          ],
+          "script-0000": [
+            66307,
+            52845083,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0001": [
+            66307,
+            52845084,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0002": [
+            66307,
+            52845085,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0003": [
+            66307,
+            52845086,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0004": [
+            66307,
+            52845087,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0005": [
+            66307,
+            52845088,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0006": [
+            66307,
+            52845089,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0007": [
+            66307,
+            52845090,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0008": [
+            66307,
+            52845091,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0009": [
+            66307,
+            52845092,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0010": [
+            66307,
+            52845093,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0011": [
+            66307,
+            52845094,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0012": [
+            66307,
+            52845095,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0013": [
+            66307,
+            52845096,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0014": [
+            66307,
+            52845097,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0015": [
+            66307,
+            52845098,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0016": [
+            66307,
+            52845099,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0017": [
+            66307,
+            52845100,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0018": [
+            66307,
+            52845101,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0019": [
+            66307,
+            52845102,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0020": [
+            66307,
+            52845103,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0021": [
+            66307,
+            52845104,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0022": [
+            66307,
+            52845105,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0023": [
+            66307,
+            52845106,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0024": [
+            66307,
+            52845107,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0025": [
+            66307,
+            52845108,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0026": [
+            66307,
+            52845109,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0027": [
+            66307,
+            52845110,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0028": [
+            66307,
+            52845111,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0029": [
+            66307,
+            52845112,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0030": [
+            66307,
+            52845113,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0031": [
+            66307,
+            52845114,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0032": [
+            66307,
+            52845115,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0033": [
+            66307,
+            52845116,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0034": [
+            66307,
+            52845117,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0035": [
+            66307,
+            52845118,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0036": [
+            66307,
+            52845119,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0037": [
+            66307,
+            52845120,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0038": [
+            66307,
+            52845121,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0039": [
+            66307,
+            52845122,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0040": [
+            66307,
+            52845123,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0041": [
+            66307,
+            52845124,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0042": [
+            66307,
+            52845125,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0043": [
+            66307,
+            52845126,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0044": [
+            66307,
+            52845127,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0045": [
+            66307,
+            52845128,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0046": [
+            66307,
+            52845129,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0047": [
+            66307,
+            52845130,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0048": [
+            66307,
+            52845131,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0049": [
+            66307,
+            52845132,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0050": [
+            66307,
+            52845133,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0051": [
+            66307,
+            52845134,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0052": [
+            66307,
+            52845135,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0053": [
+            66307,
+            52845136,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0054": [
+            66307,
+            52845137,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0055": [
+            66307,
+            52845138,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0056": [
+            66307,
+            52845139,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0057": [
+            66307,
+            52845140,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0058": [
+            66307,
+            52845141,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0059": [
+            66307,
+            52845142,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0060": [
+            66307,
+            52845143,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0061": [
+            66307,
+            52845144,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0062": [
+            66307,
+            52845145,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0063": [
+            66307,
+            52845146,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0064": [
+            66307,
+            52845147,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0065": [
+            66307,
+            52845148,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0066": [
+            66307,
+            52845149,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0067": [
+            66307,
+            52845150,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0068": [
+            66307,
+            52845151,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0069": [
+            66307,
+            52845152,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0070": [
+            66307,
+            52845153,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0071": [
+            66307,
+            52845154,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0072": [
+            66307,
+            52845155,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0073": [
+            66307,
+            52845156,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0074": [
+            66307,
+            52845157,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0075": [
+            66307,
+            52845158,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0076": [
+            66307,
+            52845159,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0077": [
+            66307,
+            52845160,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0078": [
+            66307,
+            52845161,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0079": [
+            66307,
+            52845162,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0080": [
+            66307,
+            52845163,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0081": [
+            66307,
+            52845164,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0082": [
+            66307,
+            52845165,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0083": [
+            66307,
+            52845166,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0084": [
+            66307,
+            52845167,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0085": [
+            66307,
+            52845168,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0086": [
+            66307,
+            52845169,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0087": [
+            66307,
+            52845170,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0088": [
+            66307,
+            52845171,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0089": [
+            66307,
+            52845172,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0090": [
+            66307,
+            52845173,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0091": [
+            66307,
+            52845174,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0092": [
+            66307,
+            52845175,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0093": [
+            66307,
+            52845176,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0094": [
+            66307,
+            52845177,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0095": [
+            66307,
+            52845178,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0096": [
+            66307,
+            52845179,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0097": [
+            66307,
+            52845180,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0098": [
+            66307,
+            52845181,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0099": [
+            66307,
+            52845182,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0100": [
+            66307,
+            52845183,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0101": [
+            66307,
+            52845184,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0102": [
+            66307,
+            52845185,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0103": [
+            66307,
+            52845186,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0104": [
+            66307,
+            52845187,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0105": [
+            66307,
+            52845188,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0106": [
+            66307,
+            52845189,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0107": [
+            66307,
+            52845190,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0108": [
+            66307,
+            52845191,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0109": [
+            66307,
+            52845192,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0110": [
+            66307,
+            52845193,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0111": [
+            66307,
+            52845194,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0112": [
+            66307,
+            52845195,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0113": [
+            66307,
+            52845196,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0114": [
+            66307,
+            52845197,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0115": [
+            66307,
+            52845198,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0116": [
+            66307,
+            52845199,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0117": [
+            66307,
+            52845200,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0118": [
+            66307,
+            52845201,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0119": [
+            66307,
+            52845202,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0120": [
+            66307,
+            52845203,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0121": [
+            66307,
+            52845204,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0122": [
+            66307,
+            52845205,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0123": [
+            66307,
+            52845206,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0124": [
+            66307,
+            52845207,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0125": [
+            66307,
+            52845208,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0126": [
+            66307,
+            52845209,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0127": [
+            66307,
+            52845210,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0128": [
+            66307,
+            52845211,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0129": [
+            66307,
+            52845212,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0130": [
+            66307,
+            52845213,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0131": [
+            66307,
+            52845214,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0132": [
+            66307,
+            52845215,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0133": [
+            66307,
+            52845216,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0134": [
+            66307,
+            52845217,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0135": [
+            66307,
+            52845218,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0136": [
+            66307,
+            52845219,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0137": [
+            66307,
+            52845220,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0138": [
+            66307,
+            52845221,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0139": [
+            66307,
+            52845222,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0140": [
+            66307,
+            52845223,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0141": [
+            66307,
+            52845224,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0142": [
+            66307,
+            52845225,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0143": [
+            66307,
+            52845226,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0144": [
+            66307,
+            52845227,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0145": [
+            66307,
+            52845228,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0146": [
+            66307,
+            52845229,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0147": [
+            66307,
+            52845230,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0148": [
+            66307,
+            52845231,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0149": [
+            66307,
+            52845232,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0150": [
+            66307,
+            52845233,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0151": [
+            66307,
+            52845234,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0152": [
+            66307,
+            52845235,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0153": [
+            66307,
+            52845236,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0154": [
+            66307,
+            52845237,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0155": [
+            66307,
+            52845238,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0156": [
+            66307,
+            52845239,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0157": [
+            66307,
+            52845240,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0158": [
+            66307,
+            52845241,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0159": [
+            66307,
+            52845242,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0160": [
+            66307,
+            52845243,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0161": [
+            66307,
+            52845244,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0162": [
+            66307,
+            52845245,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0163": [
+            66307,
+            52845246,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0164": [
+            66307,
+            52845247,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0165": [
+            66307,
+            52845248,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0166": [
+            66307,
+            52845249,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0167": [
+            66307,
+            52845250,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0168": [
+            66307,
+            52845251,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0169": [
+            66307,
+            52845252,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0170": [
+            66307,
+            52845253,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0171": [
+            66307,
+            52845254,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0172": [
+            66307,
+            52845255,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0173": [
+            66307,
+            52845256,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0174": [
+            66307,
+            52845257,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0175": [
+            66307,
+            52845258,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0176": [
+            66307,
+            52845259,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0177": [
+            66307,
+            52845260,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0178": [
+            66307,
+            52845261,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0179": [
+            66307,
+            52845262,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0180": [
+            66307,
+            52845263,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0181": [
+            66307,
+            52845264,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0182": [
+            66307,
+            52845265,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0183": [
+            66307,
+            52845266,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0184": [
+            66307,
+            52845267,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0185": [
+            66307,
+            52845268,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0186": [
+            66307,
+            52845269,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0187": [
+            66307,
+            52845270,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0188": [
+            66307,
+            52845271,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0189": [
+            66307,
+            52845272,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0190": [
+            66307,
+            52845273,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0191": [
+            66307,
+            52845274,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0192": [
+            66307,
+            52845275,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0193": [
+            66307,
+            52845276,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0194": [
+            66307,
+            52845277,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0195": [
+            66307,
+            52845278,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0196": [
+            66307,
+            52845279,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0197": [
+            66307,
+            52845280,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0198": [
+            66307,
+            52845281,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0199": [
+            66307,
+            52845282,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0200": [
+            66307,
+            52845283,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0201": [
+            66307,
+            52845284,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0202": [
+            66307,
+            52845285,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0203": [
+            66307,
+            52845286,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0204": [
+            66307,
+            52845287,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0205": [
+            66307,
+            52845288,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0206": [
+            66307,
+            52845289,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0207": [
+            66307,
+            52845290,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0208": [
+            66307,
+            52845291,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0209": [
+            66307,
+            52845292,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0210": [
+            66307,
+            52845293,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0211": [
+            66307,
+            52845294,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0212": [
+            66307,
+            52845295,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0213": [
+            66307,
+            52845296,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0214": [
+            66307,
+            52845297,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0215": [
+            66307,
+            52845298,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0216": [
+            66307,
+            52845299,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0217": [
+            66307,
+            52845300,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0218": [
+            66307,
+            52845301,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0219": [
+            66307,
+            52845302,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0220": [
+            66307,
+            52845303,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0221": [
+            66307,
+            52845304,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0222": [
+            66307,
+            52845305,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0223": [
+            66307,
+            52845306,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0224": [
+            66307,
+            52845307,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0225": [
+            66307,
+            52845308,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0226": [
+            66307,
+            52845309,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0227": [
+            66307,
+            52845310,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0228": [
+            66307,
+            52845311,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0229": [
+            66307,
+            52845312,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0230": [
+            66307,
+            52845313,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0231": [
+            66307,
+            52845314,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0232": [
+            66307,
+            52845315,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0233": [
+            66307,
+            52845316,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0234": [
+            66307,
+            52845317,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0235": [
+            66307,
+            52845318,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0236": [
+            66307,
+            52845319,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0237": [
+            66307,
+            52845320,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0238": [
+            66307,
+            52845321,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0239": [
+            66307,
+            52845322,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0240": [
+            66307,
+            52845323,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0241": [
+            66307,
+            52845324,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0242": [
+            66307,
+            52845325,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0243": [
+            66307,
+            52845326,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0244": [
+            66307,
+            52845327,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0245": [
+            66307,
+            52845328,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0246": [
+            66307,
+            52845329,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0247": [
+            66307,
+            52845330,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0248": [
+            66307,
+            52845331,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0249": [
+            66307,
+            52845332,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0250": [
+            66307,
+            52845333,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0251": [
+            66307,
+            52845334,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0252": [
+            66307,
+            52845335,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0253": [
+            66307,
+            52845336,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "script-0254": [
+            66307,
+            52845337,
+            33257,
+            "b6a69afcac41a2d56957f79d4d510296ad4b91fdf5215382706bb5910628e33a"
+          ],
+          "script-0255": [
+            66307,
+            52845338,
+            33257,
+            "a577ee4598babd74c8c6bd60956fb2f865159db7376a366d8e27b7b41205de1d"
+          ],
+          "shell": [
+            66307,
+            52845340,
+            33204,
+            "148cfec8ae5c4870abaa6370af0a87e2f023c83bd10550e5a941b8e737e8c8c0"
+          ]
+        },
+        "body_sha256": "8317d8bc74007d9698b65fd6772827590612187107c450dbc3c8ba4095b78203",
+        "hardlinks_reset_before_each_candidate": true,
+        "script_modes": "0751",
+        "shebangs": "alternating LF/CRLF; exact source Python3.12 alias",
+        "symlink": {
+          "alias": "script-0000"
+        }
+      },
+      "native": {
+        "p50_ms": 321.716752,
+        "p95_ms": 334.869598,
+        "cpu_p50_ms": 33.614,
+        "max_rss_bytes": 21602304,
+        "cpu_p95_ms": 35.65,
+        "rss_p95_bytes": 21532672.0
+      },
+      "python": {
+        "p50_ms": 30.011368,
+        "p95_ms": 30.909552,
+        "cpu_p50_ms": 29.932,
+        "max_rss_bytes": 14069760,
+        "cpu_p95_ms": 30.819,
+        "rss_p95_bytes": 14061568.0
+      },
+      "python_over_native_median_wall_ratio": 0.09328506462106767
+    }
+  ],
+  "context": {
+    "status": "completed",
+    "calls": {
+      "projection": {
+        "status": "completed",
+        "observation": {
+          "sample": {
+            "wall_ms": 2.261352,
+            "cpu_ms": 2.194,
+            "max_rss_bytes": 14995456
+          },
+          "exit_code": 0,
+          "signal": null,
+          "timed_out": false,
+          "cancelled": false,
+          "stdout_bytes": 1140,
+          "stdout_sha256": "657f8627c6e28dda6724816f88a1869ba8d60fb744c4422e5b4b6b99fb7ba393",
+          "stderr_bytes": 0,
+          "stderr": ""
+        }
+      },
+      "raw_tokens": {
+        "status": "completed",
+        "observation": {
+          "sample": {
+            "wall_ms": 37.251183,
+            "cpu_ms": 37.138,
+            "max_rss_bytes": 38440960
+          },
+          "exit_code": 0,
+          "signal": null,
+          "timed_out": false,
+          "cancelled": false,
+          "stdout_bytes": 477,
+          "stdout_sha256": "d3ac4071559b9e3229354687cba36524fd414eb2f096c9de15248e87cd3d4557",
+          "stderr_bytes": 0,
+          "stderr": ""
+        }
+      },
+      "projection_tokens": {
+        "status": "completed",
+        "observation": {
+          "sample": {
+            "wall_ms": 36.58235,
+            "cpu_ms": 36.439,
+            "max_rss_bytes": 38686720
+          },
+          "exit_code": 0,
+          "signal": null,
+          "timed_out": false,
+          "cancelled": false,
+          "stdout_bytes": 476,
+          "stdout_sha256": "a2c0ea71e9eb78ab5a8a62495652a672dc8563e68a486dafc54cc49bf5589338",
+          "stderr_bytes": 0,
+          "stderr": ""
+        }
+      }
+    },
+    "workflow": "real_source_signature_lookup",
+    "file": "native/forge/src/worktree_runtime.rs",
+    "source_sha256": "7e4fefae55c8c48118c85f91c075ba156f462bdc69069ec8c94f58450cdd886e",
+    "source_bytes": 5712,
+    "projection_json_bytes": 1140,
+    "projection_skeleton_bytes": 790,
+    "saved_bytes": 4572,
+    "projection_stdout": "{\"schema_version\":1,\"file_path\":\"native/forge/src/worktree_runtime.rs\",\"language\":\"rust\",\"source_sha256\":\"7e4fefae55c8c48118c85f91c075ba156f462bdc69069ec8c94f58450cdd886e\",\"format\":\"rust-signatures-v1\",\"skeleton\":\"use anyhow::{ensure, Context, Result};\\nuse paths::{Bin, Interpreters, Stamp, MAX_TOTAL};\\nuse std::{\\n    collections::BTreeMap,\\n    ffi::{OsStr, OsString},\\n    os::unix::ffi::OsStrExt,\\n    path::{Path, PathBuf},\\n};\\n/// Copy-on-write exact source-Python launcher shebangs into an existing guest.\\n\\n/// No venv/worktree is created and no interpreter is executed. Discovery reads\\n\\n/// metadata only; regular candidates (even named python3) receive bounded probes.\\n\\n/// Returns normalized absolute destination paths; a second invocation changes none.\\n\\n/// Errors can follow earlier successful paths and include that completed list.\\n\\npub fn relocate_console_scripts(\\n    source_venv: &Path,\\n    destination_venv: &Path,\\n    cancel: &mut dyn FnMut() -> Result<()>,\\n) -> Result<Vec<PathBuf>> { ... }\",\"symbols\":[\"rewrite\",\"regular\",\"relocate_console_scripts\"],\"callers\":[],\"callees\":[],\"graph_status\":\"disabled\"}\n",
+    "format": "rust-signatures-v1",
+    "facts_checked": [
+      "requested symbol",
+      "source_venv/destination_venv/cancel parameter spellings",
+      "source SHA256",
+      "graph disabled"
+    ],
+    "scope": "raw full source versus complete emitted JSON; signature lookup only; omitted bodies are not equivalent full-source semantics",
+    "tokens": {
+      "operator_supplied_label": "GPT-2 artifact-pinned tokenizer; tokenization only, no model weights/billing",
+      "artifact_pinned_identity": {
+        "implementation": "hf-rust-tokenizers-0.23.2/fancy-regex/deterministic-bpe/v1",
+        "tokenizer_sha256": "8414cab924d8b9b33013f0d221c5862f365ee9be39c5c2bfae8a5a9e970478a6",
+        "model_sha256": "0707070707070707070707070707070707070707070707070707070707070707",
+        "recipe_sha256": "5a7a0b9c1dccd0a65ec34affb09e5f2629f5c584415c236d7f16ee8644837c2f",
+        "add_special_tokens": false
+      },
+      "model_identity_scope": "model SHA is config supplied; weights/deployed model are not independently verified",
+      "raw_source": 2455,
+      "complete_projection_json": 383,
+      "saved": 2072,
+      "reduction_percent": 84.39918533604887,
+      "config_sha256": "a27d2925e948ef6d10da4091abef8bf2532e205bff20d6d92490dced55c79cf6",
+      "scope": "exact supplied strings; external chat templates/envelopes and inference excluded"
+    },
+    "token_status": "exact artifact-pinned tokenizer; operator label",
+    "model_inference_performed": false,
+    "task_answer_quality_measured": false
+  },
+  "methodology": {
+    "warmups": 3,
+    "samples_per_variant": 21,
+    "clock": "monotonic Instant",
+    "cpu_rss": "Linux wait4 per child; RSS KiB converted to bytes",
+    "semantic_differences": "native additionally pins/locks dirs, bounds reads, exchanges and validates publication; matched accepted task, not identical safety semantics or isolated language speed",
+    "python_scope": "direct isolated -I -B exact retired script; UV/package wrapper overhead excluded",
+    "startup": "included in CLI measurements; not subtracted or separately identified",
+    "in_process": "reuse existing native/forge/benches/context.rs, not measured by this runner",
+    "model_time": "no model inference; token reduction does not establish answer quality or completed-task time"
+  },
+  "identity": {
+    "repository_head": "ef50dcb5629bcffab02683319c45b7a7683e9bc3",
+    "forge_path": "/home/tim/Projects/llm-forge/.git/forge-tools/native-install/bin/forge",
+    "forge_sha256": "b31e01e7e67cc1e58d383cec2811f18b7c113c6b8c1bb4ad3ee60e4afa685e1f",
+    "forge_version": "forge 0.8.21 (git ef50dcb)",
+    "native_source_binding": "pinned ELF plus reported Git version; this alone is not proof of build provenance; retain root shipping build/check receipt",
+    "python_path_as_selected": "/home/tim/Projects/llm-forge/.venv/bin/python",
+    "python_elf_sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+    "python_runtime": {
+      "version": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "executable": "/home/tim/Projects/llm-forge/.venv/bin/python",
+      "prefix": "/home/tim/Projects/llm-forge/.venv",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39"
+    },
+    "reference": {
+      "git_expression": "ef50dcb^:src/conductor/worktree_runtime.py",
+      "git_blob": "4cd99821a4c6d9f9ddc4e9c3746f3dd0c4189edb",
+      "source_sha256": "9015359e74c9fcd17a7bd898665ec6acbb610e088aa56b9e72defefebdf888cb",
+      "lifetime": "owned temporary file only; removed after run"
+    },
+    "harness_binary_sha256": "a7d71bae632a1f9c91d86a3ea85eb2275c667412df463b7c529f63cb44262e3d"
+  },
+  "host_after": {
+    "isolation": "shared unisolated host; no affinity/governor/service changes",
+    "loadavg": "0.61 0.43 1.31 2/4677 3561409\n",
+    "cpu_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=486594566\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+    "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=12856563\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=12768243\n",
+    "affinity": "Cpus_allowed_list:\t0-31",
+    "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-kitty-7407.scope\n",
+    "cpu_max": "max 100000\n",
+    "cpuset_effective": null,
+    "kernel": "7.0.0-38-generic\n"
+  },
+  "accounting": {
+    "measurement_attempts_including_warmups": {
+      "planned": 96,
+      "started": 96,
+      "completed": 96,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0
+    },
+    "separate_untimed_idempotence_attempts": {
+      "planned": 96,
+      "started": 96,
+      "completed": 96,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0
+    }
+  }
+}

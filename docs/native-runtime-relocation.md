@@ -45,8 +45,10 @@ additional. A low `RLIMIT_NOFILE` can therefore refuse valid deep paths sooner
 than sequential pathname reopening. Exhaustion while retaining this chain is an
 explicit admission error before script publication. All are released when the
 invocation returns, including errors.
-The per-script synchronization/durability protocol is unchanged; this capability
-cache has no measured speedup claim until a matched benchmark is rerun.
+The per-script synchronization/durability protocol is unchanged. A paired run at
+256 scripts reduced median CPU from 34.245 to 24.061 ms; median wall time changed
+from 321.040 to 315.810 ms. These are scoped observations on a shared host, not a
+general latency claim. See the [measurement report](native-product-value-measurements.md).
 
 Interpreter discovery has one narrow read-only exception: source Python symlink
 names may be followed for metadata only to confirm a regular-file target. The OS

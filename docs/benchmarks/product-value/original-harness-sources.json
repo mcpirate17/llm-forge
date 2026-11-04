@@ -1,0 +1,26 @@
+[
+  {
+    "path": "Cargo.toml",
+    "sha256": "fede77ddebeeaa02829324e568574ebb55dd3a4ea6d4b77d5312698b990017ec"
+  },
+  {
+    "path": "Cargo.lock",
+    "sha256": "2e459ae9d35b14f9c60800ae5294a3cc28000564a84df100649a69215735e963"
+  },
+  {
+    "path": "src/context.rs",
+    "sha256": "cfb9280a3d2493095ba9d3e2887ec5fd288ccf6e718993521ab27d049d0d873c"
+  },
+  {
+    "path": "src/fixture.rs",
+    "sha256": "1f1f5f68beec0ff0383bf5b87e6f68a673a40f3b455dd12d1d0ea439011a8416"
+  },
+  {
+    "path": "src/main.rs",
+    "sha256": "a7ed7de1580c1129336e5394f4007333082233032165b5598bb7d7c582276313"
+  },
+  {
+    "path": "src/measured.rs",
+    "sha256": "a2ac07783be9d4c7ee96a760242338008366bb9dc100f595680704a69a8e84dc"
+  }
+]

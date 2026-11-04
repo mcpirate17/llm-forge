@@ -1,0 +1,29 @@
+{
+  "schema": "forge-owned-build-observation-v1",
+  "scope": "Root-observed local build, not cryptographic execution attestation or a full release gate",
+  "candidate": {
+    "commit": "0cb1100f7eec9e1c3a2f5b8ef62f73054023582f",
+    "tree": "5f7bea9c917efafe4ceb4a3e6051e9e8f64e536c",
+    "working_tree_clean_after_build": true,
+    "elf_sha256": "15726d5689d19c41d3f0a63db59e9c6778a6841c2ad532125cf3a22e83df8d8b",
+    "version": "forge 0.8.21 (git 0cb1100)",
+    "source_fingerprint": "5b95e72d5643b97537daa0491eeb33691e5709a4112d78cc439e69dbb32edccc",
+    "build_script_source_matches_git": true,
+    "command": "cargo +1.98.0 build --offline --release --locked --jobs 2 --manifest-path native/forge/Cargo.toml --bin forge",
+    "environment": {"CUDA_VISIBLE_DEVICES":"", "CARGO_BUILD_JOBS":"2", "PYO3_PYTHON":"/nonexistent/forbidden-python"},
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "llvm": "22.1.8",
+    "target": "x86_64-unknown-linux-gnu",
+    "exit_code": 0,
+    "build_log_sha256": "71d1fa3de5a2b701ad0cb10b5e25703ab6af7121c1ebcb0c011c7335a7723ab1",
+    "focused_validation": {"runtime_library_passed":18, "actual_cli_passed":7, "workspace_strict_clippy":"passed"}
+  },
+  "baseline": {
+    "commit": "ef50dcb5629bcffab02683319c45b7a7683e9bc3",
+    "tree": "9b8990c7600d030d5d5c5f9b299bbe3b2b083068",
+    "elf_sha256": "b31e01e7e67cc1e58d383cec2811f18b7c113c6b8c1bb4ad3ee60e4afa685e1f",
+    "full_gate_receipt_sha256": "e01d46e3ab8468561162b0915445f0d5edec0ed1d5448f152fb6211ee78bd0a5",
+    "full_gate_receipt_location": ".git/forge-checks/run-1793670280104306913-3536320/receipt.json"
+  },
+  "measurement": "Separate native/native comparison results; this build record contains no performance claim"
+}

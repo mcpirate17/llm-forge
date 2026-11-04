@@ -1,126 +1,152 @@
 # llm-forge
 
-A native local-LLM tool runtime for source inspection, deterministic edits,
-confined execution, code retrieval and bounded context. The `forge` executable
-and its default library dependencies are Rust, with native C/C++ dependencies;
-the default build does not discover or link a Python interpreter and requires
-no Node or Electron runtime.
+**Local tools for coding agents: find the relevant code, prepare verifiable edits,
+keep commands running, and control what goes back into the model's context.**
 
-The repository is undergoing a native migration. The runtime described below
-works from the current source tree. Remaining interpreted governance/analysis
-adapters and optional bindings are recorded in [ARCHITECTURE.md](ARCHITECTURE.md);
-their presence means the repository-wide migration is not yet complete.
+Forge works alongside your coding assistant. It helps the assistant fetch relevant
+code, check edits against current files, and keep commands running between
+messages. You choose which files it may read or change and which programs it may
+run. Bring your own coding client and model.
 
-## Build and install
+## What you can do
 
-On Linux, install Rust 1.98.0 and the native compiler/linker prerequisites, then:
+| When your agent needs to… | Forge provides… |
+| --- | --- |
+| Understand a file before reading all of it | Definitions, signatures, references and folded bodies, with source hashes and bounded output |
+| Find related code | A structural caller/import graph, lexical search and optional vector search with explicit source freshness |
+| Change an exact file safely | Hash-checked replacements or diffs, syntax validation, dry-run preparation and guarded Git recovery |
+| Work with a compiler or test process over several turns | Persistent terminal sessions, incremental output, reconnect/retry identifiers and resource controls |
+| Fit a long conversation into a context budget | Offline tokenizer counts, protected message groups, deterministic reductions and recoverable originals |
+| Review what actually ran | Durable task records, scoped check results and source-bound receipts; missing evidence stays visible |
+
+The benefit comes from using these tools in the workflow. Installing Forge does
+not automatically shorten prompts, redirect an agent's existing tools, improve
+its reasoning or lower its bill.
+
+Use it when you work with an agent on a Linux project and spend time feeding it
+files, recovering command output, or checking whether its edits still match the
+source. For a small project where ordinary file and shell tools work well, Forge
+may add more setup than value. It is a tool backend, not a replacement chat app.
+
+## Try source inspection first
+
+On Linux with Rust 1.98.0 and native compiler/linker prerequisites:
 
 ```sh
-make build
 make install
 export PATH="$PWD/target/install/bin:$PATH"
-forge --help
+
+forge code --root "$PWD" context --symbol relocate_console_scripts \
+  --no-graph --json -- native/forge/src/worktree_runtime.rs
 ```
 
-`make install INSTALL_ROOT=/absolute/prefix` installs `bin/forge` under another
-explicit prefix. The default prefix is local to this checkout and does not
-modify a shared Python environment. SQLite is bundled. Installed runtime
-operations do not need Cargo or Python; commands that build or profile user
-code still require their explicitly selected external tools. See
-[installation](docs/install.md) for provider setup and verification.
+This returns JSON containing the function signature, imports, source hash and
+`graph_status: "disabled"`. The function body is represented by `{ ... }`:
+enough to check its parameters without reading its implementation. The command
+does not edit the file, start a service or call a model. This is also the source
+used in the signature-token measurement below. The default installation stays inside
+this checkout's `target/install`. Use `INSTALL_ROOT=/absolute/prefix` to choose
+another location. The executable's default build requires no Python, Node or
+Electron runtime; SQLite is bundled. See [installation](docs/install.md).
 
-The three native crates are:
-
-- `native/forge`: the executable, tool harness, Linux process isolation,
-  provider hooks, lifecycle, messaging and task coordination.
-- `native/conductor-native`: shared syntax, search, planning, configuration and
-  evidence algorithms. Default features enable native source and vector search.
-- `native/slop-core`: native source checks and checked ablation proposals.
-
-## Tool surfaces
-
-| Surface | Native implementation and guide |
-| --- | --- |
-| Structured calls | Compiled closed-schema validation, bounded repair, GBNF and tool-signature validation; [structured output](docs/structured-output.md) |
-| Source intelligence | Tree-sitter definitions, signatures, references, scopes and imports for seven languages; [code tools](docs/native-code-tools.md) |
-| Editing | Deterministic replacement/unified diff, unique fuzzy matching, syntax validation, dry runs and hash-bound Git undo; [code tools](docs/native-code-tools.md) |
-| Retrieval | SQLite FTS5/BM25, exact or HNSW vector search, immutable mapped indexes, source freshness and optional pinned local embedding endpoints; [code search](docs/native-code-search.md) |
-| Execution | Persistent PTYs, readiness-driven I/O, pidfds, bounded output and Linux Landlock/seccomp/cgroup isolation; [execution](docs/native-execution.md) |
-| Context | Offline BPE tokenization, protected message groups, AST folding, diagnostic projection and durable recovery before compaction; [context](docs/native-context.md) |
-| Local clerk | Explicit source inventory, bounded loopback drafts, provenance validation and exclusive output; [clerk](docs/native-clerk.md) |
-| Orchestration | Persistent local service, capability policy, request/output limits, receipts and MCP stdio; [harness](docs/native-harness.md) |
-| Source quality | Native Rust/Python source inspection and read-only checked ablation proposals; [analysis](docs/native-analysis.md) |
-
-Linux isolation requires the documented kernel and delegated-resource features;
-unsupported isolation fails explicitly. Embedding generation remains an optional
-configured service. There is no embedded GPU tensor workload or claim of GPU
-acceleration. Benchmarks distinguish library dispatch, service calls, process
-startup and full retrieval costs; see [performance](docs/performance.md) and the
-individual surface guides.
-
-## Provider and host setup
-
-Initialize host settings and preview provider changes before applying them:
+For caller/callee context, build the native graph, then ask about a file:
 
 ```sh
-forge project --host /path/to/host init
-forge project --host /path/to/host init --apply
-forge providers --host /path/to/host --provider claude install
-forge providers --host /path/to/host --provider claude install --apply
-forge providers --host /path/to/host --provider claude check
+forge graph --host /path/to/project index
+forge graph --host /path/to/project context src/module.rs --max-bytes 8192
 ```
 
-Claude and Codex use the native lifecycle dispatcher. Qwen and Grok support the
-bounded mailbox startup integration. `--replace-legacy` explicitly migrates
-recognized Forge Python entries; other commands are preserved. Installation
-records a durable, drift-checked rollback snapshot. It does not start a service
-or send peer messages. See [provider contracts](docs/native-providers.md).
+Indexing writes `.forge/graph.db`. Queries report stale, missing or uncertain
+relationships rather than presenting them as current facts. Read the
+[graph contract](docs/graph-context.md) before relying on dependency coverage.
 
-Host path settings and optional SessionStart text can live in `forge.toml`.
-The shared native reader accepts existing `pyproject.toml` host settings only
-when that native manifest is absent; it never executes an interpreter. See
-[native project configuration](docs/native-project-config.md).
+## Connect it to your agent
 
-The harness uses an operator-selected capability policy and socket. Follow
-[its setup guide](docs/native-harness.md) to start the service, then use
-[`forge mcp bind`](docs/native-mcp-setup.md) to plan and install a connection to
-that exact host and socket. Filesystem roots, command capabilities and embedding
-endpoints are
-explicit configuration, not inferred grants from model output.
+Use **MCP for tools the agent chooses**, **small hooks for automatic checks and
+brief context**, and **the CLI for direct use and scripts**. They serve different
+parts of the workflow; none should inject the entire repository on every turn.
 
-Read Python or Rust signatures with optional graph relationships through the
-native context command:
+For example, an agent requests a function signature through MCP when it needs
+one; a hook checks an edit request when the client emits that event; you run the
+CLI to inspect a file yourself. MCP does not make an agent select Forge's tools,
+and its transport does not itself keep a backend running.
+
+The persistent harness is the MCP backend. First define the files and commands Forge may access using
+the [harness guide](docs/native-harness.md): select the source root, writable
+paths, allowed programs and resource limits. Then:
 
 ```sh
-forge code context path/to/source.py --root /path/to/project --symbol Service.run --json
+forge harness preflight --policy /absolute/operator.json \
+  --state-parent /existing/private/state
+forge harness start --policy /absolute/operator.json --state-parent /existing/private/state
+forge harness catalog --socket /returned/state/socket
 ```
 
-Use `--no-graph` for source-only context. Results carry a source hash and explicit
-graph status; see [graph context](docs/graph-context.md) for bounds and formats.
+The returned socket belongs to that running service. An MCP client launches the
+absolute installed `forge` binary with these arguments:
 
-## Verification and development
-
-```sh
-make test
-make local-preview
-# On a clean committed checkout:
-make local-check
-make local-verify
+```text
+harness stdio --socket /returned/state/socket --source-root /absolute/project
 ```
 
-The default tests use native release builds. Local verification installs an
-isolated artifact and runs formatting, strict Clippy, native tests and runtime
-smoke tests. A preview is advisory and cannot produce a publication receipt.
-The committed gate binds HEAD, the target branch's policy and check logs; see
-[local checks](docs/local-checks.md). Policy changes do not install or start a
-scheduled sweep. Optional binding contracts remain outside the native gate while
-those adapters are retired.
+[Native MCP setup](docs/native-mcp-setup.md) can preview and apply a project
+`.mcp.json` entry. Other clients use their own configuration formats; copying a
+Claude project file does not configure Codex. Hook installation is a separate
+preview/apply operation through [provider setup](docs/native-providers.md).
+Claude and Codex have guard/lifecycle adapters; Qwen and Grok currently have
+bounded startup messaging integrations rather than equivalent guard coverage.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) records milestones, measurements, limits and
-remaining migration work. [Messaging](docs/messaging.md),
-[coordination](docs/coordination.md), [lifecycle](docs/native-lifecycle.md) and
-[graph context](docs/graph-context.md) describe the existing native operational
-interfaces. `AGENTS.md` is the repository working contract.
+The harness requires documented Linux kernel/systemd capabilities. Unsupported
+isolation fails explicitly. Start with inspection, add editing or execution only
+when needed, and verify the advertised catalog in your actual client. Local
+execution does not mean returned code stays out of the client's remote model
+requests. Optional embeddings require a separately configured service.
 
-This repository was split from the `LLM` monorepo on 2026-09-12, retaining the
-history of its conductor and tooling components.
+## Are the gains measured?
+
+There are useful measurements, with specific limits:
+
+- A signature lookup on a real Rust file returned **383 tokens instead of 2,455**
+  for the full file: 84.4% fewer tokens, including the complete JSON response,
+  under a pinned GPT-2 tokenizer. It omits function bodies and does not establish
+  task quality or time saved. [Measured benefits](docs/benefits.md)
+- The first matched Python/native migration benchmark found a **slowdown**:
+  relocating 256 console launchers took a median 321.7 ms natively versus
+  Python's 30.0 ms. Both produced the checked outputs; the native path performs
+  additional safety work. A native rewrite is not automatically a speedup.
+  A follow-up native optimization reduced CPU use by about 30% at that size,
+  while wall time changed little. [Matched runs and method](docs/native-product-value-measurements.md)
+- One context fixture went from **57,430 input tokens to 3,277 rendered tokens**,
+  with a separate 512-token reserve. That is 94.3% less rendered text under its
+  pinned tokenizer, after dropping 29 old groups; downstream task quality was
+  not measured. [Context evidence](docs/native-context.md#release-measurements)
+- A source-bound retrieval fixture completed all 144 requested operations. Warm
+  BM25 retrieval had a **0.461 ms median**, including source checks and JSON.
+  Its embedding/index preparation took **23.6 minutes**. This historical run is
+  not a native-versus-Python comparison. [Retrieval evidence](docs/native-code-retrieval-measurement.md)
+- Specific native scan and cache optimizations have before/after component
+  measurements. They do not establish a whole-agent speedup.
+  [Performance evidence](docs/performance.md)
+
+A general “Rust is X times faster,” prompt-cost saving or task-time saving is not
+established. The [benefits and measurements](docs/benefits.md) separate evidence, estimates
+that need your workload's inputs, and missing comparisons.
+
+## Choose the next workflow
+
+[Code tools](docs/native-code-tools.md) · [Search](docs/native-code-search.md) ·
+[Context budgets](docs/native-context.md) · [Persistent execution](docs/native-execution.md) ·
+[Candidate review](docs/native-candidate-review.md) · [Workspace hygiene](docs/native-workspace-hygiene.md) ·
+[Checkout preservation](docs/native-checkout-sync.md)
+
+Forge's native runtime is usable while some interpreted maintenance adapters and
+host integrations remain in migration. Native graph seeding is still prerequisite
+work, not a shipped replacement for external schema-9 graph stores. Local models
+are optional clerical helpers, not approval authorities. Review
+[ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries and
+[product research](docs/product-research.md) for integration and positioning research.
+
+For contributors, `make test` exercises native builds. Before publishing a clean,
+committed change, use `make local-check` and `make local-verify` as required by
+[local checks](docs/local-checks.md) and `AGENTS.md`. Installation, a passing test
+selection and a publication receipt are different things.
