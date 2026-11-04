@@ -235,7 +235,10 @@ total, so a run that stopped early shows the gap. A run the engine did not finis
 `INCOMPLETE`, as is any `TIMED_OUT`, `NO_COVERAGE` or `UNVIABLE` row and any unstarted
 mutant. `CANCELLED` means a signal stopped it; `unstarted` stays null if the engine
 had not yet said how many it planned. Neither is PASS evidence. A cancelled run never
-records a survivor baseline, and neither does a run with unstarted mutants.
+records a survivor baseline, and neither does a run with unstarted mutants. An
+`INCOMPLETE` run in which every mutant ran does record one. That cannot weaken the
+ratchet: a censored mutant is not in the baseline, so if it survives later it counts
+as a new survivor and the run is `FAIL`.
 
 Three things still need Python. fest is a Python tool, the campaign's interpreter must
 be able to import `conductor` for the `mutation_pycache_evict` pytest plugin, and it

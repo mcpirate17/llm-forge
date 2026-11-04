@@ -79,7 +79,9 @@ is different from Python required to orchestrate Forge itself.
 
 **Status:** implemented on `feat/native-mutation-runner-20261103`.
 `forge mutation plan|write|inspect|run` replace the writer and runner, and
-`make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them. The
+`make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them, through
+the `forge` on `PATH`: a binary older than this branch exits 2 with `unrecognized
+subcommand` until it is reinstalled. The
 Python entrypoints stay until hosts migrate (P5). Two limits remain: neither writer
 emits Mull campaigns, so `run` executes a Mull manifest but nothing generates one;
 and fest campaigns still need `conductor` importable in their interpreter for the

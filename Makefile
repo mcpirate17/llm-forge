@@ -30,13 +30,12 @@ REVIEW_ARGS ?=
 MUTATION_LANGUAGE ?= python
 MUTATION_BASE ?= origin/main
 MUTATION_CAMPAIGN ?=
-# conductor.mutation_receipt_build still defaults to the monorepo's
-# research/reports/mutation_testing/. campaigns/registry.json declares
+# A run's default receipt root is not evidence. campaigns/registry.json declares
 # campaigns/receipts as this repository's receipt directory, and a receipt written
-# anywhere else is invisible to evidence verification, so name it here.
-# `?=` is recursively expanded, so neither of these runs until the recipe needs it.
-MUTATION_RECEIPT ?= $(shell $(UV) run python -c \
-  'from conductor.project_paths import receipts_relative; print(receipts_relative("."))')
+# anywhere else is invisible to evidence verification, so name it here. It is a
+# literal so the native runner never waits on `uv run`, which rebuilds the native
+# tree after any edit under native/.
+MUTATION_RECEIPT ?= campaigns/receipts
 RUN_STAMP ?= $(shell date -u +%Y%m%dT%H%M%SZ)
 MUTATION_PATHS ?=
 MUTATION_GENERATE_ARGS ?=
