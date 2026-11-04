@@ -246,9 +246,31 @@ pub mod tool_schema;
 pub mod write_targets;
 
 #[cfg(target_os = "linux")]
+pub mod mutation_attribution;
+#[cfg(target_os = "linux")]
+pub mod mutation_bytecode;
+#[cfg(target_os = "linux")]
+pub mod mutation_campaign;
+#[cfg(target_os = "linux")]
+pub mod mutation_engine_cargo;
+#[cfg(target_os = "linux")]
+pub mod mutation_engine_fest;
+#[cfg(target_os = "linux")]
+pub mod mutation_engine_mull;
+#[cfg(target_os = "linux")]
+pub mod mutation_process;
+#[cfg(target_os = "linux")]
 pub mod mutation_receipt_verify;
 #[cfg(target_os = "linux")]
+pub mod mutation_run;
+#[cfg(target_os = "linux")]
+pub mod mutation_run_scope;
+#[cfg(target_os = "linux")]
 pub mod mutation_scope;
+#[cfg(target_os = "linux")]
+pub mod mutation_score;
+#[cfg(target_os = "linux")]
+pub mod mutation_snapshot;
 #[cfg(target_os = "linux")]
 pub mod mutation_write;
 
@@ -280,6 +302,8 @@ pub(crate) mod mutation_live_catalog;
 pub(crate) mod mutation_live_cli;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_live_inputs;
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) mod mutation_run_test_support;
 
 #[cfg(target_os = "linux")]
 pub mod candidate_gate;

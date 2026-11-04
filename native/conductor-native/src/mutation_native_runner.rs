@@ -200,7 +200,10 @@ mod tests {
             "components_sha256",
         ] {
             let mut payload = receipt();
-            payload["native_runner"].as_object_mut().unwrap().remove(key);
+            payload["native_runner"]
+                .as_object_mut()
+                .unwrap()
+                .remove(key);
             assert_eq!(errors(&payload, current, |_| true).len(), 1, "{key}");
         }
     }

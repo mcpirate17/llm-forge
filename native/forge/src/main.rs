@@ -38,6 +38,7 @@ mod mcp_setup;
 mod merge;
 mod mutation_plan;
 mod mutation_results;
+mod mutation_run_cli;
 use forge::mutation_receipt_verify;
 use forge::notes_index;
 mod obsidian_sync;
@@ -300,6 +301,10 @@ enum MutationCommand {
     Write(Box<mutation_plan::WriteArgs>),
     /// Parse a test report into ordered attribution JSON without running tests.
     Results(mutation_results::ResultsArgs),
+    /// Report whether a generated campaign could run now; runs nothing.
+    Inspect(mutation_run_cli::InspectArgs),
+    /// Generate, run and score a campaign's mutants in a disposable snapshot.
+    Run(Box<mutation_run_cli::RunArgs>),
 }
 
 #[derive(Subcommand)]
@@ -524,6 +529,16 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
         MutationCommand::Write(args) => command_exit(
             "mutation write",
             mutation_plan::write(*args).map(|code| code as u8),
+            1,
+        ),
+        MutationCommand::Inspect(args) => command_exit(
+            "mutation inspect",
+            mutation_run_cli::inspect(args).map(|code| code as u8),
+            1,
+        ),
+        MutationCommand::Run(args) => command_exit(
+            "mutation run",
+            mutation_run_cli::run(*args).map(|code| code as u8),
             1,
         ),
     }

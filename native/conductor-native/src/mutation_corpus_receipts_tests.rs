@@ -150,6 +150,9 @@ mod native_receipts {
     fn a_non_passing_native_status_stops_before_identity() {
         let mut receipt = native_receipt();
         receipt["status"] = json!("CANCELLED");
-        assert_eq!(judged(&receipt, "c", true).as_deref(), Some("status=CANCELLED"));
+        assert_eq!(
+            judged(&receipt, "c", true).as_deref(),
+            Some("status=CANCELLED")
+        );
     }
 }

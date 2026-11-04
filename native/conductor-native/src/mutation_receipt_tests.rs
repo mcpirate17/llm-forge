@@ -1201,17 +1201,13 @@ mod native_runner_binding {
 
     #[test]
     fn a_native_receipt_needs_no_python_runner_hash() {
-        let found = generated_rule(&native(json!({"survivors": []})), |_| {
-            Some("c".repeat(64))
-        });
+        let found = generated_rule(&native(json!({"survivors": []})), |_| Some("c".repeat(64)));
         assert!(runner_rows(&found).is_empty(), "{found:?}");
     }
 
     #[test]
     fn a_native_receipt_for_older_runner_sources_is_refused() {
-        let found = generated_rule(&native(json!({"survivors": []})), |_| {
-            Some("0".repeat(64))
-        });
+        let found = generated_rule(&native(json!({"survivors": []})), |_| Some("0".repeat(64)));
         assert!(
             found
                 .iter()
@@ -1226,7 +1222,9 @@ mod native_runner_binding {
         payload.remove("runner_kind");
         let found = generated_rule(&payload, |_| Some("c".repeat(64)));
         assert!(
-            found.iter().any(|row| row.contains("core_sha256 is missing")),
+            found
+                .iter()
+                .any(|row| row.contains("core_sha256 is missing")),
             "{found:?}"
         );
     }
