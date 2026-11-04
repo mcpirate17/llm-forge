@@ -1,0 +1,40 @@
+{
+  "cwd": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench",
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": ""
+  },
+  "argv": [
+    "target/release/forge-product-value",
+    "--repo",
+    "/home/tim/Projects/llm-forge",
+    "--forge",
+    "/home/tim/Projects/llm-forge/.git/forge-tools/native-install/bin/forge",
+    "--forge-sha256",
+    "b31e01e7e67cc1e58d383cec2811f18b7c113c6b8c1bb4ad3ee60e4afa685e1f",
+    "--python",
+    "/home/tim/Projects/llm-forge/.venv/bin/python",
+    "--python-sha256",
+    "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+    "--scratch-parent",
+    "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench",
+    "--output",
+    "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/results-01.json",
+    "--samples",
+    "21",
+    "--warmups",
+    "3",
+    "--tokenizer-config",
+    "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/gpt2-config.json",
+    "--tokenizer-name",
+    "GPT-2 artifact-pinned tokenizer; tokenization only, no model weights/billing"
+  ],
+  "effective_source": {
+    "id": "forge-real-source-signature-ef50dcb-v1",
+    "path": "native/forge/src/worktree_runtime.rs",
+    "symbol": "relocate_console_scripts",
+    "source_sha256": "7e4fefae55c8c48118c85f91c075ba156f462bdc69069ec8c94f58450cdd886e",
+    "source_bytes": 5712,
+    "projection_format": "rust-signatures-v1",
+    "projection_stdout_sha256": "657f8627c6e28dda6724816f88a1869ba8d60fb744c4422e5b4b6b99fb7ba393"
+  }
+}

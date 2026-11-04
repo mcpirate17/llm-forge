@@ -3,8 +3,8 @@ use anyhow::{bail, ensure, Context, Result};
 use cap_std::fs::{Dir, Metadata, MetadataExt, OpenOptions, OpenOptionsExt};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    ffi::OsString,
-    os::unix::ffi::OsStrExt,
+    ffi::{CStr, CString, OsString},
+    os::{fd::AsRawFd, unix::ffi::OsStrExt},
     path::{Component, Path, PathBuf},
 };
 
@@ -18,7 +18,48 @@ pub(super) fn directory_options() -> OpenOptions {
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC);
     options
 }
-fn open_directory(path: &Path) -> Result<(Dir, PathBuf)> {
+struct Ancestor {
+    directory: Dir,
+    name: Option<CString>,
+    identity: (u64, u64),
+}
+impl Ancestor {
+    fn new(directory: Dir, name: Option<CString>) -> Result<Self> {
+        let metadata = directory.dir_metadata()?;
+        Ok(Self {
+            directory,
+            name,
+            identity: (metadata.dev(), metadata.ino()),
+        })
+    }
+}
+// Names are validated single components, cached once, and never joined at verification.
+fn bound_identity(parent: &Dir, name: &CStr) -> Result<(u64, u64)> {
+    let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: the borrowed Dir keeps its descriptor alive, name is a live C string,
+    // and successful fstatat initializes metadata. AT_SYMLINK_NOFOLLOW inspects the
+    // entry itself; a symlink never supplies a directory identity.
+    let result = unsafe {
+        libc::fstatat(
+            parent.as_raw_fd(),
+            name.as_ptr(),
+            metadata.as_mut_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("virtualenv/bin directory identity changed at cached binding");
+    }
+    // SAFETY: success above initialized the entire stat result.
+    let metadata = unsafe { metadata.assume_init() };
+    ensure!(
+        metadata.st_mode & libc::S_IFMT == libc::S_IFDIR,
+        "virtualenv/bin directory identity changed: binding is not a real directory"
+    );
+    Ok((metadata.st_dev, metadata.st_ino))
+}
+fn open_directory(path: &Path) -> Result<(Vec<Ancestor>, PathBuf)> {
     ensure!(!path.as_os_str().is_empty(), "virtualenv path is empty");
     let absolute = if path.is_absolute() {
         path.to_owned()
@@ -29,7 +70,10 @@ fn open_directory(path: &Path) -> Result<(Dir, PathBuf)> {
         absolute.as_os_str().len() <= 4096 && absolute.components().count() <= 256,
         "virtualenv path exceeds limits"
     );
-    let mut ancestors = vec![Dir::open_ambient_dir("/", cap_std::ambient_authority())?];
+    let mut ancestors = vec![Ancestor::new(
+        Dir::open_ambient_dir("/", cap_std::ambient_authority())?,
+        None,
+    )?];
     let mut normalized = PathBuf::from("/");
     for part in absolute.components() {
         match part {
@@ -37,9 +81,13 @@ fn open_directory(path: &Path) -> Result<(Dir, PathBuf)> {
                 let file = ancestors
                     .last()
                     .context("directory ancestor missing")?
+                    .directory
                     .open_with(name, &directory_options())
                     .context("virtualenv ancestors must be real directories without symlinks")?;
-                ancestors.push(Dir::from_std_file(file.into_std()));
+                ancestors.push(Ancestor::new(
+                    Dir::from_std_file(file.into_std()),
+                    Some(CString::new(name.as_bytes()).context("directory name contains NUL")?),
+                )?);
                 normalized.push(name);
             }
             Component::ParentDir => {
@@ -54,10 +102,7 @@ fn open_directory(path: &Path) -> Result<(Dir, PathBuf)> {
             _ => bail!("unsupported virtualenv path"),
         }
     }
-    Ok((
-        ancestors.pop().context("virtualenv directory missing")?,
-        normalized,
-    ))
+    Ok((ancestors, normalized))
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Stamp {
@@ -88,15 +133,17 @@ impl Stamp {
 pub(super) struct Bin {
     pub dir: Dir,
     pub path: PathBuf,
-    venv: PathBuf,
+    ancestors: Vec<Ancestor>,
+    bin_name: CString,
     root_identity: (u64, u64),
     identity: (u64, u64),
 }
 impl Bin {
     pub fn open(venv: &Path) -> Result<Self> {
-        let (root, venv) = open_directory(venv)?;
-        let root_identity = Stamp::capture(&root.dir_metadata()?).identity();
-        let bin = root.open_with("bin", &directory_options()).context("both virtualenvs must contain a real bin directory; bin directories must not be symlinks")?;
+        let (ancestors, venv) = open_directory(venv)?;
+        let root = ancestors.last().context("virtualenv directory missing")?;
+        let root_identity = root.identity;
+        let bin = root.directory.open_with("bin", &directory_options()).context("both virtualenvs must contain a real bin directory; bin directories must not be symlinks")?;
         let dir = Dir::from_std_file(bin.into_std());
         let identity = Stamp::capture(&dir.dir_metadata()?).identity();
         let path = venv.join("bin");
@@ -104,19 +151,40 @@ impl Bin {
             path.as_os_str().len() <= 4096,
             "virtualenv bin path exceeds limit"
         );
-        Ok(Self {
+        let bin = Self {
             dir,
             path,
-            venv,
+            ancestors,
+            bin_name: CString::new("bin")?,
             root_identity,
             identity,
-        })
+        };
+        bin.verify()?;
+        Ok(bin)
     }
     pub fn verify(&self) -> Result<()> {
-        let current = Self::open(&self.venv)?;
+        let first = self
+            .ancestors
+            .first()
+            .context("directory ancestor missing")?;
         ensure!(
-            self.root_identity == current.root_identity
-                && self.identity == current.identity
+            Stamp::capture(&first.directory.dir_metadata()?).identity() == first.identity,
+            "virtualenv/bin directory identity changed at held filesystem root"
+        );
+        for pair in self.ancestors.windows(2) {
+            let child = &pair[1];
+            let name = child.name.as_deref().context("directory binding missing")?;
+            ensure!(
+                bound_identity(&pair[0].directory, name)? == child.identity,
+                "virtualenv/bin directory identity changed at cached ancestor"
+            );
+        }
+        let root = self
+            .ancestors
+            .last()
+            .context("virtualenv directory missing")?;
+        ensure!(
+            bound_identity(&root.directory, &self.bin_name)? == self.identity
                 && self.identity == Stamp::capture(&self.dir.dir_metadata()?).identity(),
             "virtualenv/bin directory identity changed"
         );
@@ -262,3 +330,7 @@ impl Interpreters {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "worktree_runtime_paths_tests.rs"]
+mod tests;

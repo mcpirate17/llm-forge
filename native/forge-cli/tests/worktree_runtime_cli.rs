@@ -215,3 +215,74 @@ fn actual_binary_refuses_a_cooperative_writer_lease_then_succeeds_after_release(
     );
     assert_eq!(retried["relocated_count"], 1);
 }
+
+fn descriptor_limits() -> (libc::rlim_t, libc::rlim_t) {
+    let mut limits = std::mem::MaybeUninit::<libc::rlimit>::uninit();
+    // SAFETY: getrlimit initializes the result on success; no limit is changed.
+    assert_eq!(
+        unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, limits.as_mut_ptr()) },
+        0
+    );
+    // SAFETY: the preceding assertion requires successful initialization.
+    let limits = unsafe { limits.assume_init() };
+    (limits.rlim_cur, limits.rlim_max)
+}
+
+#[test]
+fn limited_child_descriptor_budget_refuses_deep_paths_before_any_launcher_write() {
+    use std::{os::unix::process::CommandExt, path::PathBuf};
+    let parent_limits = descriptor_limits();
+    let fixture = Fixture::new();
+    let suffix = (0..12).fold(PathBuf::new(), |path, index| {
+        path.join(format!("level-{index}"))
+    });
+    let source = fixture.source.join(&suffix);
+    let destination = fixture.destination.join(&suffix);
+    for venv in [&source, &destination] {
+        fs::create_dir_all(venv.join("bin")).unwrap();
+        fs::write(
+            venv.join("bin/python3"),
+            b"metadata fixture, never executed",
+        )
+        .unwrap();
+    }
+    let script = format!("#!{}/bin/python3\nunchanged body\n", source.display());
+    fs::write(source.join("bin/eligible"), script).unwrap();
+    fs::hard_link(
+        source.join("bin/eligible"),
+        destination.join("bin/eligible"),
+    )
+    .unwrap();
+    let before = image(&fixture.root);
+    let mut command = command();
+    command.arg(&source).arg(&destination).arg("--json");
+    // SAFETY: only this child changes its descriptor soft limit before exec; the
+    // hook uses libc syscalls and no shared state or non-async-signal-safe locks.
+    unsafe {
+        command.pre_exec(|| {
+            let mut limits = std::mem::MaybeUninit::<libc::rlimit>::uninit();
+            if libc::getrlimit(libc::RLIMIT_NOFILE, limits.as_mut_ptr()) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            let mut limits = limits.assume_init();
+            limits.rlim_cur = limits.rlim_cur.min(32);
+            if libc::setrlimit(libc::RLIMIT_NOFILE, &limits) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let output = command.output().unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["outcome"], "error");
+    assert!(report["error"].as_str().unwrap().contains("os error 24"));
+    assert_eq!(before, image(&fixture.root));
+    assert_eq!(descriptor_limits(), parent_limits);
+}

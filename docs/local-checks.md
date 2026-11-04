@@ -13,6 +13,12 @@ make local-verify
 [`.forge/local-check.toml`](../.forge/local-check.toml): CPU and memory admission,
 an isolated native installation, relocated/installed executable smoke tests,
 and formatting, strict Clippy and release tests for the native libraries and CLI.
+The separate product-value package also runs formatting, strict Clippy and its
+contract tests; these checks do not execute performance workloads or assign new
+measurements to historical artifacts. The dependency audit covers all four
+native lockfiles and requires the test-only `cargo-audit` command (validated with
+0.22.2). Missing tools, advisory database update failures and vulnerable packages
+fail the check; informational maintenance warnings remain visible.
 Rust 1.98.0 is selected explicitly. CUDA is masked, and Cargo workers are bounded
 by the effective base policy and admitted CPU/memory capacity (up to eight with
 the shipped policy). Each Rust test harness uses at most two concurrent tests,

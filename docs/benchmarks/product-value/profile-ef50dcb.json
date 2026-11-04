@@ -1,0 +1,4283 @@
+{
+  "schema": "forge-relocation-syscall-profile-v1",
+  "complete": true,
+  "paired_results_sha256": "a59a0674f7ddba225f6d7da8b3d93cfabbe116942c05c94c0edba8fae34c1556",
+  "strace_sha256": "28f957c227012de0b18d1bd7fff2d396cb693ea60ed8013be68de071e84b5001",
+  "native_elf_sha256": "b31e01e7e67cc1e58d383cec2811f18b7c113c6b8c1bb4ad3ee60e4afa685e1f",
+  "python_elf_sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+  "baseline_blob": "4cd99821a4c6d9f9ddc4e9c3746f3dd0c4189edb",
+  "baseline_source_sha256": "9015359e74c9fcd17a7bd898665ec6acbb610e088aa56b9e72defefebdf888cb",
+  "scope": "four traced cases; perturbing diagnostic only, never replacement timing or exact attribution of untraced differences",
+  "model_weights": "not loaded; paired tokenizer model association0707... is synthetic fixture sentinel, not a weight hash",
+  "cases": [
+    {
+      "variant": "native",
+      "scripts": 16,
+      "body": 128,
+      "status": "completed",
+      "fixture": {
+        "source_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/source-env",
+        "destination_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/guest-env",
+        "source_image_dev_inode_mode_sha256": {
+          "binary": [
+            66307,
+            52845094,
+            33204,
+            "1548c1c4099cd9e2374c076fece3cd0cbbac1b17ecc1509ba8b89161dfb2f6aa"
+          ],
+          "foreign": [
+            66307,
+            52845092,
+            33204,
+            "b12a45c8eeddc0cde9d4c1443073ce3ba874736af9336d643ca60076b4842527"
+          ],
+          "python3.12": [
+            66307,
+            52845075,
+            33204,
+            "109af4d90d818debf9e9d0a0f8139ccc1e5231fd0b393292db324ad226b09619"
+          ],
+          "script-0000": [
+            66307,
+            52845076,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0001": [
+            66307,
+            52845077,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0002": [
+            66307,
+            52845078,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0003": [
+            66307,
+            52845079,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0004": [
+            66307,
+            52845080,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0005": [
+            66307,
+            52845081,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0006": [
+            66307,
+            52845082,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0007": [
+            66307,
+            52845083,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0008": [
+            66307,
+            52845084,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0009": [
+            66307,
+            52845085,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0010": [
+            66307,
+            52845086,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0011": [
+            66307,
+            52845087,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0012": [
+            66307,
+            52845088,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0013": [
+            66307,
+            52845089,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0014": [
+            66307,
+            52845090,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0015": [
+            66307,
+            52845091,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "shell": [
+            66307,
+            52845093,
+            33204,
+            "148cfec8ae5c4870abaa6370af0a87e2f023c83bd10550e5a941b8e737e8c8c0"
+          ]
+        },
+        "body_sha256": "2ae0c14ebd3360d2a6344470fe59e258323703ac746f19890e3956150b2e86c4",
+        "hardlinks_reset_before_each_candidate": true,
+        "script_modes": "0751",
+        "shebangs": "alternating LF/CRLF; exact source Python3.12 alias",
+        "symlink": {
+          "alias": "script-0000"
+        }
+      },
+      "fixture_bin_path_components": 13,
+      "fixture_bin_path_bytes": 127,
+      "command": [
+        "/usr/bin/strace",
+        "-f",
+        "-ttt",
+        "-T",
+        "-s",
+        "4096",
+        "-e",
+        "raw=read,write,pread64,pwrite64,readv,writev",
+        "-o",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-native-16.strace",
+        "--",
+        "/home/tim/Projects/llm-forge/.git/forge-tools/native-install/bin/forge",
+        "worktree-runtime",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/source-env",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/guest-env"
+      ],
+      "tracer_plus_tracee_observation": {
+        "sample": {
+          "wall_ms": 74.735964,
+          "cpu_ms": 46.836,
+          "max_rss_bytes": 14761984
+        },
+        "exit_code": 0,
+        "signal": null,
+        "timed_out": false,
+        "cancelled": false,
+        "stdout_bytes": 38,
+        "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+        "stderr_bytes": 0,
+        "stderr": ""
+      },
+      "trace": {
+        "syscalls": {
+          "access": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "arch_prctl": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "brk": {
+            "calls": 12,
+            "traced_syscall_wall_ms": 0.05500000000000001
+          },
+          "close": {
+            "calls": 2197,
+            "traced_syscall_wall_ms": 5.883999999999985
+          },
+          "execve": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.135
+          },
+          "fchmod": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.03700000000000001
+          },
+          "fcntl": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.001
+          },
+          "flock": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.009000000000000001
+          },
+          "fstat": {
+            "calls": 6,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "fsync": {
+            "calls": 48,
+            "traced_syscall_wall_ms": 18.393000000000004
+          },
+          "getdents64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "getpid": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.03000000000000001
+          },
+          "getrandom": {
+            "calls": 18,
+            "traced_syscall_wall_ms": 0.04700000000000001
+          },
+          "gettid": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "lseek": {
+            "calls": 54,
+            "traced_syscall_wall_ms": 0.10100000000000008
+          },
+          "mmap": {
+            "calls": 23,
+            "traced_syscall_wall_ms": 0.09100000000000001
+          },
+          "mprotect": {
+            "calls": 7,
+            "traced_syscall_wall_ms": 0.030999999999999996
+          },
+          "munmap": {
+            "calls": 3,
+            "traced_syscall_wall_ms": 0.023
+          },
+          "openat": {
+            "calls": 175,
+            "traced_syscall_wall_ms": 0.4950000000000004
+          },
+          "openat2": {
+            "calls": 2022,
+            "traced_syscall_wall_ms": 5.933999999999978
+          },
+          "poll": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "pread64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.004
+          },
+          "prlimit64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "read": {
+            "calls": 453,
+            "traced_syscall_wall_ms": 1.1289999999999973
+          },
+          "renameat2": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.09400000000000003
+          },
+          "rseq": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "rt_sigaction": {
+            "calls": 5,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "rt_sigprocmask": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "sched_getaffinity": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.006
+          },
+          "set_robust_list": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "set_tid_address": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "sigaltstack": {
+            "calls": 3,
+            "traced_syscall_wall_ms": 0.006
+          },
+          "signalfd4": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.005
+          },
+          "statx": {
+            "calls": 992,
+            "traced_syscall_wall_ms": 2.7109999999999794
+          },
+          "unlinkat": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.06700000000000003
+          },
+          "write": {
+            "calls": 17,
+            "traced_syscall_wall_ms": 0.06100000000000001
+          }
+        },
+        "categories": {
+          "locks_and_descriptor_control": {
+            "calls": 5,
+            "traced_syscall_wall_ms": 0.01
+          },
+          "other": {
+            "calls": 171,
+            "traced_syscall_wall_ms": 0.6080000000000004
+          },
+          "path_metadata_open_close": {
+            "calls": 5411,
+            "traced_syscall_wall_ms": 15.117000000000374
+          },
+          "read_write": {
+            "calls": 472,
+            "traced_syscall_wall_ms": 1.1939999999999957
+          },
+          "rename_exchange": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.09400000000000003
+          },
+          "sync": {
+            "calls": 48,
+            "traced_syscall_wall_ms": 18.393000000000004
+          }
+        },
+        "trace_process_ids": [
+          "3565569"
+        ],
+        "unparsed_duration_lines": 0,
+        "trace_span_ms": 72.97897338867188,
+        "exec_to_first_fixture_path_operation_ms": 2.499103546142578,
+        "first_fixture_path_to_last_event_ms": 70.4798698425293,
+        "boundary_scope": "operational first fixture path access, not pure startup/algorithm timing; traced syscall sums can overlap across processes"
+      },
+      "trace_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-native-16.strace",
+      "trace_sha256": "b716e3754fff542659ec025a15f5ec020d3ba01edba6a5efa66e3c916760e016",
+      "correctness_checked": true
+    },
+    {
+      "variant": "python",
+      "scripts": 16,
+      "body": 128,
+      "status": "completed",
+      "fixture": {
+        "source_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/source-env",
+        "destination_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/guest-env",
+        "source_image_dev_inode_mode_sha256": {
+          "binary": [
+            66307,
+            52845094,
+            33204,
+            "1548c1c4099cd9e2374c076fece3cd0cbbac1b17ecc1509ba8b89161dfb2f6aa"
+          ],
+          "foreign": [
+            66307,
+            52845092,
+            33204,
+            "b12a45c8eeddc0cde9d4c1443073ce3ba874736af9336d643ca60076b4842527"
+          ],
+          "python3.12": [
+            66307,
+            52845075,
+            33204,
+            "109af4d90d818debf9e9d0a0f8139ccc1e5231fd0b393292db324ad226b09619"
+          ],
+          "script-0000": [
+            66307,
+            52845076,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0001": [
+            66307,
+            52845077,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0002": [
+            66307,
+            52845078,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0003": [
+            66307,
+            52845079,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0004": [
+            66307,
+            52845080,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0005": [
+            66307,
+            52845081,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0006": [
+            66307,
+            52845082,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0007": [
+            66307,
+            52845083,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0008": [
+            66307,
+            52845084,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0009": [
+            66307,
+            52845085,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0010": [
+            66307,
+            52845086,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0011": [
+            66307,
+            52845087,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0012": [
+            66307,
+            52845088,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0013": [
+            66307,
+            52845089,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "script-0014": [
+            66307,
+            52845090,
+            33257,
+            "e88a8268a22f7b6f30ea200ed00256a42c1fbedf62157a7e8f8407a71f57f08f"
+          ],
+          "script-0015": [
+            66307,
+            52845091,
+            33257,
+            "b47d7b442d3632830eb1ab2f67f57afab65d382a59d623322ec6b1f8ba966ca6"
+          ],
+          "shell": [
+            66307,
+            52845093,
+            33204,
+            "148cfec8ae5c4870abaa6370af0a87e2f023c83bd10550e5a941b8e737e8c8c0"
+          ]
+        },
+        "body_sha256": "2ae0c14ebd3360d2a6344470fe59e258323703ac746f19890e3956150b2e86c4",
+        "hardlinks_reset_before_each_candidate": true,
+        "script_modes": "0751",
+        "shebangs": "alternating LF/CRLF; exact source Python3.12 alias",
+        "symlink": {
+          "alias": "script-0000"
+        }
+      },
+      "fixture_bin_path_components": 13,
+      "fixture_bin_path_bytes": 127,
+      "command": [
+        "/usr/bin/strace",
+        "-f",
+        "-ttt",
+        "-T",
+        "-s",
+        "4096",
+        "-e",
+        "raw=read,write,pread64,pwrite64,readv,writev",
+        "-o",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-python-16.strace",
+        "--",
+        "/home/tim/Projects/llm-forge/.venv/bin/python",
+        "-I",
+        "-B",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/reference-only.py",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/source-env",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-16/guest-env"
+      ],
+      "tracer_plus_tracee_observation": {
+        "sample": {
+          "wall_ms": 29.072548,
+          "cpu_ms": 28.267,
+          "max_rss_bytes": 12697600
+        },
+        "exit_code": 0,
+        "signal": null,
+        "timed_out": false,
+        "cancelled": false,
+        "stdout_bytes": 38,
+        "stdout_sha256": "8ae5ec488484b6131d3499d76c2ed16cafd35ff67d49025c795691081a4e0727",
+        "stderr_bytes": 0,
+        "stderr": ""
+      },
+      "trace": {
+        "syscalls": {
+          "access": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "arch_prctl": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "brk": {
+            "calls": 18,
+            "traced_syscall_wall_ms": 0.09300000000000003
+          },
+          "chmod": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.05000000000000002
+          },
+          "close": {
+            "calls": 129,
+            "traced_syscall_wall_ms": 0.2440000000000002
+          },
+          "execve": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.14400000000000002
+          },
+          "fcntl": {
+            "calls": 6,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "fstat": {
+            "calls": 190,
+            "traced_syscall_wall_ms": 0.32500000000000023
+          },
+          "futex": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "getdents64": {
+            "calls": 22,
+            "traced_syscall_wall_ms": 0.22500000000000006
+          },
+          "getpid": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.01800000000000001
+          },
+          "getrandom": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.013000000000000001
+          },
+          "gettid": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "ioctl": {
+            "calls": 127,
+            "traced_syscall_wall_ms": 0.17400000000000013
+          },
+          "lseek": {
+            "calls": 202,
+            "traced_syscall_wall_ms": 0.2610000000000002
+          },
+          "mmap": {
+            "calls": 48,
+            "traced_syscall_wall_ms": 0.2070000000000001
+          },
+          "mprotect": {
+            "calls": 10,
+            "traced_syscall_wall_ms": 0.038000000000000006
+          },
+          "munmap": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.022
+          },
+          "newfstatat": {
+            "calls": 354,
+            "traced_syscall_wall_ms": 0.7800000000000006
+          },
+          "openat": {
+            "calls": 133,
+            "traced_syscall_wall_ms": 0.4310000000000003
+          },
+          "pread64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.005
+          },
+          "prlimit64": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.001
+          },
+          "read": {
+            "calls": 173,
+            "traced_syscall_wall_ms": 0.5000000000000003
+          },
+          "readlink": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "rename": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.21500000000000005
+          },
+          "rseq": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "rt_sigaction": {
+            "calls": 66,
+            "traced_syscall_wall_ms": 0.08800000000000006
+          },
+          "set_robust_list": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "set_tid_address": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.001
+          },
+          "unlink": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.040000000000000015
+          },
+          "write": {
+            "calls": 17,
+            "traced_syscall_wall_ms": 0.07100000000000002
+          }
+        },
+        "categories": {
+          "locks_and_descriptor_control": {
+            "calls": 6,
+            "traced_syscall_wall_ms": 0.012
+          },
+          "other": {
+            "calls": 519,
+            "traced_syscall_wall_ms": 1.1209999999999942
+          },
+          "path_metadata_open_close": {
+            "calls": 849,
+            "traced_syscall_wall_ms": 2.059999999999983
+          },
+          "read_write": {
+            "calls": 192,
+            "traced_syscall_wall_ms": 0.5760000000000004
+          },
+          "rename_exchange": {
+            "calls": 16,
+            "traced_syscall_wall_ms": 0.21500000000000005
+          }
+        },
+        "trace_process_ids": [
+          "3565575"
+        ],
+        "unparsed_duration_lines": 0,
+        "trace_span_ms": 27.965068817138672,
+        "exec_to_first_fixture_path_operation_ms": 20.25890350341797,
+        "first_fixture_path_to_last_event_ms": 7.706165313720703,
+        "boundary_scope": "operational first fixture path access, not pure startup/algorithm timing; traced syscall sums can overlap across processes"
+      },
+      "trace_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-python-16.strace",
+      "trace_sha256": "d597fb4e66f8ba9b2deee6ea5fcfad7ef24b6cc441e35032e9914a8fb2c97cf8",
+      "correctness_checked": true
+    },
+    {
+      "variant": "python",
+      "scripts": 256,
+      "body": 4096,
+      "status": "completed",
+      "fixture": {
+        "source_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/source-env",
+        "destination_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/guest-env",
+        "source_image_dev_inode_mode_sha256": {
+          "binary": [
+            66307,
+            52845334,
+            33204,
+            "1548c1c4099cd9e2374c076fece3cd0cbbac1b17ecc1509ba8b89161dfb2f6aa"
+          ],
+          "foreign": [
+            66307,
+            52845332,
+            33204,
+            "b12a45c8eeddc0cde9d4c1443073ce3ba874736af9336d643ca60076b4842527"
+          ],
+          "python3.12": [
+            66307,
+            52845075,
+            33204,
+            "109af4d90d818debf9e9d0a0f8139ccc1e5231fd0b393292db324ad226b09619"
+          ],
+          "script-0000": [
+            66307,
+            52845076,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0001": [
+            66307,
+            52845077,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0002": [
+            66307,
+            52845078,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0003": [
+            66307,
+            52845079,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0004": [
+            66307,
+            52845080,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0005": [
+            66307,
+            52845081,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0006": [
+            66307,
+            52845082,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0007": [
+            66307,
+            52845083,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0008": [
+            66307,
+            52845084,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0009": [
+            66307,
+            52845085,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0010": [
+            66307,
+            52845086,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0011": [
+            66307,
+            52845087,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0012": [
+            66307,
+            52845088,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0013": [
+            66307,
+            52845089,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0014": [
+            66307,
+            52845090,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0015": [
+            66307,
+            52845091,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0016": [
+            66307,
+            52845092,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0017": [
+            66307,
+            52845093,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0018": [
+            66307,
+            52845094,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0019": [
+            66307,
+            52845095,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0020": [
+            66307,
+            52845096,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0021": [
+            66307,
+            52845097,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0022": [
+            66307,
+            52845098,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0023": [
+            66307,
+            52845099,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0024": [
+            66307,
+            52845100,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0025": [
+            66307,
+            52845101,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0026": [
+            66307,
+            52845102,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0027": [
+            66307,
+            52845103,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0028": [
+            66307,
+            52845104,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0029": [
+            66307,
+            52845105,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0030": [
+            66307,
+            52845106,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0031": [
+            66307,
+            52845107,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0032": [
+            66307,
+            52845108,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0033": [
+            66307,
+            52845109,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0034": [
+            66307,
+            52845110,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0035": [
+            66307,
+            52845111,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0036": [
+            66307,
+            52845112,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0037": [
+            66307,
+            52845113,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0038": [
+            66307,
+            52845114,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0039": [
+            66307,
+            52845115,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0040": [
+            66307,
+            52845116,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0041": [
+            66307,
+            52845117,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0042": [
+            66307,
+            52845118,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0043": [
+            66307,
+            52845119,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0044": [
+            66307,
+            52845120,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0045": [
+            66307,
+            52845121,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0046": [
+            66307,
+            52845122,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0047": [
+            66307,
+            52845123,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0048": [
+            66307,
+            52845124,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0049": [
+            66307,
+            52845125,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0050": [
+            66307,
+            52845126,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0051": [
+            66307,
+            52845127,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0052": [
+            66307,
+            52845128,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0053": [
+            66307,
+            52845129,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0054": [
+            66307,
+            52845130,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0055": [
+            66307,
+            52845131,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0056": [
+            66307,
+            52845132,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0057": [
+            66307,
+            52845133,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0058": [
+            66307,
+            52845134,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0059": [
+            66307,
+            52845135,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0060": [
+            66307,
+            52845136,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0061": [
+            66307,
+            52845137,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0062": [
+            66307,
+            52845138,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0063": [
+            66307,
+            52845139,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0064": [
+            66307,
+            52845140,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0065": [
+            66307,
+            52845141,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0066": [
+            66307,
+            52845142,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0067": [
+            66307,
+            52845143,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0068": [
+            66307,
+            52845144,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0069": [
+            66307,
+            52845145,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0070": [
+            66307,
+            52845146,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0071": [
+            66307,
+            52845147,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0072": [
+            66307,
+            52845148,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0073": [
+            66307,
+            52845149,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0074": [
+            66307,
+            52845150,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0075": [
+            66307,
+            52845151,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0076": [
+            66307,
+            52845152,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0077": [
+            66307,
+            52845153,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0078": [
+            66307,
+            52845154,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0079": [
+            66307,
+            52845155,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0080": [
+            66307,
+            52845156,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0081": [
+            66307,
+            52845157,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0082": [
+            66307,
+            52845158,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0083": [
+            66307,
+            52845159,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0084": [
+            66307,
+            52845160,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0085": [
+            66307,
+            52845161,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0086": [
+            66307,
+            52845162,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0087": [
+            66307,
+            52845163,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0088": [
+            66307,
+            52845164,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0089": [
+            66307,
+            52845165,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0090": [
+            66307,
+            52845166,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0091": [
+            66307,
+            52845167,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0092": [
+            66307,
+            52845168,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0093": [
+            66307,
+            52845169,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0094": [
+            66307,
+            52845170,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0095": [
+            66307,
+            52845171,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0096": [
+            66307,
+            52845172,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0097": [
+            66307,
+            52845173,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0098": [
+            66307,
+            52845174,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0099": [
+            66307,
+            52845175,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0100": [
+            66307,
+            52845176,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0101": [
+            66307,
+            52845177,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0102": [
+            66307,
+            52845178,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0103": [
+            66307,
+            52845179,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0104": [
+            66307,
+            52845180,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0105": [
+            66307,
+            52845181,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0106": [
+            66307,
+            52845182,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0107": [
+            66307,
+            52845183,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0108": [
+            66307,
+            52845184,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0109": [
+            66307,
+            52845185,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0110": [
+            66307,
+            52845186,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0111": [
+            66307,
+            52845187,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0112": [
+            66307,
+            52845188,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0113": [
+            66307,
+            52845189,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0114": [
+            66307,
+            52845190,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0115": [
+            66307,
+            52845191,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0116": [
+            66307,
+            52845192,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0117": [
+            66307,
+            52845193,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0118": [
+            66307,
+            52845194,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0119": [
+            66307,
+            52845195,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0120": [
+            66307,
+            52845196,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0121": [
+            66307,
+            52845197,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0122": [
+            66307,
+            52845198,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0123": [
+            66307,
+            52845199,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0124": [
+            66307,
+            52845200,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0125": [
+            66307,
+            52845201,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0126": [
+            66307,
+            52845202,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0127": [
+            66307,
+            52845203,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0128": [
+            66307,
+            52845204,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0129": [
+            66307,
+            52845205,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0130": [
+            66307,
+            52845206,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0131": [
+            66307,
+            52845207,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0132": [
+            66307,
+            52845208,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0133": [
+            66307,
+            52845209,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0134": [
+            66307,
+            52845210,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0135": [
+            66307,
+            52845211,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0136": [
+            66307,
+            52845212,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0137": [
+            66307,
+            52845213,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0138": [
+            66307,
+            52845214,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0139": [
+            66307,
+            52845215,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0140": [
+            66307,
+            52845216,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0141": [
+            66307,
+            52845217,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0142": [
+            66307,
+            52845218,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0143": [
+            66307,
+            52845219,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0144": [
+            66307,
+            52845220,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0145": [
+            66307,
+            52845221,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0146": [
+            66307,
+            52845222,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0147": [
+            66307,
+            52845223,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0148": [
+            66307,
+            52845224,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0149": [
+            66307,
+            52845225,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0150": [
+            66307,
+            52845226,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0151": [
+            66307,
+            52845227,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0152": [
+            66307,
+            52845228,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0153": [
+            66307,
+            52845229,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0154": [
+            66307,
+            52845230,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0155": [
+            66307,
+            52845231,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0156": [
+            66307,
+            52845232,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0157": [
+            66307,
+            52845233,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0158": [
+            66307,
+            52845234,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0159": [
+            66307,
+            52845235,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0160": [
+            66307,
+            52845236,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0161": [
+            66307,
+            52845237,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0162": [
+            66307,
+            52845238,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0163": [
+            66307,
+            52845239,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0164": [
+            66307,
+            52845240,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0165": [
+            66307,
+            52845241,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0166": [
+            66307,
+            52845242,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0167": [
+            66307,
+            52845243,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0168": [
+            66307,
+            52845244,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0169": [
+            66307,
+            52845245,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0170": [
+            66307,
+            52845246,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0171": [
+            66307,
+            52845247,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0172": [
+            66307,
+            52845248,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0173": [
+            66307,
+            52845249,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0174": [
+            66307,
+            52845250,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0175": [
+            66307,
+            52845251,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0176": [
+            66307,
+            52845252,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0177": [
+            66307,
+            52845253,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0178": [
+            66307,
+            52845254,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0179": [
+            66307,
+            52845255,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0180": [
+            66307,
+            52845256,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0181": [
+            66307,
+            52845257,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0182": [
+            66307,
+            52845258,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0183": [
+            66307,
+            52845259,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0184": [
+            66307,
+            52845260,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0185": [
+            66307,
+            52845261,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0186": [
+            66307,
+            52845262,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0187": [
+            66307,
+            52845263,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0188": [
+            66307,
+            52845264,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0189": [
+            66307,
+            52845265,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0190": [
+            66307,
+            52845266,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0191": [
+            66307,
+            52845267,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0192": [
+            66307,
+            52845268,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0193": [
+            66307,
+            52845269,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0194": [
+            66307,
+            52845270,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0195": [
+            66307,
+            52845271,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0196": [
+            66307,
+            52845272,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0197": [
+            66307,
+            52845273,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0198": [
+            66307,
+            52845274,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0199": [
+            66307,
+            52845275,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0200": [
+            66307,
+            52845276,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0201": [
+            66307,
+            52845277,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0202": [
+            66307,
+            52845278,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0203": [
+            66307,
+            52845279,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0204": [
+            66307,
+            52845280,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0205": [
+            66307,
+            52845281,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0206": [
+            66307,
+            52845282,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0207": [
+            66307,
+            52845283,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0208": [
+            66307,
+            52845284,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0209": [
+            66307,
+            52845285,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0210": [
+            66307,
+            52845286,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0211": [
+            66307,
+            52845287,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0212": [
+            66307,
+            52845288,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0213": [
+            66307,
+            52845289,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0214": [
+            66307,
+            52845290,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0215": [
+            66307,
+            52845291,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0216": [
+            66307,
+            52845292,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0217": [
+            66307,
+            52845293,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0218": [
+            66307,
+            52845294,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0219": [
+            66307,
+            52845295,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0220": [
+            66307,
+            52845296,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0221": [
+            66307,
+            52845297,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0222": [
+            66307,
+            52845298,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0223": [
+            66307,
+            52845299,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0224": [
+            66307,
+            52845300,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0225": [
+            66307,
+            52845301,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0226": [
+            66307,
+            52845302,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0227": [
+            66307,
+            52845303,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0228": [
+            66307,
+            52845304,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0229": [
+            66307,
+            52845305,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0230": [
+            66307,
+            52845306,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0231": [
+            66307,
+            52845307,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0232": [
+            66307,
+            52845308,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0233": [
+            66307,
+            52845309,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0234": [
+            66307,
+            52845310,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0235": [
+            66307,
+            52845311,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0236": [
+            66307,
+            52845312,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0237": [
+            66307,
+            52845313,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0238": [
+            66307,
+            52845314,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0239": [
+            66307,
+            52845315,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0240": [
+            66307,
+            52845316,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0241": [
+            66307,
+            52845317,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0242": [
+            66307,
+            52845318,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0243": [
+            66307,
+            52845319,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0244": [
+            66307,
+            52845320,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0245": [
+            66307,
+            52845321,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0246": [
+            66307,
+            52845322,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0247": [
+            66307,
+            52845323,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0248": [
+            66307,
+            52845324,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0249": [
+            66307,
+            52845325,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0250": [
+            66307,
+            52845326,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0251": [
+            66307,
+            52845327,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0252": [
+            66307,
+            52845328,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0253": [
+            66307,
+            52845329,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0254": [
+            66307,
+            52845330,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0255": [
+            66307,
+            52845331,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "shell": [
+            66307,
+            52845333,
+            33204,
+            "148cfec8ae5c4870abaa6370af0a87e2f023c83bd10550e5a941b8e737e8c8c0"
+          ]
+        },
+        "body_sha256": "8317d8bc74007d9698b65fd6772827590612187107c450dbc3c8ba4095b78203",
+        "hardlinks_reset_before_each_candidate": true,
+        "script_modes": "0751",
+        "shebangs": "alternating LF/CRLF; exact source Python3.12 alias",
+        "symlink": {
+          "alias": "script-0000"
+        }
+      },
+      "fixture_bin_path_components": 13,
+      "fixture_bin_path_bytes": 128,
+      "command": [
+        "/usr/bin/strace",
+        "-f",
+        "-ttt",
+        "-T",
+        "-s",
+        "4096",
+        "-e",
+        "raw=read,write,pread64,pwrite64,readv,writev",
+        "-o",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-python-256.strace",
+        "--",
+        "/home/tim/Projects/llm-forge/.venv/bin/python",
+        "-I",
+        "-B",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/reference-only.py",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/source-env",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/guest-env"
+      ],
+      "tracer_plus_tracee_observation": {
+        "sample": {
+          "wall_ms": 97.457178,
+          "cpu_ms": 93.297,
+          "max_rss_bytes": 13090816
+        },
+        "exit_code": 0,
+        "signal": null,
+        "timed_out": false,
+        "cancelled": false,
+        "stdout_bytes": 39,
+        "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+        "stderr_bytes": 0,
+        "stderr": ""
+      },
+      "trace": {
+        "syscalls": {
+          "access": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.004
+          },
+          "arch_prctl": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "brk": {
+            "calls": 18,
+            "traced_syscall_wall_ms": 0.065
+          },
+          "chmod": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 0.6960000000000005
+          },
+          "close": {
+            "calls": 849,
+            "traced_syscall_wall_ms": 1.6379999999999766
+          },
+          "execve": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.121
+          },
+          "fcntl": {
+            "calls": 6,
+            "traced_syscall_wall_ms": 0.011000000000000003
+          },
+          "fstat": {
+            "calls": 1150,
+            "traced_syscall_wall_ms": 1.7119999999999707
+          },
+          "futex": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "getdents64": {
+            "calls": 22,
+            "traced_syscall_wall_ms": 0.26300000000000007
+          },
+          "getpid": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 0.2670000000000002
+          },
+          "getrandom": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.013000000000000001
+          },
+          "gettid": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "ioctl": {
+            "calls": 1087,
+            "traced_syscall_wall_ms": 1.2529999999999795
+          },
+          "lseek": {
+            "calls": 1642,
+            "traced_syscall_wall_ms": 2.137999999999932
+          },
+          "mmap": {
+            "calls": 49,
+            "traced_syscall_wall_ms": 0.17900000000000013
+          },
+          "mprotect": {
+            "calls": 10,
+            "traced_syscall_wall_ms": 0.035
+          },
+          "munmap": {
+            "calls": 5,
+            "traced_syscall_wall_ms": 0.046
+          },
+          "newfstatat": {
+            "calls": 1554,
+            "traced_syscall_wall_ms": 3.2579999999998788
+          },
+          "openat": {
+            "calls": 853,
+            "traced_syscall_wall_ms": 3.1719999999999557
+          },
+          "pread64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "prlimit64": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "read": {
+            "calls": 893,
+            "traced_syscall_wall_ms": 2.28399999999997
+          },
+          "readlink": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.008
+          },
+          "rename": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 3.3109999999999857
+          },
+          "rseq": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "rt_sigaction": {
+            "calls": 66,
+            "traced_syscall_wall_ms": 0.07300000000000005
+          },
+          "set_robust_list": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.001
+          },
+          "set_tid_address": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "unlink": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 0.9290000000000007
+          },
+          "write": {
+            "calls": 257,
+            "traced_syscall_wall_ms": 1.2789999999999988
+          }
+        },
+        "categories": {
+          "locks_and_descriptor_control": {
+            "calls": 6,
+            "traced_syscall_wall_ms": 0.011000000000000003
+          },
+          "other": {
+            "calls": 3401,
+            "traced_syscall_wall_ms": 4.89899999999986
+          },
+          "path_metadata_open_close": {
+            "calls": 4689,
+            "traced_syscall_wall_ms": 10.984000000000107
+          },
+          "read_write": {
+            "calls": 1152,
+            "traced_syscall_wall_ms": 3.5659999999999736
+          },
+          "rename_exchange": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 3.3109999999999857
+          }
+        },
+        "trace_process_ids": [
+          "3565580"
+        ],
+        "unparsed_duration_lines": 0,
+        "trace_span_ms": 96.30894660949707,
+        "exec_to_first_fixture_path_operation_ms": 19.57392692565918,
+        "first_fixture_path_to_last_event_ms": 76.73501968383789,
+        "boundary_scope": "operational first fixture path access, not pure startup/algorithm timing; traced syscall sums can overlap across processes"
+      },
+      "trace_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-python-256.strace",
+      "trace_sha256": "5bfd58085a8702361b7b1820a2a7ee752986f6e0a9471a6b22be963b823a7696",
+      "correctness_checked": true
+    },
+    {
+      "variant": "native",
+      "scripts": 256,
+      "body": 4096,
+      "status": "completed",
+      "fixture": {
+        "source_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/source-env",
+        "destination_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/guest-env",
+        "source_image_dev_inode_mode_sha256": {
+          "binary": [
+            66307,
+            52845336,
+            33204,
+            "1548c1c4099cd9e2374c076fece3cd0cbbac1b17ecc1509ba8b89161dfb2f6aa"
+          ],
+          "foreign": [
+            66307,
+            52845334,
+            33204,
+            "b12a45c8eeddc0cde9d4c1443073ce3ba874736af9336d643ca60076b4842527"
+          ],
+          "python3.12": [
+            66307,
+            52845077,
+            33204,
+            "109af4d90d818debf9e9d0a0f8139ccc1e5231fd0b393292db324ad226b09619"
+          ],
+          "script-0000": [
+            66307,
+            52845078,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0001": [
+            66307,
+            52845079,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0002": [
+            66307,
+            52845080,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0003": [
+            66307,
+            52845081,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0004": [
+            66307,
+            52845082,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0005": [
+            66307,
+            52845083,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0006": [
+            66307,
+            52845084,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0007": [
+            66307,
+            52845085,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0008": [
+            66307,
+            52845086,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0009": [
+            66307,
+            52845087,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0010": [
+            66307,
+            52845088,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0011": [
+            66307,
+            52845089,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0012": [
+            66307,
+            52845090,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0013": [
+            66307,
+            52845091,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0014": [
+            66307,
+            52845092,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0015": [
+            66307,
+            52845093,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0016": [
+            66307,
+            52845094,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0017": [
+            66307,
+            52845095,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0018": [
+            66307,
+            52845096,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0019": [
+            66307,
+            52845097,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0020": [
+            66307,
+            52845098,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0021": [
+            66307,
+            52845099,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0022": [
+            66307,
+            52845100,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0023": [
+            66307,
+            52845101,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0024": [
+            66307,
+            52845102,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0025": [
+            66307,
+            52845103,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0026": [
+            66307,
+            52845104,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0027": [
+            66307,
+            52845105,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0028": [
+            66307,
+            52845106,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0029": [
+            66307,
+            52845107,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0030": [
+            66307,
+            52845108,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0031": [
+            66307,
+            52845109,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0032": [
+            66307,
+            52845110,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0033": [
+            66307,
+            52845111,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0034": [
+            66307,
+            52845112,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0035": [
+            66307,
+            52845113,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0036": [
+            66307,
+            52845114,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0037": [
+            66307,
+            52845115,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0038": [
+            66307,
+            52845116,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0039": [
+            66307,
+            52845117,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0040": [
+            66307,
+            52845118,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0041": [
+            66307,
+            52845119,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0042": [
+            66307,
+            52845120,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0043": [
+            66307,
+            52845121,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0044": [
+            66307,
+            52845122,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0045": [
+            66307,
+            52845123,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0046": [
+            66307,
+            52845124,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0047": [
+            66307,
+            52845125,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0048": [
+            66307,
+            52845126,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0049": [
+            66307,
+            52845127,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0050": [
+            66307,
+            52845128,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0051": [
+            66307,
+            52845129,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0052": [
+            66307,
+            52845130,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0053": [
+            66307,
+            52845131,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0054": [
+            66307,
+            52845132,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0055": [
+            66307,
+            52845133,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0056": [
+            66307,
+            52845134,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0057": [
+            66307,
+            52845135,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0058": [
+            66307,
+            52845136,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0059": [
+            66307,
+            52845137,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0060": [
+            66307,
+            52845138,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0061": [
+            66307,
+            52845139,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0062": [
+            66307,
+            52845140,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0063": [
+            66307,
+            52845141,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0064": [
+            66307,
+            52845142,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0065": [
+            66307,
+            52845143,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0066": [
+            66307,
+            52845144,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0067": [
+            66307,
+            52845145,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0068": [
+            66307,
+            52845146,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0069": [
+            66307,
+            52845147,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0070": [
+            66307,
+            52845148,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0071": [
+            66307,
+            52845149,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0072": [
+            66307,
+            52845150,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0073": [
+            66307,
+            52845151,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0074": [
+            66307,
+            52845152,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0075": [
+            66307,
+            52845153,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0076": [
+            66307,
+            52845154,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0077": [
+            66307,
+            52845155,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0078": [
+            66307,
+            52845156,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0079": [
+            66307,
+            52845157,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0080": [
+            66307,
+            52845158,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0081": [
+            66307,
+            52845159,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0082": [
+            66307,
+            52845160,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0083": [
+            66307,
+            52845161,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0084": [
+            66307,
+            52845162,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0085": [
+            66307,
+            52845163,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0086": [
+            66307,
+            52845164,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0087": [
+            66307,
+            52845165,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0088": [
+            66307,
+            52845166,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0089": [
+            66307,
+            52845167,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0090": [
+            66307,
+            52845168,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0091": [
+            66307,
+            52845169,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0092": [
+            66307,
+            52845170,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0093": [
+            66307,
+            52845171,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0094": [
+            66307,
+            52845172,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0095": [
+            66307,
+            52845173,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0096": [
+            66307,
+            52845174,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0097": [
+            66307,
+            52845175,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0098": [
+            66307,
+            52845176,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0099": [
+            66307,
+            52845177,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0100": [
+            66307,
+            52845178,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0101": [
+            66307,
+            52845179,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0102": [
+            66307,
+            52845180,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0103": [
+            66307,
+            52845181,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0104": [
+            66307,
+            52845182,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0105": [
+            66307,
+            52845183,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0106": [
+            66307,
+            52845184,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0107": [
+            66307,
+            52845185,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0108": [
+            66307,
+            52845186,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0109": [
+            66307,
+            52845187,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0110": [
+            66307,
+            52845188,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0111": [
+            66307,
+            52845189,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0112": [
+            66307,
+            52845190,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0113": [
+            66307,
+            52845191,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0114": [
+            66307,
+            52845192,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0115": [
+            66307,
+            52845193,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0116": [
+            66307,
+            52845194,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0117": [
+            66307,
+            52845195,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0118": [
+            66307,
+            52845196,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0119": [
+            66307,
+            52845197,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0120": [
+            66307,
+            52845198,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0121": [
+            66307,
+            52845199,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0122": [
+            66307,
+            52845200,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0123": [
+            66307,
+            52845201,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0124": [
+            66307,
+            52845202,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0125": [
+            66307,
+            52845203,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0126": [
+            66307,
+            52845204,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0127": [
+            66307,
+            52845205,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0128": [
+            66307,
+            52845206,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0129": [
+            66307,
+            52845207,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0130": [
+            66307,
+            52845208,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0131": [
+            66307,
+            52845209,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0132": [
+            66307,
+            52845210,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0133": [
+            66307,
+            52845211,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0134": [
+            66307,
+            52845212,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0135": [
+            66307,
+            52845213,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0136": [
+            66307,
+            52845214,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0137": [
+            66307,
+            52845215,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0138": [
+            66307,
+            52845216,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0139": [
+            66307,
+            52845217,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0140": [
+            66307,
+            52845218,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0141": [
+            66307,
+            52845219,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0142": [
+            66307,
+            52845220,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0143": [
+            66307,
+            52845221,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0144": [
+            66307,
+            52845222,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0145": [
+            66307,
+            52845223,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0146": [
+            66307,
+            52845224,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0147": [
+            66307,
+            52845225,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0148": [
+            66307,
+            52845226,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0149": [
+            66307,
+            52845227,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0150": [
+            66307,
+            52845228,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0151": [
+            66307,
+            52845229,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0152": [
+            66307,
+            52845230,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0153": [
+            66307,
+            52845231,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0154": [
+            66307,
+            52845232,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0155": [
+            66307,
+            52845233,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0156": [
+            66307,
+            52845234,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0157": [
+            66307,
+            52845235,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0158": [
+            66307,
+            52845236,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0159": [
+            66307,
+            52845237,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0160": [
+            66307,
+            52845238,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0161": [
+            66307,
+            52845239,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0162": [
+            66307,
+            52845240,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0163": [
+            66307,
+            52845241,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0164": [
+            66307,
+            52845242,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0165": [
+            66307,
+            52845243,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0166": [
+            66307,
+            52845244,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0167": [
+            66307,
+            52845245,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0168": [
+            66307,
+            52845246,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0169": [
+            66307,
+            52845247,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0170": [
+            66307,
+            52845248,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0171": [
+            66307,
+            52845249,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0172": [
+            66307,
+            52845250,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0173": [
+            66307,
+            52845251,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0174": [
+            66307,
+            52845252,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0175": [
+            66307,
+            52845253,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0176": [
+            66307,
+            52845254,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0177": [
+            66307,
+            52845255,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0178": [
+            66307,
+            52845256,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0179": [
+            66307,
+            52845257,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0180": [
+            66307,
+            52845258,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0181": [
+            66307,
+            52845259,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0182": [
+            66307,
+            52845260,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0183": [
+            66307,
+            52845261,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0184": [
+            66307,
+            52845262,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0185": [
+            66307,
+            52845263,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0186": [
+            66307,
+            52845264,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0187": [
+            66307,
+            52845265,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0188": [
+            66307,
+            52845266,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0189": [
+            66307,
+            52845267,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0190": [
+            66307,
+            52845268,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0191": [
+            66307,
+            52845269,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0192": [
+            66307,
+            52845270,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0193": [
+            66307,
+            52845271,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0194": [
+            66307,
+            52845272,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0195": [
+            66307,
+            52845273,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0196": [
+            66307,
+            52845274,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0197": [
+            66307,
+            52845275,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0198": [
+            66307,
+            52845276,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0199": [
+            66307,
+            52845277,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0200": [
+            66307,
+            52845278,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0201": [
+            66307,
+            52845279,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0202": [
+            66307,
+            52845280,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0203": [
+            66307,
+            52845281,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0204": [
+            66307,
+            52845282,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0205": [
+            66307,
+            52845283,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0206": [
+            66307,
+            52845284,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0207": [
+            66307,
+            52845285,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0208": [
+            66307,
+            52845286,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0209": [
+            66307,
+            52845287,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0210": [
+            66307,
+            52845288,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0211": [
+            66307,
+            52845289,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0212": [
+            66307,
+            52845290,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0213": [
+            66307,
+            52845291,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0214": [
+            66307,
+            52845292,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0215": [
+            66307,
+            52845293,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0216": [
+            66307,
+            52845294,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0217": [
+            66307,
+            52845295,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0218": [
+            66307,
+            52845296,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0219": [
+            66307,
+            52845297,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0220": [
+            66307,
+            52845298,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0221": [
+            66307,
+            52845299,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0222": [
+            66307,
+            52845300,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0223": [
+            66307,
+            52845301,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0224": [
+            66307,
+            52845302,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0225": [
+            66307,
+            52845303,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0226": [
+            66307,
+            52845304,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0227": [
+            66307,
+            52845305,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0228": [
+            66307,
+            52845306,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0229": [
+            66307,
+            52845307,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0230": [
+            66307,
+            52845308,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0231": [
+            66307,
+            52845309,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0232": [
+            66307,
+            52845310,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0233": [
+            66307,
+            52845311,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0234": [
+            66307,
+            52845312,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0235": [
+            66307,
+            52845313,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0236": [
+            66307,
+            52845314,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0237": [
+            66307,
+            52845315,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0238": [
+            66307,
+            52845316,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0239": [
+            66307,
+            52845317,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0240": [
+            66307,
+            52845318,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0241": [
+            66307,
+            52845319,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0242": [
+            66307,
+            52845320,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0243": [
+            66307,
+            52845321,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0244": [
+            66307,
+            52845322,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0245": [
+            66307,
+            52845323,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0246": [
+            66307,
+            52845324,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0247": [
+            66307,
+            52845325,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0248": [
+            66307,
+            52845326,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0249": [
+            66307,
+            52845327,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0250": [
+            66307,
+            52845328,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0251": [
+            66307,
+            52845329,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0252": [
+            66307,
+            52845330,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0253": [
+            66307,
+            52845331,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "script-0254": [
+            66307,
+            52845332,
+            33257,
+            "59767a24946a9ce83e098ff482aad9741c040ec261f0dcce5676d767ead4d4d0"
+          ],
+          "script-0255": [
+            66307,
+            52845333,
+            33257,
+            "9414b6da01325be83e77a61367e33dc5936e40c5a028bb592bf901bd525a0e25"
+          ],
+          "shell": [
+            66307,
+            52845335,
+            33204,
+            "148cfec8ae5c4870abaa6370af0a87e2f023c83bd10550e5a941b8e737e8c8c0"
+          ]
+        },
+        "body_sha256": "8317d8bc74007d9698b65fd6772827590612187107c450dbc3c8ba4095b78203",
+        "hardlinks_reset_before_each_candidate": true,
+        "script_modes": "0751",
+        "shebangs": "alternating LF/CRLF; exact source Python3.12 alias",
+        "symlink": {
+          "alias": "script-0000"
+        }
+      },
+      "fixture_bin_path_components": 13,
+      "fixture_bin_path_bytes": 128,
+      "command": [
+        "/usr/bin/strace",
+        "-f",
+        "-ttt",
+        "-T",
+        "-s",
+        "4096",
+        "-e",
+        "raw=read,write,pread64,pwrite64,readv,writev",
+        "-o",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-native-256.strace",
+        "--",
+        "/home/tim/Projects/llm-forge/.git/forge-tools/native-install/bin/forge",
+        "worktree-runtime",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/source-env",
+        "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/forge-value-0J9QJs/fixture-256/guest-env"
+      ],
+      "tracer_plus_tracee_observation": {
+        "sample": {
+          "wall_ms": 1020.9221120000001,
+          "cpu_ms": 615.777,
+          "max_rss_bytes": 21245952
+        },
+        "exit_code": 0,
+        "signal": null,
+        "timed_out": false,
+        "cancelled": false,
+        "stdout_bytes": 39,
+        "stdout_sha256": "0a283981f8532859ab93664b8051b0b93f07fb5a046d6e5b481374bc34939618",
+        "stderr_bytes": 0,
+        "stderr": ""
+      },
+      "trace": {
+        "syscalls": {
+          "access": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.004
+          },
+          "arch_prctl": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "brk": {
+            "calls": 61,
+            "traced_syscall_wall_ms": 0.1390000000000001
+          },
+          "close": {
+            "calls": 31717,
+            "traced_syscall_wall_ms": 68.17699999999635
+          },
+          "execve": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.10900000000000001
+          },
+          "fchmod": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 0.4980000000000004
+          },
+          "fcntl": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "flock": {
+            "calls": 4,
+            "traced_syscall_wall_ms": 0.008
+          },
+          "fstat": {
+            "calls": 6,
+            "traced_syscall_wall_ms": 0.013000000000000001
+          },
+          "fsync": {
+            "calls": 768,
+            "traced_syscall_wall_ms": 297.1450000000002
+          },
+          "getdents64": {
+            "calls": 5,
+            "traced_syscall_wall_ms": 0.04200000000000001
+          },
+          "getpid": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 0.43600000000000033
+          },
+          "getrandom": {
+            "calls": 258,
+            "traced_syscall_wall_ms": 0.5730000000000004
+          },
+          "gettid": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "lseek": {
+            "calls": 774,
+            "traced_syscall_wall_ms": 1.3109999999999968
+          },
+          "mmap": {
+            "calls": 23,
+            "traced_syscall_wall_ms": 0.09100000000000004
+          },
+          "mprotect": {
+            "calls": 7,
+            "traced_syscall_wall_ms": 0.027
+          },
+          "munmap": {
+            "calls": 3,
+            "traced_syscall_wall_ms": 0.033
+          },
+          "openat": {
+            "calls": 2335,
+            "traced_syscall_wall_ms": 5.619999999999858
+          },
+          "openat2": {
+            "calls": 29382,
+            "traced_syscall_wall_ms": 80.86300000000726
+          },
+          "poll": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "pread64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "prlimit64": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.005
+          },
+          "read": {
+            "calls": 10533,
+            "traced_syscall_wall_ms": 20.086000000000436
+          },
+          "renameat2": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 2.024999999999996
+          },
+          "rseq": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "rt_sigaction": {
+            "calls": 5,
+            "traced_syscall_wall_ms": 0.008
+          },
+          "rt_sigprocmask": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.005
+          },
+          "sched_getaffinity": {
+            "calls": 2,
+            "traced_syscall_wall_ms": 0.006
+          },
+          "set_robust_list": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.002
+          },
+          "set_tid_address": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "sigaltstack": {
+            "calls": 3,
+            "traced_syscall_wall_ms": 0.005
+          },
+          "signalfd4": {
+            "calls": 1,
+            "traced_syscall_wall_ms": 0.003
+          },
+          "statx": {
+            "calls": 14672,
+            "traced_syscall_wall_ms": 32.10600000000001
+          },
+          "unlinkat": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 1.3949999999999978
+          },
+          "write": {
+            "calls": 257,
+            "traced_syscall_wall_ms": 1.2919999999999983
+          }
+        },
+        "categories": {
+          "locks_and_descriptor_control": {
+            "calls": 5,
+            "traced_syscall_wall_ms": 0.010000000000000002
+          },
+          "other": {
+            "calls": 1660,
+            "traced_syscall_wall_ms": 3.2629999999998778
+          },
+          "path_metadata_open_close": {
+            "calls": 78374,
+            "traced_syscall_wall_ms": 188.2199999998793
+          },
+          "read_write": {
+            "calls": 10792,
+            "traced_syscall_wall_ms": 21.381000000000174
+          },
+          "rename_exchange": {
+            "calls": 256,
+            "traced_syscall_wall_ms": 2.024999999999996
+          },
+          "sync": {
+            "calls": 768,
+            "traced_syscall_wall_ms": 297.1450000000002
+          }
+        },
+        "trace_process_ids": [
+          "3565585"
+        ],
+        "unparsed_duration_lines": 0,
+        "trace_span_ms": 1019.6700096130371,
+        "exec_to_first_fixture_path_operation_ms": 1.8589496612548828,
+        "first_fixture_path_to_last_event_ms": 1017.8110599517822,
+        "boundary_scope": "operational first fixture path access, not pure startup/algorithm timing; traced syscall sums can overlap across processes"
+      },
+      "trace_path": "/home/tim/.local/state/llm-forge/native-migration/native-product-value-draft/bench/profile-native-256.strace",
+      "trace_sha256": "41c859d33b8135b2d63029c7ab64b068f0c1062f26c9c0e60aea8e6a7265127e",
+      "correctness_checked": true
+    }
+  ],
+  "temporary_reference_and_fixtures_removed": true
+}
