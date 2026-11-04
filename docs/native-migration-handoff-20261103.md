@@ -77,7 +77,15 @@ is different from Python required to orchestrate Forge itself.
 
 ### P1 — Automatic mutation campaign generation and execution
 
-**Current boundary:** `forge mutation plan` reports a plan; `results` parses
+**Status:** implemented on `feat/native-mutation-runner-20261103`.
+`forge mutation plan|write|inspect|run` replace the writer and runner, and
+`make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them. The
+Python entrypoints stay until hosts migrate (P5). Two limits remain: neither writer
+emits Mull campaigns, so `run` executes a Mull manifest but nothing generates one;
+and fest campaigns still need `conductor` importable in their interpreter for the
+`mutation_pycache_evict` plugin. The text below is the original brief.
+
+**Original boundary:** `forge mutation plan` reports a plan; `results` parses
 reports. Neither replaces the complete automatic writer/runner.
 
 - Remaining functions: `src/conductor/mutation_campaign_generate.py::{plan,write}`;
@@ -226,7 +234,7 @@ this handoff does not launch continuous improvement or multi-hour model runs.
 | Change | Commit state / boundary |
 | --- | --- |
 | Interrupted Astra release and completion fixes | Already committed and merged in PR #183; nothing to recover or recommit |
-| This handoff | New, uncommitted `docs/native-migration-handoff-20261103.md`; documentation-only commit when requested |
+| This handoff | Committed with the P1 work on `feat/native-mutation-runner-20261103` |
 | P1–P4 implementation | Future cohesive commits containing native behavior, migrated callers, applicable tests, dependency declarations and contract documentation; remove Python only with demonstrated closure |
 | P5 Forge packaging/client support | Forge commits/PRs after compatibility tests; do not bundle unrelated host research edits |
 | P5 LLM pin, lock and hooks | Separate LLM repository change after live ownership checks and caller parity; retain required governance/mutation evidence there |

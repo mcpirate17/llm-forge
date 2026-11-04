@@ -59,8 +59,8 @@ proof is the nightly `forge sweep` (`.forge/sweep.toml`), whose results are in
 
 **No worktrees, ever.** Not `git worktree add`, not a leased tree, not a scratch clone
 standing next to the checkout. Work in the checkout you have. The only worktrees this
-repository knows about are the disposable snapshots `mutation_engine_generated` creates
-and destroys on its own.
+repository knows about are the disposable snapshots `forge mutation run` creates and
+destroys on its own.
 
 ## Mutation testing
 

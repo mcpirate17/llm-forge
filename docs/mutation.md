@@ -1,10 +1,10 @@
 # Mutation testing in llm-forge
 
 How campaigns are generated, run and audited. `forge mutation plan|write` is the
-native campaign writer, with no interpreter start; hosts that have not migrated keep
-`conductor.mutation_campaign_generate`, whose scope, refusals and output it matches.
-The remaining commands live in `conductor.mutation_engine_generated`
-(run), `conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
+native campaign writer and `forge mutation inspect|run` the native runner; hosts that
+have not migrated keep `conductor.mutation_campaign_generate` and
+`conductor.mutation_engine_generated`. The remaining commands live in
+`conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
 (local check for `complete`-mode scope drift before the audit catches it) and
 `conductor.mutation_retention` (sweep); `make mutation-*` wraps the common flows.
 Forge ships these capabilities without requiring mutation campaigns or receipts for
@@ -214,6 +214,39 @@ The host decides how these results affect its workflow. Locally,
 `make mutation-evidence MUTATION_BASE=<ref>` runs this optional check against any
 ref (`origin/main` by default). It is not a Forge landing requirement.
 
+### The native runner
+
+`forge mutation run <manifest> --allow-mutations` runs a generated campaign in a
+disposable snapshot, then proves the pinned sources and tests held in both the
+snapshot and the live repository before it scores anything.
+
+| exit | meaning |
+|---|---|
+| 0 | `PASS` or `RATCHET_HELD` |
+| 1 | a verdict that is not green: `FAIL`, `ERROR`, `INCOMPLETE` or `CANCELLED` |
+| 4 | refused, with `{"status": "REFUSED", "error": ...}` on stdout |
+
+`forge mutation inspect` exits 0 for `READY`, 3 for `NOT_READY` and 4 when it cannot
+read the manifest.
+
+Every receipt carries `accounting`, with `planned`, `completed`, `failed`, `censored`
+and `unstarted` counts, and `complete_campaign`. `planned` comes from the engine's own
+total, so a run that stopped early shows the gap. A run the engine did not finish is
+`INCOMPLETE`, as is any `TIMED_OUT`, `NO_COVERAGE` or `UNVIABLE` row and any unstarted
+mutant. `CANCELLED` means a signal stopped it; `unstarted` stays null if the engine
+had not yet said how many it planned. Neither is PASS evidence. A cancelled run never
+records a survivor baseline, and neither does a run with unstarted mutants.
+
+Three things still need Python. fest is a Python tool, the campaign's interpreter must
+be able to import `conductor` for the `mutation_pycache_evict` pytest plugin, and it
+needs `pytest-cov` (the `mutation` extra), or the baseline fails on `--cov`.
+`[tool.conductor].snapshot_python` names that interpreter.
+
+A receipt names its runner with `runner_kind: forge-native` and a `native_runner`
+block in place of the Python runner's hashes. A build from a dirty tree records
+`source_matches_git: false`, and validators reject its receipts. Evidence has to come
+from a committed build.
+
 ### Ratchet iterations
 
 `make mutation-engine-run` writes its receipt under
@@ -228,9 +261,9 @@ tracked directory; only that copy is committed.
 Every child command an engine spawns — the baseline suite, the engine binary
 (and the per-mutant test commands it spawns in turn), attribution's re-applied
 mutants — and the gate's two pytest collect probes run against a
-`PYTHONPYCACHEPREFIX` scratch that is private to the run, wired once in
-`mutation_engine_generated.run` (the choke point all engine children flow
-through) and `gate.preflight_pytest_config`. CPython validates a
+`PYTHONPYCACHEPREFIX` scratch that is private to the run, wired once in the
+runner (the choke point all engine children flow through) and
+`gate.preflight_pytest_config`. CPython validates a
 `__pycache__` entry by source mtime and size, so a same-size rewrite within
 one mtime second leaves a stale `.pyc` that later interpreters keep
 executing — and applying a mutant *is* a same-size same-second rewrite, which
@@ -264,7 +297,7 @@ outcomes and survivor set identical in every run):
 
 ### Orphaned runs
 
-`run_command` starts every engine in its own session and binds it to the
+The runner starts every engine in its own session and binds it to the
 engine process's lifetime with `PR_SET_PDEATHSIG`, so the kernel kills the
 engine binary the moment the process that spawned it dies (Ctrl-C, session
 end, OOM, sandbox teardown) — but the mutants that engine already spawned

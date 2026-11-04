@@ -127,7 +127,7 @@ MUTATION_RECEIPT_ITERATIONS ?= $(MUTATION_RECEIPT)/.iterations
 mutation-engine-run:  ## Run a generated campaign through its engine in a disposable snapshot
 	@test -n "$(MUTATION_CAMPAIGN)" || { echo "Set MUTATION_CAMPAIGN=campaigns/<id>.json"; exit 2; }
 	@mkdir -p "$(MUTATION_RECEIPT_ITERATIONS)"
-	$(UV) run python -m conductor.mutation_engine_generated run "$(MUTATION_CAMPAIGN)" \
+	"$(FORGE)" mutation run "$(MUTATION_CAMPAIGN)" \
 		--allow-mutations --base "$(MUTATION_BASE)" \
 		$(if $(MUTATION_RECEIPT),--receipt "$(MUTATION_RECEIPT_ITERATIONS)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json") \
 		$(MUTATION_ENGINE_ARGS)
