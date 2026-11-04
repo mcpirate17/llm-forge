@@ -602,6 +602,47 @@ fn package_with_no_rust_sources_is_refused() {
 }
 
 #[test]
+fn package_whose_targets_live_in_another_crate_is_not_a_subject() {
+    let tree = Tree::new();
+    tree.write(
+        "cli/Cargo.toml",
+        "[package]\nname = \"widget-cli\"\nversion = \"0.1.0\"\n\n\
+         [[bin]]\nname = \"widget\"\npath = \"../crate/src/main.rs\"\n",
+    );
+    tree.write("crate/Cargo.toml", rust_crate());
+    tree.write("crate/src/main.rs", "fn main() {}\n#[test]\nfn runs() {}\n");
+
+    let plan = tree
+        .plan("rust", None)
+        .expect("the cli package owns no sources");
+
+    let ids: Vec<&str> = plan["manifests"]
+        .as_array()
+        .expect("manifests")
+        .iter()
+        .map(|manifest| {
+            manifest["generator"]["options"]["package"]
+                .as_str()
+                .expect("package")
+        })
+        .collect();
+    assert_eq!(ids, ["widget-core"]);
+}
+
+#[test]
+fn package_with_a_local_target_path_and_no_sources_is_still_refused() {
+    let tree = Tree::new();
+    tree.write(
+        "cli/Cargo.toml",
+        "[package]\nname = \"widget-cli\"\nversion = \"0.1.0\"\n\n\
+         [[bin]]\nname = \"widget\"\npath = \"main.rs\"\n",
+    );
+
+    let error = tree.plan("rust", None).expect_err("no sources");
+    assert_eq!(error, "crate cli declares a package but has no src/*.rs");
+}
+
+#[test]
 fn cargo_manifest_pins_inline_and_integration_tests_and_exact_source_scope() {
     let tree = Tree::new();
     tree.write("crate/Cargo.toml", rust_crate());

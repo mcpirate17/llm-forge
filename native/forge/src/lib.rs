@@ -247,6 +247,10 @@ pub mod write_targets;
 
 #[cfg(target_os = "linux")]
 pub mod mutation_receipt_verify;
+#[cfg(target_os = "linux")]
+pub mod mutation_scope;
+#[cfg(target_os = "linux")]
+pub mod mutation_write;
 
 #[cfg(target_os = "linux")]
 pub mod graph_test_select;

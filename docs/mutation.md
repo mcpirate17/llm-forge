@@ -1,7 +1,9 @@
 # Mutation testing in llm-forge
 
-How campaigns are generated, run and audited. The commands live in
-`conductor.mutation_campaign_generate` (write/refresh), `conductor.mutation_engine_generated`
+How campaigns are generated, run and audited. `forge mutation plan|write` is the
+native campaign writer, with no interpreter start; hosts that have not migrated keep
+`conductor.mutation_campaign_generate`, whose scope, refusals and output it matches.
+The remaining commands live in `conductor.mutation_engine_generated`
 (run), `conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
 (local check for `complete`-mode scope drift before the audit catches it) and
 `conductor.mutation_retention` (sweep); `make mutation-*` wraps the common flows.
@@ -10,8 +12,17 @@ its own changes. A host such as LLM can adopt a separate evidence policy.
 
 ## Optional risk-ranked planning
 
-The existing native planner can rank an exact changed-file scope without running
-an engine or writing campaigns:
+`forge mutation plan` reports what `forge mutation write` would publish. Without
+`--only` it covers the files this branch changed against `--base` (default
+`origin/main`), plus dirty files inside this lane's active ownership claims; a dirty
+checkout with no claim is refused, as is a branch with nothing changed. `--all-files`
+is the explicit whole-tree maintenance sweep. `--verbose` adds the full manifests.
+Refusals print `{"status": "REFUSED", "error": ...}` and exit 4. `write` refuses to
+replace an existing manifest, whose recorded survivor baseline would be lost, unless
+`--force` is given.
+
+The planner can also rank an exact changed-file scope without running an engine or
+writing campaigns:
 
 ```bash
 forge mutation plan rust \
@@ -25,9 +36,9 @@ explicit `[risk].high` production/validation paths are eligible. A different
 permissive policy cannot widen the host's scope. Missing policy data fails
 explicitly; discovery paths remain exempt. Priority requires exact `--only`
 paths and a verifiable base commit; it does not support a whole-tree inventory.
-The Python `mutation_campaign_generate plan/write` wrapper exposes the same
-`--priority-policy` option and uses its existing `--base` and owner-limited scope.
-Commands without the priority option retain ordinary planner behavior.
+`--priority-base` defaults to `--base`, and the Python
+`mutation_campaign_generate plan/write` wrapper exposes the same `--priority-policy`
+option. Commands without the priority option retain ordinary planner behavior.
 
 Priority produces one campaign per eligible changed source. Cargo `--file`
 patterns remain package-relative; source/test hash keys remain repository-relative.

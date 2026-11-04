@@ -110,11 +110,11 @@ candidate-review:  ## Run the native index review with explicit operator grants
 		--grants "$(CONDUCTOR_REVIEW_GRANTS)" --execute $(REVIEW_ARGS)
 
 mutation-plan:  ## Show the campaigns mutation-generate would write for THIS BRANCH
-	$(UV) run python -m conductor.mutation_campaign_generate plan \
+	"$(FORGE)" mutation plan \
 		$(MUTATION_LANGUAGE) --base "$(MUTATION_BASE)" $(MUTATION_GENERATE_ARGS)
 
 mutation-generate:  ## Write campaigns for THIS BRANCH's changed files (nothing else)
-	$(UV) run python -m conductor.mutation_campaign_generate write \
+	"$(FORGE)" mutation write \
 		$(MUTATION_LANGUAGE) --base "$(MUTATION_BASE)" $(MUTATION_GENERATE_ARGS)
 
 # Ratchet iterations write their receipts under `.iterations/` (gitignored):

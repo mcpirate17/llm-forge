@@ -37,6 +37,27 @@ pub(crate) fn encoded_size(value: &Value, limit: usize) -> anyhow::Result<usize>
     Ok(counter.count)
 }
 
+/// Python's `json.dumps(value, indent=2, sort_keys=True)` plus a newline: the
+/// on-disk form of campaign manifests, receipts and the live-process registry.
+pub fn python_pretty(mut value: Value) -> anyhow::Result<String> {
+    use std::fmt::Write as _;
+    value.sort_all_objects();
+    let pretty = serde_json::to_string_pretty(&value)?;
+    let mut text = String::with_capacity(pretty.len() + 1);
+    for ch in pretty.chars() {
+        if (ch as u32) < 0x7f {
+            text.push(ch);
+        } else {
+            let mut units = [0; 2];
+            for unit in ch.encode_utf16(&mut units) {
+                write!(text, "\\u{unit:04x}")?;
+            }
+        }
+    }
+    text.push('\n');
+    Ok(text)
+}
+
 /// Serializes `value` with recursively sorted object keys and compact
 /// separators. Arrays keep their order (Python `sort_keys` sorts keys, not
 /// array elements); scalars serialize exactly as `serde_json::to_string`

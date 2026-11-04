@@ -340,6 +340,32 @@ fn package_name(manifest: &Path) -> Option<String> {
     None
 }
 
+/// A package whose every declared target sits outside its own directory owns no
+/// sources to mutate: `native/forge-cli` builds `../forge/src/main.rs`, and those
+/// files are subjects of the crate that holds them.
+fn targets_live_elsewhere(manifest: &Path) -> bool {
+    let Some(parsed) = fs::read_to_string(manifest)
+        .ok()
+        .and_then(|text| text.parse::<toml::Table>().ok())
+    else {
+        return false;
+    };
+    let mut targets: Vec<&toml::Value> = Vec::new();
+    targets.extend(parsed.get("lib"));
+    for kind in ["bin", "example", "test", "bench"] {
+        if let Some(rows) = parsed.get(kind).and_then(toml::Value::as_array) {
+            targets.extend(rows);
+        }
+    }
+    !targets.is_empty()
+        && targets.iter().all(|target| {
+            target
+                .get("path")
+                .and_then(toml::Value::as_str)
+                .is_some_and(|path| path.starts_with("../"))
+        })
+}
+
 fn rust_subjects(repo_root: &Path) -> Result<Vec<RustCrate>, String> {
     let mut manifests = collect_files(repo_root, "toml")
         .into_iter()
@@ -366,6 +392,9 @@ fn rust_subjects(repo_root: &Path) -> Result<Vec<RustCrate>, String> {
             .collect();
         files.sort();
         if files.is_empty() {
+            if targets_live_elsewhere(manifest) {
+                continue;
+            }
             return Err(format!(
                 "crate {root} declares a package but has no src/*.rs"
             ));

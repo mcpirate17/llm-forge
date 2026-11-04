@@ -294,10 +294,10 @@ enum LedgerCommand {
 
 #[derive(Subcommand)]
 enum MutationCommand {
-    /// Report what `conductor.mutation_campaign_generate write` would emit,
-    /// without writing anything. Same computation as the public Python
-    /// `plan()` wrapper, which delegates to the native planner.
+    /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
+    /// Write one manifest and registry fragment per planned subject.
+    Write(Box<mutation_plan::WriteArgs>),
     /// Parse a test report into ordered attribution JSON without running tests.
     Results(mutation_results::ResultsArgs),
 }
@@ -519,6 +519,11 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
         MutationCommand::Plan(args) => command_exit(
             "mutation plan",
             mutation_plan::run(*args).map(|code| code as u8),
+            1,
+        ),
+        MutationCommand::Write(args) => command_exit(
+            "mutation write",
+            mutation_plan::write(*args).map(|code| code as u8),
             1,
         ),
     }

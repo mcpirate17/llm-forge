@@ -120,9 +120,9 @@ Generate a campaign per subject -- one Python module with the tests that name it
 or exact changed Rust source files with their crate's tests:
 
 ```
-python -m conductor.mutation_campaign_generate plan  rust --verbose
-python -m conductor.mutation_campaign_generate write rust
-python -m conductor.mutation_campaign_generate write python --only conductor/gate_rollout.py
+forge mutation plan  rust --verbose
+forge mutation write rust
+forge mutation write python --only conductor/gate_rollout.py
 ```
 
 `plan` writes nothing. It reports what `write` would emit, which subjects a
