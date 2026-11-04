@@ -196,6 +196,30 @@ def _receipts_by_campaign(
 # export added there would invalidate all of them.
 PASSING_RECEIPT_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
 
+# A `forge mutation run` receipt pins these sources instead of the Python runner.
+# `conductor_native::mutation_native_runner` owns the list; a test there keeps
+# this copy equal to it.
+NATIVE_RUNNER_KIND = "forge-native"
+NATIVE_RUNNER_COMPONENTS = frozenset(
+    {
+        "native/conductor-native/src/mutation_value.rs",
+        "native/conductor-native/src/mutation_value_inputs.rs",
+        "native/conductor-native/src/receipt_slim.rs",
+        "native/forge/src/mutation_attribution.rs",
+        "native/forge/src/mutation_bytecode.rs",
+        "native/forge/src/mutation_campaign.rs",
+        "native/forge/src/mutation_engine_cargo.rs",
+        "native/forge/src/mutation_engine_fest.rs",
+        "native/forge/src/mutation_engine_mull.rs",
+        "native/forge/src/mutation_process.rs",
+        "native/forge/src/mutation_run.rs",
+        "native/forge/src/mutation_run_scope.rs",
+        "native/forge/src/mutation_score.rs",
+        "native/forge/src/mutation_scope.rs",
+        "native/forge/src/mutation_snapshot.rs",
+    }
+)
+
 
 class _TreeHasher:
     """Hash the audited tree once per file, not once per receipt pinning it."""
@@ -213,6 +237,27 @@ class _TreeHasher:
             except OSError:
                 self._cache[relative] = None
         return self._cache[relative]
+
+
+def _native_runner_rejection(
+    receipt: Mapping[str, Any], package_root: Path, tree: _TreeHasher
+) -> str | None:
+    """Why a `forge mutation run` receipt's runner cannot be accepted, or ``None``.
+
+    Python twin of `conductor_native::mutation_native_runner`, which the corpus
+    audit uses: the receipt pins compiled runner sources rather than the Python
+    files that did not execute.
+    """
+
+    block = receipt.get("native_runner")
+    recorded = block.get("components_sha256") if isinstance(block, dict) else None
+    if not isinstance(recorded, dict) or set(recorded) != NATIVE_RUNNER_COMPONENTS:
+        return "native_runner.components_sha256 does not name the runner sources"
+    if block.get("source_matches_git") is not True:
+        return "native_runner was built from a dirty source tree"
+    current = {relative: tree.sha(relative) for relative in recorded}
+    if not (recorded == current or _lineage_accepts(recorded, package_root)):
+        return "native runner components match neither this tree nor any lineage entry"
 
 
 def _receipt_rejection(
@@ -244,11 +289,16 @@ def _receipt_rejection(
     status = receipt.get("status")
     if status not in PASSING_RECEIPT_STATUSES:
         return f"status={status}"
-    recorded = receipt.get("runner_components_sha256")
-    if not isinstance(recorded, dict):
-        return "no runner component map"
-    if not (recorded == dict(current) or _lineage_accepts(recorded, package_root)):
-        return "runner components match neither this runner nor any lineage entry"
+    if receipt.get("runner_kind") == NATIVE_RUNNER_KIND:
+        native_rejection = _native_runner_rejection(receipt, package_root, tree)
+        if native_rejection:
+            return native_rejection
+    else:
+        recorded = receipt.get("runner_components_sha256")
+        if not isinstance(recorded, dict):
+            return "no runner component map"
+        if not (recorded == dict(current) or _lineage_accepts(recorded, package_root)):
+            return "runner components match neither this runner nor any lineage entry"
     stale_sources = sorted(
         relative
         for relative, pinned in (receipt.get("source_sha256") or {}).items()

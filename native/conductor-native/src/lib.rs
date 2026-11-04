@@ -87,15 +87,19 @@ pub mod mutation_coverage;
 pub mod mutation_evidence;
 #[cfg(feature = "source-analysis")]
 mod mutation_manifest;
+pub mod mutation_native_runner;
 pub mod mutation_patch_anchor;
 pub mod mutation_plan;
 #[cfg(feature = "source-analysis")]
 mod mutation_receipt;
-#[cfg(feature = "python")]
-mod mutation_value;
+#[cfg(feature = "source-analysis")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
+pub mod mutation_value;
 #[cfg(feature = "source-analysis")]
 pub mod mutation_value_admission;
 pub mod mutation_value_inputs;
+#[cfg(feature = "python")]
+mod mutation_value_py;
 #[cfg(target_os = "linux")]
 pub mod native_id;
 #[cfg(feature = "python")]
@@ -183,7 +187,7 @@ fn conductor_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mutation_coverage::register(module)?;
     mutation_evidence::register(module)?;
     mutation_plan::register(module)?;
-    mutation_value::register(module)?;
+    mutation_value_py::register(module)?;
     native_reuse::register(module)?;
     project_paths::register_py(module)?;
     candidate_policy::register(module)?;

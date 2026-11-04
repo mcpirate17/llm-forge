@@ -1,15 +1,16 @@
 //! Deterministic mutation-test value analysis and fail-closed receipt validation.
+//!
+//! Pure Rust: `mutation_value_py` binds it for Python and `forge mutation run`
+//! calls `analyze_reports` directly.
 
 use std::collections::{HashMap, HashSet};
 
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{Map, Value};
 
-use crate::mutation_value_inputs::{self as inputs, JunitAdapter};
+use crate::mutation_value_inputs as inputs;
 
-const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
+pub(crate) const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
 const ADAPTERS: [&str; 3] = ["pytest-junit", "ctest-junit", "cargo-libtest"];
 const CLASSIFICATIONS: [&str; 4] = [
     "CORE",
@@ -33,7 +34,7 @@ struct ValueTest {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct ValueSpec {
+pub(crate) struct ValueSpec {
     adapter: String,
     baseline_repetitions: usize,
     contracts: Vec<ValueContract>,
@@ -42,7 +43,7 @@ struct ValueSpec {
 }
 
 #[derive(Debug, Deserialize)]
-struct MutantEvidence {
+pub(crate) struct MutantEvidence {
     mutation_id: String,
     outcome: Value,
     report_state: String,
@@ -104,7 +105,7 @@ impl Serialize for OrderedCounts {
 }
 
 #[derive(Serialize)]
-struct AnalysisOutput {
+pub(crate) struct AnalysisOutput {
     schema_version: &'static str,
     status: &'static str,
     adapter: String,
@@ -116,10 +117,6 @@ struct AnalysisOutput {
     retained_core: Vec<String>,
     tests: Vec<TestRow>,
     classification_counts: OrderedCounts,
-}
-
-fn value_error(message: impl Into<String>) -> PyErr {
-    PyValueError::new_err(message.into())
 }
 
 use crate::mutation_value_admission::python_repr;
@@ -412,7 +409,7 @@ fn spec_completeness(
     Ok(())
 }
 
-fn load_spec(
+pub(crate) fn load_spec(
     value_json: &str,
     mutation_pairs_json: &str,
     ranked_nodeids: &[String],
@@ -821,7 +818,7 @@ fn test_rows(spec: &ValueSpec, context: RowContext<'_>) -> Vec<TestRow> {
         .collect::<Vec<_>>()
 }
 
-fn analyze(
+pub(crate) fn analyze(
     spec: ValueSpec,
     baseline_reports: Vec<Value>,
     mutant_evidence: Vec<MutantEvidence>,
@@ -887,202 +884,35 @@ fn analyze(
     }
 }
 
-fn parse_json(text: &str, label: &str) -> PyResult<Value> {
-    serde_json::from_str(text).map_err(|error| value_error(format!("invalid {label}: {error}")))
-}
-
-#[pyfunction]
-fn load_value_analysis_native(
-    value_json: &str,
-    mutation_pairs_json: &str,
-    ranked_nodeids: Vec<String>,
-    mutation_ids: Vec<String>,
-    source_paths: Vec<String>,
-) -> PyResult<Option<String>> {
-    load_spec(
-        value_json,
-        mutation_pairs_json,
-        &ranked_nodeids,
-        &mutation_ids,
-        &source_paths,
-    )
-    .map(|spec| spec.map(|value| serde_json::to_string(&value).expect("spec is serializable")))
-    .map_err(value_error)
-}
-
-#[pyfunction]
-fn analyze_test_value_native(
-    spec_json: &str,
-    baseline_reports_json: &str,
-    mutant_evidence_json: &str,
-) -> PyResult<String> {
-    let spec = serde_json::from_str(spec_json)
-        .map_err(|error| value_error(format!("invalid value spec: {error}")))?;
-    let baseline_reports = serde_json::from_str(baseline_reports_json)
-        .map_err(|error| value_error(format!("invalid baseline reports: {error}")))?;
-    let mutant_evidence = serde_json::from_str(mutant_evidence_json)
-        .map_err(|error| value_error(format!("invalid mutant evidence: {error}")))?;
-    serde_json::to_string(&analyze(spec, baseline_reports, mutant_evidence))
-        .map_err(|error| value_error(error.to_string()))
-}
-
-#[pyfunction]
-fn analyze_test_value_reports_native(
-    spec_json: &str,
-    baseline_reports_json: &str,
-    mutant_reports_json: &str,
-    mutant_outcomes_json: &str,
-) -> PyResult<String> {
-    let spec: ValueSpec = serde_json::from_str(spec_json)
-        .map_err(|error| value_error(format!("invalid value spec: {error}")))?;
-    let baselines = serde_json::from_str(baseline_reports_json)
-        .map_err(|error| value_error(format!("invalid baseline reports: {error}")))?;
-    let reports = parse_json(mutant_reports_json, "mutant reports")?;
-    let outcomes = parse_json(mutant_outcomes_json, "mutant outcomes")?;
+/// Analyse one attribution run: the spec, the unmutated baseline reports, and
+/// each killed mutant's re-run report with the outcome the engine recorded.
+/// Returns serialized JSON so `killers_by_mutant` keeps its ranked key order
+/// whichever map representation the caller's `serde_json` build uses.
+pub fn analyze_reports(
+    spec: Value,
+    baseline_reports: Vec<Value>,
+    mutant_reports: &Value,
+    mutant_outcomes: &Value,
+) -> Result<String, String> {
+    let spec: ValueSpec =
+        serde_json::from_value(spec).map_err(|error| format!("invalid value spec: {error}"))?;
     let ranked = spec
         .tests
         .iter()
         .map(|test| test.nodeid.clone())
         .collect::<Vec<_>>();
-    let evidence =
-        inputs::collect_mutant_evidence(&ranked, &spec.mutation_contracts, &reports, &outcomes)
-            .into_iter()
-            .map(serde_json::from_value)
-            .collect::<Result<Vec<MutantEvidence>, _>>()
-            .map_err(|error| value_error(error.to_string()))?;
-    serde_json::to_string(&analyze(spec, baselines, evidence))
-        .map_err(|error| value_error(error.to_string()))
-}
-
-#[pyfunction]
-fn admission_errors_native(
-    value_json: &str,
-    required_nodeids: Vec<String>,
-) -> PyResult<Vec<String>> {
-    let value = parse_json(value_json, "test_value evidence")?;
-    crate::mutation_value_admission::admission_errors(&value, &required_nodeids)
-        .map_err(value_error)
-}
-
-#[pyfunction]
-fn test_value_receipt_errors_native(
-    value_json: &str,
-    expected_nodeids: Vec<String>,
-    expected_repetitions: i64,
-) -> PyResult<Vec<String>> {
-    let value = parse_json(value_json, "test_value evidence")?;
-    let Some(payload) = value.as_object() else {
-        return Ok(vec!["test_value evidence is missing".to_owned()]);
-    };
-    let mut errors = Vec::new();
-    if payload.get("schema_version").and_then(Value::as_str) != Some(VALUE_SCHEMA) {
-        errors.push("test_value schema is not current".to_owned());
-    }
-    if payload.get("status").and_then(Value::as_str) != Some("PASS") {
-        errors.push(format!(
-            "test_value status={}",
-            python_repr(payload.get("status"))
-        ));
-    }
-    let actual_nodeids = payload
-        .get("tests")
-        .and_then(Value::as_array)
-        .map(|rows| {
-            rows.iter()
-                .filter_map(Value::as_object)
-                .map(|row| row.get("nodeid").cloned().unwrap_or(Value::Null))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let expected = expected_nodeids
-        .into_iter()
-        .map(Value::String)
-        .collect::<Vec<_>>();
-    if actual_nodeids != expected {
-        errors.push("test_value nodeids do not match ranked tests".to_owned());
-    }
-    if payload.get("baseline_repetitions").and_then(Value::as_i64) != Some(expected_repetitions) {
-        errors.push("test_value baseline repetitions mismatch".to_owned());
-    }
-    Ok(errors)
-}
-
-#[pyfunction]
-fn mutation_value_pytest_identity_native(nodeid: &str) -> PyResult<(String, String)> {
-    inputs::pytest_identity(nodeid).map_err(value_error)
-}
-
-#[pyfunction]
-fn mutation_value_cargo_identity_native(nodeid: &str) -> PyResult<String> {
-    inputs::cargo_identity(nodeid).map_err(value_error)
-}
-
-#[pyfunction]
-fn mutation_value_ctest_identity_native(nodeid: &str) -> PyResult<String> {
-    inputs::ctest_identity(nodeid).map_err(value_error)
-}
-
-#[pyfunction]
-fn mutation_value_attribution_supported_native(adapter: &str, ranked: Vec<String>) -> bool {
-    inputs::attribution_supported(adapter, &ranked)
-}
-
-#[pyfunction]
-fn mutation_value_parse_junit_native(
-    path: &str,
-    adapter: &str,
-    ranked: Vec<String>,
-) -> PyResult<String> {
-    let adapter = JunitAdapter::from_name(adapter).map_err(value_error)?;
-    let result = inputs::parse_junit_file(std::path::Path::new(path), adapter, &ranked)
-        .map_err(value_error)?;
-    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
-}
-
-#[pyfunction]
-#[pyo3(signature = (stdout, ranked, repo_root=None, argv=None))]
-fn mutation_value_parse_cargo_native(
-    stdout: &str,
-    ranked: Vec<String>,
-    repo_root: Option<&str>,
-    argv: Option<Vec<String>>,
-) -> PyResult<String> {
-    let result = match (repo_root, argv) {
-        (Some(root), Some(argv)) => {
-            inputs::parse_bound_cargo_libtest(stdout, &ranked, std::path::Path::new(root), &argv)
-        }
-        (None, None) => inputs::parse_cargo_libtest(stdout, &ranked),
-        _ => Err("Cargo attribution requires both root and argv".into()),
-    }
-    .map_err(value_error)?;
-    serde_json::to_string(&result).map_err(|error| value_error(error.to_string()))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(load_value_analysis_native, module)?)?;
-    module.add_function(wrap_pyfunction!(analyze_test_value_native, module)?)?;
-    module.add_function(wrap_pyfunction!(analyze_test_value_reports_native, module)?)?;
-    module.add_function(wrap_pyfunction!(admission_errors_native, module)?)?;
-    module.add_function(wrap_pyfunction!(test_value_receipt_errors_native, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        mutation_value_pytest_identity_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        mutation_value_cargo_identity_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        mutation_value_ctest_identity_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        mutation_value_attribution_supported_native,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(mutation_value_parse_junit_native, module)?)?;
-    module.add_function(wrap_pyfunction!(mutation_value_parse_cargo_native, module)?)?;
-    Ok(())
+    let evidence = inputs::collect_mutant_evidence(
+        &ranked,
+        &spec.mutation_contracts,
+        mutant_reports,
+        mutant_outcomes,
+    )
+    .into_iter()
+    .map(serde_json::from_value)
+    .collect::<Result<Vec<MutantEvidence>, _>>()
+    .map_err(|error| error.to_string())?;
+    serde_json::to_string(&analyze(spec, baseline_reports, evidence))
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

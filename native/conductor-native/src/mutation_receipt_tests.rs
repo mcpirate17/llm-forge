@@ -1138,3 +1138,104 @@ fn a_failing_status_cannot_be_offered_as_evidence() {
     let found = errors(json!({"status": "FAIL"}));
     assert!(found.iter().any(|e| e.starts_with("status=")), "{found:?}");
 }
+
+mod native_runner_binding {
+    use super::*;
+    use crate::mutation_native_runner::{COMPONENT_PATHS, RUNNER_KIND, RUNNER_SCHEMA};
+
+    fn generated_rule(
+        payload: &Map<String, Value>,
+        hash: impl Fn(&str) -> Option<String>,
+    ) -> Vec<String> {
+        let runner = RunnerState {
+            components: Some(json!({"conductor/mutation_testing.py": "a".repeat(64)})),
+            error: None,
+            mutation_testing_sha256: Some("a".repeat(64)),
+        };
+        let found = crate::mutation_receipt::captured_generated_errors(
+            payload,
+            &campaign(),
+            &runner,
+            hash,
+            |_| false,
+        );
+        rejection_details(found)
+    }
+
+    fn native(extra: Value) -> Map<String, Value> {
+        let map: Map<String, Value> = COMPONENT_PATHS
+            .iter()
+            .map(|path| ((*path).to_owned(), json!("c".repeat(64))))
+            .collect();
+        let mut payload = receipt(extra);
+        for key in [
+            "runner_sha256",
+            "runner_components_sha256",
+            "core_sha256",
+            "scope_guard_sha256",
+            "adapter_sha256",
+        ] {
+            payload.remove(key);
+        }
+        payload.insert("runner_kind".into(), json!(RUNNER_KIND));
+        payload.insert(
+            "native_runner".into(),
+            json!({
+                "schema_version": RUNNER_SCHEMA,
+                "executable_sha256": "d".repeat(64),
+                "compiled_source_sha256": "e".repeat(64),
+                "compiled_git_commit": "f".repeat(40),
+                "source_matches_git": true,
+                "components_sha256": map,
+            }),
+        );
+        payload
+    }
+
+    fn runner_rows(found: &[String]) -> Vec<&String> {
+        found
+            .iter()
+            .filter(|row| row.contains("runner") || row.contains("_sha256"))
+            .collect()
+    }
+
+    #[test]
+    fn a_native_receipt_needs_no_python_runner_hash() {
+        let found = generated_rule(&native(json!({"survivors": []})), |_| {
+            Some("c".repeat(64))
+        });
+        assert!(runner_rows(&found).is_empty(), "{found:?}");
+    }
+
+    #[test]
+    fn a_native_receipt_for_older_runner_sources_is_refused() {
+        let found = generated_rule(&native(json!({"survivors": []})), |_| {
+            Some("0".repeat(64))
+        });
+        assert!(
+            found
+                .iter()
+                .any(|row| row.contains("match neither this tree nor any lineage")),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_receipt_without_the_declaration_keeps_the_python_rule() {
+        let mut payload = native(json!({"survivors": []}));
+        payload.remove("runner_kind");
+        let found = generated_rule(&payload, |_| Some("c".repeat(64)));
+        assert!(
+            found.iter().any(|row| row.contains("core_sha256 is missing")),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn declaring_the_native_runner_does_not_waive_a_failed_status() {
+        let found = generated_rule(&native(json!({"status": "INCOMPLETE"})), |_| {
+            Some("c".repeat(64))
+        });
+        assert_eq!(found, vec!["status='INCOMPLETE'"]);
+    }
+}
