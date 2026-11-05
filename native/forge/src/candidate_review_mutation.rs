@@ -421,14 +421,15 @@ impl<'a> Build<'a> {
                 .map(|paths| self.capture.supporting_inventory(&paths))
                 .transpose()
         });
-        let (supporting, supporting_error) = match supporting_capture {
-            Ok(value) => (value, None),
-            Err(error) => (None, Some(format!("{error:#}"))),
-        };
+        let supporting_capture = supporting_capture.map_err(|error| format!("{error:#}"));
+        let supporting = supporting_capture
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(String::as_str);
         let verified=conductor_native::mutation_evidence::verify_captured_native_with_supporting(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
             "runtime":runtime,"broken_campaigns":catalog.broken,"malformed_receipts":catalog.malformed}),&catalog.receipts,
             |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}")),
-            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity), supporting.as_ref(), supporting_error.as_deref()).map_err(anyhow::Error::msg)?;
+            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity), supporting).map_err(anyhow::Error::msg)?;
         self.payload = verified.result;
         let waived: Vec<_> = list(&states)?
             .iter()

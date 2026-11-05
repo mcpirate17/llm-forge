@@ -37,7 +37,7 @@ pub(crate) fn generated_errors_with(
     hash: impl Fn(&str) -> Option<String>,
     lineage: impl Fn(Option<&Value>) -> bool,
 ) -> Vec<Rejection> {
-    generated_errors_with_installed(payload, campaign, runner, hash, lineage, None, None, None)
+    generated_errors_with_installed(payload, campaign, runner, hash, lineage, None, Ok(None))
 }
 
 pub(crate) fn generated_errors_with_installed(
@@ -47,8 +47,7 @@ pub(crate) fn generated_errors_with_installed(
     hash: impl Fn(&str) -> Option<String>,
     lineage: impl Fn(Option<&Value>) -> bool,
     installed: Option<&native_runner::InstalledIdentity>,
-    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
-    supporting_error: Option<&str>,
+    supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
 ) -> Vec<Rejection> {
     let mut errors = Vec::new();
     if payload.get("schema_version").and_then(Value::as_str) != Some(RECEIPT_SCHEMA) {
@@ -89,12 +88,16 @@ pub(crate) fn generated_errors_with_installed(
         && campaign.generated_value.is_none()
         && campaign.mutation_engine == "cargo-mutants"
     {
-        if let Err(reason) = crate::mutation_cargo_supporting_binding::compare(
-            payload.get("supporting_inputs"),
-            supporting,
-        ) {
-            let detail =
-                supporting_error.map_or(reason.clone(), |error| format!("{reason}: {error}"));
+        let checked = match supporting {
+            Ok(identity) => crate::mutation_cargo_supporting_binding::compare(
+                payload.get("supporting_inputs"),
+                identity,
+            ),
+            Err(error) => Err(format!(
+                "independently captured Cargo supporting inputs unavailable: {error}"
+            )),
+        };
+        if let Err(detail) = checked {
             errors.push(reject(RejectionKind::NotPass, detail));
         }
     }

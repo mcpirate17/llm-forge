@@ -30,8 +30,8 @@ struct Runtime {
 }
 struct NativeBindings<'a> {
     fingerprint: Option<&'a str>,
-    supporting: Option<&'a crate::mutation_cargo_supporting_binding::SupportingInputs>,
-    supporting_error: Option<&'a str>,
+    supporting:
+        Result<Option<&'a crate::mutation_cargo_supporting_binding::SupportingInputs>, &'a str>,
     installed: Option<&'a crate::mutation_native_runner::InstalledIdentity>,
 }
 #[derive(Deserialize)]
@@ -69,8 +69,7 @@ pub fn verify_captured_native(
         anchor,
         native_fingerprint,
         installed,
-        None,
-        None,
+        Ok(None),
     )
 }
 
@@ -80,8 +79,7 @@ pub fn verify_captured_native_with_supporting(
     mut anchor: impl FnMut(&str, &[u8], &Value) -> Result<(), String>,
     native_fingerprint: Option<&str>,
     installed: Option<&crate::mutation_native_runner::InstalledIdentity>,
-    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
-    supporting_error: Option<&str>,
+    supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
 ) -> Result<CapturedVerification, String> {
     admit(request)?;
     let request: Request =
@@ -96,7 +94,6 @@ pub fn verify_captured_native_with_supporting(
     let native = NativeBindings {
         fingerprint: native_fingerprint,
         supporting,
-        supporting_error,
         installed,
     };
     let (receipts, mut malformed) = receipts(raw)?;
@@ -258,7 +255,6 @@ fn validate(
             },
             native.installed,
             native.supporting,
-            native.supporting_error,
         ));
     }
     let anchored = if payload["schema_version"] == "llm.mutation-testing.receipt.v2" {

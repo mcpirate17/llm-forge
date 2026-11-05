@@ -361,8 +361,15 @@ the snapshot. The revised tests assert exact drift, explicit refusal, retained
 snapshot ownership and completed cgroup cleanup. The rerun passed all 15 CLI
 cases with zero ignored; all five explicit release runner cases then passed,
 including detached sessions, timeout, cancellation, and retention on unknown
-cleanup. Strict Clippy and size limits passed. The full publication gate remains
-pending.
+cleanup. Strict Clippy and size limits passed. The first full gate at `29c03be`
+passed 17 of 18 steps, including all 4,644 test executions (zero failures, 172
+ignored across 177 harnesses) and the dependency audit. Shared-core Clippy refused
+an eight-argument validation function; receipt SHA-256:
+`396fb229cb573312af23912c804134bb4c03c25a991b38e4cfbca4c619066021`.
+The correction represents captured supporting identity or failure as one typed
+result and preserves missing-capture refusal. Independent review, strict Clippy
+in both affected primary crates (including contract-registry), 178 core mutation
+tests and 24 candidate tests passed. A fresh full gate remains required.
 
 This establishes bounded input freshness, not changed program behavior, full
 compiler/runtime-data closure, execution authenticity or whole-candidate approval.

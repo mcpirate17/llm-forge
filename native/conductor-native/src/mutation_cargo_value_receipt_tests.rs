@@ -206,8 +206,7 @@ fn ordinary_native_rule_requires_independent_current_supporting_binding() {
             |_| Some("e".repeat(64)),
             |_| false,
             None,
-            supporting,
-            None,
+            Ok(supporting),
         )
     };
     assert!(!check(&payload, Some(&expected))
@@ -216,6 +215,17 @@ fn ordinary_native_rule_requires_independent_current_supporting_binding() {
     assert!(check(&payload, None)
         .iter()
         .any(|e| e.detail.contains("supporting")));
+    let failure = crate::mutation_receipt::captured_generated_errors_with_installed(
+        payload.as_object().unwrap(),
+        &campaign,
+        &runner,
+        |_| Some("e".repeat(64)),
+        |_| false,
+        None,
+        Err("fixture capture failed"),
+    );
+    assert!(failure.iter().any(|e| e.detail
+        == "independently captured Cargo supporting inputs unavailable: fixture capture failed"));
     payload["supporting_inputs"]["files"] = json!(5);
     assert!(check(&payload, Some(&expected))
         .iter()
