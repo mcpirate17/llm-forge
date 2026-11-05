@@ -68,9 +68,14 @@ broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
 requires independently bound dependency manifests as well as confined execution.
 The existing root-only profile cannot yet execute Forge's own workspace campaigns.
 
-1. Extend the shared prompt/tool layer from the bounded literal inspection slice
-   described below: useful tool recommendations and eligible strengthening need
-   explicit permissions, source-backed evidence and matched task controls.
+1. Implement the missing authorized outbound MCP path, retaining the existing
+   inbound service. The immediate prerequisite is a bounded persistent duplex
+   extension to the confined process owner. Register endpoints separately from
+   ordinary terminal programs so discovery cannot grant terminal arguments.
+   Start with an operator-pinned stdio endpoint, fixed arguments, no credential
+   forwarding or network access, and one explicitly allowed tool/schema.
+   Recommendation work is deferred pending prospective task-value controls;
+   the first optional next-inspection candidate was measured and rejected below.
    External-host native receipt acceptance has a separate tracked boundary
    in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
    works without vendored Forge sources. The explicit installed-identity path is
@@ -102,6 +107,18 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
 8. Use those measurements to simplify native migration, hook overhead and context
    paths. Retire proven duplicates and interpreted boundaries after caller/parity
    verification; add readiness/setup/status/undo without parallel machinery.
+
+**Latest evaluated candidate:** optional next-inspection advice passed focused
+behavior tests and actual MCP inspections but added 22–27 µs and 943 frame bytes
+versus plain prompt preparation plus a known inspection call. Its schema added
+1,276 bytes to every context-enabled catalog. Independent review recommended
+deferral: the caller already supplied nearly the complete inspection recipe, and
+beating a redundant discovery call did not establish value over the stronger
+controls. The candidate was
+removed from production; its implementation/tests remain in the experiment's PR
+history. [Measurements and the rejection decision](performance.md#deferred-next-inspection-advice--2026-11-05)
+retain failures, controls and evidence limits. No task-success, token-saving or
+cost claim follows. Existing prompt operations and production schemas are unchanged.
 
 **Completed repair cycle:** PR #185 closed
 [#184](https://github.com/mcpirate17/llm-forge/issues/184). The exact issue command
