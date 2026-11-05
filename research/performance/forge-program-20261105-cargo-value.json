@@ -2,20 +2,20 @@
   "schema": "forge.cargo-value-observation.v1",
   "scope": "Projection of automatic fixture evidence; not a mutation receipt, producer attestation, or full candidate approval",
   "build": {
-    "commit": "e153067ad28a93740346b140e8cb6c9388c56b79",
+    "commit": "015e66e5b5dc27b529a7a35803bcb15568e88b15",
     "profile": "release",
-    "source_sha256": "62ee45dce665bca6aa53cd4aed676a1a2e526de727cf72e68e036e3b97a4a2a5",
-    "executable_sha256": "3e8952bae5825b7ccb543c97d6daf5b0edc31d29038912c05de055fd558dc50e"
+    "source_sha256": "1487f453d6e3069e1ee7be30e034becb9028322a9dc8fa88bb0ed38eccc75f6e",
+    "executable_sha256": "f05ca4dc19477739266206951b07a93ee3f3667551e0a62e76abc4eb4e0fcc3d"
   },
   "provenance": {
-    "raw_summary": "/tmp/forge-cargo-value-ar3ngtao/summary.json",
-    "raw_summary_sha256": "b67b4fdf266420af1cd9502d1bbf049e86fe346430bd99f5f0f1850eff8c77f5",
-    "receipt": "/tmp/forge-cargo-value-ar3ngtao/host/evidence/result.json",
-    "receipt_sha256": "a4558f7f77ec4ff928b1cec2708e6982b265e07cec3c5b7fc4408fa5ce503824",
+    "raw_summary": "/tmp/forge-cargo-value-7637wji3/summary.json",
+    "raw_summary_sha256": "8367afe8e4c2112be9a73f123c17871da5d71dc682fe99199afbcb6db48f1c22",
+    "receipt": "/tmp/forge-cargo-value-7637wji3/host/evidence/result.json",
+    "receipt_sha256": "a33eede80faf0f6c853a9a01bcc07f153f55cb59706b0645bda914b245a293ed",
     "manifest": {
-      "path": "/tmp/forge-cargo-value-ar3ngtao/host/campaigns/cargo-value-fixture__cargo_20261105.json",
+      "path": "/tmp/forge-cargo-value-7637wji3/host/campaigns/cargo-value-fixture__cargo_20261105.json",
       "sha256_before_run": "1587e656002a6a6fd529a0797b20a18fcefa5257c796081a9dc6dd94ca26d88d",
-      "sha256_after_run": "d98650cb6e77e01109c62485478602efe4d27efb0bb482cca941cd35eb495a08"
+      "sha256_after_run": "9bba28f6e2aa029b2c47bfcf34e42ca46f863ec8201f773ef93ab93d5663c26d"
     },
     "driver_inputs": {
       "driver_sha256": "2668fd5635b0f6ac7072e73f05e67626ea9a99e22a0db04576ff298d712541b0",
@@ -31,84 +31,84 @@
       "cgroup_ino": 6338
     },
     "operator_inputs": {
-      "/tmp/forge-cargo-value-ar3ngtao/native-pin.json": "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43",
-      "/tmp/forge-cargo-value-ar3ngtao/git-profile.json": "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
-      "/tmp/forge-cargo-value-ar3ngtao/grants.json": "ac22c7523fc5b7dda2816d591c7125ed1664ab1d49e5cf7cf7f59c80140d2122",
-      "/tmp/forge-cargo-value-ar3ngtao/host/contracts/value.json": "cc8a20cfd03301f1aadd803a3fd15ab1edcb5e44e7d4af3a98693758a825edeb"
+      "/tmp/forge-cargo-value-7637wji3/native-pin.json": "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e",
+      "/tmp/forge-cargo-value-7637wji3/git-profile.json": "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
+      "/tmp/forge-cargo-value-7637wji3/grants.json": "2dc9cd5d83099e37387db28cad35f4e9189e456ed3d2606336a0f27e702625a5",
+      "/tmp/forge-cargo-value-7637wji3/host/contracts/value.json": "cc8a20cfd03301f1aadd803a3fd15ab1edcb5e44e7d4af3a98693758a825edeb"
     },
     "tools": {
       "cargo": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/cargo",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/cargo",
         "target": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
         "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
       },
       "rustc": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/rustc",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/rustc",
         "target": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
         "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
       },
       "rustdoc": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/rustdoc",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/rustdoc",
         "target": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustdoc",
         "sha256": "20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"
       },
       "cargo-mutants": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/cargo-mutants",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/cargo-mutants",
         "target": "/home/tim/.cargo/bin/cargo-mutants",
         "sha256": "5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"
       },
       "git": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/git",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/git",
         "target": "/usr/bin/git",
         "sha256": "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"
       },
       "cc": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/cc",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/cc",
         "target": "/usr/bin/x86_64-linux-gnu-gcc-13",
         "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"
       },
       "gcc": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/gcc",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/gcc",
         "target": "/usr/bin/x86_64-linux-gnu-gcc-13",
         "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"
       },
       "ld": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/ld",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/ld",
         "target": "/usr/bin/x86_64-linux-gnu-ld.bfd",
         "sha256": "e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"
       },
       "as": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/as",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/as",
         "target": "/usr/bin/x86_64-linux-gnu-as",
         "sha256": "21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"
       },
       "ar": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/ar",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/ar",
         "target": "/usr/bin/x86_64-linux-gnu-ar",
         "sha256": "6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"
       },
       "ranlib": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/ranlib",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/ranlib",
         "target": "/usr/bin/x86_64-linux-gnu-ranlib",
         "sha256": "60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"
       },
       "strip": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/strip",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/strip",
         "target": "/usr/bin/x86_64-linux-gnu-strip",
         "sha256": "0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"
       },
       "nm": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/nm",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/nm",
         "target": "/usr/bin/x86_64-linux-gnu-nm",
         "sha256": "3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"
       },
       "objcopy": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/objcopy",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/objcopy",
         "target": "/usr/bin/x86_64-linux-gnu-objcopy",
         "sha256": "9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"
       },
       "sh": {
-        "path": "/tmp/forge-cargo-value-ar3ngtao/allowlist/sh",
+        "path": "/tmp/forge-cargo-value-7637wji3/allowlist/sh",
         "target": "/usr/bin/dash",
         "sha256": "86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"
       }
@@ -119,15 +119,15 @@
       "cargo_mutants_version": "cargo-mutants 27.1.0"
     },
     "child_environment": {
-      "PATH": "/tmp/forge-cargo-value-ar3ngtao/allowlist",
-      "HOME": "/tmp/forge-cargo-value-ar3ngtao/home",
-      "CARGO_HOME": "/tmp/forge-cargo-value-ar3ngtao/cargo-home",
-      "TMPDIR": "/tmp/forge-cargo-value-ar3ngtao/tmp",
+      "PATH": "/tmp/forge-cargo-value-7637wji3/allowlist",
+      "HOME": "/tmp/forge-cargo-value-7637wji3/home",
+      "CARGO_HOME": "/tmp/forge-cargo-value-7637wji3/cargo-home",
+      "TMPDIR": "/tmp/forge-cargo-value-7637wji3/tmp",
       "CARGO_NET_OFFLINE": "true",
       "CARGO_BUILD_JOBS": "1",
       "RUSTUP_TOOLCHAIN": "1.98.0",
-      "RUSTC": "/tmp/forge-cargo-value-ar3ngtao/allowlist/rustc",
-      "RUSTDOC": "/tmp/forge-cargo-value-ar3ngtao/allowlist/rustdoc",
+      "RUSTC": "/tmp/forge-cargo-value-7637wji3/allowlist/rustc",
+      "RUSTDOC": "/tmp/forge-cargo-value-7637wji3/allowlist/rustdoc",
       "LC_ALL": "C",
       "LANG": "C",
       "TZ": "UTC",
@@ -203,13 +203,13 @@
       "schema_version": 1
     },
     "new_test_absent_on_main": true,
-    "candidate_base": "57b7d1dcefcef34b57021babc05765dc8ebe4f69"
+    "candidate_base": "ba11449da4a9ce484757f90ac0ac26b1ab57234c"
   },
   "result": {
     "status": "PASS",
     "mutants": [
       {
-        "duration_seconds": 0.200982,
+        "duration_seconds": 0.100718,
         "function": "value",
         "id": "FnValue-f0e0b30734c8-0",
         "line": 1,
@@ -221,7 +221,7 @@
         "path": "src/a.rs"
       },
       {
-        "duration_seconds": 0.201036,
+        "duration_seconds": 0.100676,
         "function": "value",
         "id": "FnValue-e453cf7f480a-0",
         "line": 1,
@@ -308,10 +308,10 @@
         "unusable_nodeids": []
       },
       "snapshot": {
-        "commit": "fee0ca9e4e92f522b52505046c1be4271682a542",
+        "commit": "a75535e6921dcbeea22917dfcd234374e7be53c5",
         "included_untracked": [],
         "removed": true,
-        "root": "/tmp/forge-cargo-value-ar3ngtao/tmp/llm-orchestrator-snapshot-giNYtY"
+        "root": "/tmp/forge-cargo-value-7637wji3/tmp/llm-orchestrator-snapshot-nwaqFZ"
       }
     },
     "process_cleanup": {
@@ -335,7 +335,7 @@
         ],
         "confinement": {
           "cleanup_complete": true,
-          "duration_ms": 106,
+          "duration_ms": 91,
           "errors": [],
           "exit_code": 0,
           "outcome": "exited",
@@ -345,7 +345,7 @@
             "cpu_quota_us": 100000,
             "memory_max_bytes": 8589934592,
             "memory_swap_max_bytes": 0,
-            "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-725148-a80582a8532142dc75e7c5a0d2c9b2fa",
+            "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-795877-35154fd718e541079611ba3cbc19ae5a",
             "processes_max": 64,
             "verified": true
           },
@@ -370,7 +370,7 @@
         ],
         "confinement": {
           "cleanup_complete": true,
-          "duration_ms": 19,
+          "duration_ms": 16,
           "errors": [],
           "exit_code": 0,
           "outcome": "exited",
@@ -380,7 +380,7 @@
             "cpu_quota_us": 100000,
             "memory_max_bytes": 8589934592,
             "memory_swap_max_bytes": 0,
-            "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-725148-d9aae3d7a38ab6c70d71a36150a95843",
+            "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-795877-71998d52c1490adc83bd8c9a4967eb27",
             "processes_max": 64,
             "verified": true
           },
@@ -401,7 +401,7 @@
           "--timeout",
           "60",
           "--output",
-          "/tmp/forge-cargo-value-ar3ngtao/tmp/forge-cargo-value-6UpGtJ/payload/output",
+          "/tmp/forge-cargo-value-7637wji3/tmp/forge-cargo-value-IXe0bo/payload/output",
           "--package",
           "coverage_fixture",
           "--file",
@@ -417,7 +417,7 @@
         ],
         "confinement": {
           "cleanup_complete": true,
-          "duration_ms": 587,
+          "duration_ms": 420,
           "errors": [],
           "exit_code": 0,
           "outcome": "exited",
@@ -427,7 +427,7 @@
             "cpu_quota_us": 100000,
             "memory_max_bytes": 8589934592,
             "memory_swap_max_bytes": 0,
-            "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-725148-c8afcab84c09756c767337ceda72cf03",
+            "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-795877-0fd75526078a79baab47cfe73c49741d",
             "processes_max": 64,
             "verified": true
           },
@@ -486,7 +486,7 @@
           ],
           "value_waiver_states": [],
           "value_waiver_base": {
-            "commit": "c823ea5beb7496cbdfa6bf31595d995dfed8da9c",
+            "commit": "40cbf1e7344c3b22bca0e4488c49bd390b00cc56",
             "resolved_by": "commit candidate base"
           }
         }
@@ -518,9 +518,9 @@
         "help": null,
         "evidence": {
           "commits": [
-            "2abe4a42739435b0d317bd1c28654c4b1eea83f3",
-            "b949b31f8202bea9643c3d801893c95d04a76184",
-            "57b7d1dcefcef34b57021babc05765dc8ebe4f69"
+            "f6957bc7f3dca527da481f7a8d302e214ddb1c85",
+            "6731073ab660e84c088ed22c8141f5dfc5a099b2",
+            "ba11449da4a9ce484757f90ac0ac26b1ab57234c"
           ]
         },
         "fingerprint": "c8c5c3766e07fbcfdbf7a1e6",
@@ -538,9 +538,9 @@
         "help": null,
         "evidence": {
           "missing": [
-            "2abe4a42739435b0d317bd1c28654c4b1eea83f3",
-            "b949b31f8202bea9643c3d801893c95d04a76184",
-            "57b7d1dcefcef34b57021babc05765dc8ebe4f69"
+            "f6957bc7f3dca527da481f7a8d302e214ddb1c85",
+            "6731073ab660e84c088ed22c8141f5dfc5a099b2",
+            "ba11449da4a9ce484757f90ac0ac26b1ab57234c"
           ],
           "mismatched": []
         },
@@ -573,26 +573,26 @@
       "name": "identity",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "mutation",
         "identity"
       ],
       "returncode": 0,
-      "stdout_sha256": "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43",
+      "stdout_sha256": "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.031703013002697844,
+      "elapsed_seconds": 0.031619296001736075,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "plan",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "mutation",
         "plan",
         "rust",
         "--repo-root",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--owner",
         "cargo-value-fixture",
         "--base",
@@ -615,19 +615,19 @@
       "returncode": 0,
       "stdout_sha256": "5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.003459486000792822,
+      "elapsed_seconds": 0.0034428050021233503,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "write",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "mutation",
         "write",
         "rust",
         "--repo-root",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--owner",
         "cargo-value-fixture",
         "--base",
@@ -650,19 +650,19 @@
       "returncode": 0,
       "stdout_sha256": "56cb8d60dc030595e207a940b48ce756bac040745b4ccb2dc171b3ca6b1111f3",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.00749873500171816,
+      "elapsed_seconds": 0.007472771998436656,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "run",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "mutation",
         "run",
-        "/tmp/forge-cargo-value-ar3ngtao/host/campaigns/cargo-value-fixture__cargo_20261105.json",
+        "/tmp/forge-cargo-value-7637wji3/host/campaigns/cargo-value-fixture__cargo_20261105.json",
         "--repo-root",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--owner",
         "cargo-value-fixture",
         "--base",
@@ -676,41 +676,41 @@
         "evidence/result.json"
       ],
       "returncode": 0,
-      "stdout_sha256": "e5c11d8892d3d15c7375f9249275a0b1b2bab323d3105578ec605e8537999856",
+      "stdout_sha256": "71d4ce59f78aba6175a959d64ea249cbf47dee0654bbcd9676b38610c5155f69",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 1.0153624049999053,
+      "elapsed_seconds": 0.8152155629977642,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "receipt",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "receipt",
         "show",
-        "/tmp/forge-cargo-value-ar3ngtao/host/evidence/result.json"
+        "/tmp/forge-cargo-value-7637wji3/host/evidence/result.json"
       ],
       "returncode": 0,
-      "stdout_sha256": "5d782ddbda82136457de7ce0986e4a756b2616e609cf8c76290f19bf574194a2",
+      "stdout_sha256": "7b507f153af8f57ad80d984036c66336b9a33188dd769417853dc21cf9a4e062",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.003906099002051633,
+      "elapsed_seconds": 0.003873687001032522,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "live_match",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "candidate",
         "mutation-corpus",
         "--repo",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--git",
         "/usr/bin/git",
         "--git-sha256",
         "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201",
         "--git-build-profile",
-        "/tmp/forge-cargo-value-ar3ngtao/git-profile.json",
+        "/tmp/forge-cargo-value-7637wji3/git-profile.json",
         "--git-build-profile-sha256",
         "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
         "--registry",
@@ -720,32 +720,32 @@
         "--changed-file",
         "src/b.rs",
         "--native-runner-pin",
-        "/tmp/forge-cargo-value-ar3ngtao/native-pin.json",
+        "/tmp/forge-cargo-value-7637wji3/native-pin.json",
         "--native-runner-pin-sha256",
-        "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43"
+        "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e"
       ],
       "returncode": 0,
       "expectation_met": true,
-      "stdout_sha256": "0bff056ff339e2fb2e3ba59c252a33299af17bba0c94cda1a936a14248cc5cf2",
+      "stdout_sha256": "57d67e4a984d8652e3c601ce0e339e6b9678e7abd9b80b6913bf95a15c703024",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.11477159399873926,
+      "elapsed_seconds": 0.11471792700103833,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "commit_match",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "candidate",
         "mutation-corpus",
         "--repo",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--git",
         "/usr/bin/git",
         "--git-sha256",
         "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201",
         "--git-build-profile",
-        "/tmp/forge-cargo-value-ar3ngtao/git-profile.json",
+        "/tmp/forge-cargo-value-7637wji3/git-profile.json",
         "--git-build-profile-sha256",
         "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
         "--registry",
@@ -763,28 +763,28 @@
         "--policy",
         "policy.toml",
         "--scratch-parent",
-        "/tmp/forge-cargo-value-ar3ngtao/scratch",
+        "/tmp/forge-cargo-value-7637wji3/scratch",
         "--native-runner-pin",
-        "/tmp/forge-cargo-value-ar3ngtao/native-pin.json",
+        "/tmp/forge-cargo-value-7637wji3/native-pin.json",
         "--native-runner-pin-sha256",
-        "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43"
+        "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e"
       ],
       "returncode": 0,
       "expectation_met": true,
-      "stdout_sha256": "0bff056ff339e2fb2e3ba59c252a33299af17bba0c94cda1a936a14248cc5cf2",
+      "stdout_sha256": "57d67e4a984d8652e3c601ce0e339e6b9678e7abd9b80b6913bf95a15c703024",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.16530411400162848,
+      "elapsed_seconds": 0.16493488199921558,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "candidate_match",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "candidate",
         "review",
         "--repo",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--kind",
         "commit",
         "--target-ref",
@@ -798,7 +798,7 @@
         "--today",
         "2026-11-05",
         "--grants",
-        "/tmp/forge-cargo-value-ar3ngtao/grants.json",
+        "/tmp/forge-cargo-value-7637wji3/grants.json",
         "--owner",
         "installed-fixture",
         "--surface",
@@ -807,27 +807,27 @@
         "--lock-timeout",
         "2",
         "--native-runner-pin",
-        "/tmp/forge-cargo-value-ar3ngtao/native-pin.json",
+        "/tmp/forge-cargo-value-7637wji3/native-pin.json",
         "--native-runner-pin-sha256",
-        "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43"
+        "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e"
       ],
       "returncode": 1,
       "expectation_met": true,
-      "stdout_sha256": "3b4b04525463805f4e5e30e14c3537d6e17c4d2ad7f8b6a5f3cd130e76d03d3d",
+      "stdout_sha256": "136721f2e70337dbab277d5cff4bfc1b9d16654e9272e88c71e9c802c287ffb3",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.1654450440000801,
+      "elapsed_seconds": 0.16502779300208203,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "declaration_hash",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "mutation",
         "plan",
         "rust",
         "--repo-root",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--owner",
         "cargo-value-fixture",
         "--base",
@@ -852,24 +852,24 @@
       "expected_failure_class": "Rust value declaration digest mismatch",
       "stdout_sha256": "793af6924cc495938eef6f9c8cd3ae25b4542baf07e733c8e15014971e27c3d4",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.003535706000548089,
+      "elapsed_seconds": 0.003506646000460023,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "added_source",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "candidate",
         "mutation-corpus",
         "--repo",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--git",
         "/usr/bin/git",
         "--git-sha256",
         "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201",
         "--git-build-profile",
-        "/tmp/forge-cargo-value-ar3ngtao/git-profile.json",
+        "/tmp/forge-cargo-value-7637wji3/git-profile.json",
         "--git-build-profile-sha256",
         "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
         "--registry",
@@ -887,11 +887,11 @@
         "--policy",
         "policy.toml",
         "--scratch-parent",
-        "/tmp/forge-cargo-value-ar3ngtao/scratch",
+        "/tmp/forge-cargo-value-7637wji3/scratch",
         "--native-runner-pin",
-        "/tmp/forge-cargo-value-ar3ngtao/native-pin.json",
+        "/tmp/forge-cargo-value-7637wji3/native-pin.json",
         "--native-runner-pin-sha256",
-        "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43"
+        "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e"
       ],
       "returncode": 6,
       "expectation_met": true,
@@ -902,26 +902,26 @@
           "detail": "declaration or inventory differs from held input"
         }
       ],
-      "stdout_sha256": "61040d731c42367f33b2f7f33ec7838ad50cfac5f7ffa1211bc71efb106c7757",
+      "stdout_sha256": "7fa8f0afb4a0e191ebea189177cd970f4100caa95cc34a2eafdfbe4e658f85fe",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.1653449460027332,
+      "elapsed_seconds": 0.16518413399899146,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "nodeid_drift",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "candidate",
         "mutation-corpus",
         "--repo",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--git",
         "/usr/bin/git",
         "--git-sha256",
         "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201",
         "--git-build-profile",
-        "/tmp/forge-cargo-value-ar3ngtao/git-profile.json",
+        "/tmp/forge-cargo-value-7637wji3/git-profile.json",
         "--git-build-profile-sha256",
         "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
         "--registry",
@@ -939,11 +939,11 @@
         "--policy",
         "policy.toml",
         "--scratch-parent",
-        "/tmp/forge-cargo-value-ar3ngtao/scratch",
+        "/tmp/forge-cargo-value-7637wji3/scratch",
         "--native-runner-pin",
-        "/tmp/forge-cargo-value-ar3ngtao/native-pin.json",
+        "/tmp/forge-cargo-value-7637wji3/native-pin.json",
         "--native-runner-pin-sha256",
-        "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43"
+        "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e"
       ],
       "returncode": 6,
       "expectation_met": true,
@@ -954,26 +954,26 @@
           "detail": "ranked tests differ from statically discovered target tests"
         }
       ],
-      "stdout_sha256": "a93fb7e439da67fb89796ad643c49c9b7af206ce67d7689ffc5704d27e60e90f",
+      "stdout_sha256": "5e6973efbfd301a45cfde113e9d8a295d24200b434203188552d0f081140e398",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.16528018499957398,
+      "elapsed_seconds": 0.16567749599926174,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
       "name": "stale_contract",
       "state": "completed",
       "argv": [
-        "/tmp/forge-cargo-value-ar3ngtao/bin/forge",
+        "/tmp/forge-cargo-value-7637wji3/bin/forge",
         "candidate",
         "mutation-corpus",
         "--repo",
-        "/tmp/forge-cargo-value-ar3ngtao/host",
+        "/tmp/forge-cargo-value-7637wji3/host",
         "--git",
         "/usr/bin/git",
         "--git-sha256",
         "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201",
         "--git-build-profile",
-        "/tmp/forge-cargo-value-ar3ngtao/git-profile.json",
+        "/tmp/forge-cargo-value-7637wji3/git-profile.json",
         "--git-build-profile-sha256",
         "38ac210c726adaab4b47fc20d22b2cda79cfaf1f5337479d1db23ca6f599365a",
         "--registry",
@@ -991,11 +991,11 @@
         "--policy",
         "policy.toml",
         "--scratch-parent",
-        "/tmp/forge-cargo-value-ar3ngtao/scratch",
+        "/tmp/forge-cargo-value-7637wji3/scratch",
         "--native-runner-pin",
-        "/tmp/forge-cargo-value-ar3ngtao/native-pin.json",
+        "/tmp/forge-cargo-value-7637wji3/native-pin.json",
         "--native-runner-pin-sha256",
-        "35c1f25ede7429a3497de7c280160bef47a9542c1ce80f4fedfe1b34fda57a43"
+        "751593da092395e45a3e898791de155cdc08d7d526b398d6388db1372fe4ac9e"
       ],
       "returncode": 6,
       "expectation_met": true,
@@ -1006,9 +1006,9 @@
           "detail": "declaration or inventory differs from held input"
         }
       ],
-      "stdout_sha256": "61040d731c42367f33b2f7f33ec7838ad50cfac5f7ffa1211bc71efb106c7757",
+      "stdout_sha256": "7fa8f0afb4a0e191ebea189177cd970f4100caa95cc34a2eafdfbe4e658f85fe",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "elapsed_seconds": 0.16535377599939238,
+      "elapsed_seconds": 0.1653561749990331,
       "timing_scope": "single monotonic orchestration observation including capture/cancellation; not a benchmark"
     },
     {
@@ -1028,7 +1028,9 @@
     "Original scenario logs were parsed before successful runtime cleanup. Retained normalized observations and hashes are cooperative consistency evidence, not independent execution or producer authentication.",
     "Overall candidate review remains non-passing: implicit test selection, missing Agent trailers and missing local tree attestations. The driver-labelled independent CI-attestation check was unstarted. Forge has no hosted CI.",
     "Matrix-negative engine check was unstarted to avoid fabrication. Malformed normalized reports are covered by focused unit/generated-validator tests.",
-    "No model tokens, dollars, actual agent task success, cache usage, or deployed-client effectiveness were measured."
+    "No model tokens, dollars, actual agent task success, cache usage, or deployed-client effectiveness were measured.",
+    "Positive observations bind the committed fixture and held inputs. The final live declaration remains intentionally modified by the stale-contract negative check; it is not the positive input.",
+    "Native snapshot preparation uses raw bytes and held rule inputs without Git subprocesses. The view is point-in-time, not an atomic whole-filesystem snapshot; initial libgit2 discovery is not universally preemptively bounded."
   ],
   "earlier_attempts": [
     {
@@ -1045,6 +1047,16 @@
       "summary": "/tmp/forge-cargo-value-fkc32wp2/summary.json",
       "result": "Debug e153067 functional trial: same bounded PASS and remaining candidate findings; not performance evidence.",
       "summary_sha256": "d7173a1699e73ffb2fb0d1870c03023d62aef570091b9f9e14ad8b77952eee56"
+    },
+    {
+      "summary": "/tmp/forge-cargo-value-ar3ngtao/summary.json",
+      "summary_sha256": "b67b4fdf266420af1cd9502d1bbf049e86fe346430bd99f5f0f1850eff8c77f5",
+      "result": "Release e153067 pre-native-snapshot trial: bounded automatic evidence passed; inherited preparation issue #193 was identified afterwards. Not evidence for the final snapshot implementation."
+    },
+    {
+      "summary": "/tmp/forge-cargo-value-gwexj10l/summary.json",
+      "summary_sha256": "6583195b79280f72b7606d5965c2231c732ebf70569ee4e5915c49f6330af7d8",
+      "result": "Debug 015e66e native-snapshot trial: same bounded PASS and remaining candidate findings; not performance evidence."
     }
   ]
 }

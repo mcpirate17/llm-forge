@@ -212,7 +212,7 @@ local-verify passed: 4,548 passing test executions, zero failures, 145 ignored
 across 177 harnesses. Global installation and client activation are unchanged.
 **Implemented correctness increment, publication pending:** #190's opt-in target-bound
 Cargo attribution uses original engine scenarios and the shared native value analyzer.
-The clean release trial at `e153067` killed two mutants and admitted one newly added
+The clean release trial at `015e66e` killed two mutants and admitted one newly added
 `CORE` test through candidate mutation-evidence. Live and commit audits were `CLEAN`;
 four stale-input cases refused. Overall fixture review still failed its independent
 attestation and implicit test-selection obligations; no gate was waived. See
@@ -234,7 +234,11 @@ tests across 177 harnesses. Publication was held for
 [#193](https://github.com/mcpirate17/llm-forge/issues/193): inherited Git snapshot setup
 could run configured filters or hooks outside the engine actor. Snapshot preparation
 now uses native raw Git objects, held ignore rules and no Git child; 22 focused tests
-and strict Clippy pass. Its real engine trial and fresh publication gate are pending.
+and strict Clippy pass. The integrated mutation suite passed 272 tests with 12 ignored.
+Its real release engine trial passed the bounded mutation admission checks above;
+independent review verified source, receipt and cleanup identities. Fresh matched
+help/symbol comparisons also passed across 404 samples. The full publication gate
+for this final source remains pending.
 The capture is point-in-time and not an atomic filesystem snapshot. The previous
 gate receipt does not attest these later changes. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).

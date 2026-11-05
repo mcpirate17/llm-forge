@@ -13,8 +13,8 @@ publication status are in the current [engineering status](roadmap.md).
 ### Automatic Cargo test value — 2026-11-05
 
 The [automatic fixture observations](../research/performance/forge-program-20261105-cargo-value.json)
-bind a clean release build at `e153067ad28a93740346b140e8cb6c9388c56b79`, executable
-SHA-256 `3e8952bae5825b7ccb543c97d6daf5b0edc31d29038912c05de055fd558dc50e`.
+bind a clean release build at `015e66e5b5dc27b529a7a35803bcb15568e88b15`, executable
+SHA-256 `f05ca4dc19477739266206951b07a93ee3f3667551e0a62e76abc4eb4e0fcc3d`.
 The writer and cargo-mutants 27.1.0 produced two killed mutants, one per selected
 source, two passing independent baselines, complete attribution, and one `CORE`
 test. The test was absent on the fixture's `main` and added on its topic branch.
@@ -35,7 +35,7 @@ contracts each produced the expected campaign-specific refusal.
 Three supervised commands ran: two Cargo baselines and one cargo-mutants invocation.
 The receipt's generic `subprocess_scaling` field describes scaling, not an exact
 process count; internal engine subprocess count was not measured. Actor wall
-observations were 106, 19 and 587 ms; the complete run command took 1.015 seconds
+observations were 91, 16 and 420 ms; the complete run command took 0.815 seconds
 including driver capture/wait overhead. These single observations are not latency
 benchmarks. CPU and RSS were not sampled for the campaign; configured cgroup limits
 are not usage measurements. All three owned cgroups, the runtime and snapshot were
@@ -46,22 +46,28 @@ campaign need not be present in the Git snapshot, and ordinary `std::fs::copy`
 supplies harmless file-type bits with permissions. The confined-copy regression
 failed before the narrow broker fix and passed afterwards; the broker still rejects
 mismatched types, special modes and writes outside owned scratch. Earlier refused
-attempts and the successful debug trial remain separately identified in the artifact.
+attempts and successful earlier trials remain separately identified in the artifact.
+The final trial also exercises native raw snapshot preparation, replacing inherited
+Git subprocesses that could execute configured filters or hooks. Capture remains
+point-in-time, not atomic. Positive observations refer to held and committed inputs;
+the final live declaration was intentionally changed by the stale-contract negative.
 
-A matched release comparison against the previous checked `b82da144` binary used
+A fresh matched release comparison against the pre-snapshot-change `e153067` binary used
 101 successful samples and five warmups per arm, the same literal commands, input
 bytes and cleared environment. All 404 samples completed; both comparisons pass
 the unchanged 10% regression budget.
 
 | Workload | Wall p50 before / after, ms | Wall p95 before / after, ms | CPU p50 before / after, ms | Max RSS before / after, bytes | Sealed comparison |
 | --- | ---: | ---: | ---: | ---: | --- |
-| CLI help | 1.633172 / 1.629052 | 1.816312 / 1.814333 | 1.153 / 1.171 | 12,722,176 / 12,521,472 | [help](../research/performance/forge-program-20261105-cargo-value-help-comparison.json) |
-| Symbol context | 2.182666 / 2.133135 | 2.349877 / 2.330526 | 1.709 / 1.649 | 17,059,840 / 17,358,848 | [symbol](../research/performance/forge-program-20261105-cargo-value-symbol-comparison.json) |
+| CLI help | 1.808048 / 1.820759 | 2.101699 / 2.085699 | 1.296 / 1.292 | 12,378,112 / 12,357,632 | [help](../research/performance/forge-program-20261105-cargo-value-help-comparison.json) |
+| Symbol context | 2.323860 / 2.337020 | 2.547811 / 2.544191 | 1.820 / 1.819 | 17,281,024 / 17,235,968 | [symbol](../research/performance/forge-program-20261105-cargo-value-symbol-comparison.json) |
 
 The shared host and warm filesystem limit these observations to these workloads.
-The benchmark driver initially could not overwrite its read-only private subject
-after the baseline; no current samples had started. It verified and replaced that
-exact subject, preserved the baseline receipts and then measured the current arm.
+The earlier `b82da144` versus `e153067` comparison also passed across 404 samples;
+its sealed receipts remain in commit `f99737d`. Its driver initially could not
+overwrite its read-only private subject after the baseline; no current samples
+had started. It verified and replaced that exact subject before the current arm.
+The final comparison above completed without that orchestration failure.
 The performance runner's ambient Rust probe is not a build attestation; both selected
 binaries were built with Rust 1.98.0. Source pins bind the executed binaries; the
 comparison's ambient HEAD does not rebuild or reattribute the older executable.
