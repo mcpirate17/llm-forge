@@ -1,0 +1,1095 @@
+{
+  "schema": "forge.program-mcp-transport-observations.v1",
+  "scope": "Current-only controlled CLI/MCP parity experiment; no agent task, token, cost or general speedup claim.",
+  "association": "Collector associates the outer receipt and inner log hashes after collection. The outer receipt seal itself does not bind inner logs; matching identities are consistency observations, not execution attestation.",
+  "outer_receipt": "research/performance/forge-program-20261104-mcp-transport-baseline.json",
+  "outer_receipt_file_sha256": "6aa1fe0315da1fbbbd02e736e32cdc3751759f266739f85e07142a266600a59d",
+  "projection": "Raw logs retain process snapshots. This projection keeps all per-batch CPU tick and waited-child CPU deltas and maximum observed RSS/HWM; 100 Hz zeros do not establish zero CPU, and process peaks are not a simultaneous tree peak.",
+  "runs": [
+    {
+      "valid": true,
+      "measurement": "current-only matched native CLI/raw MCP; no task or token saving claim",
+      "measurement_deadline_seconds_from_driver_start": 90,
+      "sample_deadline_seconds": 2,
+      "service_lifetime_seconds": 120,
+      "deadline_scope": "cooperative measurement deadline; setup, synchronous filesystem work and cleanup are not preempted. Use an outer forge performance benchmark timeout for a whole-process bound.",
+      "identity_scope": "before/after point-in-time hashes; transient replace-and-restore and compiler authenticity are not attested",
+      "protocol_accounting": {
+        "planned": 4,
+        "started": 4,
+        "completed": 4,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "unix_diagnostic": [
+        {
+          "name": "code_fold",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 24220,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [15664,15668,14948,14889,15022,15549,15151,15158,14653,15284,15109,15002,14922,14765,15357,14672,14860,15128,14897,15354,15272,15008,14734,14832,15561,17123,22474,15914,15711,15675,15416],
+          "median_batch_mean_ns": 15151,
+          "p95_batch_mean_ns": 17123
+        },
+        {
+          "name": "session_brief",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 86790,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [15560,15342,15556,15837,15729,15869,15250,15452,15154,15559,15869,18307,15368,15666,17734,15499,15721,16143,15382,15609,15240,15447,15770,15383,15460,15406,15593,15565,15503,15564,18526],
+          "median_batch_mean_ns": 15560,
+          "p95_batch_mean_ns": 18307
+        },
+        {
+          "name": "workspace_recall",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 865825,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [283726,286102,283814,283379,286907,282667,284133,284897,287115,312090,308528,292504,291536,292062,291744,291205,297189,293460,293882,291958,290937,289616,290202,290399,289503,289032,290903,291021,289665,290720,289987],
+          "median_batch_mean_ns": 290399,
+          "p95_batch_mean_ns": 308528
+        }
+      ],
+      "clock_ticks_per_second": 100,
+      "resource_scope": "per-process /proc warm batch deltas and RSS/HWM observations; no summed tree peak. Waited-child CPU covers reaped children. Outer performance receipt excludes systemd daemon; not total MCP resources.",
+      "protocol_accounting_scope": "initialize and two tools/list replies validated; initialized notification counted as completed write, not acknowledged processing",
+      "cache_scope": "process-cold setup and first calls; kernel/filesystem caches uncontrolled",
+      "cleanup": {
+        "adapter": "verified_eof_exit",
+        "service": "verified_stopped",
+        "fixture": "verified_removed"
+      },
+      "fixture_path": "/tmp/forge-hbench-464168",
+      "fixture_prepare_ns": 47589219,
+      "service_launch_ready_ns": 49080397,
+      "service_startup_samples": 1,
+      "inputs_before": {
+        "head": "dd8714c03de7daf823d2e2342051c2f05b438d50",
+        "binary_sha256": "8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd",
+        "benchmark_binary_sha256": "c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161",
+        "source_inventory_sha256": "7e4e1dd27a790bf38b397bef891f82a2ffe6a9a2440ce6da32107cb4556dda12",
+        "build_input_sha256": {
+          "native/forge/Cargo.toml": "41257c1724e38d02a6377e323bcb3d55cf843c76619f261370a507ef5a08cf7c",
+          "native/forge/Cargo.lock": "4587db32a88c09291ae6fc4ae0ed6856eb891d6c19a74ea67a3dcdb71648152c",
+          "native/forge-cli/Cargo.toml": "db5ebdb81991cb40c140c17db4371efdfd6811b925a728d580ecbc90e1478fc2",
+          "native/forge/benches/harness.rs": "6bbb3c89b434dee3dd0664c362b6dea97b386c1fad0e0429f1f26a6b22ea865d",
+          "native/forge/benches/support/mcp_measurement.rs": "7cb7eedd56f493a8113ecbbd1396600dca839522264e50b5bddb525193b517ae",
+          "native/forge/benches/support/memory_fixture.rs": "53efec5a3b42cff8c832fcf599ccae5a0f4c788deee777b3c8708dd8a7ca788c",
+          "native/forge/tests/support/mcp_client.rs": "7f3165eb40a911e096ac98b2ea024c4152d54da937973da2f9f184afd78fe179",
+          "native/forge/tests/support/forge_binary.rs": "41986a7c6e40681741420050f90cde67984c7a8ab7e594293c533edaca0d87ff"
+        },
+        "fixture_sha256": {
+          "source/main.rs": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+          "query.json": "17f5d15112b78953715be752ef27cafd36b45f15f1e3edede1b9305cff7d6731",
+          "memory.jsonl": "d9f738577e552888d75f034423744424065817aaf8049478d344cb50b80c01c5",
+          "memory.mapped": "560aef0ca3faaadade1bd2bddae42a1acf3b386fbb5d97db2dd616e5d96b9e90",
+          "state/policy.json": "71a69dad4588f2bfd5200957e2e368b1d730aaa8aacc8fbefa53a422c1bcb19e"
+        },
+        "request_sha256": "ecba58687c7f3b7d44ec95a7b6bf2841cb266458f090e44cd8a95e0bd1ec5f26",
+        "architecture": "x86_64",
+        "scope": "observed source/build inputs and executables; not compiler authenticity attestation"
+      },
+      "expected_payload_sha256": "76cb61def3354677f1d76bc4d5781d686a43762c40609593f6610526c7245be9",
+      "source_sha256": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+      "adapter_launch_initialize_ns": 1579958,
+      "catalog_sha256": "693be7f5267d22f3d302cbc9eecd087aabf18e4b38940619ef1a49ab535ea91b",
+      "catalog_bytes": 2775,
+      "discovery_ns": 116351,
+      "adapter_setup_total_ns": 1698929,
+      "catalog_reverified": true,
+      "inputs_reverified": true,
+      "accounting_complete": true,
+      "error": null,
+      "elapsed_ns": 677700202,
+      "raw_log": ".git/forge-performance/run-1793854129249028507-464151/sample-0.log",
+      "raw_log_sha256": "0a3e528b9a9ae66664a9ac7844f1eeb205c3fd703f3a0fc6eb5741c92c8cd269",
+      "cli": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [1116111,1067776,1114165,1132408,1006750,1093801,1005661,1027052,1064851,1025186,1042307,1173712,1039018,1014798,1021904,1047778,1022738,1019449,1017177,1016176,1068666,1016269,1013209,1027080,1044903,1024295,1028634,1069596,1019704,1091410,1070255],
+        "first_call_ns": 1385398,
+        "median_batch_mean_ns": 1028634,
+        "p95_batch_mean_ns": 1132408,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6221824,
+            "maximum_observed_process_hwm_bytes": 6221824
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15241216,
+            "maximum_observed_process_hwm_bytes": 15241216
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 20262912,
+            "maximum_observed_process_hwm_bytes": 20262912
+          },
+          "waited_child_cpu_us_per_batch": [10990,10538,10880,11122,9932,10744,9922,10129,10458,10096,10290,11487,10249,10014,10034,10327,10082,10066,10030,10024,10519,10027,9994,10098,10243,10101,10121,10483,10051,10670,10557]
+        }
+      },
+      "mcp": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [37303,44315,34393,43341,34494,40065,33560,46835,38239,43330,33818,44015,34945,42890,33800,40793,33262,39071,33828,39198,33545,41900,32397,37247,31223,46306,33830,44907,32561,38484,31654],
+        "first_call_ns": 250651,
+        "median_batch_mean_ns": 37303,
+        "p95_batch_mean_ns": 46306,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6213632,
+            "maximum_observed_process_hwm_bytes": 6213632
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15241216,
+            "maximum_observed_process_hwm_bytes": 15241216
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 20262912,
+            "maximum_observed_process_hwm_bytes": 20262912
+          },
+          "waited_child_cpu_us_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        }
+      }
+    },
+    {
+      "valid": true,
+      "measurement": "current-only matched native CLI/raw MCP; no task or token saving claim",
+      "measurement_deadline_seconds_from_driver_start": 90,
+      "sample_deadline_seconds": 2,
+      "service_lifetime_seconds": 120,
+      "deadline_scope": "cooperative measurement deadline; setup, synchronous filesystem work and cleanup are not preempted. Use an outer forge performance benchmark timeout for a whole-process bound.",
+      "identity_scope": "before/after point-in-time hashes; transient replace-and-restore and compiler authenticity are not attested",
+      "protocol_accounting": {
+        "planned": 4,
+        "started": 4,
+        "completed": 4,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "unix_diagnostic": [
+        {
+          "name": "code_fold",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 124421,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [33361,21116,17760,16025,16045,15572,15246,16157,15596,15409,15641,15332,15619,15855,15553,15589,15574,16914,15833,15403,15868,15348,15614,15484,15596,15510,16220,15666,15570,15415,15559],
+          "median_batch_mean_ns": 15596,
+          "p95_batch_mean_ns": 21116
+        },
+        {
+          "name": "session_brief",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 91620,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [15720,15543,15569,15637,15636,15928,16011,15719,15657,15620,15879,15585,16022,15764,15837,15852,15940,15542,15840,16198,15871,15882,15823,15682,15828,15947,15758,15842,15735,15885,15781],
+          "median_batch_mean_ns": 15823,
+          "p95_batch_mean_ns": 16022
+        },
+        {
+          "name": "workspace_recall",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 883855,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [279688,282863,276469,274746,278698,279429,278787,279343,278486,277359,278570,278778,277844,278111,277410,278977,279544,283378,284248,279823,279718,278004,279522,277916,279533,278630,277585,277577,278639,277208,277965],
+          "median_batch_mean_ns": 278639,
+          "p95_batch_mean_ns": 283378
+        }
+      ],
+      "clock_ticks_per_second": 100,
+      "resource_scope": "per-process /proc warm batch deltas and RSS/HWM observations; no summed tree peak. Waited-child CPU covers reaped children. Outer performance receipt excludes systemd daemon; not total MCP resources.",
+      "protocol_accounting_scope": "initialize and two tools/list replies validated; initialized notification counted as completed write, not acknowledged processing",
+      "cache_scope": "process-cold setup and first calls; kernel/filesystem caches uncontrolled",
+      "cleanup": {
+        "adapter": "verified_eof_exit",
+        "service": "verified_stopped",
+        "fixture": "verified_removed"
+      },
+      "fixture_path": "/tmp/forge-hbench-464510",
+      "fixture_prepare_ns": 35304253,
+      "service_launch_ready_ns": 29914773,
+      "service_startup_samples": 1,
+      "inputs_before": {
+        "head": "dd8714c03de7daf823d2e2342051c2f05b438d50",
+        "binary_sha256": "8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd",
+        "benchmark_binary_sha256": "c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161",
+        "source_inventory_sha256": "7e4e1dd27a790bf38b397bef891f82a2ffe6a9a2440ce6da32107cb4556dda12",
+        "build_input_sha256": {
+          "native/forge/Cargo.toml": "41257c1724e38d02a6377e323bcb3d55cf843c76619f261370a507ef5a08cf7c",
+          "native/forge/Cargo.lock": "4587db32a88c09291ae6fc4ae0ed6856eb891d6c19a74ea67a3dcdb71648152c",
+          "native/forge-cli/Cargo.toml": "db5ebdb81991cb40c140c17db4371efdfd6811b925a728d580ecbc90e1478fc2",
+          "native/forge/benches/harness.rs": "6bbb3c89b434dee3dd0664c362b6dea97b386c1fad0e0429f1f26a6b22ea865d",
+          "native/forge/benches/support/mcp_measurement.rs": "7cb7eedd56f493a8113ecbbd1396600dca839522264e50b5bddb525193b517ae",
+          "native/forge/benches/support/memory_fixture.rs": "53efec5a3b42cff8c832fcf599ccae5a0f4c788deee777b3c8708dd8a7ca788c",
+          "native/forge/tests/support/mcp_client.rs": "7f3165eb40a911e096ac98b2ea024c4152d54da937973da2f9f184afd78fe179",
+          "native/forge/tests/support/forge_binary.rs": "41986a7c6e40681741420050f90cde67984c7a8ab7e594293c533edaca0d87ff"
+        },
+        "fixture_sha256": {
+          "source/main.rs": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+          "query.json": "17f5d15112b78953715be752ef27cafd36b45f15f1e3edede1b9305cff7d6731",
+          "memory.jsonl": "d9f738577e552888d75f034423744424065817aaf8049478d344cb50b80c01c5",
+          "memory.mapped": "c8d09a40ffa1f7b3394c5574ca3b07f67f6d62e3a041827aecb99cd0147a5df5",
+          "state/policy.json": "da5afb229ac902d882055daf01651ae942dce86fea24bd452b76d1227b51c468"
+        },
+        "request_sha256": "ecba58687c7f3b7d44ec95a7b6bf2841cb266458f090e44cd8a95e0bd1ec5f26",
+        "architecture": "x86_64",
+        "scope": "observed source/build inputs and executables; not compiler authenticity attestation"
+      },
+      "expected_payload_sha256": "76cb61def3354677f1d76bc4d5781d686a43762c40609593f6610526c7245be9",
+      "source_sha256": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+      "adapter_launch_initialize_ns": 1318557,
+      "catalog_sha256": "693be7f5267d22f3d302cbc9eecd087aabf18e4b38940619ef1a49ab535ea91b",
+      "catalog_bytes": 2775,
+      "discovery_ns": 166551,
+      "adapter_setup_total_ns": 1490128,
+      "catalog_reverified": true,
+      "inputs_reverified": true,
+      "accounting_complete": true,
+      "error": null,
+      "elapsed_ns": 651461689,
+      "raw_log": ".git/forge-performance/run-1793854129249028507-464151/sample-1.log",
+      "raw_log_sha256": "945f7970cd69e7bd89e06737d0eff7ab10e7f9167e8fe0ca1c05fcbed37febe5",
+      "cli": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [1094035,1031041,1081397,1045455,1140159,1037656,1057234,1074923,1077937,1066299,1110158,1024695,1067797,1114603,1093998,1036416,1126442,1042151,1058076,1128157,1029856,1054441,1136372,1060572,1046971,1070298,1071972,1038478,1312202,1070922,1188739],
+        "first_call_ns": 1387488,
+        "median_batch_mean_ns": 1070298,
+        "p95_batch_mean_ns": 1188739,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6062080,
+            "maximum_observed_process_hwm_bytes": 6062080
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15085568,
+            "maximum_observed_process_hwm_bytes": 15085568
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 19570688,
+            "maximum_observed_process_hwm_bytes": 19570688
+          },
+          "waited_child_cpu_us_per_batch": [10795,10169,10600,10320,11225,10226,10394,10583,10597,10497,10904,10110,10527,10977,10795,10223,11038,10273,10400,11119,10143,10406,11139,10460,10299,10506,10546,10223,12736,10560,11655]
+        }
+      },
+      "mcp": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [39715,39904,35680,47937,34206,44114,37856,74460,47697,51786,32615,43517,33906,46153,32701,46863,36057,48122,34357,46860,33338,44466,33086,42582,33689,46076,33190,47442,37132,48723,33465],
+        "first_call_ns": 213441,
+        "median_batch_mean_ns": 39904,
+        "p95_batch_mean_ns": 51786,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6053888,
+            "maximum_observed_process_hwm_bytes": 6053888
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15085568,
+            "maximum_observed_process_hwm_bytes": 15085568
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 19570688,
+            "maximum_observed_process_hwm_bytes": 19570688
+          },
+          "waited_child_cpu_us_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        }
+      }
+    },
+    {
+      "valid": true,
+      "measurement": "current-only matched native CLI/raw MCP; no task or token saving claim",
+      "measurement_deadline_seconds_from_driver_start": 90,
+      "sample_deadline_seconds": 2,
+      "service_lifetime_seconds": 120,
+      "deadline_scope": "cooperative measurement deadline; setup, synchronous filesystem work and cleanup are not preempted. Use an outer forge performance benchmark timeout for a whole-process bound.",
+      "identity_scope": "before/after point-in-time hashes; transient replace-and-restore and compiler authenticity are not attested",
+      "protocol_accounting": {
+        "planned": 4,
+        "started": 4,
+        "completed": 4,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "unix_diagnostic": [
+        {
+          "name": "code_fold",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 64310,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [15864,15941,15712,17551,16349,16286,15906,15826,15616,15872,16032,15793,15796,15712,15589,15723,16125,15649,15702,15750,22849,15868,15895,15823,15918,15889,15848,15936,15970,15767,15926],
+          "median_batch_mean_ns": 15868,
+          "p95_batch_mean_ns": 17551
+        },
+        {
+          "name": "session_brief",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 73690,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [16085,16258,16475,15970,16234,16001,16032,16192,16740,16049,16180,16102,16115,15888,16254,16284,15969,16167,16017,15998,16189,16039,16103,15942,16019,15897,16574,15824,15984,16142,16088],
+          "median_batch_mean_ns": 16088,
+          "p95_batch_mean_ns": 16574
+        },
+        {
+          "name": "workspace_recall",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 879785,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [289528,289551,287015,288114,287570,287290,288042,286264,325583,318512,304207,293926,293993,331257,294082,292496,292628,292406,292932,292368,290909,290326,290645,290604,290367,291533,291178,291698,289926,290897,290797],
+          "median_batch_mean_ns": 290909,
+          "p95_batch_mean_ns": 325583
+        }
+      ],
+      "clock_ticks_per_second": 100,
+      "resource_scope": "per-process /proc warm batch deltas and RSS/HWM observations; no summed tree peak. Waited-child CPU covers reaped children. Outer performance receipt excludes systemd daemon; not total MCP resources.",
+      "protocol_accounting_scope": "initialize and two tools/list replies validated; initialized notification counted as completed write, not acknowledged processing",
+      "cache_scope": "process-cold setup and first calls; kernel/filesystem caches uncontrolled",
+      "cleanup": {
+        "adapter": "verified_eof_exit",
+        "service": "verified_stopped",
+        "fixture": "verified_removed"
+      },
+      "fixture_path": "/tmp/forge-hbench-464856",
+      "fixture_prepare_ns": 35471743,
+      "service_launch_ready_ns": 37430084,
+      "service_startup_samples": 1,
+      "inputs_before": {
+        "head": "dd8714c03de7daf823d2e2342051c2f05b438d50",
+        "binary_sha256": "8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd",
+        "benchmark_binary_sha256": "c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161",
+        "source_inventory_sha256": "7e4e1dd27a790bf38b397bef891f82a2ffe6a9a2440ce6da32107cb4556dda12",
+        "build_input_sha256": {
+          "native/forge/Cargo.toml": "41257c1724e38d02a6377e323bcb3d55cf843c76619f261370a507ef5a08cf7c",
+          "native/forge/Cargo.lock": "4587db32a88c09291ae6fc4ae0ed6856eb891d6c19a74ea67a3dcdb71648152c",
+          "native/forge-cli/Cargo.toml": "db5ebdb81991cb40c140c17db4371efdfd6811b925a728d580ecbc90e1478fc2",
+          "native/forge/benches/harness.rs": "6bbb3c89b434dee3dd0664c362b6dea97b386c1fad0e0429f1f26a6b22ea865d",
+          "native/forge/benches/support/mcp_measurement.rs": "7cb7eedd56f493a8113ecbbd1396600dca839522264e50b5bddb525193b517ae",
+          "native/forge/benches/support/memory_fixture.rs": "53efec5a3b42cff8c832fcf599ccae5a0f4c788deee777b3c8708dd8a7ca788c",
+          "native/forge/tests/support/mcp_client.rs": "7f3165eb40a911e096ac98b2ea024c4152d54da937973da2f9f184afd78fe179",
+          "native/forge/tests/support/forge_binary.rs": "41986a7c6e40681741420050f90cde67984c7a8ab7e594293c533edaca0d87ff"
+        },
+        "fixture_sha256": {
+          "source/main.rs": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+          "query.json": "17f5d15112b78953715be752ef27cafd36b45f15f1e3edede1b9305cff7d6731",
+          "memory.jsonl": "d9f738577e552888d75f034423744424065817aaf8049478d344cb50b80c01c5",
+          "memory.mapped": "6049f075a4db08f014aceea68ef3d55ad64b236ef2f4d0eb3af43eb531477c05",
+          "state/policy.json": "a77d9b8be56ba7690d483984daf27072bbfadb337f400006f984495f7cb65b99"
+        },
+        "request_sha256": "ecba58687c7f3b7d44ec95a7b6bf2841cb266458f090e44cd8a95e0bd1ec5f26",
+        "architecture": "x86_64",
+        "scope": "observed source/build inputs and executables; not compiler authenticity attestation"
+      },
+      "expected_payload_sha256": "76cb61def3354677f1d76bc4d5781d686a43762c40609593f6610526c7245be9",
+      "source_sha256": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+      "adapter_launch_initialize_ns": 1258467,
+      "catalog_sha256": "693be7f5267d22f3d302cbc9eecd087aabf18e4b38940619ef1a49ab535ea91b",
+      "catalog_bytes": 2775,
+      "discovery_ns": 141421,
+      "adapter_setup_total_ns": 1403728,
+      "catalog_reverified": true,
+      "inputs_reverified": true,
+      "accounting_complete": true,
+      "error": null,
+      "elapsed_ns": 656892058,
+      "raw_log": ".git/forge-performance/run-1793854129249028507-464151/sample-2.log",
+      "raw_log_sha256": "68f57d96895f6178280aba971d7eaab9e3ea367c78d79d0ad7e8403965fcad3c",
+      "cli": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [1162746,1058097,1086568,1139705,1125930,1070305,1075157,1086563,1051680,1075455,1042993,1064739,1057988,1073078,1073847,1060224,1042443,1081689,1050089,1053147,1162389,1128340,1059592,1127230,1061654,1067350,1070040,1083995,1113183,1058178,1026630],
+        "first_call_ns": 1447678,
+        "median_batch_mean_ns": 1070305,
+        "p95_batch_mean_ns": 1162389,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6217728,
+            "maximum_observed_process_hwm_bytes": 6217728
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 14929920,
+            "maximum_observed_process_hwm_bytes": 14929920
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 20418560,
+            "maximum_observed_process_hwm_bytes": 20418560
+          },
+          "waited_child_cpu_us_per_batch": [11384,10392,10680,11153,11027,10514,10591,10648,10313,10588,10235,10486,10379,10547,10573,10452,10259,10647,10320,10354,11385,11077,10430,11049,10463,10528,10454,10650,10903,10408,10123]
+        }
+      },
+      "mcp": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [35990,46652,39453,48796,33706,53511,34925,47160,43395,43836,33300,50343,32879,45096,33640,40981,32078,42922,32616,39439,32181,48861,33648,41579,32161,70248,43007,49549,39876,42596,33629],
+        "first_call_ns": 209151,
+        "median_batch_mean_ns": 40981,
+        "p95_batch_mean_ns": 53511,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6209536,
+            "maximum_observed_process_hwm_bytes": 6209536
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 14929920,
+            "maximum_observed_process_hwm_bytes": 14929920
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 20418560,
+            "maximum_observed_process_hwm_bytes": 20418560
+          },
+          "waited_child_cpu_us_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        }
+      }
+    },
+    {
+      "valid": true,
+      "measurement": "current-only matched native CLI/raw MCP; no task or token saving claim",
+      "measurement_deadline_seconds_from_driver_start": 90,
+      "sample_deadline_seconds": 2,
+      "service_lifetime_seconds": 120,
+      "deadline_scope": "cooperative measurement deadline; setup, synchronous filesystem work and cleanup are not preempted. Use an outer forge performance benchmark timeout for a whole-process bound.",
+      "identity_scope": "before/after point-in-time hashes; transient replace-and-restore and compiler authenticity are not attested",
+      "protocol_accounting": {
+        "planned": 4,
+        "started": 4,
+        "completed": 4,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "unix_diagnostic": [
+        {
+          "name": "code_fold",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 46710,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [16145,15760,16090,16317,15524,15552,15646,15736,15384,15679,16438,15537,15727,15436,15639,15459,15268,15116,15268,15754,15618,15642,15774,15183,15326,15051,14763,14705,14650,15638,14251],
+          "median_batch_mean_ns": 15552,
+          "p95_batch_mean_ns": 16317
+        },
+        {
+          "name": "session_brief",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 68901,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [15264,15296,14944,15288,15041,14930,14887,15141,15452,15450,15353,15384,15750,15807,15450,15192,15439,15263,15625,15422,15630,15625,16519,16266,15366,15458,15297,15465,19551,17084,16661],
+          "median_batch_mean_ns": 15439,
+          "p95_batch_mean_ns": 17084
+        },
+        {
+          "name": "workspace_recall",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 874865,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [283276,283322,284660,283192,287408,287823,283599,282955,282771,286445,286920,285742,284539,284644,284672,285051,285911,284692,285127,285971,284879,285586,284205,285893,285457,328831,324842,293411,291571,291899,292175],
+          "median_batch_mean_ns": 285457,
+          "p95_batch_mean_ns": 324842
+        }
+      ],
+      "clock_ticks_per_second": 100,
+      "resource_scope": "per-process /proc warm batch deltas and RSS/HWM observations; no summed tree peak. Waited-child CPU covers reaped children. Outer performance receipt excludes systemd daemon; not total MCP resources.",
+      "protocol_accounting_scope": "initialize and two tools/list replies validated; initialized notification counted as completed write, not acknowledged processing",
+      "cache_scope": "process-cold setup and first calls; kernel/filesystem caches uncontrolled",
+      "cleanup": {
+        "adapter": "verified_eof_exit",
+        "service": "verified_stopped",
+        "fixture": "verified_removed"
+      },
+      "fixture_path": "/tmp/forge-hbench-465192",
+      "fixture_prepare_ns": 35902855,
+      "service_launch_ready_ns": 40911273,
+      "service_startup_samples": 1,
+      "inputs_before": {
+        "head": "dd8714c03de7daf823d2e2342051c2f05b438d50",
+        "binary_sha256": "8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd",
+        "benchmark_binary_sha256": "c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161",
+        "source_inventory_sha256": "7e4e1dd27a790bf38b397bef891f82a2ffe6a9a2440ce6da32107cb4556dda12",
+        "build_input_sha256": {
+          "native/forge/Cargo.toml": "41257c1724e38d02a6377e323bcb3d55cf843c76619f261370a507ef5a08cf7c",
+          "native/forge/Cargo.lock": "4587db32a88c09291ae6fc4ae0ed6856eb891d6c19a74ea67a3dcdb71648152c",
+          "native/forge-cli/Cargo.toml": "db5ebdb81991cb40c140c17db4371efdfd6811b925a728d580ecbc90e1478fc2",
+          "native/forge/benches/harness.rs": "6bbb3c89b434dee3dd0664c362b6dea97b386c1fad0e0429f1f26a6b22ea865d",
+          "native/forge/benches/support/mcp_measurement.rs": "7cb7eedd56f493a8113ecbbd1396600dca839522264e50b5bddb525193b517ae",
+          "native/forge/benches/support/memory_fixture.rs": "53efec5a3b42cff8c832fcf599ccae5a0f4c788deee777b3c8708dd8a7ca788c",
+          "native/forge/tests/support/mcp_client.rs": "7f3165eb40a911e096ac98b2ea024c4152d54da937973da2f9f184afd78fe179",
+          "native/forge/tests/support/forge_binary.rs": "41986a7c6e40681741420050f90cde67984c7a8ab7e594293c533edaca0d87ff"
+        },
+        "fixture_sha256": {
+          "source/main.rs": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+          "query.json": "17f5d15112b78953715be752ef27cafd36b45f15f1e3edede1b9305cff7d6731",
+          "memory.jsonl": "d9f738577e552888d75f034423744424065817aaf8049478d344cb50b80c01c5",
+          "memory.mapped": "f37c24559934051af8fcad889f61213bd948fe809254c74a0f62b2540e662919",
+          "state/policy.json": "3c15fe288abecf637edf5a8b20d9769940cff7569b3ada2ecc536e939a3969ee"
+        },
+        "request_sha256": "ecba58687c7f3b7d44ec95a7b6bf2841cb266458f090e44cd8a95e0bd1ec5f26",
+        "architecture": "x86_64",
+        "scope": "observed source/build inputs and executables; not compiler authenticity attestation"
+      },
+      "expected_payload_sha256": "76cb61def3354677f1d76bc4d5781d686a43762c40609593f6610526c7245be9",
+      "source_sha256": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+      "adapter_launch_initialize_ns": 1359678,
+      "catalog_sha256": "693be7f5267d22f3d302cbc9eecd087aabf18e4b38940619ef1a49ab535ea91b",
+      "catalog_bytes": 2775,
+      "discovery_ns": 170211,
+      "adapter_setup_total_ns": 1534949,
+      "catalog_reverified": true,
+      "inputs_reverified": true,
+      "accounting_complete": true,
+      "error": null,
+      "elapsed_ns": 642550169,
+      "raw_log": ".git/forge-performance/run-1793854129249028507-464151/sample-3.log",
+      "raw_log_sha256": "b5cd2dda5e7897d9823c926686ca56697e49bd20fd9b1d7b3b60d088f5656a47",
+      "cli": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [1245037,1151216,1066418,1063151,1104824,1044195,1072885,1116300,1063717,1139510,1080223,1047491,1163319,1054981,1021840,1026160,1072693,1035264,1034191,1033148,1040762,1140114,1053844,1081844,1044269,1052241,1059251,1026668,1052078,1042316,1030836],
+        "first_call_ns": 1211987,
+        "median_batch_mean_ns": 1054981,
+        "p95_batch_mean_ns": 1163319,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6225920,
+            "maximum_observed_process_hwm_bytes": 6225920
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15245312,
+            "maximum_observed_process_hwm_bytes": 15245312
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 20320256,
+            "maximum_observed_process_hwm_bytes": 20320256
+          },
+          "waited_child_cpu_us_per_batch": [12217,11271,10489,10460,10781,10298,10577,10980,10447,11209,10629,10325,11381,10384,10064,10120,10548,10227,10194,10208,10187,11155,10346,10642,10193,10392,10452,10129,10351,10284,10179]
+        }
+      },
+      "mcp": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [34257,41866,32961,40954,34965,42074,32559,41914,32109,43732,32112,43872,39189,38300,31678,40145,31801,37532,32426,40824,32242,48252,36878,46593,34899,44417,31850,42902,32433,39933,31520],
+        "first_call_ns": 194811,
+        "median_batch_mean_ns": 37532,
+        "p95_batch_mean_ns": 46593,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6217728,
+            "maximum_observed_process_hwm_bytes": 6217728
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15245312,
+            "maximum_observed_process_hwm_bytes": 15245312
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 20320256,
+            "maximum_observed_process_hwm_bytes": 20320256
+          },
+          "waited_child_cpu_us_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        }
+      }
+    },
+    {
+      "valid": true,
+      "measurement": "current-only matched native CLI/raw MCP; no task or token saving claim",
+      "measurement_deadline_seconds_from_driver_start": 90,
+      "sample_deadline_seconds": 2,
+      "service_lifetime_seconds": 120,
+      "deadline_scope": "cooperative measurement deadline; setup, synchronous filesystem work and cleanup are not preempted. Use an outer forge performance benchmark timeout for a whole-process bound.",
+      "identity_scope": "before/after point-in-time hashes; transient replace-and-restore and compiler authenticity are not attested",
+      "protocol_accounting": {
+        "planned": 4,
+        "started": 4,
+        "completed": 4,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "unix_diagnostic": [
+        {
+          "name": "code_fold",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 36420,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [26290,26128,25918,26253,26403,28152,25770,25728,25560,25539,25681,25290,30938,26971,26017,26081,25894,25835,26317,25269,25954,26063,25553,26095,25766,26217,26072,25751,26478,25965,25537],
+          "median_batch_mean_ns": 25965,
+          "p95_batch_mean_ns": 28152
+        },
+        {
+          "name": "session_brief",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 80090,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [25972,25493,25722,26195,25564,25740,25769,25802,25675,25675,25724,25698,25738,25600,25312,26371,25757,25562,25965,25699,25766,25292,28032,25371,25968,25673,25875,25526,25731,25246,25982],
+          "median_batch_mean_ns": 25724,
+          "p95_batch_mean_ns": 26371
+        },
+        {
+          "name": "workspace_recall",
+          "accounting": {
+            "planned": 321,
+            "started": 321,
+            "completed": 321,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0
+          },
+          "first_call_ns": 892245,
+          "operations_per_batch": 10,
+          "warmups": 10,
+          "sample_batch_means_ns": [288320,282541,284875,287227,285061,284254,284312,294324,287018,284399,285612,285922,284099,284448,299482,318991,283861,283281,282100,282239,280512,280556,279801,316931,308974,282594,282243,284856,283176,294927,281782],
+          "median_batch_mean_ns": 284399,
+          "p95_batch_mean_ns": 316931
+        }
+      ],
+      "clock_ticks_per_second": 100,
+      "resource_scope": "per-process /proc warm batch deltas and RSS/HWM observations; no summed tree peak. Waited-child CPU covers reaped children. Outer performance receipt excludes systemd daemon; not total MCP resources.",
+      "protocol_accounting_scope": "initialize and two tools/list replies validated; initialized notification counted as completed write, not acknowledged processing",
+      "cache_scope": "process-cold setup and first calls; kernel/filesystem caches uncontrolled",
+      "cleanup": {
+        "adapter": "verified_eof_exit",
+        "service": "verified_stopped",
+        "fixture": "verified_removed"
+      },
+      "fixture_path": "/tmp/forge-hbench-465529",
+      "fixture_prepare_ns": 35897305,
+      "service_launch_ready_ns": 32661408,
+      "service_startup_samples": 1,
+      "inputs_before": {
+        "head": "dd8714c03de7daf823d2e2342051c2f05b438d50",
+        "binary_sha256": "8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd",
+        "benchmark_binary_sha256": "c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161",
+        "source_inventory_sha256": "7e4e1dd27a790bf38b397bef891f82a2ffe6a9a2440ce6da32107cb4556dda12",
+        "build_input_sha256": {
+          "native/forge/Cargo.toml": "41257c1724e38d02a6377e323bcb3d55cf843c76619f261370a507ef5a08cf7c",
+          "native/forge/Cargo.lock": "4587db32a88c09291ae6fc4ae0ed6856eb891d6c19a74ea67a3dcdb71648152c",
+          "native/forge-cli/Cargo.toml": "db5ebdb81991cb40c140c17db4371efdfd6811b925a728d580ecbc90e1478fc2",
+          "native/forge/benches/harness.rs": "6bbb3c89b434dee3dd0664c362b6dea97b386c1fad0e0429f1f26a6b22ea865d",
+          "native/forge/benches/support/mcp_measurement.rs": "7cb7eedd56f493a8113ecbbd1396600dca839522264e50b5bddb525193b517ae",
+          "native/forge/benches/support/memory_fixture.rs": "53efec5a3b42cff8c832fcf599ccae5a0f4c788deee777b3c8708dd8a7ca788c",
+          "native/forge/tests/support/mcp_client.rs": "7f3165eb40a911e096ac98b2ea024c4152d54da937973da2f9f184afd78fe179",
+          "native/forge/tests/support/forge_binary.rs": "41986a7c6e40681741420050f90cde67984c7a8ab7e594293c533edaca0d87ff"
+        },
+        "fixture_sha256": {
+          "source/main.rs": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+          "query.json": "17f5d15112b78953715be752ef27cafd36b45f15f1e3edede1b9305cff7d6731",
+          "memory.jsonl": "d9f738577e552888d75f034423744424065817aaf8049478d344cb50b80c01c5",
+          "memory.mapped": "9ec8a928566067c1481e56ba12100019f6b117e0be3faa1b6da214026a339a09",
+          "state/policy.json": "ec0288613b484387714fd322a3d0588c19e9fc8b390b287d99780696d8b055cb"
+        },
+        "request_sha256": "ecba58687c7f3b7d44ec95a7b6bf2841cb266458f090e44cd8a95e0bd1ec5f26",
+        "architecture": "x86_64",
+        "scope": "observed source/build inputs and executables; not compiler authenticity attestation"
+      },
+      "expected_payload_sha256": "76cb61def3354677f1d76bc4d5781d686a43762c40609593f6610526c7245be9",
+      "source_sha256": "87bea8237d502885b358ec1f1e066b5e2f977f9e07f781c031126a44b4ada060",
+      "adapter_launch_initialize_ns": 1484958,
+      "catalog_sha256": "693be7f5267d22f3d302cbc9eecd087aabf18e4b38940619ef1a49ab535ea91b",
+      "catalog_bytes": 2775,
+      "discovery_ns": 138231,
+      "adapter_setup_total_ns": 1627109,
+      "catalog_reverified": true,
+      "inputs_reverified": true,
+      "accounting_complete": true,
+      "error": null,
+      "elapsed_ns": 657295459,
+      "raw_log": ".git/forge-performance/run-1793854129249028507-464151/sample-4.log",
+      "raw_log_sha256": "ce8ae4a5df4491e8f886adc817bd077ca0c2d160fa2ed945da7a4aad12ab0446",
+      "cli": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [1092374,1271444,1189547,1054031,1279095,1066322,1058318,1083616,1089591,1160004,1069171,1061064,1104427,1026127,1064193,1074165,1030742,1026320,1101586,1058078,1037565,1036029,1048890,1048377,1037933,1056394,1048644,1090452,1113505,1044278,1031510],
+        "first_call_ns": 1123816,
+        "median_batch_mean_ns": 1061064,
+        "p95_batch_mean_ns": 1271444,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6139904,
+            "maximum_observed_process_hwm_bytes": 6139904
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15273984,
+            "maximum_observed_process_hwm_bytes": 15273984
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 19570688,
+            "maximum_observed_process_hwm_bytes": 19570688
+          },
+          "waited_child_cpu_us_per_batch": [10704,12370,11620,10367,12449,10508,10444,10644,10730,11348,10532,10477,10838,10117,10498,10578,10155,10136,10792,10428,10160,10211,10348,10352,10208,10344,10314,10662,10866,10288,10111]
+        }
+      },
+      "mcp": {
+        "accounting": {
+          "planned": 321,
+          "started": 321,
+          "completed": 321,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0
+        },
+        "warmups": 10,
+        "batches": 31,
+        "operations_per_batch": 10,
+        "sample_batch_means_ns": [48364,39426,41871,44773,34907,43259,33274,42434,32059,43642,32011,41637,33182,53529,35343,44624,34096,41912,34215,46702,34409,45620,33303,42197,33584,44673,38118,43744,32569,60051,45887],
+        "first_call_ns": 197981,
+        "median_batch_mean_ns": 41871,
+        "p95_batch_mean_ns": 53529,
+        "resource_projection": {
+          "driver": {
+            "cpu_ticks_per_batch": [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 6131712,
+            "maximum_observed_process_hwm_bytes": 6131712
+          },
+          "adapter": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 15273984,
+            "maximum_observed_process_hwm_bytes": 15273984
+          },
+          "service": {
+            "cpu_ticks_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "all_observations_available": true,
+            "maximum_observed_rss_bytes": 19570688,
+            "maximum_observed_process_hwm_bytes": 19570688
+          },
+          "waited_child_cpu_us_per_batch": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        }
+      }
+    }
+  ],
+  "negative_probes": [
+    {
+      "case": "no-opt-in",
+      "raw_log": ".git/forge-program-mcp-negative-no-opt-in.log",
+      "raw_log_sha256": "1d0a852ed8aefa41405988cf99e7e971e320a27bc5e0674ba11c4c25e5d9dc4b",
+      "receipt_absent": true,
+      "fixture_absent_after_probe": true,
+      "report": {
+        "valid": false,
+        "error": "set FORGE_BENCH_SERVICE=1 to authorize this bounded transient benchmark service",
+        "cleanup": {
+          "adapter": "not_started",
+          "service": "not_stopped"
+        },
+        "fixture_path": "/tmp/forge-hbench-466226",
+        "elapsed_ns": 43170,
+        "protocol_accounting": {
+          "planned": 4,
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 4
+        }
+      },
+      "tool_call_accounting": {
+        "cli": {
+          "planned": 321,
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 321
+        },
+        "mcp": {
+          "planned": 321,
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 321
+        }
+      }
+    },
+    {
+      "case": "service-retry",
+      "raw_log": ".git/forge-program-mcp-negative-service-retry.log",
+      "raw_log_sha256": "e1c1811cc73636c97703e8d3dbc5e65954b52d80a8ed29ef9e7e52044f86f9a7",
+      "receipt_absent": true,
+      "fixture_absent_after_probe": true,
+      "report": {
+        "valid": false,
+        "error": "measurement: service readiness failed: deadline has elapsed",
+        "cleanup": {
+          "adapter": "not_started",
+          "service": "verified_stopped",
+          "fixture": "verified_removed"
+        },
+        "fixture_path": "/tmp/forge-hbench-466341",
+        "elapsed_ns": 8114191923,
+        "protocol_accounting": {
+          "planned": 4,
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 4
+        }
+      },
+      "tool_call_accounting": {
+        "cli": {
+          "planned": 321,
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 321
+        },
+        "mcp": {
+          "planned": 321,
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 321
+        }
+      }
+    }
+  ],
+  "negative_probe_note": "Missing opt-in refuses before creating a fixture; /usr/bin/false passes executable validation but never becomes a ready service. Tool calls remain unstarted. A preceding absolute --source /usr/bin/false probe was rejected before execution; its retained log is .git/forge-program-mcp-negative-service.log and is not service behavior evidence."
+}

@@ -146,7 +146,7 @@ landed in [PR #187](https://github.com/mcpirate17/llm-forge/pull/187) as
 `72a13d61a4b66bce8e451ed83cec98b143911720754c175f69f58df71424597a`, in
 `.git/forge-checks/run-1793850333047138281-332956/receipt.json`.
 
-**Active capability increment:** `forge context prompt` and MCP `context_prompt`
+**Completed capability increment:** `forge context prompt` and MCP `context_prompt`
 share native inspect/suggest/plan/compare behavior. Exact byte spans and hashes
 identify literal requirements; plan preserves supplied text and constraints;
 compare reports substring retention with explicit semantic limits. Opaque context
@@ -159,10 +159,26 @@ review corrected fence/quote/section edge cases and clarified ingress bounds.
 Four independently prepared held-out literal cases pass; these are not coding
 agent task-success evaluations. Current-only latency and matched existing-command
 regression evidence are in [performance.md](performance.md#prompt-contract-behavior-and-overhead--2026-11-04).
-Full committed-tree publication gates remain pending for this increment. Next:
-source-backed tool recommendations, actual transport measurements and matched
-agent tasks. Automatic strengthening, outbound MCP and client adoption remain
-unverified mission gaps.
+This increment landed in [PR #188](https://github.com/mcpirate17/llm-forge/pull/188)
+as `dd8714c03de7daf823d2e2342051c2f05b438d50`, identical tree to checked head
+`46adb0542ce4c205d2a4368bf53dbcbc5f4461f9`. Full local-check/local-verify passed
+all 18 steps, 4,532 successful test executions, zero failures and 145 ignored
+across 177 harnesses (repeated feature matrices included). Receipt SHA-256:
+`a26f0109ae3313ee8fe6e88c51111c5e8822005523f1a94bb4edd398f9123662`, in
+`.git/forge-checks/run-1793852521915497903-402931/receipt.json`.
+
+**Active measurement increment:** the extended harness benchmark measures the actual
+stdio adapter, negotiation, full discovery and fresh socket per forwarded call,
+with complete CLI/MCP payload parity. Five repetitions completed 1,605 calls per
+arm with zero failed/censored/unstarted calls and verified process/fixture cleanup.
+Strict Clippy and all 22 selected CLI/live-harness tests passed. Existing persistent
+socket measurements remain separate diagnostics; see [the transport evidence](performance.md#transport-task-value-and-missing-controls)
+for startup, per-call latency, resource/provenance limits and negative probes.
+Full committed-tree publication gates remain pending. Compare recommendation workflows against both discovery-first
+and best existing direct-call controls; an extra recommendation call may be a net
+cost. Automatic strengthening, outbound MCP, agent task benefit and client adoption
+remain unverified mission gaps. Issue #186 needs explicit operator-pinned installed
+identity; a candidate-controlled lock or receipt cannot authorize that identity.
 The installed global Forge remains a separate artifact.
 
 ## Historical roadmap and delivery provenance
