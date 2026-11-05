@@ -7,10 +7,10 @@ improve verified task outcomes, context use and execution cost while preserving
 correctness and explicit operator authority. Native implementation, installation,
 runtime activation and demonstrated agent benefit are separate milestones.
 
-This checkpoint audits source baseline `9117c2fb6436251d0de50038db85ef7fbb81e4b3`,
-on pending [PR #185](https://github.com/mcpirate17/llm-forge/pull/185), plus the
-working changes and scoped validation below. It does not certify the eventual
-PR head. The canonical measurement and effectiveness report is
+This checkpoint started from source baseline `9117c2fb6436251d0de50038db85ef7fbb81e4b3`.
+The reviewed mutation repair landed in [PR #185](https://github.com/mcpirate17/llm-forge/pull/185)
+as `f8c1ae9406e6e1f6d55c3bb15a26b3ef57c918b6`; its tree exactly matches the checked
+PR head `966ae9a128458a6cbc488bfcd51bc574c4b623eb`. The canonical measurement and effectiveness report is
 [performance.md](performance.md); historical delivery notes follow this checkpoint.
 Open defects live in the [issue tracker](https://github.com/mcpirate17/llm-forge/issues),
 not a parallel local defect ledger.
@@ -27,7 +27,7 @@ Paths below are relative to `native/forge/src/` unless qualified.
 | MCP server | `harness_mcp.rs`, `harness_mcp_protocol.rs`, `harness_catalog.rs`, `harness_transport.rs`, `mcp_setup.rs` | Tools discovery/calls, schema validation, bounded concurrency and operator-selected capabilities exist. Custom wire integration tests exist; actual-client selection and complete transport cost remain unmeasured | Retain the native service/adapter split; improve client setup, lifecycle and actual-client validation |
 | MCP client and prompts | `src/conductor/crg_mcp_probe.py` is a narrow diagnostic client; `context_tools.rs` searches supplied catalog snapshots | No reusable native outbound MCP session or MCP prompts/resources methods found. Existing prompt composition is not protocol prompt discovery | Build the authorized outbound integration and deterministic prompt/tool layer using composition/schema/catalog APIs; keep protocol prompt discovery distinct |
 | Performance | `performance.rs`, `performance_identity.rs`, `conductor-native/src/performance_receipt.rs`, `native/forge/benches/` | Sealed matched-receipt comparisons and component benchmarks exist. Current CLI baselines and historical retrieval/projection evidence do not establish productivity | Retain receipt integrity; improve transport/task measurements and include preparation/resource costs |
-| Quality and tests | `native/forge/tests/`, `native/conductor-native/tests/`, `local_check.rs`, `sweep.rs`, `mutation_run.rs` | Native unit/integration suites, full local checks and clean-host sweep exist; live-service tests are opt-in. Focused repair tests pass; full final-tree verification remains pending below | Retain ordinary tests and automatic scoped mutation engines; verify exact committed tree before landing |
+| Quality and tests | `native/forge/tests/`, `native/conductor-native/tests/`, `local_check.rs`, `sweep.rs`, `mutation_run.rs` | Full local checks and verification passed the merged repair tree; live-service tests remain opt-in. No new clean-host sweep or real-client validation is implied | Retain ordinary tests and automatic scoped mutation engines; verify each exact committed tree before landing |
 | Rust migration | `native/forge-cli/Cargo.toml` owns the executable using `../forge/src/main.rs`; `native/forge` owns reusable code; `native/conductor-native` supplies shared contracts | `rg --files src -g '*.py'` currently finds 83 files. File count is not migration completion; caller/dependency retirement and clean-install/runtime evidence remain necessary | Prioritize measured live interpreted boundaries; retire replaced bodies and stale compatibility plumbing after complete caller migration |
 
 ### Actual dispatch and dependency flow
@@ -60,15 +60,14 @@ this audit.
 
 ### Ordered continuation and acceptance criteria
 
-1. Complete the bounded mutation prerequisites tracked in
-   [#184](https://github.com/mcpirate17/llm-forge/issues/184): the active planner
-   change removes the fatal refusal for a package without local `src/`. The
-   planner and identity now belong to the shared library; the exact issue command
-   returns `READY` (skipping the registered crate), adding `--include-covered`
-   returns one `forge` campaign, and `cargo-mutants 27.1.0 --list` discovers 38
-   planner mutations. This is discovery, not executed mutation coverage. CLI-only
-   modules retain explicit unsupported-ownership errors. Complete full checks and
-   integrate the reviewed publication, process and receipt-freshness repairs.
+1. Remove the unnecessary interpreter prerequisite for native Rust/Mull mutation
+   workflows, retaining explicit guest configuration and Python/Fest behavior.
+   Verify a real automatically generated Rust campaign with Python absent from
+   `PATH`. External-host native receipt acceptance has a separate tracked boundary
+   in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
+   works without vendored Forge sources, but governance acceptance currently needs
+   them. Reuse independently measured, operator-pinned installed identity when
+   adding that support; receipt-supplied identity cannot authorize itself.
 2. Validate one real client: setup, advertised tools, an agent-selected read,
    allowed/denied/failure cases, reconnect and undo. Test the client-specific
    configuration rather than treating a custom wire client as client adoption.
@@ -93,8 +92,10 @@ this audit.
    paths. Retire proven duplicates and interpreted boundaries after caller/parity
    verification; add readiness/setup/status/undo without parallel machinery.
 
-**Ongoing checkpoint:** the source audit and two pre-change CLI baselines are
-complete. The pending repair covers package ownership, configured receipt paths,
+**Completed repair cycle:** PR #185 closed
+[#184](https://github.com/mcpirate17/llm-forge/issues/184). The exact issue command
+now returns `READY`; `--include-covered` selects one Forge campaign, and Cargo
+discovery finds 38 planner mutants (discovery, not executed coverage). The repair covers package ownership, configured receipt paths,
 contained atomic publication, serialized process diagnostics, bounded child output
 and shared native-source freshness. Independent review exposed and resolved
 module-path edge cases, snapshot inventory drift, canonical path ordering and
@@ -113,9 +114,12 @@ ignored executions across 172 harness invocations; repeated feature matrices are
 included, so these are not unique-test counts. Earlier fixture and Clippy failures
 are repaired. A final review removed Make's premature output-directory creation
 and corrected censored known-survivor scoring; focused regression checks cover
-those follow-ups. Logs are under `.git/forge-program-*`. Full committed-tree
-`make local-check` / `make local-verify` are the publication gates; consult their
-source-bound receipts under `.git/forge-checks/` for the exact checked revision.
+those follow-ups. Final `make local-check` and `make local-verify` both passed all
+18 steps at `966ae9a`, including 4,509 successful test executions, zero failures
+and 144 ignored executions across 176 harness invocations. Receipt SHA-256:
+`0f1fa5c382c7017faa301335beb97f70fef315dcd4913c48a6599658c611045d`, stored in
+`.git/forge-checks/run-1793848994635908412-275916/receipt.json`. The merge has the
+same source tree; a later commit or base needs its own publication receipt.
 
 Two real, automatically generated cargo-mutants campaigns verified root
 `Cargo.toml` handling: one measured source plus an unmeasured source yields
@@ -127,9 +131,15 @@ registered source-freshness evidence. Earlier failed attempts remain preserved.
 Matched original/repaired binary comparisons pass the unchanged 10% budget for
 CLI help and signature context (404 successful measured samples); an earlier
 environment-mismatched replay remains recorded. This is scoped working-tree
-evidence, not final-head certification or real-client productivity. Resume with
-publication of item 1, remove Rust/Mull's unnecessary interpreter prerequisite,
-then advance to the shared prompt/tool layer and actual transport measurements.
+evidence, not final-binary certification or real-client productivity. Item 1 is
+implemented and independently reviewed: 239 focused mutation tests (12 ignored)
+and strict Clippy pass. A matched real Cargo fixture refuses on the old binary
+without Python and completes two killed mutants on the changed binary with
+`interpreter: null`, unchanged checked live inputs and confirmed snapshot cleanup.
+The generated manifest's initial survivor baseline update is retained. This is
+dirty-build behavior evidence, with no new real Mull execution. Publication gates
+for this second increment remain pending. The next capability work is the shared
+prompt/tool layer and actual transport measurements.
 The installed global Forge remains a separate artifact.
 
 ## Historical roadmap and delivery provenance

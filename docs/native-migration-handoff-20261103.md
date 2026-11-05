@@ -77,10 +77,12 @@ is different from Python required to orchestrate Forge itself.
 
 ### P1 — Automatic mutation campaign generation and execution
 
-**Status:** implementation on `feat/native-mutation-runner-20261103`, pending
-review repairs and fresh validation in PR #185. The 2026-11-04 review found
-incomplete executable-target ownership (#184), unsafe output publication,
-concurrent process-registry updates and incomplete native receipt source binding.
+**Status:** implementation and reviewed repairs merged in PR #185 at `f8c1ae9`,
+with full source-bound local verification on the identical PR tree. The repair
+closed #184 and hardened output publication, process diagnostics, per-source
+coverage accounting and native receipt freshness. Optional native guest
+interpreter handling is the next bounded migration; external-host evidence
+acceptance is tracked separately in #186.
 See [the current engineering checkpoint](roadmap.md#current-mission-checkpoint--2026-11-04).
 `forge mutation plan|write|inspect|run` replace the writer and runner, and
 `make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them, through

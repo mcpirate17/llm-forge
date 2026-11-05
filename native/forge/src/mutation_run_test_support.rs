@@ -84,3 +84,35 @@ pub(crate) fn change(root: &Path, files: &[&str]) {
     git(root, &["add", "."]);
     git(root, &["commit", "-q", "-m", "change"]);
 }
+
+/// Run an adapter/environment assertion with a real, exclusively owned supervisor.
+pub(crate) fn with_run<T>(
+    root: &Path,
+    interpreter: Option<&str>,
+    overrides: Value,
+    body: impl FnOnce(&mut crate::mutation_run::EngineRun<'_>) -> T,
+) -> T {
+    let mut subject = campaign(root, overrides);
+    let mut receipt = Receipt::new();
+    let output = root.join("receipt.json");
+    let _owner = crate::process_signals::TEST_OWNER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let interrupts = crate::process_signals::Interrupts::install().unwrap();
+    let supervisor = crate::mutation_process::Supervisor {
+        interrupts: &interrupts,
+        registry: root.join("native_pgids.json"),
+        memory_cap: None,
+    };
+    let mut run = crate::mutation_run::EngineRun {
+        campaign: &mut subject,
+        receipt: &mut receipt,
+        output_path: &output,
+        repo_root: root,
+        worktree: root,
+        interpreter,
+        supervisor: &supervisor,
+        planned: None,
+    };
+    body(&mut run)
+}

@@ -276,3 +276,30 @@ fn only_a_regular_executable_file_counts() {
     assert!(!is_executable(dir.path()));
     assert!(!is_executable(&dir.path().join("absent")));
 }
+
+#[test]
+fn optional_guest_never_discovers_a_host_venv_and_validates_explicit_configuration() {
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(configured_snapshot_python(dir.path()).unwrap(), None);
+    write(dir.path(), ".venv/bin/python", "");
+    assert_eq!(configured_snapshot_python(dir.path()).unwrap(), None);
+    write(
+        dir.path(),
+        "pyproject.toml",
+        "[tool.conductor]\nsnapshot_python='/explicit/guest'\n",
+    );
+    assert_eq!(
+        configured_snapshot_python(dir.path()).unwrap(),
+        Some("/explicit/guest".into())
+    );
+    assert_eq!(snapshot_python(dir.path()).unwrap(), "/explicit/guest");
+    for value in ["3", "''", "' '"] {
+        write(
+            dir.path(),
+            "pyproject.toml",
+            &format!("[tool.conductor]\nsnapshot_python={value}\n"),
+        );
+        assert!(configured_snapshot_python(dir.path()).is_err());
+        assert!(snapshot_python(dir.path()).is_err());
+    }
+}

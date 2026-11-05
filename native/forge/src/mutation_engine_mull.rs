@@ -686,22 +686,26 @@ fn summary(every: &[Value], scoped: &[Value]) -> Value {
     })
 }
 
+fn environment(run: &EngineRun, worktree: &Path) -> Result<BTreeMap<String, String>, String> {
+    let mut bound = run.guest_environment(&run.campaign.environment);
+    bound.extend([
+        ("PATH".to_string(), env::var("PATH").unwrap_or_default()),
+        (
+            "MULL_CONFIG".to_string(),
+            mull_scope_config(run.campaign, worktree)?
+                .to_string_lossy()
+                .into_owned(),
+        ),
+    ]);
+    Ok(bound)
+}
+
 /// Build the instrumented corpus, cover it, mutate it, fill the receipt.
 pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
     require_no_drift(run.campaign, run.worktree)?;
     let (version, profdata_tool) = pinned_tools(run.campaign, binary)?;
     let worktree = run.worktree.to_path_buf();
-    let mut bound = run.campaign.environment.clone();
-    bound.extend([
-        run.snapshot_python_entry(),
-        ("PATH".to_string(), env::var("PATH").unwrap_or_default()),
-        (
-            "MULL_CONFIG".to_string(),
-            mull_scope_config(run.campaign, &worktree)?
-                .to_string_lossy()
-                .into_owned(),
-        ),
-    ]);
+    let bound = environment(run, &worktree)?;
     let directory = run
         .campaign
         .option_text("build_dir")

@@ -1,0 +1,293 @@
+{
+  "schema": "forge.no-python-behavior.v1",
+  "started_unix": 1793850170.5112,
+  "finished_unix": 1793850171.4336238,
+  "private_evidence_root": "/tmp/forge-program-no-python-1ebe7_4v",
+  "engine_bound_seconds": 120,
+  "outer_bound_seconds": 300,
+  "evidence_scope": "Matched behavior only; tiny hosts do not establish registered governance PASS. Python parent is orchestration, not the native child workflow.",
+  "child_environment": {
+    "PATH": "/tmp/forge-program-no-python-1ebe7_4v/allowlist",
+    "HOME": "/tmp/forge-program-no-python-1ebe7_4v/home",
+    "CARGO_HOME": "/tmp/forge-program-no-python-1ebe7_4v/cargo-home",
+    "TMPDIR": "/tmp/forge-program-no-python-1ebe7_4v/tmp",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "1",
+    "RUSTUP_TOOLCHAIN": "1.98.0",
+    "RUSTC": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/rustc",
+    "RUSTDOC": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/rustdoc",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_NO_LAZY_FETCH": "1"
+  },
+  "tools": {
+    "cargo": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/cargo",
+      "target": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+      "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+    },
+    "rustc": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/rustc",
+      "target": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+    },
+    "rustdoc": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/rustdoc",
+      "target": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "sha256": "20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"
+    },
+    "cargo-mutants": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/cargo-mutants",
+      "target": "/home/tim/.cargo/bin/cargo-mutants",
+      "sha256": "5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"
+    },
+    "git": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/git",
+      "target": "/usr/bin/git",
+      "sha256": "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"
+    },
+    "cc": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/cc",
+      "target": "/usr/bin/x86_64-linux-gnu-gcc-13",
+      "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"
+    },
+    "gcc": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/gcc",
+      "target": "/usr/bin/x86_64-linux-gnu-gcc-13",
+      "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"
+    },
+    "ld": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/ld",
+      "target": "/usr/bin/x86_64-linux-gnu-ld.bfd",
+      "sha256": "e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"
+    },
+    "as": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/as",
+      "target": "/usr/bin/x86_64-linux-gnu-as",
+      "sha256": "21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"
+    },
+    "ar": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/ar",
+      "target": "/usr/bin/x86_64-linux-gnu-ar",
+      "sha256": "6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"
+    },
+    "ranlib": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/ranlib",
+      "target": "/usr/bin/x86_64-linux-gnu-ranlib",
+      "sha256": "60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"
+    },
+    "strip": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/strip",
+      "target": "/usr/bin/x86_64-linux-gnu-strip",
+      "sha256": "0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"
+    },
+    "nm": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/nm",
+      "target": "/usr/bin/x86_64-linux-gnu-nm",
+      "sha256": "3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"
+    },
+    "objcopy": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/objcopy",
+      "target": "/usr/bin/x86_64-linux-gnu-objcopy",
+      "sha256": "9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"
+    },
+    "sh": {
+      "path": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/sh",
+      "target": "/usr/bin/dash",
+      "sha256": "86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"
+    }
+  },
+  "python_discovery": {
+    "python": null,
+    "python3": null
+  },
+  "parent_interpreter": "/usr/bin/python3",
+  "parent_scope": "Python orchestration only; outside measured Forge child PATH",
+  "isolation_scope": "Private child PATH allowlist; absolute interpreter access remains possible. This is not an OS sandbox.",
+  "binaries": {
+    "baseline": {
+      "source": "/home/tim/Projects/llm-forge/.git/forge-program-no-python-baseline-forge",
+      "copy": "/tmp/forge-program-no-python-1ebe7_4v/bin/baseline",
+      "sha256": "fe7145e55fe0c086d581d3a03cde187c87f30c2b966b3617318dc8f64693cd64",
+      "version": "forge 0.8.21 (git 966ae9a)"
+    },
+    "new": {
+      "source": "/home/tim/Projects/llm-forge/native/forge/target/release/forge",
+      "copy": "/tmp/forge-program-no-python-1ebe7_4v/bin/new",
+      "sha256": "72ca1693a5f60c53a0f09f102b5bcfc112733e3f26d2feb094e25f57b61b2c01",
+      "version": "forge 0.8.21 (git f8c1ae9)"
+    }
+  },
+  "rustc_version": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+  "cargo_version": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+  "engine_version": "cargo-mutants 27.1.0",
+  "git_version": "git version 2.43.0",
+  "completed": true,
+  "source_summary_sha256": "d499ff414ee85a062b6fa10c0b51a575b953dcf021092f1fa196ee0773b90961",
+  "cases": [
+    {
+      "fixture": "/tmp/forge-program-no-python-1ebe7_4v/baseline",
+      "new_binary": false,
+      "inspect_returncode": 3,
+      "inspection": {
+        "campaign_id": "fixture__cargo_20261104",
+        "engine_binary": null,
+        "mutation_engine": "cargo-mutants",
+        "readiness_reasons": [
+          "no Python interpreter: set [tool.conductor].snapshot_python, provide .venv/bin/python or put python3 on PATH"
+        ],
+        "source": [
+          "src/a.rs",
+          "src/b.rs"
+        ],
+        "status": "NOT_READY",
+        "survivor_baseline": [],
+        "test_argv": [
+          "cargo",
+          "test",
+          "--manifest-path",
+          "Cargo.toml",
+          "--package",
+          "coverage_fixture"
+        ]
+      },
+      "run_returncode": 4,
+      "generated_manifest": "/tmp/forge-program-no-python-1ebe7_4v/baseline/campaigns/fixture__cargo_20261104.json",
+      "generated_manifest_sha256_before": "674cfe4ef74753346bcba252fed288639c35f47612ed9f7fed30fc8429955ef3",
+      "generated_manifest_sha256_after": "674cfe4ef74753346bcba252fed288639c35f47612ed9f7fed30fc8429955ef3",
+      "live_files_before": {
+        ".gitignore": "509347ba61ec7e2dadaab432ab8076f021afd3742cc8f9cdf4912447443cc255",
+        "Cargo.toml": "06b611ede65ca275bf242c1ef53f774de13fe79920ad68512e69d01ccefee672",
+        "pyproject.toml": "350f6cd01fa47c6532815bdd8d02018ef2e45d9d9f10fd676a7f1174b7873c0b",
+        "src/lib.rs": "e7169590e3ea22dffef70fb5a346c7740bb2a9479dfb6bb596eebe407c752fd1",
+        "src/a.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "src/b.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "tests/contract.rs": "a162dd0379c88a28fef487b593e0e8f55d7390420bae773afe540a41c654eac0",
+        "Cargo.lock": "9014e50a19cfcbc8cec20afc842f68dcd8cf5cee51f8e7a358c3cd08445f2972"
+      },
+      "interpreter_selection": "missing; refused before mutation",
+      "checks_passed": true,
+      "live_files_after": {
+        ".gitignore": "509347ba61ec7e2dadaab432ab8076f021afd3742cc8f9cdf4912447443cc255",
+        "Cargo.toml": "06b611ede65ca275bf242c1ef53f774de13fe79920ad68512e69d01ccefee672",
+        "pyproject.toml": "350f6cd01fa47c6532815bdd8d02018ef2e45d9d9f10fd676a7f1174b7873c0b",
+        "src/lib.rs": "e7169590e3ea22dffef70fb5a346c7740bb2a9479dfb6bb596eebe407c752fd1",
+        "src/a.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "src/b.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "tests/contract.rs": "a162dd0379c88a28fef487b593e0e8f55d7390420bae773afe540a41c654eac0",
+        "Cargo.lock": "9014e50a19cfcbc8cec20afc842f68dcd8cf5cee51f8e7a358c3cd08445f2972"
+      },
+      "failures": [],
+      "refusal": {
+        "error": "no Python interpreter: set [tool.conductor].snapshot_python, provide .venv/bin/python or put python3 on PATH",
+        "status": "REFUSED"
+      }
+    },
+    {
+      "fixture": "/tmp/forge-program-no-python-1ebe7_4v/new",
+      "new_binary": true,
+      "inspect_returncode": 0,
+      "inspection": {
+        "campaign_id": "fixture__cargo_20261104",
+        "engine_binary": "/tmp/forge-program-no-python-1ebe7_4v/allowlist/cargo-mutants",
+        "mutation_engine": "cargo-mutants",
+        "readiness_reasons": [],
+        "source": [
+          "src/a.rs",
+          "src/b.rs"
+        ],
+        "status": "READY",
+        "survivor_baseline": [],
+        "test_argv": [
+          "cargo",
+          "test",
+          "--manifest-path",
+          "Cargo.toml",
+          "--package",
+          "coverage_fixture"
+        ]
+      },
+      "run_returncode": 0,
+      "generated_manifest": "/tmp/forge-program-no-python-1ebe7_4v/new/campaigns/fixture__cargo_20261104.json",
+      "generated_manifest_sha256_before": "674cfe4ef74753346bcba252fed288639c35f47612ed9f7fed30fc8429955ef3",
+      "generated_manifest_sha256_after": "db4dde9d99706a053eeb0c0580bd486be634c867daaa400880e6c57fe9016e93",
+      "live_files_before": {
+        ".gitignore": "509347ba61ec7e2dadaab432ab8076f021afd3742cc8f9cdf4912447443cc255",
+        "Cargo.toml": "06b611ede65ca275bf242c1ef53f774de13fe79920ad68512e69d01ccefee672",
+        "pyproject.toml": "350f6cd01fa47c6532815bdd8d02018ef2e45d9d9f10fd676a7f1174b7873c0b",
+        "src/lib.rs": "e7169590e3ea22dffef70fb5a346c7740bb2a9479dfb6bb596eebe407c752fd1",
+        "src/a.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "src/b.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "tests/contract.rs": "a162dd0379c88a28fef487b593e0e8f55d7390420bae773afe540a41c654eac0",
+        "Cargo.lock": "9014e50a19cfcbc8cec20afc842f68dcd8cf5cee51f8e7a358c3cd08445f2972"
+      },
+      "interpreter_selection": null,
+      "checks_passed": true,
+      "receipt": "/tmp/forge-program-no-python-1ebe7_4v/new/evidence/result.json",
+      "receipt_sha256": "d66346a4f8b02def959cd0958b8b519bed8cc82d035454cf64ea104002f9b072",
+      "receipt_status": "PASS",
+      "accounting": {
+        "censored": 0,
+        "completed": 2,
+        "failed": 0,
+        "planned": 2,
+        "unstarted": 0
+      },
+      "source_coverage": {
+        "complete": true,
+        "missing": [],
+        "schema_version": 1,
+        "scored_by_source": {
+          "src/a.rs": 1,
+          "src/b.rs": 1
+        }
+      },
+      "snapshot": {
+        "commit": "0095d10c598f1bea06cf67406c8e52993599f5bb",
+        "included_untracked": [],
+        "removed": true,
+        "root": "/tmp/forge-program-no-python-1ebe7_4v/tmp/llm-orchestrator-snapshot-217n4A"
+      },
+      "native_runner": {
+        "compiled_git_commit": "f8c1ae9406e6e1f6d55c3bb15a26b3ef57c918b6",
+        "compiled_source_sha256": "ab126ee0a0a7ba37514fbbe65550cd2df0f35d941422f45b3e0c7648545053bb",
+        "executable_sha256": "72ca1693a5f60c53a0f09f102b5bcfc112733e3f26d2feb094e25f57b61b2c01",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": false
+      },
+      "live_files_after": {
+        ".gitignore": "509347ba61ec7e2dadaab432ab8076f021afd3742cc8f9cdf4912447443cc255",
+        "Cargo.toml": "06b611ede65ca275bf242c1ef53f774de13fe79920ad68512e69d01ccefee672",
+        "pyproject.toml": "350f6cd01fa47c6532815bdd8d02018ef2e45d9d9f10fd676a7f1174b7873c0b",
+        "src/lib.rs": "e7169590e3ea22dffef70fb5a346c7740bb2a9479dfb6bb596eebe407c752fd1",
+        "src/a.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "src/b.rs": "01518b2dffbde9a7fe0fef103ef1ad7b6300bdc674f6bccc21bd91880dc8b3ba",
+        "tests/contract.rs": "a162dd0379c88a28fef487b593e0e8f55d7390420bae773afe540a41c654eac0",
+        "Cargo.lock": "9014e50a19cfcbc8cec20afc842f68dcd8cf5cee51f8e7a358c3cd08445f2972"
+      },
+      "failures": [],
+      "baseline_result": {
+        "returncode": 0,
+        "duration_seconds": 0.141575,
+        "timed_out": false
+      },
+      "engine_result": {
+        "returncode": 0,
+        "duration_seconds": 0.382579,
+        "timed_out": false
+      },
+      "mutant_outcomes": {
+        "KILLED": 2,
+        "SURVIVED": 0,
+        "TIMED_OUT": 0,
+        "UNVIABLE": 0,
+        "ERROR": 0
+      }
+    }
+  ]
+}

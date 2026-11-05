@@ -338,3 +338,24 @@ fn the_summary_carries_what_the_completion_check_reads() {
         })
     );
 }
+
+#[test]
+fn cargo_environment_exports_only_the_selected_optional_guest() {
+    let dir = tempfile::tempdir().unwrap();
+    for interpreter in [None, Some("/selected/python")] {
+        crate::mutation_run_test_support::with_run(
+            dir.path(),
+            interpreter,
+            json!({"environment":{"CONDUCTOR_SNAPSHOT_PYTHON":"/stale/campaign","KEEP":"yes"}}),
+            |run| {
+                let bound = environment(run);
+                assert_eq!(
+                    bound.get("CONDUCTOR_SNAPSHOT_PYTHON").map(String::as_str),
+                    interpreter
+                );
+                assert_eq!(bound["KEEP"], "yes");
+                assert!(bound.contains_key("PATH"));
+            },
+        );
+    }
+}

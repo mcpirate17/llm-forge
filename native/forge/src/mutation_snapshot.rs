@@ -114,18 +114,25 @@ fn configured_extra_suffixes(repo: &Path) -> Result<BTreeSet<String>, String> {
     Ok(suffixes)
 }
 
-/// The interpreter a snapshot exports for tests that drive Python: the host's
-/// choice, then its own venv, then `python3` from PATH.
-pub fn snapshot_python(repo: &Path) -> Result<String, String> {
+/// Explicit optional Python guest; native engines never discover one implicitly.
+pub fn configured_snapshot_python(repo: &Path) -> Result<Option<String>, String> {
     let config = project_config::load(repo)?;
     if let Some(raw) = config.conductor.get("snapshot_python") {
         return raw
             .as_str()
             .filter(|text| !text.trim().is_empty())
-            .map(str::to_string)
+            .map(|value| Some(value.to_string()))
             .ok_or_else(|| {
                 "[tool.conductor].snapshot_python must be a path to a Python interpreter".into()
             });
+    }
+    Ok(None)
+}
+
+/// Fest requires the configured guest, its host venv, or `python3` from PATH.
+pub fn snapshot_python(repo: &Path) -> Result<String, String> {
+    if let Some(interpreter) = configured_snapshot_python(repo)? {
+        return Ok(interpreter);
     }
     let venv = repo.join(".venv/bin/python");
     if venv.is_file() {

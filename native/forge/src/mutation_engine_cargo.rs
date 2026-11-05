@@ -281,9 +281,8 @@ fn read_report(output: &Path) -> Result<Value, String> {
 
 /// What every cargo run in a snapshot inherits, and nothing it shouldn't.
 fn environment(run: &EngineRun) -> BTreeMap<String, String> {
-    let mut bound = run.campaign.environment.clone();
+    let mut bound = run.guest_environment(&run.campaign.environment);
     bound.extend([
-        run.snapshot_python_entry(),
         ("PATH".to_string(), env::var("PATH").unwrap_or_default()),
         ("CARGO_TERM_COLOR".to_string(), "never".to_string()),
     ]);

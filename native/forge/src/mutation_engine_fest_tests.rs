@@ -320,3 +320,28 @@ fn only_a_clean_exit_is_a_measurement() {
     );
     assert!(require_clean_exit(&exited(Some(0), true)).is_err());
 }
+
+#[test]
+fn fest_requires_a_guest_and_keeps_pinned_python_commands_and_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::mutation_run_test_support::with_run(dir.path(), None, json!({}), |run| {
+        assert!(
+            matches!(execute(run, "/no/fest"), Err(crate::mutation_campaign::Stop::Refused(message))
+            if message.contains("requires a Python guest"))
+        );
+    });
+    crate::mutation_run_test_support::with_run(
+        dir.path(),
+        Some("/selected/bin/python"),
+        json!({}),
+        |run| {
+            let python = run.require_python().unwrap();
+            assert_eq!(coverage_argv(run.campaign, python)[0], python);
+            let bound = run.guest_environment(&environment(run.campaign, dir.path(), python));
+            assert_eq!(bound["CONDUCTOR_SNAPSHOT_PYTHON"], python);
+            assert_eq!(bound["VIRTUAL_ENV"], "/selected");
+            assert!(bound["PATH"].starts_with("/selected/bin:"));
+            assert!(bound["PYTEST_ADDOPTS"].contains(PLUGIN_NAME));
+        },
+    );
+}

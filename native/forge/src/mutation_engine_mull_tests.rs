@@ -387,3 +387,28 @@ fn a_report_from_a_failed_runner_is_refused() {
         "mull-runner failed on suite (rc=None): plugin mismatch"
     );
 }
+
+#[test]
+fn mull_environment_exports_only_the_selected_optional_guest() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::mutation_run_test_support::write(dir.path(), "src/norm.cpp", "int f() { return 1; }\n");
+    for interpreter in [None, Some("/selected/python")] {
+        crate::mutation_run_test_support::with_run(
+            dir.path(),
+            interpreter,
+            json!({"mutation_engine":"mull", "language":"cpp",
+                "generator":{"source":["src/norm.cpp"],"run_timeout_seconds":60},
+                "source_sha256":{"src/norm.cpp":"0".repeat(64)},
+                "environment":{"CONDUCTOR_SNAPSHOT_PYTHON":"/stale/campaign","KEEP":"yes"}}),
+            |run| {
+                let bound = environment(run, dir.path()).unwrap();
+                assert_eq!(
+                    bound.get("CONDUCTOR_SNAPSHOT_PYTHON").map(String::as_str),
+                    interpreter
+                );
+                assert_eq!(bound["KEEP"], "yes");
+                assert!(Path::new(&bound["MULL_CONFIG"]).is_file());
+            },
+        );
+    }
+}

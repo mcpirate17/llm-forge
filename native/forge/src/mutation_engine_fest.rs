@@ -341,17 +341,18 @@ fn require_clean_exit(result: &CommandResult) -> Result<(), String> {
 
 /// Collect coverage, generate and run the mutants, fill in the receipt.
 pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
+    let interpreter = run.require_python()?;
     require_no_drift(run.campaign, run.worktree)?;
     let worktree = run.worktree.to_path_buf();
     let timeout = run.campaign.run_timeout_seconds;
     let coverage = worktree.join(".coverage");
-    let attribution_environment = environment(run.campaign, &worktree, run.interpreter);
+    let attribution_environment = environment(run.campaign, &worktree, interpreter);
     let mut bound = attribution_environment.clone();
     bound.insert(
         "COVERAGE_FILE".into(),
         coverage.to_string_lossy().into_owned(),
     );
-    let baseline_argv = coverage_argv(run.campaign, run.interpreter);
+    let baseline_argv = coverage_argv(run.campaign, interpreter);
     let (baseline, _) = run.run(&baseline_argv, &worktree, timeout, &bound, &[])?;
     run.note_baseline(&baseline, &baseline_argv)?;
     if !coverage.is_file() {
@@ -361,7 +362,7 @@ pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
         )
         .into());
     }
-    let toml = config(run.campaign, run.interpreter)?;
+    let toml = config(run.campaign, interpreter)?;
     fs::write(worktree.join("fest.toml"), toml)
         .map_err(|error| format!("cannot write fest.toml: {error}"))?;
     let mutated: Vec<PathBuf> = run
