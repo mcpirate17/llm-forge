@@ -306,7 +306,22 @@ non-JSON refusals; public Fest execution remains unsupported. Scorer/parser
 unit tests retain protocol-specific outcome assertions. The first migrated run
 had one incorrect baseline-status expectation; after correcting it to
 BASELINE_FAILED, all cases passed with zero ignored. Strict Clippy and size
-limits passed. A fresh full publication gate is still required.
+limits passed. The repeat full gate and local-verify passed at
+`0674d34b72e84e301e7a8927221a1bd86980573a`: all 18 steps, 4,623 passing
+executions, zero failures and 172 ignored across 177 harnesses. Receipt SHA-256:
+`3dc97c137d20aefbbabdc3139980c938e74d85634e69a884cfe27f3919ee9d47`.
+All 45 explicit release executions then passed with zero ignored: 15 CLI,
+two Fest adapter, five runner, eight attribution, one guest-environment and
+14 execution-owner cases. These overlap default suites and are not a unique-test
+total. Final release automatic-engine trials from that same source repeated the
+ordinary 14/14 check result and the Cargo-value 12 completed/two unstarted result;
+the compact artifact retains all 11 trials. Native binary SHA-256:
+`00fe167a21c5084a1f9a523d1776fb3980e01c8df52ba28dd232b1f1a564f06f`;
+compiled source fingerprint:
+`974a19a1506ad33281875d7b8d19f6a8b1c9bdd3c585d692e7273e63e6e4a39a`.
+Publication revalidates the committed documentation/evidence update against the
+same production implementation. Global installation and client activation have
+not changed.
 
 Read-only review also identified a pre-existing supporting-input freshness gap,
 tracked in [#197](https://github.com/mcpirate17/llm-forge/issues/197): ordinary

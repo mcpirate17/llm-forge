@@ -369,7 +369,13 @@ from these fixtures. The first full publication gate at `abebaa1` failed the
 legacy CLI fixture tests (28 failures); the other 17 steps passed. That is not
 release validation. See the [current status](roadmap.md) for the preserved receipt
 and test migration. The migrated suite subsequently passed all 15 CLI cases
-(including 10 explicitly delegated cases); a new full gate remains required.
+(including 10 explicitly delegated cases). The repeat full gate and local-verify
+passed at `0674d34` (18 steps; 4,623 passing executions, zero failures and 172
+ignored across 177 harnesses); 45 explicit release executions then passed with
+zero ignored. Fresh ordinary and Cargo-value automatic trials reproduced the
+recorded outcomes from that source. The compact evidence retains all 11 attempts.
+These are correctness and execution-validation results, not measured workflow
+speed or agent effectiveness.
 
 Matched read-only release checks compare `015e66e` with `adec2a6`, using the same
 binary pathname, command, input file, environment and unchanged 10% regression
