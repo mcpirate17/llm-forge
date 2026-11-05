@@ -1,9 +1,9 @@
 # Measuring performance
 
-## Current program evidence — 2026-11-04
+## Current program evidence — 2026-11-05
 
 This is the canonical performance and effectiveness report; current mission status
-and ordered continuation are in [the roadmap](roadmap.md#current-mission-checkpoint--2026-11-04).
+and ordered continuation are in [the roadmap](roadmap.md#current-mission-checkpoint--2026-11-05).
 Source baseline is `9117c2fb6436251d0de50038db85ef7fbb81e4b3`; the repair landed in
 [PR #185](https://github.com/mcpirate17/llm-forge/pull/185). Pre-change observations,
 repaired working-tree measurements and matched binary comparisons are separated
@@ -346,6 +346,36 @@ measurements; native relocation's recorded slowdown remains visible rather than
 being generalized into a language-performance claim.
 
 ## Benchmark and comparison contract
+
+### Ordinary Cargo receipt freshness — 2026-11-05
+
+The bounded [before-fix observations](../research/performance/forge-program-20261105-supporting-input-freshness.json)
+and [fixed release validation](../research/performance/forge-program-20261105-supporting-input-validation.json)
+measure correctness of later receipt admission. Each fixture uses a real automatic
+2-kill/PASS campaign. Selected mutation source/test, campaign and receipt bytes stay
+fixed while authored supporting inputs change independently.
+
+| Supporting input changed | Before, live / committed | Fixed, live / committed | Fixed after exact restoration |
+| --- | --- | --- | --- |
+| Unpinned library bytes | Accepted / accepted | Rejected / rejected | Accepted / accepted |
+| Cargo edition | Accepted / accepted | Rejected / rejected | Accepted / accepted |
+| Cargo.lock format version | Unmeasured | Rejected / rejected | Accepted / accepted |
+| Added Rust binary | Accepted / accepted | Rejected / rejected | Accepted / accepted |
+
+The fixed release is `9451943`, binary SHA-256
+`019c15b9baa08aa5fb4f49efc82c383cc6286564986b0e0da962035e6ab060ef`.
+All 43 phases and 114 commands completed, including expected nonzero refusals,
+without failures or censored/unstarted work. Baseline and restoration require both CLEAN and receipt acceptance; all
+eight drift checks require the specific supporting-input change refusal. Owned
+snapshot/cgroup absence and evidence hashes were independently checked.
+
+This is discovery-input freshness evidence. The unused helper and lock-format
+probes do not demonstrate changed program behavior or dependency resolution.
+Non-Rust data and full compiler/environment closure are unmeasured. The experiment
+does not measure a latency distribution, incremental scan cost, CPU/RSS, model
+usage or agent productivity. No speed or cost improvement is attributed to it.
+The [engineering status](roadmap.md) tracks the separate release checks and their
+failures; this successful experiment alone is not release validation.
 
 ### Ordinary Cargo confinement update — 2026-11-05
 

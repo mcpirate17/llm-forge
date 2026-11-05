@@ -406,11 +406,14 @@ fn confined_cargo_cli_refuses_snapshot_source_and_test_drift() {
     ] {
         let mut host = CargoFixture::new(cargo_report("Success", &["CaughtMutant"]), 0, 0);
         host.mode(action, 10);
+        let original = fs::read_to_string(host.repo.join(path)).unwrap();
         let run = host.run();
-        assert_eq!(run.code, Some(REFUSED), "{:?}", run.printed);
-        assert_eq!(run.receipt["status"], "ERROR");
-        assert!(run.receipt["identity_check"]["snapshot_drift"][path].is_string());
-        assert_eq!(run.receipt["snapshot"]["removed"], true);
+        let retained = assert_held_drift_refused(&host, &run);
+        assert_eq!(fs::read_to_string(host.repo.join(path)).unwrap(), original);
+        assert_eq!(
+            fs::read_to_string(retained.join("worktree").join(path)).unwrap(),
+            format!("{original}// changed\n")
+        );
     }
 }
 
@@ -487,10 +490,15 @@ fn confined_cargo_cli_refuses_live_source_drift() {
     )
     .unwrap();
     let run = host.finish(child);
-    assert_eq!(run.code, Some(REFUSED), "{:?}", run.printed);
-    assert_eq!(run.receipt["status"], "ERROR");
-    assert!(run.receipt["identity_check"]["repository_drift"]["src/lib.rs"].is_string());
-    assert_eq!(run.receipt["snapshot"]["removed"], true);
+    let retained = assert_held_drift_refused(&host, &run);
+    assert_eq!(
+        fs::read_to_string(host.repo.join("src/lib.rs")).unwrap(),
+        "pub fn value() -> bool { true }\n"
+    );
+    assert_eq!(
+        fs::read_to_string(retained.join("worktree/src/lib.rs")).unwrap(),
+        "pub fn value() -> bool { false }\n"
+    );
 }
 
 #[test]
@@ -600,6 +608,53 @@ fn confined_cargo_cli_rejects_unexplained_engine_exits() {
         assert_eq!(run.code, Some(1), "{:?}", run.printed);
         assert_eq!(run.receipt["status"], "INCOMPLETE");
     }
+}
+
+/// Held-input drift is discovered before the later identity report. The owner
+/// has completed its groups, but the unverified snapshot remains for inspection.
+fn assert_held_drift_refused(host: &CargoFixture, run: &Run) -> PathBuf {
+    assert_eq!(run.code, Some(REFUSED), "{:?}", run.printed);
+    assert_eq!(run.receipt["status"], "ERROR");
+    assert!(run.receipt["error"]
+        .as_str()
+        .unwrap()
+        .contains("input identity changed"));
+    assert!(run.receipt["execution_verification_error"]
+        .as_str()
+        .unwrap()
+        .contains("input identity changed"));
+    assert!(run.receipt["identity_check"].is_null());
+    assert_eq!(run.receipt["snapshot"]["removed"], false);
+    assert_eq!(
+        run.receipt["snapshot"]["retained_reason"],
+        "process cleanup or execution input verification is incomplete"
+    );
+    assert_eq!(run.receipt["process_cleanup"]["complete"], true);
+    assert_eq!(run.receipt["process_cleanup"]["commands_observed"], 2);
+    let commands = run.receipt["process_commands"].as_array().unwrap();
+    assert_eq!(commands.len(), 2);
+    for row in commands {
+        assert_eq!(row["state"], "observed");
+        assert_eq!(row["confinement"]["cleanup_complete"], true);
+        assert!(absent(Path::new(
+            row["confinement"]["resources"]["path"].as_str().unwrap()
+        )));
+    }
+    let scratch = host
+        .root
+        .as_ref()
+        .unwrap()
+        .path()
+        .join("scratch")
+        .canonicalize()
+        .unwrap();
+    let root = PathBuf::from(run.receipt["snapshot"]["root"].as_str().unwrap());
+    assert_eq!(root.canonicalize().unwrap(), root);
+    assert_eq!(root.parent(), Some(scratch.as_path()));
+    assert!(fs::symlink_metadata(root.join("worktree"))
+        .unwrap()
+        .is_dir());
+    root
 }
 
 fn absent(path: &Path) -> bool {

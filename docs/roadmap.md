@@ -1,6 +1,6 @@
 # llm-forge roadmap: native execution and agent productivity
 
-## Current mission checkpoint — 2026-11-04
+## Current mission checkpoint — 2026-11-05
 
 Forge supplies bounded native tools to existing coding agents. The mission is to
 improve verified task outcomes, context use and execution cost while preserving
@@ -24,7 +24,7 @@ Paths below are relative to `native/forge/src/` unless qualified.
 | Agent intelligence | `route.rs`, `ledger/`, `local_clerk/generate.rs`, `workspace_runtime_eval.rs`; existing client/model remains the agent | Routing, accounting and clerical generation exist. Runtime matrix completeness is not task-quality evaluation; no matched agent-success study | Retain accounting and deterministic tools; improve real-task controls. Local models are clerical only and cannot approve, authorize, promote or launch work |
 | Context and tokens | `context_tools.rs`, `prompt_contract.rs`, `context_window.rs`, `context_store.rs`, `tokenizer.rs`, `context_telemetry.rs`; `conductor-native/src/context_projection.rs` | Composition, deferred catalog lookup, exact supplied-text counts and recoverable compaction exist. New literal prompt inspection/checklists share CLI/MCP implementation; automatic strengthening and tool recommendations remain incomplete. Historical reductions omit provider envelopes, rereads and task-quality effects | Retain these primitives; measure actual provider usage and recovery cost before expanding compression |
 | CLI | `main.rs`, `dispatch.rs`, `candidate_cli.rs`, `project.rs` | Native command dispatch and hook adapters exist; matched startup/signature comparisons remain within the 10% regression budget. Host adoption requires independent verification | Improve readiness and exact workload profiling; retire duplicate interpreted callers only after parity and caller migration |
-| MCP server | `harness_mcp.rs`, `harness_mcp_protocol.rs`, `harness_catalog.rs`, `harness_transport.rs`, `mcp_setup.rs` | Tools discovery/calls, schema validation, bounded concurrency and operator-selected capabilities exist. Custom wire integration tests exist; actual-client selection and complete transport cost remain unmeasured | Retain the native service/adapter split; improve client setup, lifecycle and actual-client validation |
+| MCP server | `harness_mcp.rs`, `harness_mcp_protocol.rs`, `harness_catalog.rs`, `harness_transport.rs`, `mcp_setup.rs` | Tools discovery/calls, schema validation, bounded concurrency and operator-selected capabilities exist. Custom wire integration tests and matched stdio adapter/CLI measurements exist; actual-client selection and agent outcomes remain unmeasured | Retain the native service/adapter split; improve client setup, lifecycle and actual-client validation |
 | MCP client and prompts | `src/conductor/crg_mcp_probe.py` is a narrow diagnostic client; `context_tools.rs` searches supplied catalog snapshots | No reusable native outbound MCP session or MCP prompts/resources methods found. Existing prompt composition is not protocol prompt discovery | Build the authorized outbound integration and deterministic prompt/tool layer using composition/schema/catalog APIs; keep protocol prompt discovery distinct |
 | Performance | `performance.rs`, `performance_identity.rs`, `conductor-native/src/performance_receipt.rs`, `native/forge/benches/` | Sealed matched-receipt comparisons and component benchmarks exist. Current CLI baselines and historical retrieval/projection evidence do not establish productivity | Retain receipt integrity; improve transport/task measurements and include preparation/resource costs |
 | Quality and tests | `native/forge/tests/`, `native/conductor-native/tests/`, `local_check.rs`, `sweep.rs`, `mutation_run.rs` | Full local checks and verification passed the merged repair tree; live-service tests remain opt-in. No new clean-host sweep or real-client validation is implied | Retain ordinary tests and automatic scoped mutation engines; verify each exact committed tree before landing |
@@ -60,11 +60,13 @@ this audit.
 
 ### Ordered continuation and acceptance criteria
 
-The next correctness priority is [#192](https://github.com/mcpirate17/llm-forge/issues/192):
-legacy mutation runners must prove descendant cleanup before snapshot deletion.
-An execution-owner capture prerequisite is implemented on the active branch and
-tested; the runner migration is still in progress. It takes precedence over the
-product backlog below.
+The descendant-cleanup and exact-test-target repairs landed in PR #198. The
+current increment addresses [#197](https://github.com/mcpirate17/llm-forge/issues/197):
+ordinary Cargo discovery-input freshness now passes the real automatic-engine
+drift experiment below; final publication checks remain pending. Restoring the
+broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
+requires independently bound dependency manifests as well as confined execution.
+The existing root-only profile cannot yet execute Forge's own workspace campaigns.
 
 1. Extend the shared prompt/tool layer from the bounded literal inspection slice
    described below: useful tool recommendations and eligible strengthening need
@@ -327,25 +329,49 @@ PR #198 merged as `42ade902278121f7c7cbbd9c59577ea2b505dd8f`; its tree
 The temporary branch was retired. Global installation and client activation
 have not changed.
 
-Read-only review also identified a pre-existing supporting-input freshness gap,
-tracked in [#197](https://github.com/mcpirate17/llm-forge/issues/197): ordinary
-receipts bind selected source/test files, but later admission does not bind all
-unselected Rust inputs, Cargo manifests or added relevant files. Run-time
-holdings are not a later freshness guarantee. A fresh automatic PASS fixture then
-completed 32 diagnostic checks: an unused helper appended to `src/lib.rs`, a Cargo
-edition change and a new Rust binary file each left the original receipt accepted
-by live and committed corpus admission, with selected source/test/receipt bytes
-held unchanged. Exact authored restoration returned to the original tree after
-each probe. [Reproduction inputs and observations](../research/performance/forge-program-20261105-supporting-input-freshness.json)
-preserve native CLI arguments, hashes and raw log references. These establish an
-input-freshness gap, not demonstrated behavior changes, compiler-input closure or
-whole-candidate approval. Cargo.lock drift is not yet probed. This correctness
-prerequisite comes before broader dependency support in #196. The active next
-increment binds the supported Rust/Cargo discovery inventory across execution
-and later live/committed receipt admission. It does not promise total compiler
-input or runtime data closure; non-Rust data remains outside that scope.
+**Active [#197](https://github.com/mcpirate17/llm-forge/issues/197):** ordinary
+native receipts now bind a versioned Rust/Cargo discovery inventory separately
+from the selected mutation source/test pins. Execution holds host and snapshot
+inputs; later native corpus and candidate checks independently reconstruct the
+inventory. Each native corpus row must also match its independently loaded
+campaign, and compact receipt details cannot change its runner identity.
 
-The first full gate at `941578b` passed all test steps (4,548 passing executions,
+The [before-fix experiment](../research/performance/forge-program-20261105-supporting-input-freshness.json)
+completed 32 checks at `adec2a6`: unpinned library bytes, Cargo edition and a new
+Rust binary each left the original receipt accepted in live and committed views.
+The [fixed release experiment](../research/performance/forge-program-20261105-supporting-input-validation.json)
+at `9451943c939656ff98176ae96e52b8c345a5e7ee` completed all 43 phases and 114
+commands, including expected nonzero refusals, with zero failed, censored or
+unstarted work. A real automatic campaign
+killed both mutants and produced PASS. Both admission modes accepted the baseline,
+rejected all four independent changes (adding Cargo.lock format drift), and
+accepted every exact restoration. Selected source, test, campaign and receipt
+bytes remained fixed. Independent review rehashed all logs, tools and fixture
+pins and observed the snapshot and both cgroups absent. Binary SHA-256:
+`019c15b9baa08aa5fb4f49efc82c383cc6286564986b0e0da962035e6ab060ef`;
+source fingerprint:
+`bc35057e28e79848800069e7c463fbc54e2a3ee3acfd7ca071c28b13e6b70b0c`.
+
+Focused tests passed 178 core and 308 Forge cases (28 Forge cases ignored in that
+invocation); strict Clippy and size limits passed. Independent review found and
+closed a shared-capture/per-row binding gap and a compact-receipt runner-identity
+conflict. The first explicit delegated CLI run passed 13 and failed two assertions:
+the stronger held-input check refuses drift before the old diagnostic and retains
+the snapshot. The revised tests assert exact drift, explicit refusal, retained
+snapshot ownership and completed cgroup cleanup. The rerun passed all 15 CLI
+cases with zero ignored; all five explicit release runner cases then passed,
+including detached sessions, timeout, cancellation, and retention on unknown
+cleanup. Strict Clippy and size limits passed. The full publication gate remains
+pending.
+
+This establishes bounded input freshness, not changed program behavior, full
+compiler/runtime-data closure, execution authenticity or whole-candidate approval.
+Non-Rust data remains outside `cargo-root-rust-discovery-v1`. Older ordinary native
+receipts lacking the identity remain readable but do not satisfy current admission.
+No workflow-speed, token-cost or productivity improvement is measured by this
+experiment. Dependency restoration remains separate work in #196.
+
+During #186, the first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
 two lints. The fixes preserve behavior, passed independent review and focused core
 tests/Clippy, and passed the fresh full publication gate above. Its receipt is

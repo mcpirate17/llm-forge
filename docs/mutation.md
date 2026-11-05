@@ -310,6 +310,9 @@ inputs invalidate the identity. Selected mutation sources and tests retain their
 separate campaign pins. The runner holds and compares host and snapshot inputs,
 and native live corpus, committed corpus and candidate validation independently
 reconstruct the discovery inventory.
+If held execution inputs drift during a run, the runner refuses before further
+commands and retains the snapshot for inspection even after owned process cleanup
+completes. The receipt records the input-verification failure and retained path.
 
 Older ordinary native receipts without this binding remain readable, but cannot
 satisfy current native admission; regenerate them through the automatic runner.
