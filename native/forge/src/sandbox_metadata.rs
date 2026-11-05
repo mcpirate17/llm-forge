@@ -46,7 +46,10 @@ pub(super) fn operation(request: &libc::seccomp_notif) -> io::Result<(Target, u3
         ),
         _ => return Err(denied()),
     };
-    if mode & !0o777 != 0 {
+    // std::fs::copy passes st_mode, including the source file type. Carry only
+    // recognized type bits to the broker, which checks the pinned target type.
+    let kind = mode & u64::from(libc::S_IFMT);
+    if mode & !(0o777 | u64::from(libc::S_IFMT)) != 0 || !matches!(kind, 0 | 0o100000 | 0o040000) {
         return Err(denied());
     }
     Ok((target, mode as u32))

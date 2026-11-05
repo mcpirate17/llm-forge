@@ -99,7 +99,11 @@ impl Broker {
         // on FIFOs. Validate the notification again after resolving its thread ID.
         let file = super::metadata::open(&self.root, &self.path, request, target)?;
         valid(listener, request.id)?;
-        self.check_file(&file)?;
+        let actual_kind = self.check_file(&file)?;
+        let requested_kind = mode & libc::S_IFMT;
+        if requested_kind != 0 && requested_kind != actual_kind {
+            return Err(denied());
+        }
         // The pinned descriptor is the operation's target; changing the child's
         // fd table or pathname cannot redirect this operation after validation.
         if unsafe {
@@ -107,7 +111,7 @@ impl Broker {
                 libc::SYS_fchmodat2,
                 file.as_raw_fd(),
                 c"".as_ptr(),
-                mode,
+                mode & 0o777,
                 libc::AT_EMPTY_PATH,
             )
         } != 0
@@ -117,7 +121,7 @@ impl Broker {
         Ok(())
     }
 
-    fn check_file(&self, file: &File) -> io::Result<()> {
+    fn check_file(&self, file: &File) -> io::Result<u32> {
         let metadata = file.metadata()?;
         if !(metadata.is_file() || metadata.is_dir())
             || (metadata.is_file() && metadata.nlink() != 1)
@@ -142,7 +146,7 @@ impl Broker {
         if (inside.dev(), inside.ino()) != (metadata.dev(), metadata.ino()) {
             return Err(denied());
         }
-        Ok(())
+        Ok(metadata.mode() & libc::S_IFMT)
     }
 }
 
