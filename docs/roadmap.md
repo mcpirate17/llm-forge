@@ -254,16 +254,47 @@ local-verify passed: 4,636 passing executions, zero failures and 145 ignored acr
 The capture is point-in-time and not an atomic filesystem snapshot. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 
-**Active #192 prerequisite:** the existing confined execution owner now has a
-complete-output mode with separate 16 MiB stdout and 1 MiB stderr limits. Overflow
-still fails through owned cleanup; valid UTF-8 reuses its buffer and invalid bytes
-retain the legacy replacement behavior. Focused capture tests passed (42 passing,
-four ignored), all 15 pipe-observer tests passed, and all 14 explicitly delegated
-execution-owner integration tests passed with zero ignored. These suites overlap;
-they are not a unique-test count. Strict Clippy passed. This establishes the capture
-prerequisite only: ordinary engine routing, explicit grants and runner-level
-detached-descendant/disposition tests remain unfinished. No full publication gate
-has run for this active increment.
+**Active [#192](https://github.com/mcpirate17/llm-forge/issues/192) and
+[#195](https://github.com/mcpirate17/llm-forge/issues/195):** ordinary native
+execution now requires pinned operator grants and the shared sandbox/cgroup
+command owner. The initial supported profile is a dependency-free root Cargo
+package with one explicit integration target. Unsupported Fest, Mull, workspace
+and dependency profiles refuse before payload launch; restoring those profiles
+under the same guarantees is tracked in
+[#196](https://github.com/mcpirate17/llm-forge/issues/196). Current native PASS
+admission requires consistent owned cleanup and snapshot removal. Historical
+process-group-only receipts remain readable but do not meet that admission.
+See [execution grants](mutation.md#ordinary-cargo-execution-grants).
+
+The clean release built from `adec2a6` completed both real automatic-engine
+fixtures: the declared killer test produced two killed mutants and PASS; the
+extra, unpinned killer target produced two survivors and RATCHET_HELD, which is
+not PASS. The earlier release control incorrectly produced two kills and PASS
+in that mixed-target fixture. Both baseline and engine now explicitly select the
+declared target. Independent review verified generated source/test pins, exact
+arguments, receipt hashes and removal of owned cgroups and snapshots. These are
+bounded execution observations, not producer attestation or agent-productivity
+results. [The compact evidence](../research/performance/forge-program-20261105-owned-mutation.json)
+preserves all three earlier failed attempts, debug and release runs, and the old
+control. The per-test value release compatibility trial completed 12 checks with
+zero failures and two unstarted checks; its mutation admission passed while the
+overall candidate gate still failed on separate obligations.
+
+Focused verification passed 171 core mutation tests and 278 Forge mutation tests
+(with 26 ignored in that invocation). All 14 newly delegated runner/attribution/
+environment cases were then explicitly executed and passed, including detached
+sessions, timeout, cancellation and snapshot retention on unknown cleanup. The
+unknown-ledger case injects state; it does not simulate a kernel failure. Earlier
+capture suites passed 42 tests (four ignored), 15 pipe tests and 14 explicitly
+delegated execution-owner tests. Counts overlap and must not be added as unique
+tests. Strict Clippy and file/function limits passed. The complete-output mode
+bounds stdout at 16 MiB and stderr at 1 MiB and fails through owned cleanup on
+overflow. Matched read-only CLI/help and symbol-context comparisons passed the
+unchanged 10% budget across 404 measured executions; symbol p95 increased 8.64%.
+Mutation workflow overhead is unmeasured because review rejected the proposed
+unsafe timeout harness before execution. Full publication checks for this
+increment remain pending.
+
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
 two lints. The fixes preserve behavior, passed independent review and focused core

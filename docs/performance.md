@@ -347,6 +347,44 @@ being generalized into a language-performance claim.
 
 ## Benchmark and comparison contract
 
+### Ordinary Cargo confinement update — 2026-11-05
+
+The earlier ordinary-engine measurements below used the then-current runner and
+process-group supervision. They do not establish owned descendant cleanup or
+current native receipt admission. The current implementation requires explicit
+[execution grants](mutation.md#ordinary-cargo-execution-grants) and supports a
+narrow stdlib-only root Cargo profile. Clean release `adec2a6` passed the normal
+real-engine fixture (two kills/PASS), and the mixed-target fixture preserved both
+mutants (two survivors/RATCHET_HELD, not PASS). The old control falsely killed
+both via the unpinned test. [Recorded observations](../research/performance/forge-program-20261105-owned-mutation.json)
+retain the prior permission refusal, missing-linker-helper baseline failure and
+dirty-scope refusal; no failed attempt is discarded.
+
+Mutation workflow timing remains unmeasured by a valid matched benchmark. Review
+rejected an unexecuted proposed harness because killing its wrapper on timeout
+could leave detached engine descendants. Individual receipt durations are
+orchestration observations, not latency distributions or isolated confinement
+cost. No token, allocation, model-cost, task-success or productivity claim follows
+from these fixtures. Full publication checks remain pending.
+
+Matched read-only release checks compare `015e66e` with `adec2a6`, using the same
+binary pathname, command, input file, environment and unchanged 10% regression
+budget. Each arm/workload has 101 measured samples after five warmups: 404 measured
+executions, zero failures. These are process-startup measurements with warmed
+filesystem caches; cold-cache behavior and concurrent workloads were not measured.
+
+| Workload | p50 ms, before → after | p95 ms, before → after | CPU p50 ms, before → after | Maximum RSS bytes, before → after |
+| --- | --- | --- | --- | --- |
+| CLI help | 1.794 → 1.815 | 1.970 → 1.955 | 1.281 → 1.296 | 12,439,552 → 12,288,000 |
+| Bounded symbol context | 2.340 → 2.358 | 2.519 → 2.737 | 1.821 → 1.851 | 17,174,528 → 17,313,792 |
+
+Both comparisons passed the existing budget. The symbol p95 increased 8.64%; this
+is a measured difference in one batch, not evidence of a speed improvement.
+Sealed [help receipts](../research/performance/forge-program-20261105-owned-mutation-help-comparison.json)
+and [symbol receipts](../research/performance/forge-program-20261105-owned-mutation-symbol-comparison.json)
+retain individual samples and exact workload/source identities. These read-only
+checks do not measure mutation-engine overhead.
+
 ### Rust mutation workflow without Python — 2026-11-04
 
 A matched behavior check used two identical, dependency-free Rust fixtures with
