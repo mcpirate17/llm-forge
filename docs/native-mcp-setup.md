@@ -60,6 +60,15 @@ entry named `forge` causes a conflict instead of being overwritten. Plans expose
 hashes, byte lengths, the desired command and live tool names, not unrelated
 configuration values or credentials.
 
+## Operator-configured outbound tool
+
+The optional outbound capability is configured on the **harness policy**, not
+by adding an endpoint to a coding client's MCP configuration. See [the outbound
+policy and isolation contract](native-harness.md#optional-outbound-mcp-tool).
+When configured, the existing Forge adapter advertises its single public tool;
+its remote output remains untrusted. `bind` does not create this capability or
+prove that a client will select or use it.
+
 ## Hook interaction
 
 When [native provider hooks](native-providers.md) are installed, only

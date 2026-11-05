@@ -21,6 +21,8 @@ pub struct Policy {
     pub workspace: Option<super::workspace::BriefCapability>,
     #[serde(default)]
     pub memory_indexes: BTreeMap<String, super::workspace::MemoryCapability>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outbound_mcp: Option<OutboundCapability>,
     pub aggregate: Limits,
     pub session: Limits,
     pub max_sessions: usize,
@@ -31,6 +33,77 @@ pub struct Policy {
     pub retention_seconds: u64,
     pub replay_bytes: usize,
     pub log_bytes: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OutboundPin {
+    pub path: PathBuf,
+    pub sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OutboundCapability {
+    pub public_name: String,
+    pub remote_name: String,
+    pub executable: OutboundPin,
+    pub fixed_arguments: Vec<String>,
+    pub pinned_inputs: Vec<OutboundPin>,
+    pub read_only: Vec<PathBuf>,
+    pub input_schema_json: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema_json: Option<String>,
+    pub resources: Limits,
+    pub max_wall_seconds: u64,
+}
+impl OutboundCapability {
+    pub(crate) fn bind(
+        &self,
+        policy: &Policy,
+        state: &Path,
+    ) -> Result<crate::mutation_execution_grants::OutboundBindings> {
+        arguments(&self.fixed_arguments)?;
+        ensure!(
+            self.public_name.starts_with("outbound_")
+                && self.public_name.len() <= 128
+                && self
+                    .public_name
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_'),
+            "invalid outbound public name"
+        );
+        ensure!(
+            (1..=policy.lifetime_seconds).contains(&self.max_wall_seconds),
+            "invalid outbound lifetime"
+        );
+        let r = self.resources;
+        ensure!(
+            (10..=1_024_000).contains(&r.cpu_millis)
+                && (16..=1_048_576).contains(&r.memory_mib)
+                && (1..=4096).contains(&r.processes),
+            "invalid outbound resources"
+        );
+        crate::outbound_mcp_protocol::OutboundProtocol::new(
+            &self.remote_name,
+            &self.input_schema_json,
+            self.output_schema_json.as_deref(),
+        )?;
+        let pins = self
+            .pinned_inputs
+            .iter()
+            .map(|p| (p.path.clone(), p.sha256.clone()))
+            .collect::<Vec<_>>();
+        crate::mutation_execution_grants::OutboundBindings::capture(
+            &self.executable.path,
+            &self.executable.sha256,
+            &self.read_only,
+            &pins,
+            &policy.source_root,
+            state,
+            &policy.read_only,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -127,54 +200,7 @@ impl Policy {
             self.source_root.is_dir() && self.source_root.parent().is_some(),
             "invalid source root"
         );
-        ensure!(
-            (1..=32).contains(&self.max_sessions)
-                && (self.max_sessions..=256).contains(&self.max_retained_sessions)
-                && (self.max_retained_sessions..=4096).contains(&self.max_tasks),
-            "invalid session capacity"
-        );
-        ensure!(
-            (1..=86400).contains(&self.lifetime_seconds)
-                && (1..=self.lifetime_seconds).contains(&self.session_seconds)
-                && (1..=3600).contains(&self.retention_seconds),
-            "invalid lifecycle bounds"
-        );
-        ensure!(
-            (1..=4 * 1024 * 1024).contains(&self.replay_bytes)
-                && self.log_bytes <= 64 * 1024 * 1024,
-            "invalid output limits"
-        );
-        ensure!(
-            (10..=1_024_000).contains(&self.session.cpu_millis)
-                && (16..=1_048_576).contains(&self.session.memory_mib)
-                && (1..=4096).contains(&self.session.processes),
-            "invalid session resources"
-        );
-        ensure!(
-            self.aggregate.cpu_millis <= 1_024_000
-                && self.aggregate.memory_mib <= 1_048_576
-                && self.aggregate.processes <= 4096,
-            "invalid aggregate resources"
-        );
-        // Cover bounded request/reply buffers, retained replay and native workers.
-        let supervisor_mib = 384
-            + self.index_reservation()?
-            + super::workspace::reservation(&self)?
-            + self
-                .context
-                .as_ref()
-                .map(ContextBudget::reserve_mib)
-                .transpose()?
-                .unwrap_or(0)
-            + (self.max_retained_sessions * self.replay_bytes).div_ceil(1024 * 1024) as u64;
-        ensure!(
-            self.aggregate.cpu_millis >= self.session.cpu_millis
-                && self.aggregate.memory_mib
-                    >= supervisor_mib + self.session.memory_mib * self.max_sessions as u64
-                && u64::from(self.aggregate.processes)
-                    >= 16 + u64::from(self.session.processes) * self.max_sessions as u64,
-            "aggregate budget must cover all sessions plus {supervisor_mib} MiB and 16 supervisor tasks"
-        );
+        self.validate_limits()?;
         ensure!(
             self.write_paths.len() <= 4096
                 && self.read_only.len() <= 120
@@ -213,9 +239,77 @@ impl Policy {
             arguments(&program.fixed_arguments)?;
             crate::sandbox::validate_environment(&program.environment)?;
         }
+        if let Some(capability) = &self.outbound_mcp {
+            capability.bind(&self, &state)?;
+        }
         self.validate_indexes(&state)?;
         super::workspace::validate(&self, &state)?;
         Ok(self)
+    }
+
+    fn validate_limits(&self) -> Result<()> {
+        ensure!(
+            (1..=32).contains(&self.max_sessions)
+                && (self.max_sessions..=256).contains(&self.max_retained_sessions)
+                && (self.max_retained_sessions..=4096).contains(&self.max_tasks),
+            "invalid session capacity"
+        );
+        ensure!(
+            (1..=86400).contains(&self.lifetime_seconds)
+                && (1..=self.lifetime_seconds).contains(&self.session_seconds)
+                && (1..=3600).contains(&self.retention_seconds),
+            "invalid lifecycle bounds"
+        );
+        ensure!(
+            (1..=4 * 1024 * 1024).contains(&self.replay_bytes)
+                && self.log_bytes <= 64 * 1024 * 1024,
+            "invalid output limits"
+        );
+        ensure!(
+            (10..=1_024_000).contains(&self.session.cpu_millis)
+                && (16..=1_048_576).contains(&self.session.memory_mib)
+                && (1..=4096).contains(&self.session.processes),
+            "invalid session resources"
+        );
+        ensure!(
+            self.aggregate.cpu_millis <= 1_024_000
+                && self.aggregate.memory_mib <= 1_048_576
+                && self.aggregate.processes <= 4096,
+            "invalid aggregate resources"
+        );
+        if let Some(capability) = &self.outbound_mcp {
+            let r = capability.resources;
+            ensure!(
+                (10..=1_024_000).contains(&r.cpu_millis)
+                    && (16..=1_048_576).contains(&r.memory_mib)
+                    && (1..=4096).contains(&r.processes),
+                "invalid outbound resources"
+            );
+        }
+        // Cover bounded request/reply buffers, retained replay and native workers.
+        let supervisor_mib = 384
+            + self
+                .outbound_mcp
+                .as_ref()
+                .map_or(0, |c| c.resources.memory_mib + 20)
+            + self.index_reservation()?
+            + super::workspace::reservation(self)?
+            + self
+                .context
+                .as_ref()
+                .map(ContextBudget::reserve_mib)
+                .transpose()?
+                .unwrap_or(0)
+            + (self.max_retained_sessions * self.replay_bytes).div_ceil(1024 * 1024) as u64;
+        ensure!(
+            u64::from(self.aggregate.cpu_millis) >= u64::from(self.session.cpu_millis) + self.outbound_mcp.as_ref().map_or(0, |c| u64::from(c.resources.cpu_millis))
+                && self.aggregate.memory_mib
+                    >= supervisor_mib + self.session.memory_mib * self.max_sessions as u64
+                && u64::from(self.aggregate.processes)
+                    >= 16 + u64::from(self.session.processes) * self.max_sessions as u64 + self.outbound_mcp.as_ref().map_or(0, |c| u64::from(c.resources.processes)),
+            "aggregate budget must cover all sessions plus {supervisor_mib} MiB and 16 supervisor tasks"
+        );
+        Ok(())
     }
 
     pub fn permit_write(&self, path: &Path) -> Result<()> {

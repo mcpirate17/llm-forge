@@ -24,6 +24,8 @@ flowchart TD
     Boundary --> Search[Structural graph and code retrieval]
     Boundary --> Context[Token counting and context projection]
     Boundary --> Runtime[Persistent terminals and task supervisors]
+    Boundary --> Outbound[Operator-pinned outbound MCP tool]
+    Outbound --> Runtime
     Code --> State[Bounded stores, recovery artifacts and receipts]
     Search --> State
     Context --> State
@@ -62,6 +64,14 @@ A client-launched `harness stdio` adapter forwards requests to its verified Unix
 socket. The backend owns terminals, compiled schemas and task state independently
 of the client connection. Adapter disconnection does not itself terminate an
 owned session. MCP transport alone does not create that lifetime guarantee.
+
+**Outbound MCP.** An optional harness capability selects one local stdio endpoint,
+fixed arguments, executable/input hashes and one remote tool's schemas. The native
+client initializes and discovers lazily, reuses the connection and checks inputs
+before and after each call. It uses the shared confined process owner with bounded
+duplex I/O, a finite lifetime and explicit cleanup. Remote output stays untrusted;
+discovery cannot grant tools or paths. This slice does not enable networking or
+ambient credential forwarding. See [the operator contract](docs/native-harness.md#optional-outbound-mcp-tool).
 
 **Hooks.** Client-specific native adapters run automatic lifecycle/policy/context
 and telemetry work. They should return small summaries or references rather than

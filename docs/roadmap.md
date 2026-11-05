@@ -25,7 +25,7 @@ Paths below are relative to `native/forge/src/` unless qualified.
 | Context and tokens | `context_tools.rs`, `prompt_contract.rs`, `context_window.rs`, `context_store.rs`, `tokenizer.rs`, `context_telemetry.rs`; `conductor-native/src/context_projection.rs` | Composition, deferred catalog lookup, exact supplied-text counts and recoverable compaction exist. New literal prompt inspection/checklists share CLI/MCP implementation; automatic strengthening and tool recommendations remain incomplete. Historical reductions omit provider envelopes, rereads and task-quality effects | Retain these primitives; measure actual provider usage and recovery cost before expanding compression |
 | CLI | `main.rs`, `dispatch.rs`, `candidate_cli.rs`, `project.rs` | Native command dispatch and hook adapters exist; matched startup/signature comparisons remain within the 10% regression budget. Host adoption requires independent verification | Improve readiness and exact workload profiling; retire duplicate interpreted callers only after parity and caller migration |
 | MCP server | `harness_mcp.rs`, `harness_mcp_protocol.rs`, `harness_catalog.rs`, `harness_transport.rs`, `mcp_setup.rs` | Tools discovery/calls, schema validation, bounded concurrency and operator-selected capabilities exist. Custom wire integration tests and matched stdio adapter/CLI measurements exist; actual-client selection and agent outcomes remain unmeasured | Retain the native service/adapter split; improve client setup, lifecycle and actual-client validation |
-| MCP client and prompts | `src/conductor/crg_mcp_probe.py` is a narrow diagnostic client; `context_tools.rs` searches supplied catalog snapshots | No reusable native outbound MCP session or MCP prompts/resources methods found. Existing prompt composition is not protocol prompt discovery | Build the authorized outbound integration and deterministic prompt/tool layer using composition/schema/catalog APIs; keep protocol prompt discovery distinct |
+| MCP client and prompts | `harness_outbound.rs`, `outbound_mcp_protocol.rs`, and the shared confined duplex owner provide one operator-pinned stdio endpoint; `context_tools.rs` searches supplied catalog snapshots | Real external Rust-server tests cover persistent calls, denied reads, schema/protocol failures and input drift. HTTP endpoints, credential forwarding, multi-endpoint routing and protocol prompts/resources remain outside this slice | Retain shared admission/ownership; measure first/warm cost and verify a real coding client before extending transport or routing |
 | Performance | `performance.rs`, `performance_identity.rs`, `conductor-native/src/performance_receipt.rs`, `native/forge/benches/` | Sealed matched-receipt comparisons and component benchmarks exist. Current CLI baselines and historical retrieval/projection evidence do not establish productivity | Retain receipt integrity; improve transport/task measurements and include preparation/resource costs |
 | Quality and tests | `native/forge/tests/`, `native/conductor-native/tests/`, `local_check.rs`, `sweep.rs`, `mutation_run.rs` | Full local checks and verification passed the merged repair tree; live-service tests remain opt-in. No new clean-host sweep or real-client validation is implied | Retain ordinary tests and automatic scoped mutation engines; verify each exact committed tree before landing |
 | Rust migration | `native/forge-cli/Cargo.toml` owns the executable using `../forge/src/main.rs`; `native/forge` owns reusable code; `native/conductor-native` supplies shared contracts | `rg --files src -g '*.py'` currently finds 83 files. File count is not migration completion; caller/dependency retirement and clean-install/runtime evidence remain necessary | Prioritize measured live interpreted boundaries; retire replaced bodies and stale compatibility plumbing after complete caller migration |
@@ -38,6 +38,9 @@ flowchart TD
   Adapter -->|new Unix socket per call| Service[harness + operator catalog]
   Service --> Source[Source / search / context / workspace tools]
   Service --> Terminal[Confined PTYs + task journal]
+  Service --> Outbound[Operator-pinned outbound MCP session]
+  Outbound --> Owner[Shared confined duplex process owner]
+  Owner --> Controls
   CLI[forge-cli: main.rs] --> Dispatch[CLI dispatch / native hooks]
   Dispatch --> Native[forge library + conductor-native contracts]
   Source --> Native
@@ -68,12 +71,12 @@ broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
 requires independently bound dependency manifests as well as confined execution.
 The existing root-only profile cannot yet execute Forge's own workspace campaigns.
 
-1. Implement the missing authorized outbound MCP path, retaining the existing
-   inbound service. The immediate prerequisite is a bounded persistent duplex
-   extension to the confined process owner. Register endpoints separately from
-   ordinary terminal programs so discovery cannot grant terminal arguments.
-   Start with an operator-pinned stdio endpoint, fixed arguments, no credential
-   forwarding or network access, and one explicitly allowed tool/schema.
+1. Validate and measure the implemented outbound MCP slice through the existing
+   inbound service. It reuses the confined process owner, registers the endpoint
+   separately from terminal programs, and admits one operator-pinned stdio tool
+   with fixed arguments, schemas, read grants and resource limits. Networking
+   and ambient credential forwarding remain disabled. Broader routing and HTTP
+   support require separately verified authority and lifecycle contracts.
    Recommendation work is deferred pending prospective task-value controls;
    the first optional next-inspection candidate was measured and rejected below.
    External-host native receipt acceptance has a separate tracked boundary
@@ -94,10 +97,10 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
 4. Measure matched CLI versus actual MCP adapter calls with equivalent outputs;
    separate service/adapter startup and discovery from warm dispatch. Include
    schema/policy checks, socket connection and serialization in declared scope.
-5. Complete the authorized inbound/outbound MCP workflow: retain the existing
-   inbound server, add bounded native outbound sessions with explicit endpoint,
-   executable, credential and cancellation policy, then exercise discovery and
-   calls through the actual consumer.
+5. Extend the bounded inbound/outbound MCP workflow only after the local slice's
+   real-client and performance evidence; preserve explicit endpoint, executable,
+   credential and cancellation policy. Adapter cancellation currently suppresses
+   the response; it does not prove that a daemon operation was undone.
 6. Run bounded matched agent tasks with the same model, budget, source and tasks;
    independently verify outputs, report repetitions and failed/censored/unstarted
    cases, provider usage, recovery/rereads and embedding preparation.
@@ -108,7 +111,27 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
    paths. Retire proven duplicates and interpreted boundaries after caller/parity
    verification; add readiness/setup/status/undo without parallel machinery.
 
-**Latest evaluated candidate:** optional next-inspection advice passed focused
+**Verified native MCP increment:** the local outbound endpoint passed six opted-in
+wire integration tests, seven protocol/controller tests (including delegated
+prelaunch cleanup), and three admission tests. The shared owner passed all 22
+opted-in process tests. Strict all-target Clippy passed after correcting an
+unnecessary borrow in the resource-validation extraction. Two early wire runs
+failed test-fixture permission and cgroup-layout assumptions; both were corrected
+without changing admission or weakening cleanup assertions. Independent review
+found no additional concrete blocker. Full local-check and local-verify passed all
+18 steps at `5669fb33d3db9dac9b59fbec4680e8ac4df9efc8`: 4,653 successful test
+executions, zero failures and 188 ignored across 179 harnesses. Receipt SHA-256:
+`818e49f2ea3a3e39d7a585fc6c6a70549b6c7d6ca8be523e36ade6329aa6314e`.
+The final release repeated all 22 owner, seven controller/protocol and six wire
+tests with zero ignored cases. Five observations completed 160 selected-tool calls
+with verified cleanup: warm medians were 1.259–1.333 ms; the ordinary CLI control
+stayed within its existing budget. [The performance report](performance.md#native-outbound-mcp-observations--2026-11-05)
+records identities, controls, failures and limitations. Later documentation/test
+guard changes require their own publication receipt. Real coding-client use,
+task benefit and global installation remain separate unverified milestones.
+See [the operator contract](native-harness.md#optional-outbound-mcp-tool).
+
+**Rejected candidate:** optional next-inspection advice passed focused
 behavior tests and actual MCP inspections but added 22–27 µs and 943 frame bytes
 versus plain prompt preparation plus a known inspection call. Its schema added
 1,276 bytes to every context-enabled catalog. Independent review recommended
@@ -211,7 +234,7 @@ all 18 steps, 4,532 successful executions, zero failures and 145 ignored across
 `.git/forge-checks/run-1793854577157961065-467531/receipt.json`.
 Compare recommendation workflows against both discovery-first
 and best existing direct-call controls; an extra recommendation call may be a net
-cost. Automatic strengthening, outbound MCP, agent task benefit and client adoption
+cost. Automatic strengthening, broader outbound MCP, agent task benefit and client adoption
 remain unverified mission gaps. The new installed identity path retains explicit
 operator pins; a candidate-controlled lock or receipt cannot authorize that identity.
 The installed global Forge remains a separate artifact.

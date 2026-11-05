@@ -358,14 +358,14 @@ pub(crate) fn observation_error(observation: Observation, timeout: Duration) -> 
         Observation::Cancelled => Err(Interrupted.into()),
     }
 }
-fn descriptor(fd: RawFd, events: i16) -> libc::pollfd {
+pub(crate) fn descriptor(fd: RawFd, events: i16) -> libc::pollfd {
     libc::pollfd {
         fd,
         events,
         revents: 0,
     }
 }
-fn poll(descriptors: &mut [libc::pollfd], remaining: Duration) -> Result<()> {
+pub(crate) fn poll(descriptors: &mut [libc::pollfd], remaining: Duration) -> Result<()> {
     let millis = remaining.as_micros().div_ceil(1000).min(i32::MAX as u128) as i32;
     // SAFETY: poll mutates exactly the initialized descriptor slice.
     if unsafe {

@@ -226,6 +226,21 @@ fn session_start_extension() -> io::Result<i32> {
         }
     }
 }
+fn duplex_lines() -> io::Result<()> {
+    use std::io::BufRead;
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let mut row = Vec::new();
+    loop {
+        row.clear();
+        if input.read_until(b'\n', &mut row)? == 0 {
+            return Ok(());
+        }
+        io::stdout().write_all(&row)?;
+        io::stdout().flush()?;
+    }
+}
+
 fn run() -> io::Result<i32> {
     if program_name().as_deref() == Some("session-start") {
         return session_start_extension();
@@ -265,6 +280,7 @@ fn run() -> io::Result<i32> {
         "stdin-echo" => {
             io::copy(&mut io::stdin(), &mut io::stdout())?;
         }
+        "duplex-lines" => duplex_lines()?,
         "allocate" => allocate(args)?,
         #[cfg(target_os = "linux")]
         "flood-both" => flood_both(args)?,

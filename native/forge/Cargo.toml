@@ -80,6 +80,11 @@ harness = false
 name = "graph_context"
 harness = false
 
+[[example]]
+name = "outbound_mcp_server"
+path = "tests/support/outbound_mcp_server.rs"
+test = false
+
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
 tokio = { version = "1.53.3", features = ["rt", "macros", "net", "time", "sync", "signal", "fs", "io-util"] }

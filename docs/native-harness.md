@@ -69,6 +69,64 @@ The service verifies its manager PID, lifecycle policy and actual aggregate
 controller values before accepting requests. Only its newly owned service root
 has controllers enabled; shared parent slices are untouched.
 
+## Optional outbound MCP tool
+
+An operator may add one `outbound_mcp` object to the policy. This is separate
+from `programs`: it does not grant `terminal_spawn` access to the endpoint or let
+callers choose its executable or arguments. Replace every path and digest below
+with an independently measured absolute path and lowercase SHA-256; the digest
+shown is a placeholder. Add each required executable, runtime library and input
+read path to the enclosing policy's `read_only` or use a path beneath its
+`source_root`; apply the usual metadata, credential and Git-directory exclusions.
+The endpoint's `read_only` entries must stay within those operator grants.
+Admission rejects group/world-writable bound files, directories and non-sticky
+ancestors. Use explicitly prepared private inputs; do not change permissions on
+an unrelated shared checkout to make a policy pass. Directory read grants also
+allow descendant execution and do not constitute a complete executable allowlist.
+
+```json
+"outbound_mcp": {
+  "public_name": "outbound_lookup",
+  "remote_name": "lookup",
+  "executable": {"path": "/absolute/tools/server", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+  "fixed_arguments": ["--stdio"],
+  "pinned_inputs": [],
+  "read_only": ["/absolute/tools/server"],
+  "input_schema_json": "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"maxLength\":256}},\"required\":[\"query\"],\"additionalProperties\":false}",
+  "output_schema_json": "{\"type\":\"object\",\"properties\":{\"answer\":{\"type\":\"string\",\"maxLength\":4096}},\"required\":[\"answer\"],\"additionalProperties\":false}",
+  "resources": {"cpu_millis": 500, "memory_mib": 128, "processes": 16},
+  "max_wall_seconds": 60
+}
+```
+
+This fragment belongs inside the complete policy object; it is not a standalone
+policy. `public_name` must begin `outbound_`. The input and optional output schema
+fields are JSON **strings**, accepted by Forge's bounded schema profile; they
+must structurally match the selected remote tool's advertised schemas. Omit
+`output_schema_json` only if the selected tool advertises no output schema.
+`pinned_inputs` may contain `{ "path": "...", "sha256": "..." }` entries for
+operator-selected files; hashes are checked at admission and around calls. A
+read-only directory grant is a capability, not a recursive content pin. Adjust
+the aggregate resource budget to include the outbound reservation. Preflight
+validates policy and admission without launching the endpoint.
+
+The catalog exposes only the configured public tool through both `harness call`
+and the existing MCP stdio adapter. The first call starts the fixed endpoint and
+performs MCP 2025-11-25 initialization and bounded discovery over stdio; calls
+permit one in-flight request and reject concurrent calls as busy. Each request
+is checked against the pinned schema. Remote content is untrusted
+and does not authorize operations. The sandbox denies networking, clears ambient
+credentials/environment, and supplies a private scratch `HOME`, temporary and
+cache directories. It limits child resources and owns process-tree cleanup.
+
+`max_wall_seconds` bounds the endpoint lifetime, not each individual call;
+transport and service deadlines also apply. Errors or cancellation can leave an
+uncertain call result. There are no automatic retries or replacement launches;
+start a new finite-lived harness to reset a failed or expired endpoint. Discovery
+and replies are checked at bounded points, not authenticated producer identity or
+atomic proof of when remote bytes were generated. This describes the native
+interface, not proof that an external coding client uses it.
+
 ## Calls and reconnects
 
 The socket accepts one UTF-8 JSON object per newline-delimited request, with a

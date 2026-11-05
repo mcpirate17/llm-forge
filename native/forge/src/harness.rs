@@ -10,6 +10,8 @@ mod context;
 mod journal;
 #[path = "harness_mcp.rs"]
 pub mod mcp;
+#[path = "harness_outbound.rs"]
+mod outbound;
 #[path = "harness_policy.rs"]
 pub mod policy;
 #[path = "harness_search.rs"]
@@ -42,6 +44,7 @@ pub struct Harness {
     search: search::Searches,
     context: context::Contexts,
     workspace: workspace::Workspace,
+    outbound: Option<outbound::Outbound>,
     fatal: watch::Receiver<Option<String>>,
     stopping: Arc<AtomicBool>,
 }
@@ -65,6 +68,8 @@ impl Harness {
         let (send, fatal) = watch::channel(None);
         let policy = Arc::new(policy);
         let stopping = Arc::new(AtomicBool::new(false));
+        let outbound =
+            outbound::Outbound::new(&policy, &state.root, parent.clone(), stopping.clone())?;
         let terminals = Arc::new(terminal::Terminals::new(
             policy.clone(),
             Arc::new(state),
@@ -85,6 +90,7 @@ impl Harness {
             search,
             context,
             workspace,
+            outbound,
             fatal,
             stopping,
         })
@@ -152,6 +158,17 @@ impl Harness {
                     .map_or(Ok(20), |v| v.as_u64().context("limit must be an integer"))?;
                 self.journal
                     .call(move |store| Ok(serde_json::to_value(store.list(limit as usize)?)?))
+                    .await
+            }
+            _ if self
+                .outbound
+                .as_ref()
+                .is_some_and(|outbound| outbound.name() == name) =>
+            {
+                self.outbound
+                    .as_ref()
+                    .context("outbound unavailable")?
+                    .call(args)
                     .await
             }
             _ => anyhow::bail!("registered tool lacks handler"),

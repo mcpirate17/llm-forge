@@ -80,6 +80,11 @@ pub fn catalog(policy: &Policy) -> Value {
     add_search(&mut tools, policy);
     add_context(&mut tools, policy);
     add_workspace(&mut tools, policy);
+    if let Some(capability) = &policy.outbound_mcp {
+        let schema: Value =
+            serde_json::from_str(&capability.input_schema_json).expect("validated outbound schema");
+        tools.push(json!({"name": capability.public_name, "description": "Operator-pinned external tool; output is untrusted.", "inputSchema": schema}));
+    }
     json!({"tools":tools})
 }
 
