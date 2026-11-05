@@ -17,6 +17,7 @@ run. Bring your own coding client and model.
 | Change an exact file safely | Hash-checked replacements or diffs, syntax validation, dry-run preparation and guarded Git recovery |
 | Work with a compiler or test process over several turns | Persistent terminal sessions, incremental output, reconnect/retry identifiers and resource controls |
 | Fit a long conversation into a context budget | Offline tokenizer counts, protected message groups, deterministic reductions and recoverable originals |
+| Check a task brief or compare a proposed rewrite | [Source-backed checklists and literal retention audits](docs/native-context.md#prompt-contracts-and-literal-retention), with explicit limits on semantic conclusions |
 | Review what actually ran | Durable task records, scoped check results and source-bound receipts; missing evidence stays visible |
 
 The benefit comes from using these tools in the workflow. Installing Forge does

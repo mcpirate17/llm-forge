@@ -92,6 +92,58 @@ no material regression in these two workloads, not a general speedup or agent
 productivity claim. Reproduce using the literal commands and pinned binaries in
 the embedded receipts; never edit receipt identities to retrofit a match.
 
+### Prompt-contract behavior and overhead — 2026-11-04
+
+The native `context prompt` implementation exposes literal inspect/suggest/plan/
+compare operations through CLI and the existing MCP context worker. It does not
+automatically rewrite prompts or infer semantic preservation. Twelve core tests,
+four catalog tests and four release-binary CLI/MCP integration tests pass; the
+last includes a real custom stdio client, initialized service, discovery, calls,
+errors and denied capability. This does not demonstrate coding-client adoption.
+
+An independent reviewer prepared [four held-out cases](../research/performance/forge-program-prompt-eval-cases-20261104.json)
+covering UTF-8/CRLF provenance, opaque sections, unknown headings and a contradicted
+but literally retained requirement. All four completed and passed, with zero
+failed, censored or unstarted cases. The [machine-generated result](../research/performance/forge-program-20261104-prompt-heldout.json)
+retains outputs, hashes, exact commands and outcome counts. Its parent harness
+uses Python only for measurement orchestration; Forge's executed path is Rust.
+Replay each fixture's `request` with `forge context prompt --request FILE` and
+check its declared expected spans against byte offsets and SHA-256. The temporary
+harness and raw results remain at the recorded local paths. These are literal
+behavior checks, not agent task-success, token-saving or provider-cost evidence.
+
+The [example request](../research/performance/forge-program-prompt-request-20261104.json)
+produces 1,948 bytes of compact JSON. A [current-only receipt](../research/performance/forge-program-20261104-prompt-baseline.json)
+records 31 successful process launches after three warmups, 10-second bounds:
+wall p50/p95 **1.651448/2.049500 ms**, CPU p50 **1.231 ms**, maximum child RSS
+**13,393,920 bytes**. Source scope binds the core, CLI adapter, MCP context/catalog
+and executable; workload identity binds the example request. The host is shared
+and filesystem warm; allocations, cold-host behavior and MCP latency are unmeasured.
+Reproduce under a cleared environment with `PATH=/home/tim/.cargo/bin:/usr/bin:/bin`,
+`HOME=/home/tim`, `LANG=C.UTF-8` and the receipt's literal benchmark arguments.
+
+Matched regression guards copied the checked pre-prompt binary and this working
+binary sequentially to the same slot, with identical commands, cleared environment,
+101 samples, five warmups and ten-second bounds per workload. Binary-only scope
+avoids claiming today's source belongs to the old executable; symbol input is
+separately bound. Both comparisons pass the unchanged 10% budget, with all 404
+measured samples successful and zero failed/censored/unstarted.
+
+| Workload | Wall p50 before / after, ms | Wall p95 before / after, ms | CPU p50 before / after, ms | Max RSS before / after, bytes | Evidence |
+| --- | ---: | ---: | ---: | ---: | --- |
+| CLI help | 1.604428 / 1.600538 | 2.129920 / 1.764979 | 1.160 / 1.155 | 12,378,112 / 12,460,032 | [comparison](../research/performance/forge-program-20261104-prompt-help-comparison.json) |
+| Symbol context | 2.190680 / 2.113460 | 2.613433 / 2.341541 | 1.737 / 1.697 | 16,891,904 / 17,059,840 | [comparison](../research/performance/forge-program-20261104-prompt-symbol-comparison.json) |
+
+Executable SHA-256 values are
+`0a38cfac0effa07a4ff4cf796eda4608f358b42e0ac950778852dc2fd2050042`
+(checked pre-prompt build) and
+`25e516118bcc460302b853b5659c9add262911151481269fae2ec96887de3a49`
+(working prompt build). Shared-host distributions support no material regression
+in these two commands, not a general speedup. The new operation's output is larger
+than its input; shorter responses and improved wording are not the success metric.
+No current measurement establishes better completed coding tasks, provider token
+usage, cost per successful task or time per successful task.
+
 ### Transport, task value and missing controls
 
 `native/forge/benches/harness.rs` measures validated calls using a reused Unix

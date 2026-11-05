@@ -22,6 +22,8 @@ pub struct ContextArgs {
 enum ContextCommand {
     /// Record bounded context events, tee hook output, or summarize telemetry.
     Telemetry(crate::context_telemetry_cli::TelemetryArgs),
+    /// Inspect, suggest, plan or compare a supplied prompt through a bounded native contract.
+    Prompt(PromptArgs),
     /// Report actual provider usage, request deduplication, and context overhead.
     Report(ReportArgs),
     /// Compose stable instructions and bounded dynamic fragments without an LLM.
@@ -34,6 +36,26 @@ enum ContextCommand {
     Compact(CompactArgs),
     /// Retrieve and verify an exact content-addressed context recovery artifact.
     Recover(RecoverArgs),
+}
+
+#[derive(Args)]
+struct PromptArgs {
+    #[arg(long)]
+    request: PathBuf,
+}
+
+fn prompt(args: PromptArgs) -> Result<u8> {
+    let bytes =
+        forge::bounded_file::read(&args.request, forge::prompt_contract::MAX_REQUEST_BYTES)?;
+    let request: forge::prompt_contract::Request = serde_json::from_slice(&bytes)?;
+    let result = forge::prompt_contract::analyze(&request).map_err(anyhow::Error::msg)?;
+    let output = serde_json::to_string(&result)?;
+    ensure!(
+        output.len() <= request.max_output_bytes,
+        "prompt output exceeds requested byte limit"
+    );
+    print!("{output}");
+    Ok(0)
 }
 
 #[derive(Args)]
@@ -156,6 +178,7 @@ pub fn run(args: ContextArgs) -> Result<u8> {
     match args.action {
         ContextCommand::Telemetry(args) => crate::context_telemetry_cli::run(args),
         ContextCommand::Tokens(args) => tokens(args),
+        ContextCommand::Prompt(args) => prompt(args),
         ContextCommand::Compact(args) => compact(args),
         ContextCommand::Recover(args) => recover(args),
         ContextCommand::Report(args) => {

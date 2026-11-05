@@ -82,3 +82,62 @@ fn workspace_catalog_enforces_query_version_and_configured_dimension_bounds() {
     call["arguments"]["query"]["vector"] = json!([1.0, 0.0, 0.0, 0.0, 0.0]);
     assert!(registry.validate_call(&call.to_string(), false).is_err());
 }
+
+#[test]
+fn prompt_catalog_requires_context_capability_and_sufficient_bytes() {
+    let mut policy = policy();
+    for bytes in [128, 511, 512, 8192] {
+        policy.context.as_mut().unwrap().max_input_bytes = bytes;
+        let catalog = catalog(&policy);
+        assert_eq!(
+            catalog["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|tool| tool["name"] == "context_prompt")
+                .count(),
+            usize::from(bytes >= 512)
+        );
+        registry(&policy);
+    }
+    policy.context = None;
+    let registry = registry(&policy);
+    assert!(registry
+        .validate_call(
+            &json!({"name":"context_prompt","arguments":{
+        "mode":"inspect","prompt":"test","max_output_bytes":512}})
+            .to_string(),
+            false
+        )
+        .is_err());
+}
+
+#[test]
+fn prompt_catalog_bounds_modes_fields_and_optional_candidate_without_schema_unions() {
+    let mut policy = policy();
+    policy.context.as_mut().unwrap().max_input_bytes = 8192;
+    let registry = registry(&policy);
+    let base = json!({"name":"context_prompt","arguments":{
+        "mode":"inspect","prompt":"literal prompt","max_output_bytes":8192}});
+    assert!(registry.validate_call(&base.to_string(), false).is_ok());
+    for mode in ["inspect", "suggest", "plan", "compare"] {
+        let mut call = base.clone();
+        call["arguments"]["mode"] = json!(mode);
+        call["arguments"]["candidate"] = json!("candidate");
+        assert!(registry.validate_call(&call.to_string(), false).is_ok());
+    }
+    for (key, value) in [
+        ("mode", json!("execute")),
+        ("candidate", Value::Null),
+        ("model", json!("untrusted")),
+        ("max_output_bytes", json!(8193)),
+        ("constraints", json!(vec!["x"; 33])),
+    ] {
+        let mut call = base.clone();
+        call["arguments"][key] = value;
+        assert!(
+            registry.validate_call(&call.to_string(), false).is_err(),
+            "{call}"
+        );
+    }
+}

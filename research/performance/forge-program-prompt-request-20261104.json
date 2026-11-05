@@ -1,0 +1,6 @@
+{
+  "mode": "plan",
+  "prompt": "# Objective\nFix the Rust planner's external-target handling.\n# Constraints\nDo not change the selected source set.\nPreserve explicit refusals for unsupported ownership.\n# Verification\nRun the targeted ownership regression tests.\n# Acceptance criteria\nThe requested planner path returns READY.\n",
+  "constraints": ["Preserve unrelated working changes."],
+  "max_output_bytes": 8192
+}

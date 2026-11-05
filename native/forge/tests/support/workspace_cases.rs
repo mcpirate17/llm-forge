@@ -154,7 +154,7 @@ async fn mapped_recall_reloads_atomic_rebuilds_and_rejects_stale_or_widened_requ
 }
 
 async fn mcp_workspace_calls(service: &Running) {
-    let mut mcp = Mcp::new(&service.socket());
+    let mut mcp = Mcp::new(Path::new(support::forge_binary::path()), &service.socket());
     mcp.send(modern_request(1, "tools/list", json!({}))).await;
     assert!(mcp.receive().await["result"]["tools"]
         .as_array()

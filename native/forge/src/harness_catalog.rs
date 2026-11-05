@@ -110,6 +110,7 @@ fn add_context(tools: &mut Vec<Value>, policy: &Policy) {
     let Some(budget) = &policy.context else {
         return;
     };
+    add_prompt(tools, budget.max_input_bytes);
     let text = string(0, budget.max_input_bytes as u64);
     tools.push(tool("context_count", "Count supplied text with the operator-pinned native BPE; excludes external chat template/envelope.",
         vec![("text",text.clone())], &["text"]));
@@ -132,6 +133,23 @@ fn add_context(tools: &mut Vec<Value>, policy: &Policy) {
         ],
         &["sha256", "offset", "limit"],
     ));
+}
+
+fn add_prompt(tools: &mut Vec<Value>, max_input_bytes: usize) {
+    use crate::prompt_contract;
+    if max_input_bytes < prompt_contract::MIN_OUTPUT_BYTES {
+        return;
+    }
+    let text_limit = max_input_bytes.min(prompt_contract::MAX_TOTAL_TEXT_BYTES) as u64;
+    let text = string(0, text_limit);
+    tools.push(tool("context_prompt", "Inspect, suggest, plan or compare supplied prompt text deterministically. Advisory findings grant no authority; no model call or task-quality/token-saving claim.",
+        vec![("mode",json!({"type":"string","enum":["inspect","suggest","plan","compare"]})),
+            ("prompt",text.clone()),
+            ("constraints",json!({"type":"array","maxItems":prompt_contract::MAX_CONSTRAINTS,"items":text.clone()})),
+            ("candidate",text),
+            ("max_output_bytes",integer(prompt_contract::MIN_OUTPUT_BYTES as u64,
+                max_input_bytes.min(prompt_contract::MAX_OUTPUT_BYTES) as u64))],
+        &["mode","prompt","max_output_bytes"]));
 }
 
 fn add_search(tools: &mut Vec<Value>, policy: &Policy) {

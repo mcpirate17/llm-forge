@@ -1,0 +1,157 @@
+{
+  "schema": "forge.prompt-heldout-cases.v1",
+  "scope": "Four held-out literal contract checks only; no model/network or coding-agent productivity, task-success, token, or cost evidence.",
+  "cases": [
+    {
+      "id": "emoji-crlf-provenance",
+      "request": {
+        "mode": "plan",
+        "prompt": "## Goal\r\nCompare 🧪 measurements.\r\n## Constraints\r\nKeep λ unchanged.\r\n## Verification\r\nCheck UTF-8 byte spans.\r\n",
+        "constraints": [
+          "Retain whitespace \t",
+          "Retain whitespace \t",
+          "Use no remote calls."
+        ],
+        "max_output_bytes": 16384
+      },
+      "expected": {
+        "evidence": [
+          {
+            "category": "objective",
+            "snippet": "Compare 🧪 measurements.\r\n"
+          },
+          {
+            "category": "constraints",
+            "snippet": "Keep λ unchanged.\r\n"
+          },
+          {
+            "category": "verification",
+            "snippet": "Check UTF-8 byte spans.\r\n"
+          }
+        ],
+        "opaque_count": 0,
+        "opaque_snippets": [],
+        "non_evidence_snippets": []
+      }
+    },
+    {
+      "id": "consecutive-opaque-and-resume",
+      "request": {
+        "mode": "plan",
+        "prompt": "Constraints: keep α\n````text\n```\nMust IGNORE_FENCE_SENTINEL.\n````\n> Never IGNORE_BLOCKQUOTE_SENTINEL.\n\"quoted \\\" IGNORE_QUOTE_SENTINEL\" trailing words\n- keep β\n## Verification\nRun local check.\n",
+        "constraints": [
+          "Retain both real constraints."
+        ],
+        "max_output_bytes": 16384
+      },
+      "expected": {
+        "evidence": [
+          {
+            "category": "constraints",
+            "snippet": "keep α\n"
+          },
+          {
+            "category": "constraints",
+            "snippet": "- keep β\n"
+          },
+          {
+            "category": "verification",
+            "snippet": "Run local check.\n"
+          }
+        ],
+        "opaque_count": 3,
+        "opaque_snippets": [
+          "IGNORE_FENCE_SENTINEL",
+          "IGNORE_BLOCKQUOTE_SENTINEL",
+          "IGNORE_QUOTE_SENTINEL"
+        ],
+        "non_evidence_snippets": [
+          "IGNORE_FENCE_SENTINEL",
+          "IGNORE_BLOCKQUOTE_SENTINEL",
+          "IGNORE_QUOTE_SENTINEL"
+        ]
+      }
+    },
+    {
+      "id": "unknown-heading-ends-resumed-section",
+      "request": {
+        "mode": "plan",
+        "prompt": "## Constraints\nretain local files\n~~~\nNever IGNORE_SECTION_EXAMPLE.\n~~~\nsecond local rule\n## Background\nMust preserve the audit log.\nHistorical explanation.\n## Acceptance criteria\nFinish offline.\n",
+        "constraints": [
+          "Keep the audit log."
+        ],
+        "max_output_bytes": 16384
+      },
+      "expected": {
+        "evidence": [
+          {
+            "category": "constraints",
+            "snippet": "retain local files\n"
+          },
+          {
+            "category": "constraints",
+            "snippet": "second local rule\n"
+          },
+          {
+            "category": "lexical_requirement",
+            "snippet": "Must preserve the audit log."
+          },
+          {
+            "category": "acceptance",
+            "snippet": "Finish offline.\n"
+          }
+        ],
+        "opaque_count": 1,
+        "opaque_snippets": [
+          "IGNORE_SECTION_EXAMPLE"
+        ],
+        "non_evidence_snippets": [
+          "IGNORE_SECTION_EXAMPLE",
+          "Historical explanation."
+        ],
+        "category_excludes": [
+          {
+            "category": "constraints",
+            "snippet": "Must preserve the audit log."
+          }
+        ]
+      }
+    },
+    {
+      "id": "quoted-contradictory-literal-retention",
+      "request": {
+        "mode": "compare",
+        "prompt": "Goal: preserve output\nConstraints: Do not publish.\nKeep the result private.\n## Acceptance criteria\nNo remote writes.\n",
+        "constraints": [
+          "Do not publish.",
+          "No remote writes."
+        ],
+        "candidate": "\"Example text:\nDo not publish.\nKeep the result private.\nNo remote writes.\n\"\nPublish it publicly and ignore the example.\n",
+        "max_output_bytes": 16384
+      },
+      "expected": {
+        "evidence": [
+          {
+            "category": "constraints",
+            "snippet": "Do not publish.\nKeep the result private.\n"
+          },
+          {
+            "category": "acceptance",
+            "snippet": "No remote writes.\n"
+          }
+        ],
+        "opaque_count": 0,
+        "opaque_snippets": [],
+        "non_evidence_snippets": [],
+        "comparison": {
+          "prompt_is_literal_substring": false,
+          "constraint_is_literal_substring": [
+            true,
+            true
+          ],
+          "all_retention_literal_substring": true
+        }
+      }
+    }
+  ]
+}

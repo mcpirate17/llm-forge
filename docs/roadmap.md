@@ -22,7 +22,7 @@ Paths below are relative to `native/forge/src/` unless qualified.
 | Area | Actual implementation | Gap and available evidence | Disposition |
 | --- | --- | --- | --- |
 | Agent intelligence | `route.rs`, `ledger/`, `local_clerk/generate.rs`, `workspace_runtime_eval.rs`; existing client/model remains the agent | Routing, accounting and clerical generation exist. Runtime matrix completeness is not task-quality evaluation; no matched agent-success study | Retain accounting and deterministic tools; improve real-task controls. Local models are clerical only and cannot approve, authorize, promote or launch work |
-| Context and tokens | `context_tools.rs`, `context_window.rs`, `context_store.rs`, `tokenizer.rs`, `context_telemetry.rs`; `conductor-native/src/context_projection.rs` | Composition, deferred catalog-definition lookup, exact supplied-text counts and recoverable compaction already exist. A deterministic prompt-strengthening/mode-selection and tool-recommendation engine is absent; historical reductions omit provider envelopes, rereads and task-quality effects | Retain these primitives; measure actual provider usage and recovery cost before expanding compression |
+| Context and tokens | `context_tools.rs`, `prompt_contract.rs`, `context_window.rs`, `context_store.rs`, `tokenizer.rs`, `context_telemetry.rs`; `conductor-native/src/context_projection.rs` | Composition, deferred catalog lookup, exact supplied-text counts and recoverable compaction exist. New literal prompt inspection/checklists share CLI/MCP implementation; automatic strengthening and tool recommendations remain incomplete. Historical reductions omit provider envelopes, rereads and task-quality effects | Retain these primitives; measure actual provider usage and recovery cost before expanding compression |
 | CLI | `main.rs`, `dispatch.rs`, `candidate_cli.rs`, `project.rs` | Native command dispatch and hook adapters exist; matched startup/signature comparisons remain within the 10% regression budget. Host adoption requires independent verification | Improve readiness and exact workload profiling; retire duplicate interpreted callers only after parity and caller migration |
 | MCP server | `harness_mcp.rs`, `harness_mcp_protocol.rs`, `harness_catalog.rs`, `harness_transport.rs`, `mcp_setup.rs` | Tools discovery/calls, schema validation, bounded concurrency and operator-selected capabilities exist. Custom wire integration tests exist; actual-client selection and complete transport cost remain unmeasured | Retain the native service/adapter split; improve client setup, lifecycle and actual-client validation |
 | MCP client and prompts | `src/conductor/crg_mcp_probe.py` is a narrow diagnostic client; `context_tools.rs` searches supplied catalog snapshots | No reusable native outbound MCP session or MCP prompts/resources methods found. Existing prompt composition is not protocol prompt discovery | Build the authorized outbound integration and deterministic prompt/tool layer using composition/schema/catalog APIs; keep protocol prompt discovery distinct |
@@ -60,10 +60,10 @@ this audit.
 
 ### Ordered continuation and acceptance criteria
 
-1. Remove the unnecessary interpreter prerequisite for native Rust/Mull mutation
-   workflows, retaining explicit guest configuration and Python/Fest behavior.
-   Verify a real automatically generated Rust campaign with Python absent from
-   `PATH`. External-host native receipt acceptance has a separate tracked boundary
+1. Extend the shared prompt/tool layer from the bounded literal inspection slice
+   described below: useful tool recommendations and eligible strengthening need
+   explicit permissions, source-backed evidence and matched task controls.
+   External-host native receipt acceptance has a separate tracked boundary
    in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
    works without vendored Forge sources, but governance acceptance currently needs
    them. Reuse independently measured, operator-pinned installed identity when
@@ -71,10 +71,10 @@ this audit.
 2. Validate one real client: setup, advertised tools, an agent-selected read,
    allowed/denied/failure cases, reconnect and undo. Test the client-specific
    configuration rather than treating a custom wire client as client adoption.
-3. Build deterministic prompt strengthening with explicit task modes and tool
-   recommendations, reusing composition, catalog filtering, token counts and
-   recovery. Verify that strengthened prompts retain requirements and report
-   changes/overhead; composition alone does not satisfy this deliverable.
+3. Evaluate deterministic prompt strengthening with explicit task modes, reusing
+   composition, catalog filtering, token counts and recovery. Literal retention
+   alone cannot establish preserved meaning, instruction priority or improved
+   task success; report these limits and any added overhead.
 4. Measure matched CLI versus actual MCP adapter calls with equivalent outputs;
    separate service/adapter startup and discovery from warm dispatch. Include
    schema/policy checks, socket connection and serialization in declared scope.
@@ -137,9 +137,32 @@ and strict Clippy pass. A matched real Cargo fixture refuses on the old binary
 without Python and completes two killed mutants on the changed binary with
 `interpreter: null`, unchanged checked live inputs and confirmed snapshot cleanup.
 The generated manifest's initial survivor baseline update is retained. This is
-dirty-build behavior evidence, with no new real Mull execution. Publication gates
-for this second increment remain pending. The next capability work is the shared
-prompt/tool layer and actual transport measurements.
+dirty-build behavior evidence, with no new real Mull execution. This increment
+landed in [PR #187](https://github.com/mcpirate17/llm-forge/pull/187) as
+`782a16dbfb1bcb58b973ca891efb026ad61d93c2`, with the same tree as checked head
+`9ea488d702711b164c435b70ea50258cbc383a0d`. Its full local-check/local-verify passed
+18 steps, 4,515 successful test executions, zero failures and 144 ignored across
+176 harnesses. Receipt SHA-256:
+`72a13d61a4b66bce8e451ed83cec98b143911720754c175f69f58df71424597a`, in
+`.git/forge-checks/run-1793850333047138281-332956/receipt.json`.
+
+**Active capability increment:** `forge context prompt` and MCP `context_prompt`
+share native inspect/suggest/plan/compare behavior. Exact byte spans and hashes
+identify literal requirements; plan preserves supplied text and constraints;
+compare reports substring retention with explicit semantic limits. Opaque context
+never becomes execution authority, and output overflow refuses without truncating
+protected content. No model, automatic rewrite or execution is introduced. See
+[the request and trust contract](native-context.md#prompt-contracts-and-literal-retention).
+Twelve core tests, four catalog tests, strict Clippy, release build and four CLI/MCP
+integration tests pass, including the opt-in real stdio/service test. Independent
+review corrected fence/quote/section edge cases and clarified ingress bounds.
+Four independently prepared held-out literal cases pass; these are not coding
+agent task-success evaluations. Current-only latency and matched existing-command
+regression evidence are in [performance.md](performance.md#prompt-contract-behavior-and-overhead--2026-11-04).
+Full committed-tree publication gates remain pending for this increment. Next:
+source-backed tool recommendations, actual transport measurements and matched
+agent tasks. Automatic strengthening, outbound MCP and client adoption remain
+unverified mission gaps.
 The installed global Forge remains a separate artifact.
 
 ## Historical roadmap and delivery provenance

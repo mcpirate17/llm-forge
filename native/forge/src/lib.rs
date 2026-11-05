@@ -226,6 +226,7 @@ pub mod process_io;
 pub mod process_probe;
 #[cfg(target_os = "linux")]
 pub mod process_signals;
+pub mod prompt_contract;
 #[cfg(target_os = "linux")]
 pub mod pty;
 #[cfg(target_os = "linux")]

@@ -118,7 +118,7 @@ impl Harness {
         let name = call.name();
         let args = call.arguments();
         match name {
-            "context_count" | "context_compact" | "context_recover" => {
+            "context_count" | "context_compact" | "context_recover" | "context_prompt" => {
                 self.context.call(name, args).await
             }
             "code_search" => self.search.call(args).await,
