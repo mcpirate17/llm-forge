@@ -88,10 +88,7 @@ pub fn errors_with_installed(
                     == Some(identity.compiled_git_commit.as_str())
                 && block.get("executable_sha256").and_then(Value::as_str)
                     == Some(identity.executable_sha256.as_str())
-        }) =>
-        {
-            ()
-        }
+        }) => {}
         _ => {
             return vec![
                 "native runner source fingerprint is unavailable or differs from this tree".into(),

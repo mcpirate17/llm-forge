@@ -209,6 +209,11 @@ Independent review confirmed this distinction. Publication checks remain pending
 global installation and client activation are unchanged. The next correctness slice
 is #190's automatic target-bound Cargo attribution, using engine-generated scenario
 logs and existing native value validators; outbound MCP follows that gap.
+The first full gate at `941578b` passed all test steps (4,548 passing executions,
+zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
+two lints. The fixes preserve behavior, passed independent review and focused core
+tests/Clippy, and require a fresh full publication receipt. The failed attempt is
+retained at `.git/forge-checks/run-1793857262705128812-559687/receipt.json`.
 
 ## Historical roadmap and delivery provenance
 

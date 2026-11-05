@@ -28,6 +28,10 @@ struct Runtime {
     binding_sha256: BTreeMap<String, String>,
     lineage: Option<Value>,
 }
+struct NativeBindings<'a> {
+    fingerprint: Option<&'a str>,
+    installed: Option<&'a crate::mutation_native_runner::InstalledIdentity>,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Request {
@@ -67,6 +71,10 @@ pub fn verify_captured_native(
         runtime_guard(runtime)?;
     }
     let paths = inventory(&request)?;
+    let native = NativeBindings {
+        fingerprint: native_fingerprint,
+        installed,
+    };
     let (receipts, mut malformed) = receipts(raw)?;
     malformed.extend(request.malformed_receipts.iter().cloned());
     let mut cache = Cache::new();
@@ -103,8 +111,7 @@ pub fn verify_captured_native(
                     receipt,
                     request.runtime.as_ref(),
                     &mut anchor,
-                    native_fingerprint,
-                    installed,
+                    &native,
                 )?,
                 Err(error) => vec![error.clone()],
             };
@@ -123,8 +130,7 @@ pub fn verify_captured_native(
                     receipt,
                     campaign,
                     request.runtime.as_ref(),
-                    native_fingerprint,
-                    installed,
+                    &native,
                 ),
                 errors: error_rows(&errors),
             });
@@ -192,15 +198,14 @@ fn validate(
     receipt: &Receipt,
     runtime: Option<&Runtime>,
     anchor: &mut impl FnMut(&str, &[u8], &Value) -> Result<(), String>,
-    native_fingerprint: Option<&str>,
-    installed: Option<&crate::mutation_native_runner::InstalledIdentity>,
+    native: &NativeBindings<'_>,
 ) -> Result<Vec<Rejection>, String> {
     let payload = value
         .as_object()
         .ok_or("expanded captured receipt is not an object")?;
     if campaign.generated {
-        let native = crate::mutation_native_runner::declared(payload);
-        if runtime.is_none() && !native {
+        let is_native = crate::mutation_native_runner::declared(payload);
+        if runtime.is_none() && !is_native {
             return Ok(vec![missing_runner()]);
         }
         let empty = RunnerState {
@@ -214,7 +219,8 @@ fn validate(
             runtime.map_or(&empty, |r| &r.runner),
             |path| {
                 if path == crate::mutation_native_runner::FINGERPRINT_KEY {
-                    native_fingerprint
+                    native
+                        .fingerprint
                         .map(str::to_string)
                         .or_else(|| runtime.and_then(|r| r.binding_sha256.get(path).cloned()))
                 } else {
@@ -226,7 +232,7 @@ fn validate(
                     .and_then(|r| r.lineage.as_ref())
                     .is_some_and(|lineage| rules::lineage_payload_accepts(recorded, lineage))
             },
-            installed,
+            native.installed,
         ));
     }
     let anchored = if payload["schema_version"] == "llm.mutation-testing.receipt.v2" {
@@ -266,8 +272,7 @@ fn summary_current(
     receipt: &Receipt,
     campaign: &CampaignContract,
     runtime: Option<&Runtime>,
-    native_fingerprint: Option<&str>,
-    installed: Option<&crate::mutation_native_runner::InstalledIdentity>,
+    native: &NativeBindings<'_>,
 ) -> bool {
     let runner_current = if let Some(payload) = receipt
         .value
@@ -278,7 +283,8 @@ fn summary_current(
             payload,
             |path| {
                 if path == crate::mutation_native_runner::FINGERPRINT_KEY {
-                    native_fingerprint
+                    native
+                        .fingerprint
                         .map(str::to_string)
                         .or_else(|| runtime.and_then(|r| r.binding_sha256.get(path).cloned()))
                 } else {
@@ -286,7 +292,7 @@ fn summary_current(
                 }
             },
             |_| false,
-            installed,
+            native.installed,
         )
         .is_empty()
     } else {
