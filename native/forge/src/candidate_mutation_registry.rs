@@ -10,6 +10,7 @@ pub(crate) struct Catalog {
     pub contracts: Vec<Value>,
     pub raw_manifests: BTreeMap<String, Value>,
     pub receipts: Vec<engine::CapturedReceipt>,
+    pub has_native_receipts: bool,
     pub broken: Vec<Value>,
     pub malformed: Vec<String>,
 }
@@ -71,6 +72,7 @@ pub(crate) fn catalog(
         contracts: Vec::new(),
         raw_manifests: BTreeMap::new(),
         receipts: Vec::new(),
+        has_native_receipts: false,
         broken: Vec::new(),
         malformed: Vec::new(),
     };
@@ -119,6 +121,9 @@ pub(crate) fn catalog(
                         .map(|value| (text, value))
                 }) {
                 Ok((text, value)) if value.is_object() => {
+                    result.has_native_receipts |= value
+                        .as_object()
+                        .is_some_and(conductor_native::mutation_native_runner::declared);
                     result.receipts.push(engine::CapturedReceipt {
                         path,
                         text: text.into(),

@@ -66,6 +66,8 @@ pub mod candidate_mutation_external_cli;
 #[cfg(target_os = "linux")]
 pub(crate) mod candidate_mutation_runner;
 #[cfg(target_os = "linux")]
+pub mod candidate_native_runner_pin;
+#[cfg(target_os = "linux")]
 pub mod candidate_plan;
 #[cfg(target_os = "linux")]
 pub mod candidate_policy;

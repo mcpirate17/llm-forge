@@ -75,3 +75,31 @@ fn native_inventory_matches_shared_fingerprint_and_detects_new_files() {
     write("native/forge/src/new_module.rs");
     assert!(held.verify().is_err());
 }
+
+#[test]
+fn installed_fallback_requires_held_absence_of_all_four_roots() {
+    for name in ["forge", "forge-cli", "conductor-native", "slop-core"] {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir_all(root.join("src/conductor")).unwrap();
+        fs::write(root.join("src/conductor/memory_sources.toml"), b"host").unwrap();
+        let mut held = LiveInputs::open(root).unwrap();
+        assert!(held.native_inventory_absent().unwrap());
+        held.verify().unwrap();
+        fs::create_dir_all(root.join("native").join(name)).unwrap();
+        assert!(held.verify().is_err());
+        let mut partial = LiveInputs::open(root).unwrap();
+        assert!(!partial.native_inventory_absent().unwrap());
+        assert_eq!(partial.native_source_fingerprint().unwrap(), None);
+    }
+}
+
+#[test]
+fn symlinked_root_is_not_absent() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir(dir.path().join("native")).unwrap();
+    symlink(dir.path(), dir.path().join("native/forge")).unwrap();
+    let mut held = LiveInputs::open(dir.path()).unwrap();
+    assert!(!held.native_inventory_absent().unwrap());
+    assert!(held.native_source_fingerprint().unwrap().is_none());
+}

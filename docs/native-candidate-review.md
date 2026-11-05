@@ -668,7 +668,19 @@ supports corruption detection and optional exact-tree binding via
 report always records `approval: false`. Review has no approval or promotion
 operation.
 
-#### Installed mutation runner bundle
+#### Installed native mutation runner
+
+Native receipts from a host without Forge sources can use independently selected
+`--native-runner-pin PATH --native-runner-pin-sha256 HEX`. Create the description with
+the selected clean binary's `forge mutation identity` before evaluating receipts.
+See [the pin and trust contract](mutation.md#installed-native-runner-identity).
+The pin must remain outside source, Git common, snapshot and scratch roots. Review
+and gate retain and reverify it and the candidate's existing `uv.lock` Git revision
+binding. Missing or partial native source inventory cannot implicitly authorize a
+receipt. This channel neither requires a Python bundle for native receipts nor
+replaces compatibility and test-quality evidence when those checks apply.
+
+#### Installed compatibility mutation runner bundle
 
 The optional `--mutation-runner-bundle` plus `--mutation-runner-sha256`
 provides a separately operator-selected compatibility-source manifest for

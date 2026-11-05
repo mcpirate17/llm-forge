@@ -3,12 +3,54 @@
 How campaigns are generated, run and audited. `forge mutation plan|write` is the
 native campaign writer and `forge mutation inspect|run` the native runner; hosts that
 have not migrated keep `conductor.mutation_campaign_generate` and
-`conductor.mutation_engine_generated`. The remaining commands live in
-`conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
+`conductor.mutation_engine_generated`. Native corpus auditing is available through
+`forge candidate mutation-corpus`; its legacy caller remains
+`conductor.mutation_patch_audit`. Other compatibility commands include `conductor.complete_scope_drift`
 (local check for `complete`-mode scope drift before the audit catches it) and
 `conductor.mutation_retention` (sweep); `make mutation-*` wraps the common flows.
 Forge ships these capabilities without requiring mutation campaigns or receipts for
 its own changes. A host such as LLM can adopt a separate evidence policy.
+
+## Installed native runner identity
+
+On Linux, `forge mutation identity` prints a bounded JSON description of the running
+executable: compiled Git revision, compiled source fingerprint and measured executable
+SHA-256. Dirty or unknown builds are refused. Before evaluating receipts, an operator
+can independently select a clean binary, save its description outside the host, Git
+common directory and scratch roots in a private directory, then pin those exact bytes:
+
+```sh
+umask 077
+/selected/forge mutation identity > /operator/private/forge-native.json
+sha256sum /operator/private/forge-native.json
+```
+
+Pass both `--native-runner-pin /operator/private/forge-native.json` and
+`--native-runner-pin-sha256 HEX` to native `candidate mutation-corpus`, `candidate
+review`, `candidate gate`, or the candidate benchmark. The schema is
+`llm.mutation-testing.native-runner-pin.v1`; unknown fields are refused. Selecting
+these independently measured bytes is an explicit operator input. A receipt, project
+file, environment variable or model response cannot supply that authority.
+
+Installed mode is eligible only when all four Forge source roots (`native/forge`,
+`native/forge-cli`, `native/conductor-native`, `native/slop-core`) are absent. Complete
+in-tree inventories retain source-fingerprint validation; partial, symlinked or
+unreadable inventories never enable fallback. Inputs and absence observations are
+held and rechecked through final disposition. The running binary and all three
+receipt identity fields must match the selected pin; dirty receipts still fail.
+Live baseline publication cannot overwrite the pin or a hardlink alias.
+
+All-native corpus audits need neither a Python runner bundle nor `uv.lock`.
+Candidate review and gate retain their existing engine-integrity requirement for
+the candidate's exact `conductor-tooling` Git revision in `uv.lock`, held through
+final verification. That candidate-controlled lock is additional consistency data,
+not operator authority. Legacy Python receipt validation still needs its separately
+selected compatibility bundle; Python APIs do not gain an ambient installed-pin path.
+
+This establishes cooperative identity consistency and freshness, not compiler,
+producer or execution attestation. Source/test/manifest hashes, complete measured
+mutation coverage, outcome accounting and test-quality requirements still apply.
+Identity acceptance alone does not establish corpus cleanliness or candidate approval.
 
 ## Optional risk-ranked planning
 

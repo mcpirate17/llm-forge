@@ -121,6 +121,7 @@ pub(crate) fn catalog(capture: &mut LiveInputs, registry: &Value) -> Result<Cata
         contracts: Vec::new(),
         raw_manifests: BTreeMap::new(),
         receipts: Vec::new(),
+        has_native_receipts: false,
         broken: Vec::new(),
         malformed: Vec::new(),
     };
@@ -148,10 +149,15 @@ pub(crate) fn catalog(capture: &mut LiveInputs, registry: &Value) -> Result<Cata
             match text(&bytes).and_then(|text| {
                 crate::tool_schema::parse_document_with_limit(text, 2 * 1024 * 1024)
             }) {
-                Ok(value) if value.is_object() => result.receipts.push(engine::CapturedReceipt {
-                    path,
-                    text: text(&bytes)?.to_owned(),
-                }),
+                Ok(value) if value.is_object() => {
+                    result.has_native_receipts |= value
+                        .as_object()
+                        .is_some_and(conductor_native::mutation_native_runner::declared);
+                    result.receipts.push(engine::CapturedReceipt {
+                        path,
+                        text: text(&bytes)?.to_owned(),
+                    });
+                }
                 _ => result.malformed.push(path),
             }
         }

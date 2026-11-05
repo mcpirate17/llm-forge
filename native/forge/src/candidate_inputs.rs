@@ -76,7 +76,7 @@ fn canonical(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn exclude(path: &Path, excluded: Option<&Path>) -> Result<()> {
+pub(crate) fn exclude(path: &Path, excluded: Option<&Path>) -> Result<()> {
     if let Some(excluded) = excluded {
         canonical(excluded)?;
         ensure!(

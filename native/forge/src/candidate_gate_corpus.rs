@@ -75,7 +75,9 @@ fn phase(report: Value, code: u8) -> Result<Phase> {
 }
 pub(super) struct Corpus<'a> {
     capture: Capture<'a>,
-    bundle: RunnerBundle,
+    bundle: Option<RunnerBundle>,
+    native_pin: Option<crate::candidate_native_runner_pin::NativeRunnerPin>,
+    native_lock: Option<crate::candidate_inputs::BoundFile>,
     checker: Checker<'a>,
     interpreters: Vec<Interpreter>,
     pub phase: Phase,
@@ -83,7 +85,15 @@ pub(super) struct Corpus<'a> {
 impl Corpus<'_> {
     pub fn verify(&self) -> Result<()> {
         self.capture.verify()?;
-        self.bundle.verify()?;
+        if let Some(bundle) = &self.bundle {
+            bundle.verify()?;
+        }
+        if let Some(pin) = &self.native_pin {
+            pin.verify()?;
+        }
+        if let Some(lock) = &self.native_lock {
+            lock.verify()?;
+        }
         self.checker.verify()?;
         for item in &self.interpreters {
             item.verify()?;
@@ -91,12 +101,88 @@ impl Corpus<'_> {
         Ok(())
     }
 }
+fn require_installed_lock(
+    commit: Option<&str>,
+    lock: Option<crate::candidate_inputs::BoundFile>,
+    stamp: &crate::candidate_engine_identity::BuildStamp,
+) -> Result<crate::candidate_inputs::BoundFile> {
+    anyhow::ensure!(
+        commit == Some(stamp.git_commit),
+        "candidate uv.lock does not pin the running native CLI revision"
+    );
+    lock.context("installed candidate runner requires held uv.lock")
+}
+fn capture_bundle(
+    args: &GateArgs,
+    selection: &Selection,
+    source: &Source,
+    snapshot: &Snapshot,
+) -> Result<Option<RunnerBundle>> {
+    Ok(
+        match (
+            &args.review.mutation_runner_bundle,
+            &args.review.mutation_runner_sha256,
+        ) {
+            (Some(manifest), Some(sha256)) => Some(RunnerBundle::capture(
+                RunnerBundleSpec { manifest, sha256 },
+                source,
+                snapshot,
+                std::slice::from_ref(&selection.grants.scratch_parent),
+            )?),
+            (None, None) => None,
+            _ => anyhow::bail!("runner bundle and sha256 must be supplied together"),
+        },
+    )
+}
+type GateNative = (
+    Option<crate::candidate_native_runner_pin::NativeRunnerPin>,
+    Option<crate::candidate_inputs::BoundFile>,
+);
+fn capture_native(
+    args: &GateArgs,
+    selection: &Selection,
+    source: &Source,
+    snapshot: &Snapshot,
+    stamp: &crate::candidate_engine_identity::BuildStamp,
+    capture: &mut Capture<'_>,
+) -> Result<GateNative> {
+    let native_pin = match (
+        &args.review.native_runner_pin,
+        &args.review.native_runner_pin_sha256,
+    ) {
+        (Some(path), Some(sha256)) => Some(
+            crate::candidate_native_runner_pin::NativeRunnerPin::capture(
+                path,
+                sha256,
+                &[
+                    source.root().to_owned(),
+                    source.common_dir().to_owned(),
+                    snapshot.path(),
+                    selection.grants.scratch_parent.clone(),
+                ],
+                stamp,
+            )?,
+        ),
+        (None, None) => None,
+        _ => anyhow::bail!("native runner pin and sha256 must be supplied together"),
+    };
+    let native_lock = if native_pin.is_some() && capture.native_inventory_absent()? {
+        let entries = source.list_tree(&selection.candidate.tree_oid)?;
+        let (commit, _, lock) =
+            crate::candidate_engine_identity::installed_pin(snapshot, &entries)?;
+        Some(require_installed_lock(commit.as_deref(), lock, stamp)?)
+    } else {
+        None
+    };
+    Ok((native_pin, native_lock))
+}
 pub(super) fn collect<'a>(
     args: &GateArgs,
     selection: &'a Selection,
     source: &Source,
     snapshot: &'a Snapshot,
     interrupts: &'a crate::process_signals::Interrupts,
+    stamp: &crate::candidate_engine_identity::BuildStamp,
 ) -> Result<Corpus<'a>> {
     let mut capture = Capture::new(
         source,
@@ -113,31 +199,10 @@ pub(super) fn collect<'a>(
         conductor_native::project_paths::mutation_registry_from_config(config.as_ref())
             .map_err(anyhow::Error::msg)?;
     let path = crate::mutation_corpus_cli::baseline_path(&configured, None)?;
-    let baseline = if capture.inputs.entries.contains_key(&path) {
-        Some(capture.json(&path)?)
-    } else {
-        capture.inputs.absent(&path)?;
-        None
-    };
-    let manifest = args
-        .review
-        .mutation_runner_bundle
-        .as_deref()
-        .context("corpus audit requires a pinned mutation runner bundle")?;
-    let digest = args
-        .review
-        .mutation_runner_sha256
-        .as_deref()
-        .context("corpus audit requires the mutation runner bundle SHA-256")?;
-    let bundle = RunnerBundle::capture(
-        RunnerBundleSpec {
-            manifest,
-            sha256: digest,
-        },
-        source,
-        snapshot,
-        std::slice::from_ref(&selection.grants.scratch_parent),
-    )?;
+    let baseline = crate::mutation_corpus_cli::capture_baseline(&mut capture, &path)?;
+    let bundle = capture_bundle(args, selection, source, snapshot)?;
+    let (native_pin, native_lock) =
+        capture_native(args, selection, source, snapshot, stamp, &mut capture)?;
     let profile = crate::mutation_corpus_git_profile::Profile::open(
         &args.git_build_profile,
         &args.git_build_profile_sha256,
@@ -159,10 +224,11 @@ pub(super) fn collect<'a>(
         })
         .map(|row| row.path.clone())
         .collect();
-    let (report, code, _, interpreters) = mutation_corpus_audit::audit(
+    let (report, code, _, interpreters) = mutation_corpus_audit::audit_installed(
         &catalog,
         &mut capture,
-        &bundle,
+        bundle.as_ref(),
+        native_pin.as_ref(),
         &checker,
         mutation_corpus_audit::AuditOptions {
             changed: &changed,
@@ -176,6 +242,8 @@ pub(super) fn collect<'a>(
     let result = Corpus {
         capture,
         bundle,
+        native_pin,
+        native_lock,
         checker,
         interpreters,
         phase,

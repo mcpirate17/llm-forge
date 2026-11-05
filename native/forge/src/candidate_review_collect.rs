@@ -87,6 +87,7 @@ pub(super) fn run(
     let mutation = run_mutation(
         args,
         &context,
+        stamp,
         selection,
         runtime,
         interrupts,
@@ -178,6 +179,7 @@ fn finish_checks(
 fn run_mutation<'a>(
     args: &'a ReviewArgs,
     context: &Captured<'a>,
+    stamp: &'a BuildStamp,
     execution: &Arc<Selection>,
     runtime: &tokio::runtime::Runtime,
     interrupts: &Interrupts,
@@ -206,6 +208,11 @@ fn run_mutation<'a>(
             policy: &context.selection.policy,
             today: context.selection.date(),
             runner,
+            native_runner_pin: args
+                .native_runner_pin
+                .as_deref()
+                .zip(args.native_runner_pin_sha256.as_deref()),
+            stamp: Some(stamp),
             scratch_exclusions: std::slice::from_ref(&context.selection.grants.scratch_parent),
             grandfather: context.selection.grants.mutation_grandfather.as_ref(),
             waiver_policy_sha256: context

@@ -17,6 +17,7 @@ pub(crate) trait CorpusInputs {
     fn hash(&mut self, path: &str) -> Result<Option<String>>;
     fn present(&mut self, path: &str) -> Result<bool>;
     fn verify_inputs(&self) -> Result<()>;
+    fn native_inventory_absent(&mut self) -> Result<bool>;
 }
 impl CorpusInputs for Capture<'_> {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
@@ -37,6 +38,9 @@ impl CorpusInputs for Capture<'_> {
     fn verify_inputs(&self) -> Result<()> {
         self.verify()
     }
+    fn native_inventory_absent(&mut self) -> Result<bool> {
+        self.native_inventory_absent()
+    }
 }
 impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
@@ -53,6 +57,9 @@ impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
     }
     fn verify_inputs(&self) -> Result<()> {
         self.verify()
+    }
+    fn native_inventory_absent(&mut self) -> Result<bool> {
+        self.native_inventory_absent()
     }
 }
 fn string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
@@ -186,7 +193,8 @@ fn campaign_receipts(
     campaign: &Value,
     rows: &[Value],
     capture: &mut dyn CorpusInputs,
-    bundle: &RunnerBundle,
+    bundle: Option<&RunnerBundle>,
+    installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
 ) -> Result<(Option<Value>, Vec<Value>, Vec<Value>)> {
     let id = string(campaign, "campaign_id")?;
     let symbols: BTreeSet<_> = keys(&campaign["source_symbols"])?.into_iter().collect();
@@ -197,16 +205,31 @@ fn campaign_receipts(
         source_symbols: &symbols,
     };
     let reject = |row: &Value, capture: &mut dyn CorpusInputs| {
-        receipts::rejection(
+        if bundle.is_none()
+            && !row
+                .as_object()
+                .is_some_and(conductor_native::mutation_native_runner::declared)
+        {
+            return Ok(Some(
+                "Python receipt requires an operator-pinned runner bundle".into(),
+            ));
+        }
+        let empty = json!({});
+        receipts::rejection_with_installed(
             &view,
             row,
-            &bundle.runner["components"],
+            bundle.map_or(&empty, |bundle| &bundle.runner["components"]),
             |path| capture.hash(path),
             |recorded| {
-                Ok(bundle.lineage.as_ref().is_some_and(|lineage| {
-                    conductor_native::mutation_evidence::captured_lineage_accepts(recorded, lineage)
-                }))
+                Ok(bundle
+                    .and_then(|bundle| bundle.lineage.as_ref())
+                    .is_some_and(|lineage| {
+                        conductor_native::mutation_evidence::captured_lineage_accepts(
+                            recorded, lineage,
+                        )
+                    }))
             },
+            installed,
         )
     };
     let mut reasons = BTreeSet::new();
@@ -249,7 +272,8 @@ fn scope(catalog: &Catalog, campaign: &Value) -> Result<CampaignScope> {
 fn reproduction(
     catalog: &Catalog,
     capture: &mut dyn CorpusInputs,
-    bundle: &RunnerBundle,
+    bundle: Option<&RunnerBundle>,
+    installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
     changed: &[String],
     root: &Path,
     checker: &Checker<'_>,
@@ -269,7 +293,8 @@ fn reproduction(
             interpreter_bindings.push(binding);
         }
         let rows = grouped.get(id).map_or(&[][..], Vec::as_slice);
-        let (failure, missing, tests) = campaign_receipts(campaign, rows, capture, bundle)?;
+        let (failure, missing, tests) =
+            campaign_receipts(campaign, rows, capture, bundle, installed)?;
         evidence.extend(failure);
         unmeasured.extend(missing);
         inert.extend(tests);
@@ -316,7 +341,8 @@ pub(crate) struct AuditOptions<'a> {
 }
 
 pub(crate) struct PublicationEvidence<'a, 'snapshot> {
-    pub bundle: &'a RunnerBundle,
+    pub bundle: Option<&'a RunnerBundle>,
+    pub native_pin: Option<&'a crate::candidate_native_runner_pin::NativeRunnerPin>,
     pub checker: &'a Checker<'snapshot>,
     pub lease: &'a crate::candidate_review_lock::ReviewLock,
     pub list: Option<&'a crate::candidate_inputs::BoundFile>,
@@ -324,7 +350,12 @@ pub(crate) struct PublicationEvidence<'a, 'snapshot> {
 }
 impl PublicationEvidence<'_, '_> {
     pub(crate) fn verify(&self) -> Result<()> {
-        self.bundle.verify()?;
+        if let Some(bundle) = self.bundle {
+            bundle.verify()?;
+        }
+        if let Some(pin) = self.native_pin {
+            pin.verify()?;
+        }
         self.checker.verify()?;
         for interpreter in self.interpreters {
             interpreter.verify()?;
@@ -337,14 +368,30 @@ impl PublicationEvidence<'_, '_> {
     }
 }
 
-/// Run the complete corpus observation using held snapshot, runner and baseline bytes.
-pub(crate) fn audit(
+/// Run the corpus observation over held candidate inputs and operator pins.
+pub(crate) fn audit_installed(
     catalog: &Catalog,
     capture: &mut dyn CorpusInputs,
-    bundle: &RunnerBundle,
+    bundle: Option<&RunnerBundle>,
+    native_pin: Option<&crate::candidate_native_runner_pin::NativeRunnerPin>,
     checker: &Checker<'_>,
     options: AuditOptions<'_>,
 ) -> Result<(Value, u8, Value, Vec<Interpreter>)> {
+    let installed = if let Some(pin) = native_pin {
+        if capture.native_inventory_absent()? {
+            Some(pin.identity())
+        } else {
+            anyhow::ensure!(
+                capture
+                    .hash(conductor_native::mutation_native_runner::FINGERPRINT_KEY)?
+                    .is_some(),
+                "partial native source inventory"
+            );
+            None
+        }
+    } else {
+        None
+    };
     let AuditOptions {
         changed,
         baseline,
@@ -353,10 +400,16 @@ pub(crate) fn audit(
         record,
     } = options;
     checker.poll()?;
-    bundle.verify()?;
+    if let Some(bundle) = bundle {
+        bundle.verify()?;
+    }
+    if let Some(pin) = native_pin {
+        pin.verify()?;
+    }
     capture.verify_inputs()?;
     let mut patches = patch_rows(catalog, checker, root)?;
-    let (mut repro, interpreters) = reproduction(catalog, capture, bundle, changed, root, checker)?;
+    let (mut repro, interpreters) =
+        reproduction(catalog, capture, bundle, installed, changed, root, checker)?;
     let found = delta::findings(&patches, &repro)?;
     let recorded = json!({"schema_version":1,"note":"Registered mutant reproducibility debt; this baseline is a ratchet.",
         "stale_mutations":found["stale_mutations"],"unloadable_manifests":found["unloadable_manifests"],
@@ -396,7 +449,12 @@ pub(crate) fn audit(
         }
     }
     capture.verify_inputs()?;
-    bundle.verify()?;
+    if let Some(bundle) = bundle {
+        bundle.verify()?;
+    }
+    if let Some(pin) = native_pin {
+        pin.verify()?;
+    }
     checker.verify()?;
     for interpreter in &interpreters {
         interpreter.verify()?;

@@ -19,12 +19,30 @@ fn hex(value: Option<&str>, length: usize) -> bool {
     })
 }
 
+/// Supplied only by a coordinator that has independently held and checked an operator pin.
+#[derive(Clone, Debug)]
+pub struct InstalledIdentity {
+    pub compiled_source_sha256: String,
+    pub compiled_git_commit: String,
+    pub executable_sha256: String,
+}
+
 /// Validate the self-reported identity and compare it with independently held
 /// current inputs. Legacy partial component maps cannot establish freshness.
 pub fn errors(
     payload: &Map<String, Value>,
     hash: impl Fn(&str) -> Option<String>,
     _lineage: impl Fn(Option<&Value>) -> bool,
+) -> Vec<String> {
+    errors_with_installed(payload, hash, _lineage, None)
+}
+
+/// `installed` is independently held and checked coordinator input, never receipt data.
+pub fn errors_with_installed(
+    payload: &Map<String, Value>,
+    hash: impl Fn(&str) -> Option<String>,
+    _lineage: impl Fn(Option<&Value>) -> bool,
+    installed: Option<&InstalledIdentity>,
 ) -> Vec<String> {
     let Some(block) = payload.get("native_runner").and_then(Value::as_object) else {
         return vec!["native_runner is missing".into()];
@@ -62,10 +80,23 @@ pub fn errors(
         return vec!["native_runner was built from a dirty source tree".into()];
     }
     let expected = block.get("compiled_source_sha256").and_then(Value::as_str);
-    if hash(FINGERPRINT_KEY).as_deref() != expected {
-        return vec![
-            "native runner source fingerprint is unavailable or differs from this tree".into(),
-        ];
+    match hash(FINGERPRINT_KEY) {
+        Some(current) if Some(current.as_str()) == expected => (),
+        None if installed.is_some_and(|identity| {
+            Some(identity.compiled_source_sha256.as_str()) == expected
+                && block.get("compiled_git_commit").and_then(Value::as_str)
+                    == Some(identity.compiled_git_commit.as_str())
+                && block.get("executable_sha256").and_then(Value::as_str)
+                    == Some(identity.executable_sha256.as_str())
+        }) =>
+        {
+            ()
+        }
+        _ => {
+            return vec![
+                "native runner source fingerprint is unavailable or differs from this tree".into(),
+            ]
+        }
     }
     let expanded = match crate::receipt_slim::expand_receipt(&Value::Object(payload.clone())) {
         Ok(value) => value,
@@ -144,6 +175,39 @@ mod tests {
         assert!(errors(&receipt(), |_| Some("b".repeat(64)), |_| false).is_empty());
         assert!(!errors(&receipt(), |_| Some("c".repeat(64)), |_| true).is_empty());
         assert!(!errors(&receipt(), |_| None, |_| true).is_empty());
+    }
+
+    #[test]
+    fn installed_identity_requires_every_field_and_never_waives_tree_drift() {
+        let identity = InstalledIdentity {
+            executable_sha256: "a".repeat(64),
+            compiled_source_sha256: "b".repeat(64),
+            compiled_git_commit: "c".repeat(40),
+        };
+        let check = |current: Option<String>, pin: &InstalledIdentity| {
+            errors_with_installed(&receipt(), |_| current.clone(), |_| false, Some(pin))
+        };
+        assert!(check(None, &identity).is_empty());
+        assert!(!check(Some("d".repeat(64)), &identity).is_empty());
+        for changed in [
+            InstalledIdentity {
+                executable_sha256: "d".repeat(64),
+                ..identity.clone()
+            },
+            InstalledIdentity {
+                compiled_source_sha256: "d".repeat(64),
+                ..identity.clone()
+            },
+            InstalledIdentity {
+                compiled_git_commit: "d".repeat(40),
+                ..identity.clone()
+            },
+        ] {
+            assert!(!check(None, &changed).is_empty());
+        }
+        let mut dirty = receipt();
+        dirty["native_runner"]["source_matches_git"] = json!(false);
+        assert!(!errors_with_installed(&dirty, |_| None, |_| false, Some(&identity)).is_empty());
     }
 
     #[test]

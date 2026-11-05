@@ -218,7 +218,7 @@ fn snapshot_run(
     phases.push(waivers::run(selection)?);
     let closure = closure::Closure::collect(source)?;
     phases.push(closure.phase.clone());
-    let corpus = corpus::collect(&args, selection, source, snapshot, interrupts)?;
+    let corpus = corpus::collect(&args, selection, source, snapshot, interrupts, stamp)?;
     phases.push(corpus.phase.clone());
     let budget = budget::collect(source, snapshot, interrupts)?;
     phases.push(budget.phase.clone());
