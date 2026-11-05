@@ -385,6 +385,8 @@ impl Supervisor<'_> {
         command
             .args(arguments)
             .current_dir(cwd)
+            // This mutation-owned key is supplied only by the selected guest.
+            .env_remove("CONDUCTOR_SNAPSHOT_PYTHON")
             .envs(environment)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

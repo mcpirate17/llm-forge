@@ -19,7 +19,7 @@ use crate::mutation_score::{
     account, record_baseline, rows, score, status, Receipt, BASELINE_FAILED, CANCELLED, ERROR,
     RUNNING,
 };
-use crate::mutation_snapshot::{snapshot_python, Snapshot};
+use crate::mutation_snapshot::{configured_snapshot_python, snapshot_python, Snapshot};
 use crate::mutation_write::atomic_write;
 use crate::process_signals::Interrupts;
 use conductor_native::mutation_native_runner::{RUNNER_KIND, RUNNER_SCHEMA};
@@ -73,13 +73,13 @@ pub struct EngineRun<'a> {
     pub output_path: &'a Path,
     pub repo_root: &'a Path,
     pub worktree: &'a Path,
-    pub interpreter: &'a str,
+    pub interpreter: Option<&'a str>,
     pub supervisor: &'a Supervisor<'a>,
     /// The engine's own mutant count, set as soon as a report states one.
     pub planned: Option<u64>,
 }
 
-impl EngineRun<'_> {
+impl<'a> EngineRun<'a> {
     /// One child, bound to the private bytecode cache of the directory it runs in.
     pub fn run(
         &self,
@@ -89,7 +89,8 @@ impl EngineRun<'_> {
         environment: &BTreeMap<String, String>,
         mutated_paths: &[PathBuf],
     ) -> Step<(CommandResult, String)> {
-        let isolated = isolated_python_env(environment, &scratch_root_for(cwd), mutated_paths)?;
+        let bound = self.guest_environment(environment);
+        let isolated = isolated_python_env(&bound, &scratch_root_for(cwd), mutated_paths)?;
         self.supervisor.run(argv, cwd, timeout_seconds, &isolated)
     }
 
@@ -148,12 +149,28 @@ impl EngineRun<'_> {
         self.require_executed(rows.len() as u64, tested as u64)
     }
 
-    /// `CONDUCTOR_SNAPSHOT_PYTHON`, for tests that drive Python from a snapshot.
-    pub fn snapshot_python_entry(&self) -> (String, String) {
-        (
-            SNAPSHOT_PYTHON_ENV.to_string(),
-            self.interpreter.to_string(),
-        )
+    /// Python-only adapters must never use an absent guest as an empty command.
+    pub fn require_python(&self) -> Result<&'a str, String> {
+        self.interpreter
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| "this mutation operation requires a Python guest".into())
+    }
+
+    /// The selected guest owns this key, overriding contradictory campaign values.
+    pub(crate) fn guest_environment(
+        &self,
+        environment: &BTreeMap<String, String>,
+    ) -> BTreeMap<String, String> {
+        let mut bound = environment.clone();
+        match self.interpreter {
+            Some(interpreter) => {
+                bound.insert(SNAPSHOT_PYTHON_ENV.into(), interpreter.into());
+            }
+            None => {
+                bound.remove(SNAPSHOT_PYTHON_ENV);
+            }
+        }
+        bound
     }
 
     /// Prove the pinned bytes held, in the snapshot and in the live repository.
@@ -219,7 +236,7 @@ fn relative_to_repo(path: &Path, repo_root: &Path) -> Option<String> {
 fn open_receipt(
     campaign: &Campaign,
     repo_root: &Path,
-    interpreter: &str,
+    interpreter: Option<&str>,
     stamp: &BuildStamp,
     opened: f64,
 ) -> Result<Receipt, String> {
@@ -293,9 +310,17 @@ fn resolve_receipt_path(
 }
 
 /// The engine binary this campaign would run, or why it cannot.
-fn engine_binary(campaign: &Campaign, interpreter: &str) -> Result<String, String> {
+fn selected_interpreter(campaign: &Campaign, repo_root: &Path) -> Result<Option<String>, String> {
     match campaign.mutation_engine.as_str() {
-        "fest" => fest::binary(interpreter),
+        "fest" => snapshot_python(repo_root).map(Some),
+        "cargo-mutants" | "mull" => configured_snapshot_python(repo_root),
+        other => Err(format!("{other} has no native adapter")),
+    }
+}
+
+fn engine_binary(campaign: &Campaign, interpreter: Option<&str>) -> Result<String, String> {
+    match campaign.mutation_engine.as_str() {
+        "fest" => fest::binary(interpreter.ok_or("fest requires a Python guest")?),
         "cargo-mutants" => cargo::binary(),
         "mull" => mull::binary(),
         other => Err(format!("{other} has no native adapter")),
@@ -317,7 +342,7 @@ struct Execution<'a> {
     receipt: &'a mut Receipt,
     output_path: &'a Path,
     repo_root: &'a Path,
-    interpreter: &'a str,
+    interpreter: Option<&'a str>,
     binary: &'a str,
     supervisor: &'a Supervisor<'a>,
     planned: &'a mut Option<u64>,
@@ -433,10 +458,16 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
         &request.base,
         &request.only,
     )?;
-    let interpreter = snapshot_python(&repo_root)?;
-    let binary = engine_binary(&campaign, &interpreter)?;
+    let interpreter = selected_interpreter(&campaign, &repo_root)?;
+    let binary = engine_binary(&campaign, interpreter.as_deref())?;
     let opened = now();
-    let mut receipt = open_receipt(&campaign, &repo_root, &interpreter, &request.stamp, opened)?;
+    let mut receipt = open_receipt(
+        &campaign,
+        &repo_root,
+        interpreter.as_deref(),
+        &request.stamp,
+        opened,
+    )?;
     let cap = memory_cap()?;
     receipt.insert("memory_cap_bytes".into(), json!(cap.map(|cap| cap.limit)));
     let (output, relative) =
@@ -455,7 +486,7 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
         receipt: &mut receipt,
         output_path: &output,
         repo_root: &repo_root,
-        interpreter: &interpreter,
+        interpreter: interpreter.as_deref(),
         binary: &binary,
         supervisor: &supervisor,
         planned: &mut planned,
@@ -473,9 +504,9 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
 /// Whether the campaign could run now, without running it.
 pub fn inspect(campaign: &Campaign, repo_root: &Path) -> Result<Map<String, Value>, String> {
     let mut reasons = Vec::new();
-    let interpreter = snapshot_python(repo_root);
+    let interpreter = selected_interpreter(campaign, repo_root);
     let binary = interpreter
-        .and_then(|interpreter| engine_binary(campaign, &interpreter))
+        .and_then(|interpreter| engine_binary(campaign, interpreter.as_deref()))
         .map_err(|error| reasons.push(error))
         .ok();
     for (relative, expected) in &campaign.source_sha256 {

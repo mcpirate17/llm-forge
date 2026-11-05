@@ -283,12 +283,22 @@ The Cargo adapter spells a root-package manifest as `./Cargo.toml` when invoking
 cargo-mutants, preserving a nonempty parent directory without modifying the
 generated manifest. Nested and absolute manifest argument spelling is preserved.
 
-Three things still need Python. fest is a Python tool, the campaign's interpreter must
-be able to import `conductor` for the `mutation_pycache_evict` pytest plugin, and it
-needs `pytest-cov` (the `mutation` extra), or the baseline fails on `--cov`.
-`[tool.conductor].snapshot_python` names that interpreter. The current runner also
-resolves an interpreter for Rust and Mull runs to support guest test adapters;
-removing that unconditional dependency remains migration work.
+Python remains necessary for fest: its interpreter must import `conductor` for
+the `mutation_pycache_evict` pytest plugin and have `pytest-cov` (the `mutation`
+extra), or the baseline fails on `--cov`. `[tool.conductor].snapshot_python`
+selects that interpreter; without it, fest retains host-venv/PATH discovery.
+
+Rust and Mull campaigns do not discover or require Python by default. An explicit
+`snapshot_python` selects a guest interpreter for tests that need one. Without
+that setting, the receipt records `interpreter: null`, and supervised engine,
+test and attribution children cannot inherit a stale `CONDUCTOR_SNAPSHOT_PYTHON`
+from either the caller or campaign.
+An explicit selection owns that environment key. Native bytecode-cache isolation
+remains active for guest tests; it creates directories and environment settings
+without invoking Python. Invalid configuration types and blank selections fail
+explicitly. The configured path or command is recorded, not its executable bytes;
+this selection is not interpreter binary attestation. External tools and project
+tests still require their own declared toolchains.
 
 A receipt names its runner with `runner_kind: forge-native` and a `native_runner`
 block in place of the Python runner's hashes. A build whose native fingerprint

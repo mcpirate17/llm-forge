@@ -74,7 +74,7 @@ fn attributed(dir: &Path, pytest: &str, timeout: i64, mutants: Vec<Value>) -> (S
         output_path: &output,
         repo_root: dir,
         worktree: dir,
-        interpreter: "/venv/bin/python",
+        interpreter: Some("/venv/bin/python"),
         supervisor: &supervisor,
         planned: None,
     };

@@ -389,7 +389,7 @@ fn measure_kills(
     fs::create_dir_all(&reports)
         .map_err(|error| format!("cannot create {}: {error}", reports.display()))?;
     let mut session = Session {
-        argv: pinned(&run.campaign.test_argv, run.interpreter),
+        argv: pinned(&run.campaign.test_argv, run.require_python()?),
         environment,
         reports,
         timeout: run.campaign.run_timeout_seconds,

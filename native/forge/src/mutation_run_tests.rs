@@ -51,8 +51,14 @@ fn pinned_host(dir: &Path) -> (PathBuf, Campaign) {
 fn a_receipt_names_the_compiled_runner_and_no_python_file() {
     let dir = tempfile::tempdir().unwrap();
     let (root, subject) = pinned_host(dir.path());
-    let receipt =
-        open_receipt(&subject, &root, "/venv/bin/python", &STAMP, 1_700_000_000.0).unwrap();
+    let receipt = open_receipt(
+        &subject,
+        &root,
+        Some("/venv/bin/python"),
+        &STAMP,
+        1_700_000_000.0,
+    )
+    .unwrap();
     assert_eq!(receipt["schema_version"], RECEIPT_SCHEMA);
     assert_eq!(receipt["status"], RUNNING);
     assert_eq!(receipt["manifest"], "campaign.json");
@@ -87,7 +93,7 @@ fn a_manifest_outside_the_repository_is_refused() {
     let subject = campaign(elsewhere.path(), json!({}));
     let root = absolute_resolved(repository.path()).unwrap();
     assert_eq!(
-        open_receipt(&subject, &root, "/python", &STAMP, 0.0).unwrap_err(),
+        open_receipt(&subject, &root, Some("/python"), &STAMP, 0.0).unwrap_err(),
         "campaign manifest must be inside the repository"
     );
 }
@@ -278,5 +284,79 @@ fn inspection_names_a_missing_engine() {
             .as_str()
             .unwrap()
             .contains("fest is not installed"));
+    }
+}
+
+#[test]
+fn only_fest_discovers_python_and_native_receipts_record_no_guest() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), ".venv/bin/python", "");
+    for engine in ["cargo-mutants", "mull"] {
+        let subject = campaign(dir.path(), json!({"mutation_engine": engine}));
+        assert_eq!(selected_interpreter(&subject, dir.path()).unwrap(), None);
+        let receipt = open_receipt(&subject, dir.path(), None, &STAMP, 0.0).unwrap();
+        assert!(receipt["interpreter"].is_null());
+    }
+    let subject = campaign(dir.path(), json!({}));
+    assert_eq!(
+        selected_interpreter(&subject, dir.path()).unwrap(),
+        Some(
+            dir.path()
+                .join(".venv/bin/python")
+                .to_string_lossy()
+                .into_owned()
+        )
+    );
+    assert!(engine_binary(&subject, None)
+        .unwrap_err()
+        .contains("requires a Python guest"));
+    write(
+        dir.path(),
+        "pyproject.toml",
+        "[tool.conductor]\nsnapshot_python='/configured/python'\n",
+    );
+    for engine in ["fest", "cargo-mutants", "mull"] {
+        let subject = campaign(dir.path(), json!({"mutation_engine": engine}));
+        assert_eq!(
+            selected_interpreter(&subject, dir.path()).unwrap(),
+            Some("/configured/python".into())
+        );
+    }
+    write(
+        dir.path(),
+        "pyproject.toml",
+        "[tool.conductor]\nsnapshot_python=3\n",
+    );
+    for engine in ["fest", "cargo-mutants", "mull"] {
+        let subject = campaign(dir.path(), json!({"mutation_engine": engine}));
+        assert!(selected_interpreter(&subject, dir.path()).is_err());
+    }
+}
+
+#[test]
+fn guest_selection_clears_inherited_and_campaign_environment_without_losing_cache_isolation() {
+    const CHILD: &str = "FORGE_OPTIONAL_PYTHON_GUEST_CHILD";
+    if std::env::var(CHILD).as_deref() != Ok("1") {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "mutation_run::tests::guest_selection_clears_inherited_and_campaign_environment_without_losing_cache_isolation", "--nocapture"])
+            .env(CHILD, "1").env(SNAPSHOT_PYTHON_ENV, "/stale/inherited")
+            .output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    for (interpreter, expected) in [
+        (None, "absent"),
+        (Some("/selected/python"), "/selected/python"),
+    ] {
+        crate::mutation_run_test_support::with_run(dir.path(), interpreter, json!({}), |run| {
+            let environment =
+                BTreeMap::from([(SNAPSHOT_PYTHON_ENV.into(), "/stale/campaign".into())]);
+            let argv = ["/bin/sh", "-c", "test -d \"$PYTHONPYCACHEPREFIX\" && printf '%s' \"${CONDUCTOR_SNAPSHOT_PYTHON-absent}\""]
+                .map(str::to_string);
+            let (result, stdout) = run.run(&argv, dir.path(), 5, &environment, &[]).unwrap();
+            assert!(result.succeeded());
+            assert_eq!(stdout, expected);
+        });
     }
 }

@@ -4,7 +4,7 @@
 
 This is the canonical performance and effectiveness report; current mission status
 and ordered continuation are in [the roadmap](roadmap.md#current-mission-checkpoint--2026-11-04).
-Source baseline is `9117c2fb6436251d0de50038db85ef7fbb81e4b3`, on pending
+Source baseline is `9117c2fb6436251d0de50038db85ef7fbb81e4b3`; the repair landed in
 [PR #185](https://github.com/mcpirate17/llm-forge/pull/185). Pre-change observations,
 repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
@@ -120,6 +120,47 @@ measurements; native relocation's recorded slowdown remains visible rather than
 being generalized into a language-performance claim.
 
 ## Benchmark and comparison contract
+
+### Rust mutation workflow without Python — 2026-11-04
+
+A matched behavior check used two identical, dependency-free Rust fixtures with
+the same automatically generated campaign manifest and no `snapshot_python`
+setting or host venv. Each child received a private native-tool allowlist on
+`PATH`, containing Rust/Cargo 1.98.0, cargo-mutants 27.1.0, Git and native compiler
+utilities. Neither `python` nor `python3` was discoverable. The actual Rust test
+also asserts those names are absent from its `PATH` and the guest interpreter
+variable is unset. The [machine-generated summary](../research/performance/forge-program-20261104-no-python-behavior.json)
+records tool/binary hashes, configuration, source/test hashes and raw evidence paths.
+
+| Binary | Inspect / run | Completed mutant work | Receipt interpreter | Cleanup |
+| --- | --- | --- | --- | --- |
+| Merged repair's verified build (`966ae9a`) | `NOT_READY` (3) / `REFUSED` (4): missing Python | No campaign executed | No receipt | No snapshot created |
+| Optional-guest working build | `READY` (0) / `PASS` (0) | 2 planned, 2 completed and killed; 0 failed/censored/unstarted | `null` | Snapshot removed |
+
+The baseline binary SHA-256 is
+`fe7145e55fe0c086d581d3a03cde187c87f30c2b966b3617318dc8f64693cd64`;
+the changed binary is
+`72ca1693a5f60c53a0f09f102b5bcfc112733e3f26d2feb094e25f57b61b2c01`.
+The checked live source, test and configuration files were unchanged. The new
+runner updated its generated manifest only to record the initial empty survivor
+baseline; the original and updated manifest hashes are retained. The Rust
+baseline command took 0.142 s and its engine 0.383 s in this one fixture, not a
+latency distribution or matched speedup against the refused command.
+
+The parent measurement harness uses Python outside the Forge child environment.
+PATH control is not an OS sandbox: absolute interpreter paths remain accessible.
+The working binary is dirty and the tiny hosts lack Forge sources, so the PASS
+is runtime behavior evidence, not registered governance evidence. Mull has
+adapter/environment unit coverage here, not a new real-engine no-Python trial.
+Fest retains its Python requirement. No agent-productivity or token-cost claim
+follows from this check.
+
+To reproduce, use the two-function Rust fixture described below, omit
+`snapshot_python`, and add the two environment assertions to its integration test.
+Run each pinned binary's automatic writer, inspect and runner with identical
+explicit native-only `PATH`, private Cargo/home/temp directories, offline Cargo,
+one worker and a 120-second engine bound. Keep manifests and receipts untouched;
+retain refusal, generated baseline updates, accounting, source checks and cleanup.
 
 ### Native mutation behavior checks — 2026-11-04
 
