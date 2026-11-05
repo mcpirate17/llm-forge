@@ -65,9 +65,10 @@ this audit.
    explicit permissions, source-backed evidence and matched task controls.
    External-host native receipt acceptance has a separate tracked boundary
    in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
-   works without vendored Forge sources, but governance acceptance currently needs
-   them. Reuse independently measured, operator-pinned installed identity when
-   adding that support; receipt-supplied identity cannot authorize itself.
+   works without vendored Forge sources. The explicit installed-identity path is
+   now implemented and measured below; receipt-supplied identity cannot authorize
+   itself. Automatic Cargo test attribution remains a separate gap in
+   [#190](https://github.com/mcpirate17/llm-forge/issues/190).
 2. Validate one real client: setup, advertised tools, an agent-selected read,
    allowed/denied/failure cases, reconnect and undo. Test the client-specific
    configuration rather than treating a custom wire client as client adoption.
@@ -167,19 +168,52 @@ across 177 harnesses (repeated feature matrices included). Receipt SHA-256:
 `a26f0109ae3313ee8fe6e88c51111c5e8822005523f1a94bb4edd398f9123662`, in
 `.git/forge-checks/run-1793852521915497903-402931/receipt.json`.
 
-**Active measurement increment:** the extended harness benchmark measures the actual
+**Completed measurement increment:** the extended harness benchmark measures the actual
 stdio adapter, negotiation, full discovery and fresh socket per forwarded call,
 with complete CLI/MCP payload parity. Five repetitions completed 1,605 calls per
 arm with zero failed/censored/unstarted calls and verified process/fixture cleanup.
 Strict Clippy and all 22 selected CLI/live-harness tests passed. Existing persistent
 socket measurements remain separate diagnostics; see [the transport evidence](performance.md#transport-task-value-and-missing-controls)
 for startup, per-call latency, resource/provenance limits and negative probes.
-Full committed-tree publication gates remain pending. Compare recommendation workflows against both discovery-first
+This landed in [PR #189](https://github.com/mcpirate17/llm-forge/pull/189) as
+`5f7e62b5be6debc6ebceb007ff433103b01336ba`, with the same tree as checked head
+`f2253317d2621ca0f34f2c08800ab7ba48ed3426`. Full local-check/local-verify passed
+all 18 steps, 4,532 successful executions, zero failures and 145 ignored across
+177 harnesses. Receipt SHA-256:
+`30fdc14d4f357a0234e46b0f919718c75849b820dbf1eef4e13b98808caf00da`, in
+`.git/forge-checks/run-1793854577157961065-467531/receipt.json`.
+Compare recommendation workflows against both discovery-first
 and best existing direct-call controls; an extra recommendation call may be a net
 cost. Automatic strengthening, outbound MCP, agent task benefit and client adoption
-remain unverified mission gaps. Issue #186 needs explicit operator-pinned installed
-identity; a candidate-controlled lock or receipt cannot authorize that identity.
+remain unverified mission gaps. The new installed identity path retains explicit
+operator pins; a candidate-controlled lock or receipt cannot authorize that identity.
 The installed global Forge remains a separate artifact.
+
+**Active correctness increment — 2026-11-05:** #186 now has an explicit installed
+native pin path in candidate review/gate and live/commit corpus audits, plus a
+read-only identity command. Complete source inventories take precedence; partial
+inventories refuse installed fallback. Native evidence no longer requires a Python
+bundle, while candidate engine integrity retains its held lock binding. Independent
+review found and corrected escaped JSON runner names, final lock retention and live
+baseline overwrite aliases. Focused validation passed 410 candidate tests (nine
+ignored), 242 mutation tests (12 ignored), 142 shared mutation tests and strict
+all-target Clippy. Counts overlap and are not unique-test totals. Implementation
+commit `3f65b1ee03ed493c1402c5c1e663a30cdd20f831` built cleanly. A real automatic
+two-source Cargo campaign killed both mutants; live and commit corpus audits were
+`CLEAN`. Candidate receipt verification passed with one covered test and no missing
+tests. All 14 negative pin/lock/inventory/source cases refused. The whole experiment
+remains **incomplete**: candidate review failed the unchanged test-value/attribution
+gate and the synthetic fixture's CI attestation checks. No receipt or gate was
+modified to pass. See [the exact evidence and earlier failed attempts](performance.md#installed-native-identity--2026-11-05).
+Independent review confirmed this distinction. Publication checks remain pending;
+global installation and client activation are unchanged. The next correctness slice
+is #190's automatic target-bound Cargo attribution, using engine-generated scenario
+logs and existing native value validators; outbound MCP follows that gap.
+The first full gate at `941578b` passed all test steps (4,548 passing executions,
+zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
+two lints. The fixes preserve behavior, passed independent review and focused core
+tests/Clippy, and require a fresh full publication receipt. The failed attempt is
+retained at `.git/forge-checks/run-1793857262705128812-559687/receipt.json`.
 
 ## Historical roadmap and delivery provenance
 

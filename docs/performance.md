@@ -10,6 +10,43 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Installed native identity — 2026-11-05
+
+The [machine-generated observations](../research/performance/forge-program-20261105-installed-native-identity.json)
+record a real automatically generated cargo-mutants 27.1.0 campaign on a tiny
+external-host fixture with no vendored Forge sources or Python on the child PATH.
+Clean build commit: `3f65b1ee03ed493c1402c5c1e663a30cdd20f831`; executable SHA-256:
+`2e63e55b2d2303db8a4014770752790a83b6dca018bd93cb5b23a8930308111a`.
+The operator pin came from that binary's identity command before receipt generation.
+
+The engine killed two mutants, one in each selected source, and removed its snapshot.
+Both live and commit corpus audits were `CLEAN` without a Python bundle or `uv.lock`.
+Candidate receipt verification was `PASS`, with one covered test and no missing
+tests, after adding the separately required matching candidate lock. Fourteen
+negative cases refused missing/mismatched pins and locks, partial inventories or
+source drift. All 22 final command attempts completed; none was censored or unstarted.
+
+**Full candidate review did not pass.** The automatic Cargo receipt lacks complete
+per-test attribution and admitted test-value evidence, tracked in
+[#190](https://github.com/mcpirate17/llm-forge/issues/190). The fixture also lacks CI
+commit attestations and Agent trailers. The original experiment retains
+`all_expectations_met: false` and `INCOMPLETE_OR_REFUSED`; identity acceptance does
+not change those outcomes. No debt baseline, value waiver, manually authored mutant
+or generated receipt/manifest edit was used. Earlier attempts are retained: one
+refused an uncommitted fixture test before engine execution (18 commands unstarted);
+another completed the corpus cases but its seven review invocations lacked a
+required surface and did not reach evidence collection.
+
+The artifact includes fixture text, exact commands, tool/build pins, report hashes,
+failure details and unchanged-input/cleanup checks. Raw logs and the original
+automatic receipt remain under the recorded private paths. Reproduction requires a
+new automatic campaign with the selected clean binary and independently selected
+pin; new hashes are new evidence. Private Python only orchestrated the experiment;
+Forge and engine processes used a native-only executable search path. Recorded
+single-command durations include driver wait/capture overhead and are **not latency
+benchmarks**. This demonstrates cooperative consistency on one local synthetic host,
+not producer attestation, deployed-client adoption, agent effectiveness or a speedup.
+
 ### Fresh current-only CLI baselines
 
 Both workloads completed 31 successful samples after three warmups, with a

@@ -37,6 +37,17 @@ pub(crate) fn generated_errors_with(
     hash: impl Fn(&str) -> Option<String>,
     lineage: impl Fn(Option<&Value>) -> bool,
 ) -> Vec<Rejection> {
+    generated_errors_with_installed(payload, campaign, runner, hash, lineage, None)
+}
+
+pub(crate) fn generated_errors_with_installed(
+    payload: &Map<String, Value>,
+    campaign: &CampaignContract,
+    runner: &RunnerState,
+    hash: impl Fn(&str) -> Option<String>,
+    lineage: impl Fn(Option<&Value>) -> bool,
+    installed: Option<&native_runner::InstalledIdentity>,
+) -> Vec<Rejection> {
     let mut errors = Vec::new();
     if payload.get("schema_version").and_then(Value::as_str) != Some(RECEIPT_SCHEMA) {
         errors.push(reject(
@@ -73,7 +84,9 @@ pub(crate) fn generated_errors_with(
     }
     errors.extend(identity_errors(payload, campaign));
     if native_runner::declared(payload) {
-        errors.extend(native_binding_errors(payload, campaign, hash, lineage));
+        errors.extend(native_binding_errors(
+            payload, campaign, hash, lineage, installed,
+        ));
     } else {
         errors.extend(runner_errors_with(payload, runner, lineage));
         errors.extend(binding_errors(payload, campaign, hash));
@@ -128,11 +141,13 @@ fn native_binding_errors(
     campaign: &CampaignContract,
     hash: impl Fn(&str) -> Option<String>,
     lineage: impl Fn(Option<&Value>) -> bool,
+    installed: Option<&native_runner::InstalledIdentity>,
 ) -> Vec<Rejection> {
-    let mut errors: Vec<Rejection> = native_runner::errors(payload, hash, lineage)
-        .into_iter()
-        .map(|detail| reject(RejectionKind::RunnerMapMismatch, detail))
-        .collect();
+    let mut errors: Vec<Rejection> =
+        native_runner::errors_with_installed(payload, hash, lineage, installed)
+            .into_iter()
+            .map(|detail| reject(RejectionKind::RunnerMapMismatch, detail))
+            .collect();
     if !matches!(
         campaign.mutation_engine.as_str(),
         "cargo-mutants" | "fest" | "mull"

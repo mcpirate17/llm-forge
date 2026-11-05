@@ -10,6 +10,8 @@ mod definitions;
 mod git;
 #[path = "candidate_mutation_inputs.rs"]
 pub(crate) mod inputs;
+#[path = "candidate_mutation_native.rs"]
+mod native;
 #[path = "candidate_mutation_registry.rs"]
 pub(crate) mod registry;
 #[cfg(test)]
@@ -45,6 +47,8 @@ pub(crate) struct Context<'a> {
     pub policy: &'a Policy,
     pub today: &'a str,
     pub runner: Option<RunnerBundleSpec<'a>>,
+    pub native_runner_pin: Option<(&'a Path, &'a str)>,
+    pub stamp: Option<&'a crate::candidate_engine_identity::BuildStamp>,
     pub scratch_exclusions: &'a [PathBuf],
     pub grandfather: Option<&'a crate::candidate_execution_workspace::MutationGrandfather>,
     pub waiver_policy_sha256: Option<&'a str>,
@@ -58,6 +62,7 @@ pub(crate) struct Evidence<'a> {
     policy: &'a Policy,
     candidate_digest: String,
     bundle: Option<RunnerBundle>,
+    native: Option<native::Identity>,
     values: Option<value::Values>,
     base_findings: Vec<Finding>,
     date: String,
@@ -82,6 +87,9 @@ impl Evidence<'_> {
         );
         if let Some(bundle) = &self.bundle {
             bundle.verify()?;
+        }
+        if let Some(native) = &self.native {
+            native.verify()?;
         }
         if let Some(observation) = &self.observation {
             observation.verify(self.candidate, self.policy, &self.requests)?;
@@ -209,6 +217,7 @@ pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
         "grandfather_baseline":context.grandfather,
         "waiver_policy_authorized":waivers_authorized,
         "receipt_verification":build.payload,"runner":build.bundle.as_ref().map(|b|&b.evidence),
+        "native_runner":build.native.as_ref().map(|value|&value.evidence),
         "original_witnesses":build.values.as_ref().map(value::Values::witnesses),"external_invariant_requests":requests,
         "external_invariants":null,"execution_verified":false,"approval":false,
         "scope":"held receipt consistency and source bindings; external runtime observations recorded separately"});
@@ -239,6 +248,7 @@ pub(crate) fn collect<'a>(context: Context<'a>) -> Result<Evidence<'a>> {
         policy: context.policy,
         candidate_digest: candidate_test_selection::digest_json(context.candidate)?,
         bundle: build.bundle,
+        native: build.native,
         values: build.values,
         base_findings: build.findings,
         date: waivers::local_date()?,
@@ -264,6 +274,7 @@ struct Build<'a> {
     skip: Option<String>,
     payload: Value,
     bundle: Option<RunnerBundle>,
+    native: Option<native::Identity>,
     values: Option<value::Values>,
     metrics: Map<String, Value>,
 }
@@ -290,6 +301,7 @@ impl<'a> Build<'a> {
             skip: None,
             payload: Value::Null,
             bundle: None,
+            native: None,
             values: None,
             metrics: Map::new(),
         }
@@ -385,25 +397,23 @@ impl<'a> Build<'a> {
                 )?);
             }
         }
-        let mut runtime = self
+        let runtime = self
             .bundle
             .as_ref()
             .map(|b| json!({"runner":b.runner,"binding_sha256":b.bindings,"lineage":b.lineage}));
-        if let Some(runtime) = runtime.as_mut().filter(|_| {
-            catalog
-                .receipts
-                .iter()
-                .any(|row| row.text.contains("forge-native"))
-        }) {
-            if let Some(fingerprint) = self.capture.native_source_fingerprint()? {
-                runtime["binding_sha256"]
-                    [conductor_native::mutation_native_runner::FINGERPRINT_KEY] =
-                    json!(fingerprint);
+        let native_fingerprint = if catalog.has_native_receipts {
+            let fingerprint = self.capture.native_source_fingerprint()?;
+            if fingerprint.is_none() {
+                self.native = native::Identity::capture(ctx, &mut self.capture)?;
             }
-        }
-        let verified=conductor_native::mutation_evidence::verify_captured(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
+            fingerprint
+        } else {
+            None
+        };
+        let verified=conductor_native::mutation_evidence::verify_captured_native(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
             "runtime":runtime,"broken_campaigns":catalog.broken,"malformed_receipts":catalog.malformed}),&catalog.receipts,
-            |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}"))).map_err(anyhow::Error::msg)?;
+            |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}")),
+            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity)).map_err(anyhow::Error::msg)?;
         self.payload = verified.result;
         let waived: Vec<_> = list(&states)?
             .iter()

@@ -36,10 +36,14 @@ pub struct AuditArgs {
     pub(crate) git_build_profile: PathBuf,
     #[arg(long)]
     pub(crate) git_build_profile_sha256: String,
-    #[arg(long)]
-    pub(crate) mutation_runner_bundle: PathBuf,
-    #[arg(long)]
-    pub(crate) mutation_runner_sha256: String,
+    #[arg(long, requires = "mutation_runner_sha256")]
+    pub(crate) mutation_runner_bundle: Option<PathBuf>,
+    #[arg(long, requires = "mutation_runner_bundle")]
+    pub(crate) mutation_runner_sha256: Option<String>,
+    #[arg(long, requires = "native_runner_pin_sha256")]
+    pub(crate) native_runner_pin: Option<PathBuf>,
+    #[arg(long, requires = "native_runner_pin")]
+    pub(crate) native_runner_pin_sha256: Option<String>,
     #[arg(long)]
     pub(crate) registry: Option<String>,
     #[arg(long)]
@@ -54,6 +58,24 @@ pub struct AuditArgs {
     pub(crate) summary: bool,
     #[arg(long)]
     pub(crate) write_baseline: bool,
+}
+pub(crate) fn capture_native_pin(
+    args: &AuditArgs,
+    stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
+    exclusions: &[PathBuf],
+) -> Result<Option<crate::candidate_native_runner_pin::NativeRunnerPin>> {
+    match (&args.native_runner_pin, &args.native_runner_pin_sha256) {
+        (Some(path), Some(sha256)) => Ok(Some(
+            crate::candidate_native_runner_pin::NativeRunnerPin::capture(
+                path,
+                sha256,
+                exclusions,
+                stamp.context("native runner pin requires CLI build stamp")?,
+            )?,
+        )),
+        (None, None) => Ok(None),
+        _ => anyhow::bail!("native runner pin and sha256 must be supplied together"),
+    }
 }
 pub(crate) fn baseline_path(registry: &str, explicit: Option<&str>) -> Result<String> {
     if let Some(path) = explicit {
@@ -114,15 +136,21 @@ fn publish(
     crate::mutation_corpus_record::write(source.root(), path, expected.as_deref(), recorded, verify)
 }
 pub fn run(args: AuditArgs) -> Result<u8> {
+    run_with_stamp(args, None)
+}
+pub fn run_with_stamp(
+    args: AuditArgs,
+    stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
+) -> Result<u8> {
     ensure!(
         (1..=64).contains(&args.max_workers),
         "max-workers must be 1..64"
     );
     let interrupts = crate::process_signals::Interrupts::install()?;
     if args.kind.is_none() {
-        return crate::mutation_live_cli::run(args, &interrupts);
+        return crate::mutation_live_cli::run(args, &interrupts, stamp);
     }
-    run_candidate(args, &interrupts)
+    run_candidate(args, &interrupts, stamp)
 }
 fn candidate_scratch(args: &AuditArgs, source: &Source) -> Result<PathBuf> {
     let scratch = args
@@ -162,7 +190,11 @@ pub(crate) fn baseline_lease(
         )?,
     ))
 }
-fn run_candidate(args: AuditArgs, interrupts: &crate::process_signals::Interrupts) -> Result<u8> {
+fn run_candidate(
+    args: AuditArgs,
+    interrupts: &crate::process_signals::Interrupts,
+    stamp: Option<&crate::candidate_engine_identity::BuildStamp>,
+) -> Result<u8> {
     let lease = baseline_lease(&args, interrupts)?;
     let source = Source::open(&args.repo)?;
     let scratch = candidate_scratch(&args, &source)?;
@@ -183,8 +215,7 @@ fn run_candidate(args: AuditArgs, interrupts: &crate::process_signals::Interrupt
         &snapshot,
         &candidate,
         scratch,
-        lease.as_ref(),
-        interrupts,
+        (lease.as_ref(), interrupts, stamp),
     );
     let cleanup = snapshot.discard();
     match (result, cleanup) {
@@ -203,15 +234,70 @@ fn run_candidate(args: AuditArgs, interrupts: &crate::process_signals::Interrupt
         ),
     }
 }
+pub(crate) fn capture_baseline(
+    capture: &mut Capture<'_>,
+    path: &str,
+) -> Result<Option<serde_json::Value>> {
+    if capture.inputs.entries.contains_key(path) {
+        Ok(Some(capture.json(path)?))
+    } else {
+        capture.inputs.absent(path)?;
+        Ok(None)
+    }
+}
+fn capture_candidate_bundle(
+    args: &AuditArgs,
+    source: &Source,
+    snapshot: &Snapshot,
+    scratch: &[PathBuf],
+) -> Result<Option<RunnerBundle>> {
+    Ok(
+        match (&args.mutation_runner_bundle, &args.mutation_runner_sha256) {
+            (Some(manifest), Some(sha256)) => Some(RunnerBundle::capture(
+                RunnerBundleSpec { manifest, sha256 },
+                source,
+                snapshot,
+                scratch,
+            )?),
+            (None, None) => None,
+            _ => anyhow::bail!("runner bundle and sha256 must be supplied together"),
+        },
+    )
+}
+fn verify_candidate_observation(
+    capture: &Capture<'_>,
+    bundle: Option<&RunnerBundle>,
+    native_pin: Option<&crate::candidate_native_runner_pin::NativeRunnerPin>,
+    checker: &Checker<'_>,
+    held_list: Option<&crate::candidate_inputs::BoundFile>,
+) -> Result<()> {
+    if let Some(held) = held_list {
+        held.verify()?;
+    }
+    capture.verify()?;
+    if let Some(bundle) = bundle {
+        bundle.verify()?;
+    }
+    if let Some(pin) = native_pin {
+        pin.verify()?;
+    }
+    checker.verify()?;
+    checker.poll()?;
+    Ok(())
+}
 fn observe_candidate(
     args: &AuditArgs,
     source: &Source,
     snapshot: &Snapshot,
     candidate: &crate::candidate_source::Candidate,
     scratch: PathBuf,
-    lease: Option<&crate::candidate_review_lock::ReviewLock>,
-    interrupts: &crate::process_signals::Interrupts,
+    runtime: (
+        Option<&crate::candidate_review_lock::ReviewLock>,
+        &crate::process_signals::Interrupts,
+        Option<&crate::candidate_engine_identity::BuildStamp>,
+    ),
 ) -> Result<(u8, serde_json::Value)> {
+    let (lease, interrupts, stamp) = runtime;
     ensure!(
         snapshot.report().skipped_gitlinks == 0,
         "corpus audit refuses omitted gitlinks"
@@ -231,20 +317,17 @@ fn observe_candidate(
     .context("mutation registry absent")?;
     let catalog = registry::catalog(&mut capture, &registry, &[])?;
     let path = baseline_path(&configured, args.baseline.as_deref())?;
-    let baseline = if capture.inputs.entries.contains_key(&path) {
-        Some(capture.json(&path)?)
-    } else {
-        capture.inputs.absent(&path)?;
-        None
-    };
-    let bundle = RunnerBundle::capture(
-        RunnerBundleSpec {
-            manifest: &args.mutation_runner_bundle,
-            sha256: &args.mutation_runner_sha256,
-        },
-        source,
-        snapshot,
-        &[scratch],
+    let baseline = capture_baseline(&mut capture, &path)?;
+    let bundle = capture_candidate_bundle(args, source, snapshot, std::slice::from_ref(&scratch))?;
+    let native_pin = capture_native_pin(
+        args,
+        stamp,
+        &[
+            source.root().to_owned(),
+            source.common_dir().to_owned(),
+            snapshot.path(),
+            scratch,
+        ],
     )?;
     let profile = crate::mutation_corpus_git_profile::Profile::open(
         &args.git_build_profile,
@@ -255,10 +338,11 @@ fn observe_candidate(
     let checker =
         Checker::open(snapshot, &args.git, &args.git_sha256, profile)?.with_interrupts(interrupts);
     let (changed, held_list) = changed_files(args, snapshot)?;
-    let (report, code, recorded, interpreters) = mutation_corpus_audit::audit(
+    let (report, code, recorded, interpreters) = mutation_corpus_audit::audit_installed(
         &catalog,
         &mut capture,
-        &bundle,
+        bundle.as_ref(),
+        native_pin.as_ref(),
         &checker,
         mutation_corpus_audit::AuditOptions {
             changed: &changed,
@@ -278,7 +362,8 @@ fn observe_candidate(
             &recorded,
             &mut capture,
             &mutation_corpus_audit::PublicationEvidence {
-                bundle: &bundle,
+                bundle: bundle.as_ref(),
+                native_pin: native_pin.as_ref(),
                 checker: &checker,
                 lease: lease.context("baseline writer lease missing")?,
                 list: held_list.as_ref(),
@@ -286,10 +371,13 @@ fn observe_candidate(
             },
         )?;
     }
-    if let Some(held) = &held_list {
-        held.verify()?;
-    }
-    checker.poll()?;
+    verify_candidate_observation(
+        &capture,
+        bundle.as_ref(),
+        native_pin.as_ref(),
+        &checker,
+        held_list.as_ref(),
+    )?;
     Ok((code, report))
 }
 

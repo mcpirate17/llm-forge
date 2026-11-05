@@ -52,6 +52,11 @@ pub struct ReviewArgs {
     pub(crate) mutation_runner_bundle: Option<PathBuf>,
     #[arg(long, requires = "mutation_runner_bundle")]
     pub(crate) mutation_runner_sha256: Option<String>,
+    /// Explicit operator pin for a clean installed native mutation runner.
+    #[arg(long, requires = "native_runner_pin_sha256")]
+    pub(crate) native_runner_pin: Option<PathBuf>,
+    #[arg(long, requires = "native_runner_pin")]
+    pub(crate) native_runner_pin_sha256: Option<String>,
     /// Exact operator-held guest extension and its SHA-256.
     #[arg(long, requires = "equivalence_guest_sha256")]
     equivalence_guest: Option<PathBuf>,

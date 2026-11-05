@@ -447,7 +447,9 @@ pub fn load_campaign_captured(
 
 #[path = "mutation_evidence_capture.rs"]
 mod captured;
-pub use captured::{verify_captured, CapturedAttempt, CapturedReceipt, CapturedVerification};
+pub use captured::{
+    verify_captured, verify_captured_native, CapturedAttempt, CapturedReceipt, CapturedVerification,
+};
 
 pub fn normalize_path(path: &str) -> Result<String, String> {
     if path.len() > 4096 {

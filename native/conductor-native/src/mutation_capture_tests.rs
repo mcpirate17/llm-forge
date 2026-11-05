@@ -116,3 +116,58 @@ fn captured_inventory_and_registry_fail_loudly() {
     let request = json!({"candidate_paths":[TEST,TEST],"campaigns":[contract],"runtime":null,"broken_campaigns":[],"malformed_receipts":[]});
     assert!(verify_captured(&request, &[], |_, _, _| Ok(())).is_err());
 }
+
+#[test]
+fn captured_native_identity_uses_explicit_pin_without_python_runtime() {
+    use crate::mutation_native_runner::{InstalledIdentity, RUNNER_KIND, RUNNER_SCHEMA};
+    let contract = load_campaign_captured(MANIFEST, &files(), &[TEST.into()]).unwrap();
+    let request = json!({"candidate_paths":[TEST],"campaigns":[contract],"runtime":null,"broken_campaigns":[],"malformed_receipts":[]});
+    let original: Value = serde_json::from_str(RECEIPT).unwrap();
+    let mut payload = crate::receipt_slim::expand_receipt(&original).unwrap();
+    let source = payload["source_sha256"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap()
+        .clone();
+    payload["runner_kind"] = json!(RUNNER_KIND);
+    payload["native_runner"] = json!({"schema_version":RUNNER_SCHEMA,"forge_version":"fixture",
+        "executable_sha256":"a".repeat(64),"compiled_source_sha256":"b".repeat(64),
+        "compiled_git_commit":"c".repeat(40),"source_matches_git":true});
+    payload["mutants"] = json!([{"path":source,"outcome":"KILLED"}]);
+    payload["source_coverage"] = crate::mutation_source_coverage::report(
+        payload["source_sha256"].as_object().unwrap(),
+        payload["mutants"].as_array().unwrap(),
+    )
+    .unwrap();
+    let raw = [CapturedReceipt {
+        path: "campaigns/receipts/native-test.json".into(),
+        text: payload.to_string(),
+    }];
+    let pin = InstalledIdentity {
+        executable_sha256: "a".repeat(64),
+        compiled_source_sha256: "b".repeat(64),
+        compiled_git_commit: "c".repeat(40),
+    };
+    let selected =
+        verify_captured_native(&request, &raw, |_, _, _| Ok(()), None, Some(&pin)).unwrap();
+    assert!(!selected.attempts[0]
+        .errors
+        .to_string()
+        .contains("native runner source fingerprint"));
+    let stale = verify_captured_native(
+        &request,
+        &raw,
+        |_, _, _| Ok(()),
+        Some(&"d".repeat(64)),
+        Some(&pin),
+    )
+    .unwrap();
+    assert!(stale.attempts[0]
+        .errors
+        .to_string()
+        .contains("native runner source fingerprint"));
+    let no_pin = verify_captured(&request, &raw, |_, _, _| Ok(())).unwrap();
+    assert!(!no_pin.attempts[0].valid);
+}

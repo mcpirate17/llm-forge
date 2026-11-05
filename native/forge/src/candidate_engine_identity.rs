@@ -148,13 +148,13 @@ fn check_policy(snapshot: &Snapshot, policy: &Policy, today: &str) -> Result<()>
     );
     Ok(())
 }
-fn valid_sha256(value: &str) -> bool {
+pub(crate) fn valid_sha256(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn valid_commit(value: &str) -> bool {
+pub(crate) fn valid_commit(value: &str) -> bool {
     value.len() == 40
         && value
             .bytes()
@@ -168,7 +168,7 @@ pub(crate) struct BinaryIdentity {
     pub(crate) dev: u64,
     pub(crate) ino: u64,
 }
-fn running_executable() -> Result<BinaryIdentity> {
+pub(crate) fn running_executable() -> Result<BinaryIdentity> {
     // `/proc/self/exe` opens the inode backing this process, including when the
     // original path was atomically replaced. The proc link is intentional.
     let file = File::open("/proc/self/exe").context("open running native executable")?;
@@ -431,7 +431,7 @@ fn ensure_lock_absent(snapshot: &Snapshot) -> Result<()> {
     );
     Ok(())
 }
-fn installed_pin(
+pub(crate) fn installed_pin(
     snapshot: &Snapshot,
     entries: &[TreeEntry],
 ) -> Result<(

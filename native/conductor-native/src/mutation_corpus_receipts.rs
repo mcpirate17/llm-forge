@@ -29,8 +29,28 @@ pub fn rejection(
     campaign: &Campaign<'_>,
     receipt: &Value,
     runner_components: &Value,
+    source_hash: impl FnMut(&str) -> Result<Option<String>>,
+    lineage_accepts: impl FnMut(&Value) -> Result<bool>,
+) -> Result<Option<String>> {
+    rejection_with_installed(
+        campaign,
+        receipt,
+        runner_components,
+        source_hash,
+        lineage_accepts,
+        None,
+    )
+}
+
+/// Installed identity must come from an independently held operator pin, after
+/// the caller proves the entire native source inventory is absent.
+pub fn rejection_with_installed(
+    campaign: &Campaign<'_>,
+    receipt: &Value,
+    runner_components: &Value,
     mut source_hash: impl FnMut(&str) -> Result<Option<String>>,
     mut lineage_accepts: impl FnMut(&Value) -> Result<bool>,
+    installed: Option<&native_runner::InstalledIdentity>,
 ) -> Result<Option<String>> {
     ensure!(
         runner_components.is_object(),
@@ -43,7 +63,8 @@ pub fn rejection(
     }
     if native_runner::declared(object) {
         let current = source_hash(native_runner::FINGERPRINT_KEY)?;
-        let errors = native_runner::errors(object, |_| current.clone(), |_| false);
+        let errors =
+            native_runner::errors_with_installed(object, |_| current.clone(), |_| false, installed);
         if let Some(reason) = errors.into_iter().next() {
             return Ok(Some(reason));
         }

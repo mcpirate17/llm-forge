@@ -98,6 +98,8 @@ fn context<'a>(
         policy,
         today: TODAY,
         runner: None,
+        native_runner_pin: None,
+        stamp: None,
         scratch_exclusions: &[],
         grandfather: None,
         waiver_policy_sha256: None,
@@ -656,4 +658,45 @@ fn held_candidate_native_inventory_matches_and_detects_snapshot_drift() {
     )
     .unwrap();
     assert!(captured.verify().is_err());
+}
+
+#[test]
+fn native_receipt_detection_uses_decoded_runner_kind_only() {
+    // These marker objects test dispatch only, and cannot pass receipt validation.
+    for (text, native) in [
+        (r#"{"runner_kind":"forge\u002dnative"}"#, true),
+        (r#"{"runner_kind":"legacy","note":"forge-native"}"#, false),
+    ] {
+        let fixture = Fixture::new();
+        fixture.write("receipts/marker.json", text);
+        let (source, snapshot, candidate, policy) = fixture.captured();
+        let mut capture = Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+        let selected = registry::Registry {
+            path: "unused".into(),
+            payload: json!({"receipt_directories":["receipts"]}),
+            manifests: vec![],
+        };
+        let catalog = registry::catalog(&mut capture, &selected, &[]).unwrap();
+        assert_eq!(catalog.has_native_receipts, native);
+        assert_eq!(catalog.receipts.len(), 1);
+        assert!(catalog.malformed.is_empty());
+    }
+}
+
+#[test]
+fn installed_candidate_requires_held_complete_inventory_absence() {
+    let fixture = Fixture::new();
+    fixture.write("conductor.toml", "schema_version=1\n");
+    let (source, snapshot, candidate, policy) = fixture.captured();
+    let mut capture = Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    assert!(capture.native_source_fingerprint().unwrap().is_none());
+    assert!(capture.native_inventory_absent().unwrap());
+    capture.verify().unwrap();
+    fs::create_dir_all(snapshot.path().join("native/forge")).unwrap();
+    assert!(capture.verify().is_err());
+    fixture.write("native/forge/src/lib.rs", "partial");
+    let (source, snapshot, candidate, policy) = fixture.captured();
+    let mut capture = Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    assert!(capture.native_source_fingerprint().unwrap().is_none());
+    assert!(!capture.native_inventory_absent().unwrap());
 }

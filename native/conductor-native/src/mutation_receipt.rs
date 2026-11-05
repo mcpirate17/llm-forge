@@ -598,6 +598,7 @@ pub(crate) fn runner_errors_with(
 #[path = "mutation_receipt_generated.rs"]
 mod generated;
 pub(crate) use generated::generated_errors_with as captured_generated_errors;
+pub(crate) use generated::generated_errors_with_installed as captured_generated_errors_with_installed;
 #[cfg(test)]
 pub(crate) use generated::generated_outcome_errors;
 use generated::generated_receipt_errors;

@@ -295,6 +295,9 @@ enum LedgerCommand {
 
 #[derive(Subcommand)]
 enum MutationCommand {
+    /// Describe this clean native executable for explicit operator pinning; grants no authority.
+    #[cfg(target_os = "linux")]
+    Identity,
     /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
     /// Write one manifest and registry fragment per planned subject.
@@ -518,6 +521,8 @@ fn run_worktree_runtime(args: forge::worktree_runtime_cli::RuntimeArgs) -> ExitC
 
 fn run_mutation(action: MutationCommand) -> ExitCode {
     match action {
+        #[cfg(target_os = "linux")]
+        MutationCommand::Identity => command_exit("mutation identity", native_runner_identity(), 1),
         MutationCommand::Results(args) => {
             command_exit("mutation results", mutation_results::run(args), 2)
         }
@@ -544,17 +549,25 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
     }
 }
 
+fn build_stamp() -> forge::candidate_engine_identity::BuildStamp {
+    forge::candidate_engine_identity::BuildStamp {
+        source_sha256: env!("FORGE_SOURCE_SHA256"),
+        git_commit: env!("FORGE_GIT_FULL_REV"),
+        source_matches_git: env!("FORGE_SOURCE_MATCHES_GIT"),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn native_runner_identity() -> anyhow::Result<u8> {
+    let identity = forge::candidate_native_runner_pin::describe(&build_stamp())?;
+    println!("{}", serde_json::to_string(&identity)?);
+    Ok(0)
+}
+
 fn run_candidate(args: forge::candidate_cli::CandidateArgs) -> ExitCode {
     command_exit(
         "candidate",
-        forge::candidate_cli::run_with_stamp(
-            args,
-            Some(&forge::candidate_engine_identity::BuildStamp {
-                source_sha256: env!("FORGE_SOURCE_SHA256"),
-                git_commit: env!("FORGE_GIT_FULL_REV"),
-                source_matches_git: env!("FORGE_SOURCE_MATCHES_GIT"),
-            }),
-        ),
+        forge::candidate_cli::run_with_stamp(args, Some(&build_stamp())),
         1,
     )
 }

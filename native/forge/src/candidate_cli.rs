@@ -150,7 +150,9 @@ pub fn run_with_stamp(
                 stamp.context("benchmark worker requires the CLI's compiled engine identity")?,
             )
         }
-        Action::MutationCorpus(args) => return crate::mutation_corpus_cli::run(*args),
+        Action::MutationCorpus(args) => {
+            return crate::mutation_corpus_cli::run_with_stamp(*args, stamp)
+        }
         Action::Commit(args) => return crate::candidate_commit::run(args),
         Action::Review(args) => {
             let report = crate::candidate_review::run(

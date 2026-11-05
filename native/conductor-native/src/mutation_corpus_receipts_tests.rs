@@ -125,6 +125,42 @@ mod native_receipts {
     }
 
     #[test]
+    fn installed_pin_is_only_used_when_source_fingerprint_is_unavailable() {
+        let receipt = native_receipt();
+        let symbols = BTreeSet::new();
+        let c = campaign(&symbols);
+        let pin = native_runner::InstalledIdentity {
+            executable_sha256: "d".repeat(64),
+            compiled_source_sha256: "e".repeat(64),
+            compiled_git_commit: "f".repeat(40),
+        };
+        let check = |fingerprint: Option<String>| {
+            rejection_with_installed(
+                &c,
+                &receipt,
+                &json!({}),
+                |path| {
+                    Ok(if path == native_runner::FINGERPRINT_KEY {
+                        fingerprint.clone()
+                    } else {
+                        Some("e".repeat(64))
+                    })
+                },
+                |_| Ok(false),
+                Some(&pin),
+            )
+            .unwrap()
+        };
+        assert!(check(None).is_none());
+        assert!(check(Some("a".repeat(64))).is_some());
+        assert!(
+            rejection(&c, &receipt, &json!({}), |_| Ok(None), |_| Ok(false))
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
     fn native_receipts_bind_to_this_tree_or_lineage() {
         let receipt = native_receipt();
         assert_eq!(judged(&receipt, &"e".repeat(64), false), None);

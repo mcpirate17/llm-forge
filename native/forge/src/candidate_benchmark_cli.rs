@@ -80,6 +80,10 @@ struct Inputs {
     mutation_runner_bundle: Option<PathBuf>,
     #[arg(long, requires = "mutation_runner_bundle")]
     mutation_runner_sha256: Option<String>,
+    #[arg(long, requires = "native_runner_pin_sha256")]
+    native_runner_pin: Option<PathBuf>,
+    #[arg(long, requires = "native_runner_pin")]
+    native_runner_pin_sha256: Option<String>,
     #[arg(long, requires = "equivalence_guest_sha256")]
     equivalence_guest: Option<PathBuf>,
     #[arg(long, requires = "equivalence_guest")]
@@ -96,6 +100,7 @@ impl Inputs {
         for (flag, path) in [
             ("--registry", &self.registry),
             ("--mutation-runner-bundle", &self.mutation_runner_bundle),
+            ("--native-runner-pin", &self.native_runner_pin),
             ("--equivalence-guest", &self.equivalence_guest),
             ("--equivalence-store", &self.equivalence_store),
             ("--equivalence-artifacts", &self.equivalence_artifacts),
@@ -107,6 +112,7 @@ impl Inputs {
         for (flag, value) in [
             ("--registry-sha256", &self.registry_sha256),
             ("--mutation-runner-sha256", &self.mutation_runner_sha256),
+            ("--native-runner-pin-sha256", &self.native_runner_pin_sha256),
             ("--equivalence-guest-sha256", &self.equivalence_guest_sha256),
             ("--equivalence-store-sha256", &self.equivalence_store_sha256),
         ] {

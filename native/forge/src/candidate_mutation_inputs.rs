@@ -10,6 +10,33 @@ pub(crate) struct Capture<'a> {
     pub failed: bool,
 }
 impl<'a> Capture<'a> {
+    /// Capture the absence of every Forge source root, and hold it through verify.
+    pub fn native_inventory_absent(&mut self) -> Result<bool> {
+        for root in [
+            "native/forge",
+            "native/forge-cli",
+            "native/conductor-native",
+            "native/slop-core",
+        ] {
+            if self
+                .inputs
+                .entries
+                .keys()
+                .any(|path| path == root || path.starts_with(&format!("{root}/")))
+            {
+                return Ok(false);
+            }
+        }
+        for root in [
+            "native/forge",
+            "native/forge-cli",
+            "native/conductor-native",
+            "native/slop-core",
+        ] {
+            self.inputs.absent(root)?;
+        }
+        Ok(true)
+    }
     /// Fingerprint the complete native inventory from the held candidate tree.
     pub fn native_source_fingerprint(&mut self) -> Result<Option<String>> {
         if let Some(value) = &self.native_fingerprint {

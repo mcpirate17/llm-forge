@@ -137,6 +137,28 @@ impl LiveInputs {
                 .as_slice(),
         ))
     }
+    /// Hold absence of every Forge source root through final verification.
+    pub(crate) fn native_inventory_absent(&mut self) -> Result<bool> {
+        for root in [
+            "native/forge",
+            "native/forge-cli",
+            "native/conductor-native",
+            "native/slop-core",
+        ] {
+            if !self.missing(root)? {
+                return Ok(false);
+            }
+        }
+        for root in [
+            "native/forge",
+            "native/forge-cli",
+            "native/conductor-native",
+            "native/slop-core",
+        ] {
+            ensure!(self.read(root)?.is_none(), "native source root appeared");
+        }
+        Ok(true)
+    }
     pub(crate) fn native_source_fingerprint(&mut self) -> Result<Option<String>> {
         use conductor_native::source_fingerprint::{self, Fingerprint};
         if let Some(value) = &self.native_fingerprint {
