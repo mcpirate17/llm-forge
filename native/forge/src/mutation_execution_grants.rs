@@ -504,3 +504,170 @@ impl Grants {
 #[cfg(test)]
 #[path = "mutation_execution_grants_tests.rs"]
 mod tests;
+
+/// Narrow shared admission primitives for an outbound endpoint; the caller
+/// additionally restricts every read root to the harness operator's grants.
+pub(crate) struct OutboundBindings {
+    program: HeldProgram,
+    directories: Vec<DirectoryBinding>,
+    files: Vec<BoundFile>,
+    environment: EnvironmentSelection,
+    home: PathBuf,
+    protected: Vec<PathBuf>,
+    source: PathBuf,
+    git: Option<(PathBuf, PathBuf, PathBuf)>,
+}
+fn outbound_covers(reads: &[PathBuf], path: &Path) -> bool {
+    reads
+        .iter()
+        .any(|root| path == root || root.is_dir() && path.starts_with(root))
+}
+fn bind_outbound_pins(
+    reads: &[PathBuf],
+    pins: &[(PathBuf, String)],
+    state: &Path,
+    files: &mut Vec<BoundFile>,
+    total: &mut usize,
+) -> Result<()> {
+    for (path, hash) in pins {
+        ensure!(
+            outbound_covers(reads, path),
+            "outbound pinned input lacks read grant"
+        );
+        canonical(path)?;
+        ancestors(path)?;
+        let (held, bytes) =
+            candidate_inputs::external_with_tmp(path, hash, MAX_READ_FILE_BYTES, state, None)?;
+        *total = total
+            .checked_add(bytes.len())
+            .context("outbound pin byte overflow")?;
+        ensure!(
+            *total <= MAX_TOTAL_READ_FILE_BYTES,
+            "outbound pinned file limit exceeded"
+        );
+        files.push(held);
+    }
+    Ok(())
+}
+impl OutboundBindings {
+    pub(crate) fn capture(
+        program: &Path,
+        hash: &str,
+        reads: &[PathBuf],
+        pins: &[(PathBuf, String)],
+        source: &Path,
+        state: &Path,
+        allowed: &[PathBuf],
+    ) -> Result<Self> {
+        ensure!(
+            (1..=120).contains(&reads.len()),
+            "invalid outbound read grant count"
+        );
+        ensure!(pins.len() <= 128, "too many outbound pins");
+        let (home, protected) = protected_roots()?;
+        let git = crate::repository::checkout_of_checked(source)?;
+        let git_dir = match &git {
+            Some((root, _)) => Some(git2::Repository::open(root)?.path().canonicalize()?),
+            None => None,
+        };
+        let git_identity = git.as_ref().map(|(root, common)| {
+            (
+                root.clone(),
+                common.clone(),
+                git_dir.clone().expect("checkout has git directory"),
+            )
+        });
+        let mut directories = vec![directory(source)?];
+        if let Some((_, common, git_dir)) = &git_identity {
+            directories.push(directory(common)?);
+            if git_dir != common {
+                directories.push(directory(git_dir)?);
+            }
+        }
+        let mut files = Vec::new();
+        let mut total = 0usize;
+        for (index, read) in reads.iter().enumerate() {
+            canonical(read)?;
+            ancestors(read)?;
+            ensure!(
+                read.starts_with(source) || allowed.iter().any(|a| read.starts_with(a)),
+                "outbound read exceeds operator grants"
+            );
+            ensure!(!home.starts_with(read), "outbound read exposes HOME");
+            disjoint(read, state)?;
+            for path in &protected {
+                disjoint(read, path)?;
+            }
+            if let Some((root, common)) = &git {
+                disjoint(read, &root.join(".git"))?;
+                disjoint(read, common)?;
+            }
+            if let Some(path) = &git_dir {
+                disjoint(read, path)?;
+            }
+            for previous in &reads[..index] {
+                disjoint(read, previous)?;
+            }
+            if fs::symlink_metadata(read)?.is_dir() {
+                directories.push(directory(read)?);
+            } else {
+                let (file, size) = read_file(read, state)?;
+                total = total
+                    .checked_add(size)
+                    .context("outbound read byte overflow")?;
+                ensure!(
+                    total <= MAX_TOTAL_READ_FILE_BYTES,
+                    "outbound read file limit exceeded"
+                );
+                files.push(file);
+            }
+        }
+        ensure!(
+            outbound_covers(reads, program),
+            "outbound executable lacks read grant"
+        );
+        let program = HeldProgram::capture(
+            Program {
+                path: program.into(),
+                sha256: hash.into(),
+            },
+            MAX_PROGRAM_BYTES,
+        )?;
+        bind_outbound_pins(reads, pins, state, &mut files, &mut total)?;
+        let result = Self {
+            program,
+            directories,
+            files,
+            environment: environment_selection(),
+            home,
+            protected,
+            source: source.into(),
+            git: git_identity,
+        };
+        result.verify()?;
+        Ok(result)
+    }
+    pub(crate) fn verify(&self) -> Result<()> {
+        ensure!(
+            environment_selection() == self.environment
+                && protected_roots()? == (self.home.clone(), self.protected.clone()),
+            "outbound credential roots changed"
+        );
+        let current = crate::repository::checkout_of_checked(&self.source)?;
+        let current = current
+            .map(|(root, common)| -> Result<_> {
+                let git_dir = git2::Repository::open(&root)?.path().canonicalize()?;
+                Ok((root, common, git_dir))
+            })
+            .transpose()?;
+        ensure!(current == self.git, "outbound source Git metadata changed");
+        self.program.verify()?;
+        for directory in &self.directories {
+            directory.verify()?;
+        }
+        for file in &self.files {
+            file.verify()?;
+        }
+        Ok(())
+    }
+}

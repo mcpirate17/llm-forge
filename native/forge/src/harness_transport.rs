@@ -139,18 +139,34 @@ pub async fn serve(harness: Harness, root: &Path, unit: &str) -> Result<()> {
     harness.stopping.store(true, Ordering::Release);
     stop.send_replace(true);
     drop(listener);
-    tokio::time::timeout(Duration::from_secs(4), harness.terminals.close_all())
-        .await
-        .context("terminal shutdown deadline exceeded")??;
-    tokio::time::timeout(Duration::from_secs(2), async {
+    let mut failures = Vec::new();
+    if let Some(outbound) = &harness.outbound {
+        match tokio::time::timeout(Duration::from_secs(4), outbound.shutdown()).await {
+            Ok(Ok(())) => (),
+            Ok(Err(error)) => failures.push(format!("outbound shutdown: {error:#}")),
+            Err(error) => failures.push(format!("outbound shutdown deadline exceeded: {error}")),
+        }
+    }
+    match tokio::time::timeout(Duration::from_secs(4), harness.terminals.close_all()).await {
+        Ok(Ok(())) => (),
+        Ok(Err(error)) => failures.push(format!("terminal shutdown: {error:#}")),
+        Err(error) => failures.push(format!("terminal shutdown deadline exceeded: {error}")),
+    }
+    match tokio::time::timeout(Duration::from_secs(2), async {
         while clients.join_next().await.is_some() {}
     })
     .await
-    .context("active client shutdown deadline exceeded")?;
+    {
+        Ok(()) => (),
+        Err(error) => failures.push(format!("active client shutdown deadline exceeded: {error}")),
+    }
+    if let Some(error) = fatal.borrow().as_deref() {
+        failures.push(format!("harness failed: {error}"));
+    }
     ensure!(
-        fatal.borrow().is_none(),
-        "harness failed: {}",
-        fatal.borrow().as_deref().unwrap_or("unknown")
+        failures.is_empty(),
+        "harness shutdown failed: {}",
+        failures.join("; ")
     );
     Ok(())
 }
@@ -183,10 +199,14 @@ async fn connection(
         let outcome = match parse_request(&frame) {
             Ok(Request::Catalog) => Ok(harness.catalog().clone()),
             Ok(Request::Grammar) => Ok(json!({"grammar":harness.grammar()})),
-            Ok(Request::Status) => Ok(
-                json!({"pid":std::process::id(),"protocol":1,"source_root":harness.policy.source_root,
-                    "stopping":harness.stopping.load(Ordering::Acquire)}),
-            ),
+            Ok(Request::Status) => {
+                let mut status = json!({"pid":std::process::id(),"protocol":1,"source_root":harness.policy.source_root,
+                    "stopping":harness.stopping.load(Ordering::Acquire)});
+                if let Some(outbound) = &harness.outbound {
+                    status["outbound_mcp"] = outbound.status();
+                }
+                Ok(status)
+            }
             Ok(Request::Shutdown) => {
                 shutdown = true;
                 Ok(json!({"stopping":true}))

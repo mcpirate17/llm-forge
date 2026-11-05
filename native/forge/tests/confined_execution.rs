@@ -595,3 +595,362 @@ async fn complete_output_overflow_fails_and_runs_owned_cleanup() {
     assert!(!path.exists(), "owned cgroup survived overflow");
     assert!(finished.load(std::sync::atomic::Ordering::SeqCst));
 }
+struct DuplexHost {
+    host: Option<support::Host>,
+    safe: bool,
+}
+impl DuplexHost {
+    fn new() -> Self {
+        Self {
+            host: Some(support::Host::new()),
+            safe: false,
+        }
+    }
+    fn get(&self) -> &support::Host {
+        self.host.as_ref().unwrap()
+    }
+}
+impl Drop for DuplexHost {
+    fn drop(&mut self) {
+        if !self.safe {
+            if let Some(host) = self.host.take() {
+                eprintln!("retaining unverified duplex fixture {}", host.0.display());
+                std::mem::forget(host);
+            }
+        }
+    }
+}
+struct DuplexResources(std::sync::Arc<std::sync::Mutex<Vec<bool>>>);
+impl confined_execution::Resources for DuplexResources {
+    fn arm(&mut self) {}
+    fn finish(self: Box<Self>, cleanup_safe: bool) -> anyhow::Result<()> {
+        self.0.lock().unwrap().push(cleanup_safe);
+        Ok(())
+    }
+}
+fn duplex_limits() -> confined_execution::DuplexLimits {
+    confined_execution::DuplexLimits {
+        message_bytes: 1024 * 1024,
+        input_bytes: 2 * 1024 * 1024,
+        stdout_bytes: 1024 * 1024,
+        stderr_bytes: 1024 * 1024,
+        output_chunks: 32,
+    }
+}
+fn duplex_start(
+    plan: CommandPlan,
+    group: Cgroup,
+    limits: Limits,
+    trace: std::sync::Arc<std::sync::Mutex<Vec<bool>>>,
+) -> confined_execution::Duplex {
+    confined_execution::start_duplex_with_resources(
+        plan,
+        group,
+        limits,
+        Box::new(DuplexResources(trace)),
+        duplex_limits(),
+    )
+    .unwrap()
+}
+async fn next_stdout(duplex: &mut confined_execution::Duplex) -> Vec<u8> {
+    let mut output = Vec::new();
+    loop {
+        match tokio::time::timeout(Duration::from_secs(3), duplex.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            Some(confined_execution::DuplexEvent::Stdout(bytes)) => {
+                output.extend(bytes);
+                if output.last() == Some(&b'\n') {
+                    return output;
+                }
+            }
+            Some(_) => (),
+            None => panic!("stdout ended before response"),
+        }
+    }
+}
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_keeps_stdin_open_for_multiple_exact_binary_responses() {
+    let mut host = DuplexHost::new();
+    let (plan, group, path) = prepared(host.get(), support::task_worker(), &["duplex-lines"]);
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let mut duplex = duplex_start(plan, group, limits(), trace.clone());
+    for value in [
+        b"first\n".as_slice(),
+        b"second\n".as_slice(),
+        b"\xff\x00\n".as_slice(),
+    ] {
+        duplex.send(value.to_vec()).await.unwrap();
+        assert_eq!(next_stdout(&mut duplex).await, value);
+    }
+    duplex.close_stdin().await.unwrap();
+    while duplex.recv().await.unwrap().is_some() {}
+    let report = duplex.wait().await.unwrap();
+    cleaned(&report, &path);
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    assert_eq!(report.outcome, Outcome::Exited);
+    assert_eq!(*trace.lock().unwrap(), vec![true]);
+    host.safe = true;
+}
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_dropped_send_and_client_trigger_owned_cancellation() {
+    let mut host = DuplexHost::new();
+    let (plan, group, path) = prepared(host.get(), support::task_worker(), &["sleep", "2000"]);
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let mut duplex = duplex_start(plan, group, limits(), trace.clone());
+    let mut completion = duplex.completion();
+    assert!(tokio::time::timeout(
+        Duration::from_millis(100),
+        duplex.send(vec![b'x'; 1024 * 1024])
+    )
+    .await
+    .is_err());
+    drop(duplex);
+    let terminal = tokio::time::timeout(Duration::from_secs(6), completion.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(terminal.outcome, Outcome::Cancelled);
+    assert!(terminal.cleanup_complete);
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    assert_eq!(*trace.lock().unwrap(), vec![true]);
+    host.safe = true;
+}
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_output_limit_fails_through_owned_cleanup() {
+    let mut host = DuplexHost::new();
+    let (plan, group, path) = prepared(host.get(), support::task_worker(), &["output"]);
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let mut cfg = duplex_limits();
+    cfg.stdout_bytes = 128;
+    let mut duplex = confined_execution::start_duplex_with_resources(
+        plan,
+        group,
+        limits(),
+        Box::new(DuplexResources(trace.clone())),
+        cfg,
+    )
+    .unwrap();
+    while duplex.recv().await.unwrap().is_some() {}
+    let report = duplex.wait().await.unwrap();
+    assert_eq!(report.outcome, Outcome::Failed);
+    assert!(report
+        .errors
+        .iter()
+        .any(|e| e.contains("duplex output exceeds bound")));
+    assert!(report.cleanup_complete);
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    assert_eq!(*trace.lock().unwrap(), vec![true]);
+    host.safe = true;
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_dropped_recv_and_oversize_send_cancel_owner() {
+    for oversize in [false, true] {
+        let mut host = DuplexHost::new();
+        let (plan, group, path) = prepared(host.get(), support::task_worker(), &["sleep", "2000"]);
+        let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut duplex = duplex_start(plan, group, limits(), trace.clone());
+        let mut completion = duplex.completion();
+        if oversize {
+            assert!(duplex.send(vec![0; 1024 * 1024 + 1]).await.is_err());
+        } else {
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), duplex.recv())
+                    .await
+                    .is_err()
+            );
+        }
+        drop(duplex);
+        let terminal = tokio::time::timeout(Duration::from_secs(6), completion.wait())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.outcome, Outcome::Cancelled);
+        assert!(terminal.cleanup_complete);
+        assert!(
+            matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound)
+        );
+        assert_eq!(*trace.lock().unwrap(), vec![true]);
+        host.safe = true;
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_early_wait_cancels_without_discarding_buffered_output() {
+    let mut host = DuplexHost::new();
+    let (plan, group, path) = prepared(host.get(), support::task_worker(), &["output"]);
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let duplex = duplex_start(plan, group, limits(), trace.clone());
+    let mut completion = duplex.completion();
+    let error = duplex.wait().await.unwrap_err();
+    assert!(error.to_string().contains("drained"));
+    let terminal = tokio::time::timeout(Duration::from_secs(6), completion.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    if terminal.cleanup_complete {
+        host.safe = true;
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT and pidfd"]
+async fn duplex_cancellation_reaps_owned_setsid_descendant_with_closed_pipes() {
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+    let mut host = DuplexHost::new();
+    let (plan, group, path) = prepared(
+        host.get(),
+        support::task_worker(),
+        &["setsid-wait", "5000", "child.pid", "owner.ack"],
+    );
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let duplex = duplex_start(
+        plan,
+        group,
+        Limits {
+            timeout: Duration::from_secs(8),
+            ..limits()
+        },
+        trace.clone(),
+    );
+    let pid_path = host.get().0.join("scratch/child.pid");
+    let pid: i32 = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Ok(text) = fs::read_to_string(&pid_path) {
+                if let Ok(pid) = text.parse() {
+                    break pid;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) };
+    assert!(
+        raw >= 0,
+        "pidfd_open failed: {}",
+        std::io::Error::last_os_error()
+    );
+    let fd = unsafe { OwnedFd::from_raw_fd(raw as i32) };
+    let mut observed = libc::pollfd {
+        fd: fd.as_raw_fd(),
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    assert_eq!(
+        unsafe { libc::poll(&mut observed, 1, 0) },
+        0,
+        "fixture descendant already exited"
+    );
+    let expected_group = format!(
+        "0::/{}",
+        path.strip_prefix("/sys/fs/cgroup").unwrap().display()
+    );
+    let membership = fs::read_to_string(format!("/proc/{pid}/cgroup")).unwrap();
+    assert!(
+        membership.lines().any(|line| line == expected_group),
+        "fixture PID is outside owned cgroup: {membership}"
+    );
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
+    let start = stat
+        .rsplit_once(')')
+        .unwrap()
+        .1
+        .split_whitespace()
+        .nth(19)
+        .unwrap()
+        .to_owned();
+    let current = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
+    assert_eq!(
+        current
+            .rsplit_once(')')
+            .unwrap()
+            .1
+            .split_whitespace()
+            .nth(19),
+        Some(start.as_str())
+    );
+    fs::write(host.get().0.join("scratch/owner.ack"), b"ack").unwrap();
+    let mut completion = duplex.completion();
+    duplex.cancellation().cancel().unwrap();
+    drop(duplex);
+    let terminal = tokio::time::timeout(Duration::from_secs(6), completion.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(terminal.cleanup_complete);
+    assert_eq!(
+        unsafe { libc::poll(&mut observed, 1, 0) },
+        1,
+        "owned descendant did not exit"
+    );
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    assert_eq!(*trace.lock().unwrap(), vec![true]);
+    host.safe = true;
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_saturated_output_queue_fails_and_retains_uncertain_resources() {
+    let host = DuplexHost::new();
+    let (plan, group, path) = prepared(host.get(), support::task_worker(), &["output"]);
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let mut cfg = duplex_limits();
+    cfg.output_chunks = 1;
+    let mut duplex = confined_execution::start_duplex_with_resources(
+        plan,
+        group,
+        limits(),
+        Box::new(DuplexResources(trace.clone())),
+        cfg,
+    )
+    .unwrap();
+    let mut completion = duplex.completion();
+    let terminal = tokio::time::timeout(Duration::from_secs(6), completion.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(terminal.outcome, Outcome::Failed);
+    assert!(!terminal.cleanup_complete);
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    assert_eq!(*trace.lock().unwrap(), vec![false]);
+    while duplex.recv().await.unwrap().is_some() {}
+    let report = duplex.wait().await.unwrap();
+    assert!(report
+        .errors
+        .iter()
+        .any(|e| e.contains("duplex output queue full")));
+    // The fixture guard retains the root because finalization was uncertain.
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn duplex_abandoned_client_drains_after_containment_and_cleans() {
+    let mut host = DuplexHost::new();
+    let (plan, group, path) = prepared(host.get(), support::task_worker(), &["duplex-lines"]);
+    let trace = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let mut duplex = duplex_start(plan, group, limits(), trace.clone());
+    duplex.send(b"ready\n".to_vec()).await.unwrap();
+    assert_eq!(next_stdout(&mut duplex).await, b"ready\n");
+    let mut completion = duplex.completion();
+    drop(duplex);
+    let terminal = tokio::time::timeout(Duration::from_secs(6), completion.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(terminal.outcome, Outcome::Cancelled);
+    assert!(terminal.cleanup_complete);
+    assert!(matches!(fs::symlink_metadata(path),Err(e) if e.kind()==std::io::ErrorKind::NotFound));
+    assert_eq!(*trace.lock().unwrap(), vec![true]);
+    host.safe = true;
+}

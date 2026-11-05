@@ -3,6 +3,8 @@
 //! Runtime shutdown and uninterruptible kernel I/O require an outer watchdog.
 #[path = "confined_execution_cancel.rs"]
 mod cancellation;
+#[path = "confined_execution_duplex.rs"]
+mod duplex;
 use crate::process_probe::readiness::{self, CapturePolicy, Input, Monitor, Observation};
 use crate::{
     cgroup::Cgroup,
@@ -11,6 +13,7 @@ use crate::{
 };
 use anyhow::{ensure, Context, Result};
 pub use cancellation::Cancellation;
+pub use duplex::{Duplex, DuplexEvent, DuplexLimits};
 use serde::Serialize;
 use std::os::fd::{AsRawFd, OwnedFd};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
@@ -162,6 +165,7 @@ impl Process {
 struct Observed {
     process: Process,
     monitor: Option<Monitor<'static>>,
+    duplex: Option<duplex::Driver>,
     pidfd: Option<OwnedFd>,
 }
 
@@ -183,6 +187,7 @@ pub fn start_with_resources(
         resources,
         None,
         CapturePolicy::TailChars(limits.max_output_chars),
+        None,
     )
 }
 
@@ -206,6 +211,7 @@ pub fn start_capture_with_resources(
             stdout: 16 * 1024 * 1024,
             stderr: 1024 * 1024,
         },
+        None,
     )
 }
 
@@ -229,7 +235,35 @@ pub fn start_filter_with_resources(
         resources,
         Some(input),
         CapturePolicy::StrictCombined(max_output_bytes),
+        None,
     )
+}
+
+/// Launch persistent bounded byte streams under the same owner and cleanup path.
+/// Dropping the client or an in-flight operation cancels the endpoint. Stream
+/// EOF alone does not prove exit or cleanup; await Completion or wait().
+pub fn start_duplex_with_resources(
+    mut plan: CommandPlan,
+    group: Cgroup,
+    limits: Limits,
+    resources: Box<dyn Resources>,
+    stream_limits: DuplexLimits,
+) -> Result<Duplex> {
+    let (seed, client) = duplex::prepare(&mut plan, stream_limits)?;
+    let execution = start_inner(
+        plan,
+        group,
+        limits,
+        resources,
+        None,
+        CapturePolicy::TailChars(1),
+        Some(seed),
+    )?;
+    Ok(client.bind(execution))
+}
+struct PreparedInput {
+    one_shot: Option<Input<'static>>,
+    duplex: Option<duplex::Seed>,
 }
 
 fn start_inner(
@@ -239,6 +273,7 @@ fn start_inner(
     mut resources: Box<dyn Resources>,
     bytes: Option<Vec<u8>>,
     capture: CapturePolicy,
+    duplex: Option<duplex::Seed>,
 ) -> Result<Execution> {
     tokio::runtime::Handle::try_current().context("execution requires a Tokio reactor")?;
     let admission = EXECUTIONS
@@ -252,10 +287,15 @@ fn start_inner(
     capture.validate()?;
     limits.cpu_seconds = limit_value(libc::RLIMIT_CPU, limits.cpu_seconds)?;
     limits.address_space_bytes = limit_value(libc::RLIMIT_AS, limits.address_space_bytes)?;
-    let input = match bytes {
-        Some(bytes) => Input::prepare_owned(plan.command(), bytes)?,
-        None => Input::prepare(plan.command(), None)?,
+    let one_shot = if duplex.is_none() {
+        Some(match bytes {
+            Some(bytes) => Input::prepare_owned(plan.command(), bytes)?,
+            None => Input::prepare(plan.command(), None)?,
+        })
+    } else {
+        None
     };
+    let input = PreparedInput { one_shot, duplex };
     plan.command().stdout(Stdio::piped()).stderr(Stdio::piped());
     configure_rlimits(plan.command(), limits);
     group.configure_command(plan.command())?;
@@ -363,7 +403,7 @@ pub(crate) fn configure_rlimits(command: &mut std::process::Command, limits: Lim
 fn prepare_monitor(
     owned: &mut Observed,
     group: &Cgroup,
-    input: Input<'static>,
+    input: PreparedInput,
     capture: CapturePolicy,
 ) -> Result<()> {
     let Process::Running(process) = &mut owned.process else {
@@ -371,18 +411,24 @@ fn prepare_monitor(
     };
     group.verify_member(process.child())?;
     owned.pidfd = Some(open_pidfd(process.child())?);
-    owned.monitor = Some(Monitor::new(
-        process
-            .take_stdout()
-            .context("execution stdout missing")?
-            .into(),
-        process
-            .take_stderr()
-            .context("execution stderr missing")?
-            .into(),
-        input,
-        capture,
-    )?);
+    let out = process
+        .take_stdout()
+        .context("execution stdout missing")?
+        .into();
+    let err = process
+        .take_stderr()
+        .context("execution stderr missing")?
+        .into();
+    if let Some(seed) = input.duplex {
+        owned.duplex = Some(duplex::Driver::new(seed, out, err)?);
+    } else {
+        owned.monitor = Some(Monitor::new(
+            out,
+            err,
+            input.one_shot.context("execution input missing")?,
+            capture,
+        )?);
+    }
     Ok(())
 }
 async fn observe(
@@ -403,13 +449,17 @@ async fn observe(
                 .as_ref()
                 .context("execution pidfd missing")?
                 .as_raw_fd();
-            let monitor = owned
-                .monitor
-                .as_mut()
-                .context("execution monitor missing")?;
-            let observation = monitor.observe(fd, cutoff, Some(cancel.as_raw_fd()), || {
-                Ok(cancel.is_cancelled())
-            })?;
+            let observation = if let Some(driver) = owned.duplex.as_mut() {
+                driver.observe(fd, cutoff, &cancel)?
+            } else {
+                let monitor = owned
+                    .monitor
+                    .as_mut()
+                    .context("execution monitor missing")?;
+                monitor.observe(fd, cutoff, Some(cancel.as_raw_fd()), || {
+                    Ok(cancel.is_cancelled())
+                })?
+            };
             Ok(observation)
         }))
         .map_err(|_| anyhow::anyhow!("execution monitor panicked"))?
@@ -420,7 +470,7 @@ async fn observe(
 async fn run(
     plan: CommandPlan,
     mut group: Cgroup,
-    input: Input<'static>,
+    input: PreparedInput,
     limits: Limits,
     capture: CapturePolicy,
     cancel: Arc<Cancellation>,
@@ -436,6 +486,7 @@ async fn run(
                 owned = Some(Observed {
                     process: Process::Running(process),
                     monitor: None,
+                    duplex: None,
                     pidfd: None,
                 })
             }
@@ -444,6 +495,7 @@ async fn run(
                 owned = failure.process.map(|process| Observed {
                     process: Process::LaunchFailed(process),
                     monitor: None,
+                    duplex: None,
                     pidfd: None,
                 });
             }
@@ -457,7 +509,7 @@ async fn run(
                     .push(format!("monitor preparation: {error:#}")),
                 Ok(()) => {
                     let slot = Arc::new(Mutex::new(owned.take()));
-                    match observe(slot.clone(), started + limits.timeout, cancel).await {
+                    match observe(slot.clone(), started + limits.timeout, cancel.clone()).await {
                         Ok(Observation::Exited) => report.outcome = Outcome::Exited,
                         Ok(Observation::TimedOut) => report.outcome = Outcome::TimedOut,
                         Ok(Observation::Cancelled) => report.outcome = Outcome::Cancelled,
@@ -476,14 +528,19 @@ async fn run(
             }
         }
     }
-    cleanup(&mut group, owned, &mut report).await;
+    cleanup(&mut group, owned, &mut report, cancel).await;
     if !report.errors.is_empty() {
         report.outcome = Outcome::Failed;
     }
     report.duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     report
 }
-async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut Report) {
+async fn cleanup(
+    group: &mut Cgroup,
+    mut owned: Option<Observed>,
+    report: &mut Report,
+    cancel: Arc<Cancellation>,
+) {
     let mut complete = true;
     if let Err(error) = group.finish(Duration::from_secs(2)).await {
         complete = false;
@@ -498,6 +555,37 @@ async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut R
             Err(error) => {
                 complete = false;
                 report.errors.push(format!("process cleanup: {error:#}"));
+            }
+        }
+        if let Some(mut driver) = state.duplex.take() {
+            if report.outcome == Outcome::Exited && report.exit_code == Some(0) {
+                if let Err(error) = driver.require_input_complete() {
+                    report
+                        .errors
+                        .push(format!("duplex stdin delivery: {error:#}"));
+                }
+            }
+            let cleanup_safe = complete;
+            let drained = tokio::task::spawn_blocking(move || {
+                let result = driver.drain(Duration::from_secs(2), &cancel, cleanup_safe);
+                (result, driver.bytes())
+            })
+            .await;
+            match drained {
+                Ok((result, (out, err))) => {
+                    report.stdout_bytes = out;
+                    report.stderr_bytes = err;
+                    if let Err(error) = result {
+                        complete = false;
+                        report
+                            .errors
+                            .push(format!("duplex residual output: {error:#}"));
+                    }
+                }
+                Err(error) => {
+                    complete = false;
+                    report.errors.push(format!("duplex drain task: {error:#}"));
+                }
             }
         }
         if let Some(monitor) = state.monitor.take() {

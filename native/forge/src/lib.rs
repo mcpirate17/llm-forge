@@ -216,6 +216,7 @@ pub mod context_diagnostics;
 pub mod context_store;
 #[cfg(target_os = "linux")]
 pub mod context_window;
+pub mod outbound_mcp_protocol;
 pub mod patch;
 #[cfg(target_os = "linux")]
 pub mod process_capture;
