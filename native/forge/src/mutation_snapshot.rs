@@ -191,18 +191,23 @@ impl Snapshot {
         Ok(())
     }
 
-    /// The legacy confined slice has no host Git capability. Its synthetic
-    /// HEAD stays local, but parent/history objects are deliberately unavailable.
-    pub(crate) fn disable_git_alternate(&self) -> Result<(), String> {
-        let path = self.worktree.join(".git/objects/info/alternates");
-        fs::remove_file(&path)
-            .map_err(|error| format!("cannot remove snapshot Git alternate: {error}"))?;
+    /// Remove coordinator-created private Git metadata before a no-Git payload.
+    /// The synthetic commit remains diagnostic only; no Git history is promised.
+    pub(crate) fn remove_git_metadata(&self) -> Result<(), String> {
+        let path = self.worktree.join(".git");
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("cannot inspect snapshot Git metadata: {error}"))?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err("snapshot Git metadata is not a private directory".into());
+        }
+        fs::remove_dir_all(&path)
+            .map_err(|error| format!("cannot remove snapshot Git metadata: {error}"))?;
         match fs::symlink_metadata(&path) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(format!(
-                "cannot verify removed snapshot Git alternate: {error}"
+                "cannot verify removed snapshot Git metadata: {error}"
             )),
-            Ok(_) => Err("snapshot Git alternate survived removal".into()),
+            Ok(_) => Err("snapshot Git metadata survived removal".into()),
         }
     }
 

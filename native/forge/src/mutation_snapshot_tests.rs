@@ -361,6 +361,18 @@ fn configured_hooks_templates_and_fsmonitor_do_not_run() {
 }
 
 #[test]
+fn private_git_metadata_can_be_removed_before_payload() {
+    let dir = host(&["src/a.py"]);
+    let snapshot = Snapshot::create(dir.path()).unwrap();
+    assert!(snapshot.worktree.join(".git").exists());
+    let before = read(&snapshot.worktree, "src/a.py");
+    snapshot.remove_git_metadata().unwrap();
+    assert!(!snapshot.worktree.join(".git").exists());
+    assert_eq!(read(&snapshot.worktree, "src/a.py"), before);
+    snapshot.remove().unwrap();
+}
+
+#[test]
 fn staged_addition_is_not_an_untracked_overlay_and_head_overlay_is_live() {
     let dir = host(&["src/a.py"]);
     let root = dir.path();

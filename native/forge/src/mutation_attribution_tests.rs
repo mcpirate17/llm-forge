@@ -1,8 +1,6 @@
 use super::*;
-use crate::mutation_process::Supervisor;
-use crate::mutation_run_test_support::{campaign, write};
+use crate::mutation_run_test_support::{campaign, with_session, write, Delegated};
 use crate::mutation_score::Receipt;
-use crate::process_signals::{Interrupts, TEST_OWNER};
 
 const NODE: &str = "tests/test_a.py::test_x";
 const PASSING: &str = "<testcase classname=\"tests.test_a\" name=\"test_x\"/>";
@@ -46,40 +44,40 @@ fn red() -> String {
     format!("report '{FAILING}'")
 }
 
-/// `attribute` over `rows` in a snapshot-shaped directory, under the signal owner.
-fn attributed(dir: &Path, pytest: &str, timeout: i64, mutants: Vec<Value>) -> (Step<()>, Receipt) {
+/// `attribute` inside a real test-owned sandbox and delegated cgroup session.
+fn attributed(
+    fixture: &Delegated,
+    pytest: &str,
+    timeout: i64,
+    mutants: Vec<Value>,
+) -> (Step<()>, Receipt) {
+    let session = fixture.session();
+    let result = attributed_with_session(fixture.path(), pytest, timeout, mutants, Some(&session));
+    fixture.assert_ledger(&result.1);
+    result
+}
+fn attributed_with_session(
+    dir: &Path,
+    pytest: &str,
+    timeout: i64,
+    mutants: Vec<Value>,
+    session: Option<&crate::mutation_execution::CommandSession<'_>>,
+) -> (Step<()>, Receipt) {
     write(dir, "src/a.py", "x = 1\n");
-    let mut subject = campaign(
+    with_session(
         dir,
+        Some("/venv/bin/python"),
         json!({
             "generator": {"source": ["src/a.py"], "run_timeout_seconds": timeout},
             "test_argv": ["/bin/sh", pytest],
         }),
-    );
-    let mut receipt = Receipt::new();
-    receipt.insert("mutants".into(), Value::Array(mutants));
-    let _owner = TEST_OWNER
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let interrupts = Interrupts::install().unwrap();
-    let supervisor = Supervisor {
-        interrupts: &interrupts,
-        registry: dir.join("live_pgids.json"),
-        memory_cap: None,
-    };
-    let output = dir.join("receipt.json");
-    let mut run = EngineRun {
-        campaign: &mut subject,
-        receipt: &mut receipt,
-        output_path: &output,
-        repo_root: dir,
-        worktree: dir,
-        interpreter: Some("/venv/bin/python"),
-        supervisor: &supervisor,
-        planned: None,
-    };
-    let outcome = attribute(&mut run, &BTreeMap::new());
-    (outcome, receipt)
+        session,
+        |run| {
+            run.receipt.insert("mutants".into(), Value::Array(mutants));
+            let outcome = attribute(run, &BTreeMap::new());
+            (outcome, run.receipt.clone())
+        },
+    )
 }
 
 #[test]
@@ -288,10 +286,11 @@ fn one_contract_spans_the_campaign_because_kills_cross_files() {
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_kill_is_charged_to_the_test_that_failed() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     let pytest = stub(dir.path(), &green(), &red());
-    let (outcome, receipt) = attributed(dir.path(), &pytest, 30, vec![killed("m", &[NODE])]);
+    let (outcome, receipt) = attributed(&dir, &pytest, 30, vec![killed("m", &[NODE])]);
     outcome.unwrap();
     let summary = &receipt["attribution"];
     assert_eq!(summary["status"], "ATTRIBUTED");
@@ -312,60 +311,68 @@ fn a_kill_is_charged_to_the_test_that_failed() {
     );
 }
 
-fn unattributed_reason(dir: &Path, mutated: &str, timeout: i64) -> Value {
-    let pytest = stub(dir, &green(), mutated);
+fn unattributed_reason(dir: &Delegated, mutated: &str, timeout: i64) -> Value {
+    let pytest = stub(dir.path(), &green(), mutated);
     let (outcome, receipt) = attributed(dir, &pytest, timeout, vec![killed("m", &[NODE])]);
     outcome.unwrap();
     assert_eq!(receipt["attribution"]["status"], "NO_ATTRIBUTION");
     assert_eq!(receipt["attribution"]["attributed_mutants"], 0);
     assert!(!receipt.contains_key("test_value"));
-    assert_eq!(fs::read_to_string(dir.join("src/a.py")).unwrap(), "x = 1\n");
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/a.py")).unwrap(),
+        "x = 1\n"
+    );
     receipt["attribution"]["unattributed"].clone()
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_mutant_that_aborts_the_interpreter_is_recorded_not_charged() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     assert_eq!(
-        unattributed_reason(dir.path(), "exit 134", 30),
+        unattributed_reason(&dir, "exit 134", 30),
         json!([{"id": "m", "reason": "covering set crashed without a report"}])
     );
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_mutant_its_covering_set_does_not_kill_again_is_recorded_not_charged() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     assert_eq!(
-        unattributed_reason(dir.path(), &green(), 30),
+        unattributed_reason(&dir, &green(), 30),
         json!([{"id": "m", "reason": "covering set passed on re-run"}])
     );
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_mutant_that_hangs_is_recorded_not_charged() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     assert_eq!(
-        unattributed_reason(dir.path(), "exec sleep 30", 1),
+        unattributed_reason(&dir, "exec sleep 30", 1),
         json!([{"id": "m", "reason": "covering set timed out"}])
     );
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_report_that_cannot_be_mapped_charges_no_test() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     let stranger = "report '<testcase classname=\"elsewhere\" name=\"test_y\"/>'";
     assert_eq!(
-        unattributed_reason(dir.path(), stranger, 30),
+        unattributed_reason(&dir, stranger, 30),
         json!([{"id": "m", "reason": "report does not map to nodeids"}])
     );
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_kill_with_no_usable_covering_test_is_recorded_beside_those_with_one() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     let pytest = stub(dir.path(), &green(), &red());
     let rows = vec![killed("a", &["doctest::a"]), killed("b", &[NODE])];
-    let (outcome, receipt) = attributed(dir.path(), &pytest, 30, rows);
+    let (outcome, receipt) = attributed(&dir, &pytest, 30, rows);
     outcome.unwrap();
     let summary = &receipt["attribution"];
     assert_eq!(summary["status"], "ATTRIBUTED");
@@ -378,10 +385,11 @@ fn a_kill_with_no_usable_covering_test_is_recorded_beside_those_with_one() {
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_baseline_with_no_report_stops_attribution_and_keeps_the_summary() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     let pytest = stub(dir.path(), "exit 3", &red());
-    let (outcome, receipt) = attributed(dir.path(), &pytest, 30, vec![killed("m", &[NODE])]);
+    let (outcome, receipt) = attributed(&dir, &pytest, 30, vec![killed("m", &[NODE])]);
     assert_eq!(
         outcome,
         Err(Stop::Refused(
@@ -392,10 +400,11 @@ fn a_baseline_with_no_report_stops_attribution_and_keeps_the_summary() {
 }
 
 #[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
 fn a_baseline_that_times_out_stops_attribution() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = Delegated::new(Some("/venv/bin/python"));
     let pytest = stub(dir.path(), "exec sleep 30", &red());
-    let (outcome, _) = attributed(dir.path(), &pytest, 1, vec![killed("m", &[NODE])]);
+    let (outcome, _) = attributed(&dir, &pytest, 1, vec![killed("m", &[NODE])]);
     assert_eq!(
         outcome,
         Err(Stop::Refused("attribution baseline 0 timed out".into()))
@@ -408,12 +417,17 @@ fn nothing_is_attempted_without_a_kill_or_a_test_junit_can_name() {
     let pytest = stub(dir.path(), "exit 9", "exit 9");
     let mut survivor = killed("m", &[NODE]);
     survivor["outcome"] = json!("SURVIVED");
-    let (outcome, receipt) = attributed(dir.path(), &pytest, 30, vec![survivor]);
+    let (outcome, receipt) = attributed_with_session(dir.path(), &pytest, 30, vec![survivor], None);
     outcome.unwrap();
     assert_eq!(receipt["attribution"]["status"], "NOT_ATTEMPTED");
     assert_eq!(receipt["attribution"]["reason"], "no mutant was killed");
-    let (outcome, receipt) =
-        attributed(dir.path(), &pytest, 30, vec![killed("m", &["doctest::a"])]);
+    let (outcome, receipt) = attributed_with_session(
+        dir.path(),
+        &pytest,
+        30,
+        vec![killed("m", &["doctest::a"])],
+        None,
+    );
     outcome.unwrap();
     assert_eq!(receipt["attribution"]["status"], "NOT_ATTEMPTED");
     assert_eq!(

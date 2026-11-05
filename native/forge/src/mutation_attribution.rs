@@ -248,7 +248,7 @@ impl Session<'_> {
     /// Run exactly these tests and read their outcomes back out.
     fn measure(
         &self,
-        run: &EngineRun,
+        run: &mut EngineRun,
         nodeids: &[String],
         name: &str,
     ) -> Step<(CommandResult, Measured)> {
@@ -267,7 +267,7 @@ impl Session<'_> {
 
     /// The unmutated runs every mutant is compared against; their wall time then
     /// bounds the mutant re-runs.
-    fn baselines(&mut self, run: &EngineRun, ranked: &[String]) -> Step<Vec<Value>> {
+    fn baselines(&mut self, run: &mut EngineRun, ranked: &[String]) -> Step<Vec<Value>> {
         let mut reports = Vec::new();
         let mut slowest = 0.0_f64;
         for index in 0..BASELINE_REPETITIONS {
@@ -335,7 +335,7 @@ fn unusable_reason(measured: &Measured) -> Option<&'static str> {
 /// One JUnit report per killed mutant, over that mutant's covering set.
 fn matrix(
     session: &Session,
-    run: &EngineRun,
+    run: &mut EngineRun,
     killed: &[Value],
     ranked: &[String],
     summary: &mut Map<String, Value>,

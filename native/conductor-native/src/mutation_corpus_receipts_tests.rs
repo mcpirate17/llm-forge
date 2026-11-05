@@ -91,6 +91,10 @@ mod native_receipts {
     fn native_receipt() -> Value {
         json!({
             "status": "RATCHET_HELD",
+            "execution_grants_sha256": "a".repeat(64),
+            "process_cleanup": {"schema_version":1,"complete":true,"commands_observed":1},
+            "process_commands": [{"state":"observed","confinement":{"cleanup_complete":true,"outcome":"exited","exit_code":0,"signal":null,"resources":{"verified":true},"errors":[]}}],
+            "snapshot": {"removed":true},
             "runner_kind": RUNNER_KIND,
             "source_sha256": {"src/a.rs": "e".repeat(64)},
             "mutants": [{"path":"src/a.rs","outcome":"KILLED"}],
@@ -122,6 +126,28 @@ mod native_receipts {
             |_| Ok(lineage),
         )
         .expect("rejection")
+    }
+
+    #[test]
+    fn native_acceptance_requires_consistent_owned_cleanup() {
+        let mut receipt = native_receipt();
+        receipt
+            .as_object_mut()
+            .unwrap()
+            .remove("execution_grants_sha256");
+        assert!(judged(&receipt, &"e".repeat(64), true)
+            .unwrap()
+            .contains("historical"));
+        let mut receipt = native_receipt();
+        receipt["process_cleanup"]["commands_observed"] = json!(2);
+        assert!(judged(&receipt, &"e".repeat(64), true)
+            .unwrap()
+            .contains("inconsistent"));
+        let mut receipt = native_receipt();
+        receipt["snapshot"]["removed"] = json!(false);
+        assert!(judged(&receipt, &"e".repeat(64), true)
+            .unwrap()
+            .contains("inconsistent"));
     }
 
     #[test]

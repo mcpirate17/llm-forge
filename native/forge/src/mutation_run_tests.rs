@@ -264,6 +264,8 @@ fn a_run_is_refused_before_anything_loads_without_the_opt_in() {
         only: Vec::new(),
         allow_mutations: false,
         receipt: None,
+        execution_grants: None,
+        execution_grants_sha256: None,
         stamp: STAMP,
     };
     assert_eq!(
@@ -273,12 +275,18 @@ fn a_run_is_refused_before_anything_loads_without_the_opt_in() {
 }
 
 #[test]
-fn a_campaign_with_its_engine_and_pinned_bytes_is_ready() {
+fn pinned_campaign_and_engine_still_require_execution_grants() {
     let dir = tempfile::tempdir().unwrap();
     let (root, subject) = pinned_host(dir.path());
     let report = inspect(&subject, &root).unwrap();
-    assert_eq!(report["status"], "READY");
-    assert_eq!(report["readiness_reasons"], json!([]));
+    assert_eq!(report["status"], "NOT_READY");
+    assert!(report["readiness_reasons"]
+        .to_string()
+        .contains("execution grants"));
+    assert_eq!(
+        report["readiness_reasons"],
+        json!(["ordinary mutation execution requires explicit pinned execution grants"])
+    );
     assert_eq!(
         report["engine_binary"],
         root.join("bin/fest").to_string_lossy().as_ref()
@@ -292,14 +300,20 @@ fn inspection_names_every_reason_a_campaign_could_not_run() {
     write(&root, "src/a.py", "x = 2\n");
     assert_eq!(
         inspect(&subject, &root).unwrap()["readiness_reasons"],
-        json!(["pinned source drifted: src/a.py"])
+        json!([
+            "ordinary mutation execution requires explicit pinned execution grants",
+            "pinned source drifted: src/a.py"
+        ])
     );
     fs::remove_file(root.join("src/a.py")).unwrap();
     let report = inspect(&subject, &root).unwrap();
     assert_eq!(report["status"], "NOT_READY");
     assert_eq!(
         report["readiness_reasons"],
-        json!(["pinned source is absent: src/a.py"])
+        json!([
+            "ordinary mutation execution requires explicit pinned execution grants",
+            "pinned source is absent: src/a.py"
+        ])
     );
 }
 
@@ -320,10 +334,11 @@ fn inspection_names_a_missing_engine() {
     if crate::mutation_snapshot::on_path("fest").is_none() {
         assert_eq!(report["status"], "NOT_READY");
         assert!(report["engine_binary"].is_null());
-        assert!(report["readiness_reasons"][0]
-            .as_str()
+        assert!(report["readiness_reasons"]
+            .as_array()
             .unwrap()
-            .contains("fest is not installed"));
+            .iter()
+            .any(|reason| reason.as_str().unwrap().contains("fest is not installed")));
     }
 }
 
@@ -374,22 +389,23 @@ fn only_fest_discovers_python_and_native_receipts_record_no_guest() {
 }
 
 #[test]
-fn guest_selection_clears_inherited_and_campaign_environment_without_losing_cache_isolation() {
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+fn confined_fixture_clears_inherited_guest_and_has_private_cache() {
     const CHILD: &str = "FORGE_OPTIONAL_PYTHON_GUEST_CHILD";
     if std::env::var(CHILD).as_deref() != Ok("1") {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "mutation_run::tests::guest_selection_clears_inherited_and_campaign_environment_without_losing_cache_isolation", "--nocapture"])
+            .args(["--exact", "mutation_run::tests::confined_fixture_clears_inherited_guest_and_has_private_cache", "--nocapture", "--ignored"])
             .env(CHILD, "1").env(SNAPSHOT_PYTHON_ENV, "/stale/inherited")
             .output().unwrap();
         assert!(output.status.success(), "{output:?}");
         return;
     }
-    let dir = tempfile::tempdir().unwrap();
     for (interpreter, expected) in [
         (None, "absent"),
         (Some("/selected/python"), "/selected/python"),
     ] {
-        crate::mutation_run_test_support::with_run(dir.path(), interpreter, json!({}), |run| {
+        let dir = crate::mutation_run_test_support::Delegated::new(interpreter);
+        dir.with_run(interpreter, json!({}), |run| {
             let environment =
                 BTreeMap::from([(SNAPSHOT_PYTHON_ENV.into(), "/stale/campaign".into())]);
             let argv = ["/bin/sh", "-c", "test -d \"$PYTHONPYCACHEPREFIX\" && printf '%s' \"${CONDUCTOR_SNAPSHOT_PYTHON-absent}\""]
@@ -397,6 +413,49 @@ fn guest_selection_clears_inherited_and_campaign_environment_without_losing_cach
             let (result, stdout) = run.run(&argv, dir.path(), 5, &environment, &[]).unwrap();
             assert!(result.succeeded());
             assert_eq!(stdout, expected);
+        });
+    }
+}
+
+#[test]
+fn payload_without_an_admitted_session_is_refused_before_launch() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::mutation_run_test_support::with_run(dir.path(), None, json!({}), |run| {
+        let argv = ["/bin/sh", "-c", "touch unconfined-marker"].map(str::to_string);
+        let outcome = run.run(&argv, dir.path(), 1, &BTreeMap::new(), &[]);
+        assert!(matches!(outcome, Err(Stop::Refused(message))
+            if message == "mutation payload requires an admitted confined execution session"));
+        assert!(!dir.path().join("unconfined-marker").exists());
+    });
+}
+
+#[test]
+fn guest_binding_removes_stale_values_and_preserves_cache_isolation() {
+    let dir = tempfile::tempdir().unwrap();
+    for interpreter in [None, Some("/selected/python")] {
+        crate::mutation_run_test_support::with_run(dir.path(), interpreter, json!({}), |run| {
+            let base = BTreeMap::from([
+                (SNAPSHOT_PYTHON_ENV.into(), "/stale/campaign".into()),
+                ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
+            ]);
+            let bound = run.guest_environment(&base);
+            assert_eq!(
+                bound.get(SNAPSHOT_PYTHON_ENV).map(String::as_str),
+                interpreter
+            );
+            let scratch = crate::mutation_bytecode::scratch_root_for(dir.path());
+            let isolated =
+                crate::mutation_bytecode::isolated_python_env(&bound, &scratch, &[]).unwrap();
+            assert_eq!(
+                isolated.get(SNAPSHOT_PYTHON_ENV).map(String::as_str),
+                interpreter
+            );
+            assert!(!isolated.contains_key("PYTHONDONTWRITEBYTECODE"));
+            assert_eq!(
+                std::path::Path::new(&isolated["PYTHONPYCACHEPREFIX"]),
+                scratch.join("pycache")
+            );
+            assert!(scratch.join("pycache").is_dir());
         });
     }
 }

@@ -55,6 +55,11 @@ pub struct RunArgs {
     /// Repository root; defaults to the nearest ancestor with a `.git` entry.
     #[arg(long)]
     pub repo_root: Option<PathBuf>,
+    /// Operator-owned execution capabilities for ordinary mutation engines.
+    #[arg(long, requires = "execution_grants_sha256")]
+    pub execution_grants: Option<PathBuf>,
+    #[arg(long, requires = "execution_grants")]
+    pub execution_grants_sha256: Option<String>,
 }
 
 fn stamp() -> BuildStamp {
@@ -109,6 +114,8 @@ pub fn run(args: RunArgs) -> Result<i32> {
         only: args.only,
         allow_mutations: args.allow_mutations,
         receipt: args.receipt,
+        execution_grants: args.execution_grants,
+        execution_grants_sha256: args.execution_grants_sha256,
         stamp: stamp(),
     };
     match mutation_run::run_campaign(&request) {

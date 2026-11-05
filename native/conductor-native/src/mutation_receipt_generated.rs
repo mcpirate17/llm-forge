@@ -84,6 +84,9 @@ pub(crate) fn generated_errors_with_installed(
     }
     errors.extend(identity_errors(payload, campaign));
     if native_runner::declared(payload) {
+        if let Some(detail) = native_runner::owned_cleanup_error(payload) {
+            errors.push(reject(RejectionKind::SchemaError, detail));
+        }
         errors.extend(native_binding_errors(
             payload, campaign, hash, lineage, installed,
         ));

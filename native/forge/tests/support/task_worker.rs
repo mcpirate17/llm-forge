@@ -70,6 +70,41 @@ fn detached_child(args: &[String], exit_after_ready: bool) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+fn setsid_child(args: &[String], exit_after_ready: bool) -> io::Result<()> {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+    let sleep = duration(args)?;
+    if sleep > Duration::from_secs(30) { return Err(argument_error("fixture exceeds 30 seconds")); }
+    let path = args.get(1).ok_or_else(|| argument_error("missing child PID path"))?;
+    let ack = args.get(2).ok_or_else(|| argument_error("missing owner acknowledgement"))?;
+    let mut command = Command::new(std::env::current_exe()?);
+    command.args(["pid-sleep", &args[0], path]);
+    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    // SAFETY: setsid is async-signal-safe and the closure allocates nothing.
+    unsafe { command.pre_exec(|| {
+        unsafe extern "C" { fn setsid() -> i32; }
+        if setsid() < 0 { return Err(io::Error::last_os_error()); }
+        Ok(())
+    }); }
+    let mut child = command.spawn()?;
+    let ready = wait_for_pid(&mut child, path).and_then(|()| {
+        let until = std::time::Instant::now() + Duration::from_secs(3);
+        while !std::path::Path::new(ack).exists() {
+            if child.try_wait()?.is_some() { return Err(io::Error::other("child ended before acknowledgement")); }
+            if std::time::Instant::now() >= until { return Err(io::Error::other("owner acknowledgement timeout")); }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        Ok(())
+    });
+    if let Err(error) = ready {
+        if child.try_wait()?.is_none() { child.kill()?; child.wait()?; }
+        return Err(error);
+    }
+    if !exit_after_ready { std::thread::sleep(sleep); child.wait()?; }
+    Ok(())
+}
+
 fn allocate(args: &[String]) -> io::Result<()> {
     let mib: usize = args
         .first()
@@ -276,6 +311,10 @@ fn run() -> io::Result<i32> {
         "detach-child" => detached_child(args, false)?,
         #[cfg(unix)]
         "detach-exit" => detached_child(args, true)?,
+        #[cfg(target_os = "linux")]
+        "setsid-exit" => setsid_child(args, true)?,
+        #[cfg(target_os = "linux")]
+        "setsid-wait" => setsid_child(args, false)?,
         _ => return Err(argument_error(&format!("unknown worker mode: {mode}"))),
     }
     io::stdout().flush()?;

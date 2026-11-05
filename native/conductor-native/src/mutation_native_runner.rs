@@ -19,6 +19,62 @@ fn hex(value: Option<&str>, length: usize) -> bool {
     })
 }
 
+/// Structural cleanup consistency, not producer or execution attestation.
+/// Historical process-group-only receipts remain readable but are not current
+/// whole-tree cleanup evidence.
+pub fn owned_cleanup_error(payload: &Map<String, Value>) -> Option<String> {
+    let legacy = payload.contains_key("execution_grants_sha256");
+    if legacy
+        && !hex(
+            payload
+                .get("execution_grants_sha256")
+                .and_then(Value::as_str),
+            64,
+        )
+    {
+        return Some("execution grants digest is missing or malformed".into());
+    }
+    let (cleanup, commands) = if legacy {
+        (
+            payload.get("process_cleanup"),
+            payload.get("process_commands"),
+        )
+    } else {
+        (
+            payload.get("cargo_value_process_cleanup"),
+            payload.get("cargo_value_commands"),
+        )
+    };
+    let Some(cleanup) = cleanup.and_then(Value::as_object) else {
+        return Some("historical native receipt lacks owned process cleanup evidence".into());
+    };
+    let Some(commands) = commands.and_then(Value::as_array) else {
+        return Some("owned process command ledger is missing".into());
+    };
+    if commands.is_empty()
+        || commands.len() > 4096
+        || cleanup.get("complete") != Some(&Value::Bool(true))
+        || cleanup.get("commands_observed").and_then(Value::as_u64) != Some(commands.len() as u64)
+        || payload
+            .get("snapshot")
+            .and_then(|value| value.get("removed"))
+            != Some(&Value::Bool(true))
+        || commands.iter().any(|row| {
+            row["state"] != "observed"
+                || row["confinement"]["cleanup_complete"] != true
+                || row["confinement"]["outcome"] != "exited"
+                || row["confinement"]["resources"]["verified"] != true
+                || row["confinement"]["errors"]
+                    .as_array()
+                    .is_none_or(|errors| !errors.is_empty())
+        })
+        || legacy && cleanup.get("schema_version").and_then(Value::as_u64) != Some(1)
+    {
+        return Some("owned process or snapshot cleanup is incomplete or inconsistent".into());
+    }
+    None
+}
+
 /// Supplied only by a coordinator that has independently held and checked an operator pin.
 #[derive(Clone, Debug)]
 pub struct InstalledIdentity {
