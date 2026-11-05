@@ -153,6 +153,8 @@ collector is usable only when an existing governed campaign supplies a verified
 single-target command and ranked tests; raw or multi-target output remains
 incomplete. Detecting native admission debt is separate from producing that
 evidence, and no campaign or receipt is authored manually to bridge this gap.
+Automatic production of that evidence is tracked in
+[#190](https://github.com/mcpirate17/llm-forge/issues/190).
 
 ## Receipt format
 
@@ -351,9 +353,11 @@ requires committed native inputs.
 Native-runner schema v2 compares the compiled source fingerprint with the audited
 native source inventory: source trees, Cargo manifests/lockfiles, build scripts
 and declared embedded assets. The former v1 partial component list is rejected;
-lineage cannot waive a stale native fingerprint. Missing Forge sources in a host
-cannot establish current native-runner identity. This is source freshness,
-not authenticated producer identity, compiler equivalence or binary attestation.
+lineage cannot waive a stale native fingerprint. A source-less host needs the
+explicit [installed native pin](#installed-native-runner-identity) for native
+candidate/corpus validation; missing sources alone never establish identity.
+This is cooperative source/build/binary consistency, not authenticated producer
+identity, compiler equivalence or binary attestation.
 Captured candidate/corpus inputs retain their own freshness checks; ambient
 compatibility reads remain filesystem observations.
 

@@ -80,9 +80,10 @@ is different from Python required to orchestrate Forge itself.
 **Status:** implementation and reviewed repairs merged in PR #185 at `f8c1ae9`,
 with full source-bound local verification on the identical PR tree. The repair
 closed #184 and hardened output publication, process diagnostics, per-source
-coverage accounting and native receipt freshness. Optional native guest
-interpreter handling is the next bounded migration; external-host evidence
-acceptance is tracked separately in #186.
+coverage accounting and native receipt freshness. Optional native guest interpreter
+handling landed in PR #187. External-host identity acceptance is tracked in #186,
+and automatic Cargo per-test attribution in #190; the latest implementation and
+measurement status is in the current checkpoint linked below.
 See [the current engineering checkpoint](roadmap.md#current-mission-checkpoint--2026-11-04).
 `forge mutation plan|write|inspect|run` replace the writer and runner, and
 `make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them, through
