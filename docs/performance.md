@@ -146,12 +146,78 @@ usage, cost per successful task or time per successful task.
 
 ### Transport, task value and missing controls
 
-`native/forge/benches/harness.rs` measures validated calls using a reused Unix
-socket. Actual `harness_mcp.rs::forward` calls `harness_transport.rs::request`,
-which opens a fresh Unix socket per forwarded call. The socket benchmark omits
-that per-call connection cost, MCP envelopes, discovery and actual agent tool
-selection; it is not an end-to-end MCP measurement. The opt-in live MCP tests
-exercise a custom wire client and service, not a real Claude/Codex client.
+The extended `native/forge/benches/harness.rs` measures real native MCP stdio,
+including `harness_mcp.rs::forward` opening a fresh Unix socket per call, alongside
+equivalent CLI `code fold` results. Its reused-socket diagnostics remain separately
+labeled and now use 31 batches of ten operations; they are not the old 100-operation
+batch workload. All CLI/MCP calls must match the complete native reference payload
+and source hash. The adapter negotiates `2025-11-25`, discovers the full permitted
+catalog, and revalidates it after measurement. A custom wire client is not proof
+of Claude/Codex adoption or agent tool selection.
+
+Five process-fresh repetitions ran on the shared host with uncontrolled filesystem
+and kernel caches. Each arm makes one first call, ten warmups and 31 batches of ten
+measured calls, alternating arm order. All 1,605 CLI and 1,605 MCP calls completed,
+including 1,550 measured calls per arm, with zero failed/censored/unstarted calls.
+The 20 protocol operations and 4,815 separate Unix diagnostic calls also completed.
+Protocol accounting includes the initialized notification as a completed write,
+not acknowledged server processing. Every run verifies adapter EOF/exit, service
+stop, fixture removal, catalog stability and matching before/after input hashes.
+
+| Phase | Median across five runs | Observed range |
+| --- | ---: | ---: |
+| Fixture/index preparation | 35.897 ms | 35.304–47.589 ms |
+| Service launch through readiness | 37.430 ms | 29.915–49.080 ms |
+| Adapter launch and initialization | 1.360 ms | 1.258–1.580 ms |
+| Full permitted catalog discovery, including one client schema validation | 0.141 ms | 0.116–0.170 ms |
+| CLI median batch mean per operation | 1.061 ms | 1.029–1.070 ms |
+| MCP median batch mean per operation | 39.904 µs | 37.303–41.871 µs |
+| CLI p95 batch mean per operation | 1.163 ms | 1.132–1.271 ms |
+| MCP p95 batch mean per operation | 51.786 µs | 46.306–53.529 µs |
+
+These p95s describe batch means, not individual-call tails. This tiny one-function
+folding workload demonstrates lower per-call latency once the service is running;
+startup and preparation remain separate costs. It does not establish a general
+speedup or faster complete agent tasks. The catalog is 2,775 serialized bytes;
+that byte count is not a provider token measurement.
+
+The [outer native receipt](../research/performance/forge-program-20261104-mcp-transport-baseline.json)
+records whole-driver p50/p95 658.435/679.279 ms, CPU p50 482.381 ms and maximum child
+RSS 15,433,728 bytes. It includes driver/waited-child work and excludes the separate
+systemd daemon. Observed process RSS peaks during batch snapshots were 6,225,920
+bytes for the driver, 15,273,984 for the adapter and 20,418,560 for the daemon;
+these must not be summed into a simultaneous tree peak. Component CPU ticks have
+10 ms resolution: zeros in short MCP batches do not mean zero CPU consumption.
+The [machine-generated phase projection](../research/performance/forge-program-20261104-mcp-transport-observations.json)
+retains per-batch timing/counter deltas, outcome counts, hashes and raw-log paths.
+Its collector associates outer receipt and inner log hashes after collection;
+the outer receipt seal itself does not bind those logs. Before/after hashes are
+point observations and cannot attest absence of transient substitutions.
+
+Benchmark executable SHA-256:
+`c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161`;
+Forge executable SHA-256:
+`8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd`.
+The raw reports and receipt bind the source inventory, explicit build inputs,
+fixture/request/policy/catalog identities and environment within their declared
+scopes. This remains working-build measurement, separate from publication checks.
+
+Rebuild with Rust 1.98.0 using `make build` and
+`cargo +1.98.0 bench --offline --locked --manifest-path native/forge/Cargo.toml --bench harness --no-run`.
+Set `FORGE_TEST_BIN` to that absolute Forge path and `FORGE_BENCH_SERVICE=1`.
+Run the prebuilt benchmark through `forge performance benchmark` with five samples,
+zero outer warmups and `--timeout-seconds 120`, retaining the source paths and
+literal command from the receipt. The inner 90-second deadline is cooperative;
+setup, synchronous filesystem work and cleanup are not preempted by it. The outer
+runner supplies the process bound and the owned daemon has a 120-second lifetime.
+Missing opt-in and a nonready native executable each produce an invalid report
+and no receipt. Uncertain adapter/service cleanup preserves its fixture and exact
+path instead of deleting potentially live state. Twenty-two live CLI/harness tests,
+including existing cancellation/capability cases, and strict Clippy passed.
+
+These small dispatch costs do not justify further micro-optimization by themselves.
+Next measure useful work per task, including discovery/context reuse, the cost of
+recommendation calls, actual client selection and provider usage.
 
 | Evidence | What it supports | What remains unmeasured |
 | --- | --- | --- |
@@ -160,11 +226,11 @@ exercise a custom wire client and service, not a real Claude/Codex client.
 | Historical [product-value observations](native-product-value-measurements.md) | Native relocation slowdown and a signature projection's smaller supplied payload | General speedup, net billed savings or equivalent full-file semantics |
 | Historical [retrieval run](native-code-retrieval-measurement.md) | 144 completed retrievals; 0 failed/censored/unstarted; frozen agent-authored labels | Independent broad relevance, agent success and full resource attribution; preparation took 23.6 minutes |
 | Existing context composition, counting, recovery and usage reports | Reusable native primitives; exact supplied-text token counts when pinned | Actual model usage in a matched experiment, recovery/reread cost and task-quality effect |
-| Hook and service integration fixtures | Handler/protocol/control behavior within tested scopes | Hooks enabled/disabled overhead, concurrent MCP latency and actual-client enforcement |
+| Hook and service integration fixtures and measured raw MCP above | Handler/protocol/control behavior and sequential stdio transport costs within tested scopes | Hooks enabled/disabled overhead, concurrent MCP latency and actual-client enforcement |
 
 No current evidence establishes higher verified agent success, faster complete
 tasks, net provider cost savings or an optimal context budget. Prioritize actual
-client validation, matched MCP/CLI transport and hooks controls, then repeated
+client validation, representative transport/concurrency and hooks controls, then repeated
 agent tasks with independent correctness checks and complete outcome counts.
 Record model/version/budget, source/binary identities, preparation, cache/load,
 provider usage, rereads and failures. Allocate optimization effort from those

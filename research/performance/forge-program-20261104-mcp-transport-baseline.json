@@ -1,0 +1,62 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1793854132,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "dd8714c03de7daf823d2e2342051c2f05b438d50",
+    "source_files": {
+      "native/forge/benches/harness.rs": "6bbb3c89b434dee3dd0664c362b6dea97b386c1fad0e0429f1f26a6b22ea865d",
+      "native/forge/benches/support/mcp_measurement.rs": "7cb7eedd56f493a8113ecbbd1396600dca839522264e50b5bddb525193b517ae",
+      "native/forge/benches/support/memory_fixture.rs": "53efec5a3b42cff8c832fcf599ccae5a0f4c788deee777b3c8708dd8a7ca788c",
+      "native/forge/src/harness.rs": "f788945d1b72812c7d5ceaa4bfe84798c57979cf2a5982d395e20dcf800a1c16",
+      "native/forge/src/harness_mcp.rs": "5db09941e6f43c7aa713447fedcecb7bdc5f4a004a25e05eb9e08677f26823ab",
+      "native/forge/src/harness_mcp_protocol.rs": "3b650fd34c862ea69f70848440dee196b9b7837e7fcf7d62228b92757df51f7b",
+      "native/forge/src/harness_source.rs": "1053cc15cbbd388fbd6631087ece83979a55f96e846926126ac5f11d9a3a623e",
+      "native/forge/target/release/deps/harness-1546c0e21a3d0b5e": "c50c8c76c5215045ffab0bca47d03c3ffa7bb78f6ab0f9e5044d9f418c8ac161",
+      "native/forge/target/release/forge": "8785f88753a53a5715aa95c563bf58f6f2f2d98ace6f56b99d20cb4c86da63dd",
+      "native/forge/tests/support/forge_binary.rs": "41986a7c6e40681741420050f90cde67984c7a8ab7e594293c533edaca0d87ff",
+      "native/forge/tests/support/mcp_client.rs": "7f3165eb40a911e096ac98b2ea024c4152d54da937973da2f9f184afd78fe179"
+    },
+    "command": "./native/forge/target/release/deps/harness-1546c0e21a3d0b5e",
+    "workload_sha256": "15a044c2a16e3e75958cd4eaa3ec233ddcf79a6b5a3f1ccad5eea6e84fc3645b",
+    "environment_sha256": "aa9fe65010e2de96d877a8671f47fbf86f84eb1c1a093af1ac3cfc4e2303f4a4",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.93.1 (01f6ddf75 2026-02-11)",
+    "warmups": 0,
+    "timeout_seconds": 120
+  },
+  "samples": [
+    {
+      "wall_ms": 679.27902,
+      "cpu_ms": 474.008,
+      "max_rss_bytes": 14999552
+    },
+    {
+      "wall_ms": 653.119447,
+      "cpu_ms": 482.381,
+      "max_rss_bytes": 15204352
+    },
+    {
+      "wall_ms": 658.434907,
+      "cpu_ms": 482.407,
+      "max_rss_bytes": 14983168
+    },
+    {
+      "wall_ms": 644.082588,
+      "cpu_ms": 479.718,
+      "max_rss_bytes": 15282176
+    },
+    {
+      "wall_ms": 659.046329,
+      "cpu_ms": 485.903,
+      "max_rss_bytes": 15433728
+    }
+  ],
+  "summary": {
+    "p50_ms": 658.434907,
+    "p95_ms": 679.27902,
+    "cpu_p50_ms": 482.381,
+    "max_rss_bytes": 15433728
+  },
+  "receipt_sha256": "775b1a7c2d625f6faabf747e915c5df58a2bfef48499e087b0ad462a451eab04"
+}
