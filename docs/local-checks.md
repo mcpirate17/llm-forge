@@ -205,3 +205,23 @@ prefix proves relocation, not a clean-host compilation when Cargo caches are
 reused. Editing the policy does not install or start a timer. Existing sweep
 reports are under `research/reports/sweep/`; see [sweep.md](sweep.md) for lifecycle
 commands and their effects.
+
+The ordinary mutation CLI fixtures require an existing operator-delegated cgroup
+v2 parent. Default test runs leave those cases ignored. To execute all default and
+delegated public CLI cases against an explicitly selected native binary:
+
+```sh
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+FORGE_TEST_CGROUP_PARENT=/operator/existing/delegated-cgroup \
+  cargo +1.98.0 test --release --offline --locked \
+  --manifest-path native/forge/Cargo.toml --test mutation_run_cli \
+  -- --include-ignored --test-threads=1
+```
+
+These are synthetic Cargo protocol fixtures exercising real CLI admission,
+confinement, timeout/cancellation, drift rejection and cleanup disposition. They
+are not automatic-engine mutation evidence. Fest execution remains unsupported
+by the ordinary CLI; parser/scorer tests retain its protocol semantics, and the
+explicitly delegated `mutation_engine_fest::tests` cases exercise missing
+coverage and non-JSON refusals through the confined adapter. Fixture paths are
+retained when process disposition or cleanup cannot be verified.
