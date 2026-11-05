@@ -260,6 +260,8 @@ pub(crate) mod mutation_cargo_capture;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_cargo_plan;
 #[cfg(target_os = "linux")]
+pub(crate) mod mutation_cargo_supporting;
+#[cfg(target_os = "linux")]
 pub mod mutation_engine_cargo;
 #[cfg(target_os = "linux")]
 pub mod mutation_engine_fest;

@@ -16,6 +16,7 @@ pub(crate) struct Capture<'a> {
     native_fingerprint: Option<Option<String>>,
     native_inventory: Option<Vec<PathBuf>>,
     cargo_inventories: Vec<crate::mutation_cargo_capture::Held>,
+    supporting: Option<crate::mutation_cargo_supporting::Held>,
     snapshot: &'a Snapshot,
     pub failed: bool,
 }
@@ -120,6 +121,7 @@ impl<'a> Capture<'a> {
             native_fingerprint: None,
             native_inventory: None,
             cargo_inventories: Vec::new(),
+            supporting: None,
             snapshot,
             failed: false,
         })
@@ -264,6 +266,62 @@ impl<'a> Capture<'a> {
     pub fn retain_cargo(&mut self, held: crate::mutation_cargo_capture::Held) {
         self.cargo_inventories.push(held);
     }
+    pub fn supporting_inventory(
+        &mut self,
+        required: &BTreeMap<String, String>,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        use conductor_native::mutation_cargo_inventory::{self as cargo, Entry};
+        let budget = cargo_budget(&self.cargo_inventories)?;
+        let mut map = BTreeMap::new();
+        let entries: Vec<_> = self.inputs.entries.values().cloned().collect();
+        ensure!(
+            entries.len() <= 16384,
+            "supporting Git inventory exceeds 16384 entries"
+        );
+        let mut relevant = 0usize;
+        for entry in entries {
+            let path = &entry.path;
+            let mut parent = Path::new(path).parent();
+            while let Some(dir) = parent.filter(|dir| !dir.as_os_str().is_empty()) {
+                map.entry(
+                    dir.to_str()
+                        .context("supporting path must be UTF-8")?
+                        .to_owned(),
+                )
+                .or_insert(Entry::Directory);
+                parent = dir.parent();
+            }
+            let regular =
+                entry.object_type == "blob" && matches!(entry.mode.as_str(), "100644" | "100755");
+            let value = if !regular {
+                Entry::SymlinkOrSpecial
+            } else if !cargo::excluded(path) && cargo::relevant(path) {
+                relevant += 1;
+                ensure!(relevant <= budget, "supporting file budget exceeded");
+                Entry::Regular(Some(self.read(path, 2 * 1024 * 1024)?))
+            } else {
+                Entry::Regular(None)
+            };
+            ensure!(
+                map.insert(path.clone(), value).is_none(),
+                "supporting path collision"
+            );
+            ensure!(map.len() <= 16384, "supporting path budget exceeded");
+        }
+        let expected = conductor_native::mutation_cargo_supporting::build(&map, required)
+            .map_err(anyhow::Error::msg)?;
+        let held = crate::mutation_cargo_supporting::Held::capture(
+            &self.snapshot.path(),
+            budget,
+            required,
+        )?;
+        ensure!(
+            held.inventory() == &expected,
+            "materialized supporting inventory differs from Git tree"
+        );
+        self.supporting = Some(held);
+        Ok(expected)
+    }
     pub fn verify(&self) -> Result<()> {
         ensure!(
             !self.failed,
@@ -276,6 +334,9 @@ impl<'a> Capture<'a> {
             );
         }
         for held in &self.cargo_inventories {
+            held.verify()?;
+        }
+        if let Some(held) = &self.supporting {
             held.verify()?;
         }
         self.inputs.verify()

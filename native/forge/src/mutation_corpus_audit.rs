@@ -18,6 +18,10 @@ pub(crate) trait CorpusInputs {
     fn present(&mut self, path: &str) -> Result<bool>;
     fn verify_inputs(&self) -> Result<()>;
     fn native_inventory_absent(&mut self) -> Result<bool>;
+    fn supporting_inventory(
+        &mut self,
+        required: &BTreeMap<String, String>,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs>;
 }
 impl CorpusInputs for Capture<'_> {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
@@ -41,6 +45,12 @@ impl CorpusInputs for Capture<'_> {
     fn native_inventory_absent(&mut self) -> Result<bool> {
         self.native_inventory_absent()
     }
+    fn supporting_inventory(
+        &mut self,
+        required: &BTreeMap<String, String>,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        self.supporting_inventory(required)
+    }
 }
 impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
@@ -60,6 +70,12 @@ impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
     }
     fn native_inventory_absent(&mut self) -> Result<bool> {
         self.native_inventory_absent()
+    }
+    fn supporting_inventory(
+        &mut self,
+        required: &BTreeMap<String, String>,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        self.supporting_inventory(required)
     }
 }
 fn string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
@@ -195,16 +211,37 @@ fn campaign_receipts(
     capture: &mut dyn CorpusInputs,
     bundle: Option<&RunnerBundle>,
     installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
+    supporting: Option<&conductor_native::mutation_cargo_supporting_binding::SupportingInputs>,
+    supporting_error: Option<&str>,
 ) -> Result<(Option<Value>, Vec<Value>, Vec<Value>)> {
+    let ordinary_cargo = campaign["generated"] == true
+        && campaign["mutation_engine"] == "cargo-mutants"
+        && campaign["generated_value"].is_null();
     let id = string(campaign, "campaign_id")?;
     let symbols: BTreeSet<_> = keys(&campaign["source_symbols"])?.into_iter().collect();
     let view = receipts::Campaign {
         campaign_id: id,
         generated: campaign["generated"] == true,
+        ordinary_cargo,
+        ordinary_contract: ordinary_cargo.then_some(campaign),
         declares_value_analysis: !campaign["value_analysis_payload"].is_null(),
         source_symbols: &symbols,
     };
     let reject = |row: &Value, capture: &mut dyn CorpusInputs| {
+        if ordinary_cargo
+            && row
+                .as_object()
+                .is_some_and(conductor_native::mutation_native_runner::declared)
+        {
+            if let Some(error) = supporting_error {
+                return Ok(Some(format!(
+                    "Cargo supporting-input capture unavailable: {error}"
+                )));
+            }
+        }
+        if crate::mutation_cargo_supporting::stale_native_contract(campaign, row, ordinary_cargo) {
+            return Ok(Some("current source or test hashes drifted".into()));
+        }
         if bundle.is_none()
             && !row
                 .as_object()
@@ -215,7 +252,7 @@ fn campaign_receipts(
             ));
         }
         let empty = json!({});
-        receipts::rejection_with_installed(
+        receipts::rejection_with_supporting(
             &view,
             row,
             bundle.map_or(&empty, |bundle| &bundle.runner["components"]),
@@ -230,6 +267,7 @@ fn campaign_receipts(
                     }))
             },
             installed,
+            supporting,
         )
     };
     let mut reasons = BTreeSet::new();
@@ -285,6 +323,21 @@ fn reproduction(
     let mut unmeasured = Vec::new();
     let mut inert = Vec::new();
     let mut scopes = Vec::new();
+    let supporting_capture = crate::mutation_cargo_supporting::required_for(
+        &catalog.contracts,
+        &catalog.receipts,
+        || capture.hash(conductor_native::mutation_native_runner::FINGERPRINT_KEY),
+        installed,
+    )
+    .and_then(|required| {
+        required
+            .map(|paths| capture.supporting_inventory(&paths))
+            .transpose()
+    });
+    let (supporting, supporting_error) = match supporting_capture {
+        Ok(value) => (value, None),
+        Err(error) => (None, Some(format!("{error:#}"))),
+    };
     for campaign in &catalog.contracts {
         checker.poll()?;
         let id = string(campaign, "campaign_id")?;
@@ -293,8 +346,15 @@ fn reproduction(
             interpreter_bindings.push(binding);
         }
         let rows = grouped.get(id).map_or(&[][..], Vec::as_slice);
-        let (failure, missing, tests) =
-            campaign_receipts(campaign, rows, capture, bundle, installed)?;
+        let (failure, missing, tests) = campaign_receipts(
+            campaign,
+            rows,
+            capture,
+            bundle,
+            installed,
+            supporting.as_ref(),
+            supporting_error.as_deref(),
+        )?;
         evidence.extend(failure);
         unmeasured.extend(missing);
         inert.extend(tests);

@@ -84,7 +84,7 @@ coverage accounting and native receipt freshness. Optional native guest interpre
 handling landed in PR #187. External-host identity acceptance is tracked in #186,
 and automatic Cargo per-test attribution in #190; the latest implementation and
 measurement status is in the current checkpoint linked below.
-See [the current engineering checkpoint](roadmap.md#current-mission-checkpoint--2026-11-04).
+See [the current engineering checkpoint](roadmap.md#current-mission-checkpoint--2026-11-05).
 `forge mutation plan|write|inspect|run` replace the writer and runner, and
 `make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them, through
 the `forge` on `PATH`: a binary older than this branch exits 2 with `unrecognized

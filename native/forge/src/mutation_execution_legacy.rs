@@ -173,6 +173,8 @@ pub(crate) struct Inputs {
     manifest_hash: String,
     lock_hash: String,
     test_name: String,
+    supporting_host: crate::mutation_cargo_supporting::Held,
+    supporting_snapshot: std::cell::OnceCell<crate::mutation_cargo_supporting::Held>,
 }
 impl Inputs {
     pub fn capture(campaign: &Campaign, root: &Path) -> Result<Self> {
@@ -181,6 +183,14 @@ impl Inputs {
             candidate_inputs::repository_live(&root.join("Cargo.toml"), 1024 * 1024)?;
         let (lock, lock_bytes) =
             candidate_inputs::repository_live(&root.join("Cargo.lock"), 1024 * 1024)?;
+        let mut required = campaign.source_sha256.clone();
+        for (path, hash) in &campaign.test_sha256 {
+            if required.insert(path.clone(), hash.clone()).is_some() {
+                anyhow::bail!("source and test supporting pins overlap: {path}");
+            }
+        }
+        let supporting_host =
+            crate::mutation_cargo_supporting::Held::capture(root, 4096, &required)?;
         let (name, version, test_name) = validate_manifest(campaign, &manifest_bytes)?;
         validate_lock(&lock_bytes, &name, &version)?;
         Ok(Self {
@@ -189,11 +199,14 @@ impl Inputs {
             manifest_hash: crate::mutation_campaign::sha256_hex(&manifest_bytes),
             lock_hash: crate::mutation_campaign::sha256_hex(&lock_bytes),
             test_name,
+            supporting_host,
+            supporting_snapshot: std::cell::OnceCell::new(),
         })
     }
     pub fn verify(&self, snapshot: Option<&Path>) -> Result<()> {
         self.manifest.verify()?;
         self.lock.verify()?;
+        self.supporting_host.verify()?;
         if let Some(root) = snapshot {
             for (path, expected) in [
                 ("Cargo.toml", &self.manifest_hash),
@@ -210,8 +223,27 @@ impl Inputs {
         }
         Ok(())
     }
+    pub fn supporting_identity(
+        &self,
+    ) -> &conductor_native::mutation_cargo_supporting_binding::SupportingInputs {
+        self.supporting_host.inventory()
+    }
     pub fn verify_snapshot(&self, root: &Path) -> Result<()> {
         self.verify(Some(root))?;
+        if self.supporting_snapshot.get().is_none() {
+            let held = self.supporting_host.capture_peer(root)?;
+            ensure!(
+                held.inventory() == self.supporting_host.inventory(),
+                "snapshot supporting inputs differ from host"
+            );
+            self.supporting_snapshot.set(held).map_err(|_| {
+                anyhow::anyhow!("snapshot supporting inventory already initialized")
+            })?;
+        }
+        self.supporting_snapshot
+            .get()
+            .expect("supporting inventory initialized")
+            .verify()?;
         for (path, kind) in crate::mutation_cargo_capture::names(root)? {
             if conductor_native::mutation_cargo_inventory::excluded(&path) {
                 continue;

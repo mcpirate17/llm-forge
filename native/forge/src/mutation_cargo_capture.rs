@@ -11,7 +11,7 @@ use std::{
 
 const MAX_ENTRIES: usize = 16384;
 const MAX_BYTES: usize = 32 * 1024 * 1024;
-type CapturedFiles = Vec<(String, BoundFile)>;
+pub(crate) type CapturedFiles = Vec<(String, BoundFile)>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -194,7 +194,7 @@ impl Held {
 #[path = "mutation_cargo_capture_tests.rs"]
 mod tests;
 
-fn read_entries(
+pub(crate) fn read_entries(
     root: &Path,
     declaration: &str,
     max_files: usize,

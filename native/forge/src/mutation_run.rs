@@ -485,6 +485,10 @@ fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
     runtime
         .verify(Some(&snapshot.worktree))
         .map_err(|e| format!("execution input verification: {e:#}"))?;
+    parts.receipt.insert(
+        "supporting_inputs".into(),
+        json!(inputs.supporting_identity()),
+    );
     parts.receipt["snapshot"]["commit"] = json!(snapshot.commit);
     parts.receipt["snapshot"]["included_untracked"] = json!(snapshot.included_untracked);
     parts.receipt["snapshot"]["git_history"] =

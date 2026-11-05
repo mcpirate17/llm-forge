@@ -461,7 +461,8 @@ pub fn load_campaign_captured_with_cargo(
 #[path = "mutation_evidence_capture.rs"]
 mod captured;
 pub use captured::{
-    verify_captured, verify_captured_native, CapturedAttempt, CapturedReceipt, CapturedVerification,
+    verify_captured, verify_captured_native, verify_captured_native_with_supporting,
+    CapturedAttempt, CapturedReceipt, CapturedVerification,
 };
 
 pub fn normalize_path(path: &str) -> Result<String, String> {

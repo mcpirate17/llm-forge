@@ -95,7 +95,9 @@ fn canonical(path: &str) -> Result<(), String> {
 pub fn relevant(path: &str) -> bool {
     path.ends_with(".rs") || matches!(path, "Cargo.toml" | "Cargo.lock")
 }
-fn observe(entries: &BTreeMap<String, Entry>) -> Result<BTreeMap<String, String>, String> {
+pub(crate) fn observe(
+    entries: &BTreeMap<String, Entry>,
+) -> Result<BTreeMap<String, String>, String> {
     if entries.len() > 16384 {
         return Err("inventory exceeds 16384 entries".into());
     }

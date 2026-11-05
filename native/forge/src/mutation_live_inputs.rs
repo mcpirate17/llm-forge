@@ -29,6 +29,7 @@ pub(crate) struct LiveInputs {
     directories: BTreeMap<String, Option<Directory>>,
     native_inventory: Option<Vec<PathBuf>>,
     cargo_inventories: Vec<crate::mutation_cargo_capture::Held>,
+    supporting: Option<crate::mutation_cargo_supporting::Held>,
     native_fingerprint: Option<String>,
     total: usize,
 }
@@ -47,6 +48,7 @@ impl LiveInputs {
             directories: BTreeMap::new(),
             native_inventory: None,
             cargo_inventories: Vec::new(),
+            supporting: None,
             native_fingerprint: None,
             total: 0,
         };
@@ -287,6 +289,18 @@ impl LiveInputs {
     pub(crate) fn retain_cargo(&mut self, held: crate::mutation_cargo_capture::Held) {
         self.cargo_inventories.push(held);
     }
+    pub(crate) fn supporting_inventory(
+        &mut self,
+        required: &BTreeMap<String, String>,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        let budget =
+            crate::candidate_review_mutation::inputs::cargo_budget(&self.cargo_inventories)?;
+        let held =
+            crate::mutation_cargo_supporting::Held::capture(&self.canonical, budget, required)?;
+        let value = held.inventory().clone();
+        self.supporting = Some(held);
+        Ok(value)
+    }
     pub(crate) fn verify(&self) -> Result<()> {
         self.verify_root()?;
         if let Some(paths) = &self.native_inventory {
@@ -312,6 +326,9 @@ impl LiveInputs {
             );
         }
         for held in &self.cargo_inventories {
+            held.verify()?;
+        }
+        if let Some(held) = &self.supporting {
             held.verify()?;
         }
         self.verify_root()
