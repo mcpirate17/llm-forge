@@ -365,7 +365,11 @@ rejected an unexecuted proposed harness because killing its wrapper on timeout
 could leave detached engine descendants. Individual receipt durations are
 orchestration observations, not latency distributions or isolated confinement
 cost. No token, allocation, model-cost, task-success or productivity claim follows
-from these fixtures. Full publication checks remain pending.
+from these fixtures. The first full publication gate at `abebaa1` failed the
+legacy CLI fixture tests (28 failures); the other 17 steps passed. That is not
+release validation. See the [current status](roadmap.md) for the preserved receipt
+and test migration. The migrated suite subsequently passed all 15 CLI cases
+(including 10 explicitly delegated cases); a new full gate remains required.
 
 Matched read-only release checks compare `015e66e` with `adec2a6`, using the same
 binary pathname, command, input file, environment and unchanged 10% regression

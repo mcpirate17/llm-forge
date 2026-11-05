@@ -302,6 +302,14 @@ ledger. Historical process-group-only receipts remain readable as records but
 do not establish current whole-tree cleanup admission. These ledger checks are
 structural consistency checks, not independent execution attestation.
 
+Ordinary supporting-input freshness is still limited: selected source/test pins
+are checked, but later receipt admission does not yet bind all unselected Rust
+inputs, Cargo manifests or relevant-file additions. Cargo inputs held during a
+run do not close that later-validation gap. This is tracked in
+[#197](https://github.com/mcpirate17/llm-forge/issues/197); do not treat an ordinary
+receipt as proof that every compiler input is unchanged. The opt-in Cargo-value
+workflow has separate inventory validation.
+
 ## Receipt format
 
 A mutation receipt is one JSON file with two blocks (slice L):

@@ -292,8 +292,36 @@ bounds stdout at 16 MiB and stderr at 1 MiB and fails through owned cleanup on
 overflow. Matched read-only CLI/help and symbol-context comparisons passed the
 unchanged 10% budget across 404 measured executions; symbol p95 increased 8.64%.
 Mutation workflow overhead is unmeasured because review rejected the proposed
-unsafe timeout harness before execution. Full publication checks for this
-increment remain pending.
+unsafe timeout harness before execution. The first full gate at `abebaa1`
+passed 17 of 18 steps, including dependency audits, but failed the Forge test step:
+28 old CLI integration cases still assumed unconfined Fest/Cargo fixtures. The
+run recorded 3,390 passing, 28 failing and 68 ignored executions across 66
+harnesses; Cargo stopped that test step before later Forge harnesses ran. The
+failed receipt is `.git/forge-checks/run-1793873392819466207-932448/receipt.json`,
+SHA-256 `3c78064165d9eee53df3195959233c9c105e54f6d54d56575bbbef41435d70b8`.
+The migrated CLI suite now passes all 15 cases, including 10 explicitly delegated
+public Cargo cases with real confinement, and two separate Fest adapter cases
+pass through the same owner. Those adapter tests preserve missing-coverage and
+non-JSON refusals; public Fest execution remains unsupported. Scorer/parser
+unit tests retain protocol-specific outcome assertions. The first migrated run
+had one incorrect baseline-status expectation; after correcting it to
+BASELINE_FAILED, all cases passed with zero ignored. Strict Clippy and size
+limits passed. A fresh full publication gate is still required.
+
+Read-only review also identified a pre-existing supporting-input freshness gap,
+tracked in [#197](https://github.com/mcpirate17/llm-forge/issues/197): ordinary
+receipts bind selected source/test files, but later admission does not bind all
+unselected Rust inputs, Cargo manifests or added relevant files. Run-time
+holdings are not a later freshness guarantee. A fresh automatic PASS fixture then
+completed 32 diagnostic checks: an unused helper appended to `src/lib.rs`, a Cargo
+edition change and a new Rust binary file each left the original receipt accepted
+by live and committed corpus admission, with selected source/test/receipt bytes
+held unchanged. Exact authored restoration returned to the original tree after
+each probe. [Reproduction inputs and observations](../research/performance/forge-program-20261105-supporting-input-freshness.json)
+preserve native CLI arguments, hashes and raw log references. These establish an
+input-freshness gap, not demonstrated behavior changes, compiler-input closure or
+whole-candidate approval. Cargo.lock drift is not yet probed. This correctness
+prerequisite comes before broader dependency support in #196.
 
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
