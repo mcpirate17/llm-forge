@@ -7,7 +7,18 @@ pub fn catalog(policy: &Policy) -> Value {
     let hash = string(64, 64);
     let id = string(1, 128);
     let mut tools = vec![
-        crate::code_tools::inspection_definition(),
+        tool(
+            "code_inspect",
+            "Native definitions, lexical references and scopes; bounded output with source hash.",
+            vec![
+                ("path", path.clone()),
+                ("language", string(1, 32)),
+                ("symbol", string(1, 256)),
+                ("max_results", integer(1, 1000)),
+                ("max_bytes", integer(512, 1048576)),
+            ],
+            &["path"],
+        ),
         tool(
             "code_fold",
             "Fold function bodies for context without changing source.",
@@ -136,7 +147,6 @@ fn add_prompt(tools: &mut Vec<Value>, max_input_bytes: usize) {
             ("prompt",text.clone()),
             ("constraints",json!({"type":"array","maxItems":prompt_contract::MAX_CONSTRAINTS,"items":text.clone()})),
             ("candidate",text),
-            ("next_action",crate::prompt_next_action::request_schema(text_limit as usize)),
             ("max_output_bytes",integer(prompt_contract::MIN_OUTPUT_BYTES as u64,
                 max_input_bytes.min(prompt_contract::MAX_OUTPUT_BYTES) as u64))],
         &["mode","prompt","max_output_bytes"]));
@@ -224,24 +234,3 @@ fn tool(name: &str, description: &str, fields: Vec<(&str, Value)>, required: &[&
 #[cfg(test)]
 #[path = "harness_catalog_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[test]
-fn shared_inspection_definition_preserves_original_serialized_catalog_contract() {
-    let original = tool(
-        "code_inspect",
-        "Native definitions, lexical references and scopes; bounded output with source hash.",
-        vec![
-            ("path", string(1, 4096)),
-            ("language", string(1, 32)),
-            ("symbol", string(1, 256)),
-            ("max_results", integer(1, 1000)),
-            ("max_bytes", integer(512, 1048576)),
-        ],
-        &["path"],
-    );
-    assert_eq!(
-        serde_json::to_vec(&original).unwrap(),
-        serde_json::to_vec(&crate::code_tools::inspection_definition()).unwrap()
-    );
-}

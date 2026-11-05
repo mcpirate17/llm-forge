@@ -8,26 +8,6 @@ use std::io::Read;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
-/// Shared catalog contract for the existing native inspection operation.
-/// Keep the original harness field insertion order for serialized identities.
-pub(crate) fn inspection_definition() -> Value {
-    let string = |min: u64, max: u64| json!({"type":"string","minLength":min,"maxLength":max});
-    let integer = |min: u64, max: u64| json!({"type":"integer","minimum":min,"maximum":max});
-    let fields = vec![
-        ("path", string(1, 4096)),
-        ("language", string(1, 32)),
-        ("symbol", string(1, 256)),
-        ("max_results", integer(1, 1000)),
-        ("max_bytes", integer(512, 1048576)),
-    ];
-    let properties: serde_json::Map<String, Value> = fields
-        .into_iter()
-        .map(|(key, value)| (key.into(), value))
-        .collect();
-    json!({"name":"code_inspect","description":"Native definitions, lexical references and scopes; bounded output with source hash.",
-        "inputSchema":{"type":"object","properties":properties,"required":["path"],"additionalProperties":false}})
-}
-
 #[derive(Args)]
 pub struct CodeArgs {
     #[arg(long, default_value = ".", global = true)]

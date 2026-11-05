@@ -39,8 +39,6 @@ pub struct Request {
     #[serde(default, deserialize_with = "present_string")]
     pub candidate: Option<String>,
     pub max_output_bytes: usize,
-    #[serde(default, deserialize_with = "crate::prompt_next_action::present")]
-    pub next_action: Option<crate::prompt_next_action::Request>,
 }
 
 #[derive(Debug, Serialize)]
@@ -101,8 +99,6 @@ pub struct Output {
     pub checklist: Vec<ChecklistItem>,
     pub execution_contract: Option<Contract>,
     pub comparison: Option<Comparison>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub next_action: Option<crate::prompt_next_action::Advice>,
 }
 fn provenance(source: &'static str, text: &str) -> Provenance {
     Provenance {
@@ -134,29 +130,14 @@ fn validate(request: &Request) -> Result<(), String> {
     {
         return Err("candidate must not be blank".into());
     }
-    if request.next_action.is_some() && !matches!(request.mode, Mode::Suggest | Mode::Plan) {
-        return Err("next_action is supported only for suggest or plan".into());
+    let mut bytes = request.prompt.len();
+    for text in request.constraints.iter().chain(request.candidate.iter()) {
+        bytes = bytes.checked_add(text.len()).ok_or("input size overflow")?;
     }
-    let bytes = request.total_text_bytes()?;
     if bytes > MAX_TOTAL_TEXT_BYTES {
         return Err("prompt input exceeds 65536 bytes".into());
     }
     Ok(())
-}
-impl Request {
-    /// Prompt/candidate/constraint text and all next-action text values; JSON syntax has a separate ingress limit.
-    pub fn total_text_bytes(&self) -> Result<usize, String> {
-        let mut bytes = self.prompt.len();
-        for text in self.constraints.iter().chain(self.candidate.iter()) {
-            bytes = bytes.checked_add(text.len()).ok_or("input size overflow")?;
-        }
-        if let Some(next) = &self.next_action {
-            bytes = bytes
-                .checked_add(next.text_bytes()?)
-                .ok_or("input size overflow")?;
-        }
-        Ok(bytes)
-    }
 }
 fn push(
     out: &mut Vec<Evidence>,
@@ -448,11 +429,6 @@ pub fn analyze(request: &Request) -> Result<Output, String> {
     validate(request)?;
     let (evidence, opaque) = analyze_lines(&request.prompt)?;
     let suggestions = advisories(request.mode, &evidence);
-    let next_action = request
-        .next_action
-        .as_ref()
-        .map(crate::prompt_next_action::analyze)
-        .transpose()?;
     let checklist = if request.mode == Mode::Plan {
         evidence
             .iter()
@@ -477,7 +453,7 @@ pub fn analyze(request: &Request) -> Result<Output, String> {
     });
     let output = Output { schema_version: 1, budget_scope: "compact UTF-8 JSON payload; transport framing and model tokens excluded", caveat: "No authority hierarchy or semantic equivalence has been determined; lexical evidence may be ambiguous.", mode: request.mode,
         prompt: provenance("prompt", &request.prompt), constraints: request.constraints.iter().map(|s| provenance("caller_constraint", s)).collect(),
-        evidence, opaque, advisories: suggestions, checklist, execution_contract, comparison, next_action };
+        evidence, opaque, advisories: suggestions, checklist, execution_contract, comparison };
     let bytes = serde_json::to_vec(&output)
         .map_err(|error| format!("cannot serialize task contract: {error}"))?
         .len();

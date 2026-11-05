@@ -36,7 +36,6 @@ fn request(mode: Mode, prompt: &str) -> Request {
         prompt: prompt.into(),
         constraints: vec![],
         candidate: None,
-        next_action: None,
         max_output_bytes: MAX_OUTPUT_BYTES,
     }
 }
@@ -275,98 +274,4 @@ fn closing_hash_heading_and_opaque_example_preserve_section_context() {
     assert!(evidence
         .iter()
         .any(|row| row["label"] == "verification" && slice(prompt, row) == "run check\n"));
-}
-
-#[test]
-fn optional_next_action_is_mode_limited_and_all_nested_text_is_budgeted() {
-    let base = json!({"mode":"plan","prompt":"Objective: inspect","max_output_bytes":16384,
-        "next_action":{"intent":"inspect_failure","allow_read_advice":true,"path":"src/a.rs"}});
-    let parsed: Request = serde_json::from_value(base.clone()).unwrap();
-    let result = output(&parsed);
-    assert_eq!(result["next_action"]["call"]["name"], "code_inspect");
-    assert_eq!(result["execution_contract"]["prompt"], parsed.prompt);
-    for mode in ["inspect", "compare"] {
-        let mut value = base.clone();
-        value["mode"] = json!(mode);
-        if mode == "compare" {
-            value["candidate"] = json!("candidate");
-        }
-        let request: Request = serde_json::from_value(value).unwrap();
-        assert!(analyze(&request)
-            .err()
-            .unwrap()
-            .contains("only for suggest or plan"));
-    }
-    let mut value = base.clone();
-    value["next_action"] = Value::Null;
-    assert!(serde_json::from_value::<Request>(value).is_err());
-    let mut value = base;
-    value["prompt"] = json!("x".repeat(MAX_TOTAL_TEXT_BYTES - 100));
-    value["next_action"]["recent_error"] =
-        json!({"kind":"rustc","exit_code":101,"message":"λ".repeat(100)});
-    let request: Request = serde_json::from_value(value).unwrap();
-    assert!(request.total_text_bytes().unwrap() > MAX_TOTAL_TEXT_BYTES);
-    assert!(analyze(&request).err().unwrap().contains("65536"));
-}
-#[test]
-fn absent_next_action_keeps_legacy_serialized_field_order_and_bytes() {
-    #[derive(serde::Serialize)]
-    struct Legacy<'a> {
-        schema_version: u8,
-        budget_scope: &'a str,
-        caveat: &'a str,
-        mode: Mode,
-        prompt: &'a Provenance,
-        constraints: &'a Vec<Provenance>,
-        evidence: &'a Vec<Evidence>,
-        opaque: &'a Vec<Evidence>,
-        advisories: &'a Vec<Advisory>,
-        checklist: &'a Vec<ChecklistItem>,
-        execution_contract: &'a Option<Contract>,
-        comparison: &'a Option<Comparison>,
-    }
-    for mode in [Mode::Inspect, Mode::Suggest, Mode::Plan, Mode::Compare] {
-        let mut request = request(mode, "Objective: keep exact λ");
-        if mode == Mode::Compare {
-            request.candidate = Some("Objective: keep exact λ".into());
-        }
-        let result = analyze(&request).unwrap();
-        let legacy = Legacy {
-            schema_version: result.schema_version,
-            budget_scope: result.budget_scope,
-            caveat: result.caveat,
-            mode: result.mode,
-            prompt: &result.prompt,
-            constraints: &result.constraints,
-            evidence: &result.evidence,
-            opaque: &result.opaque,
-            advisories: &result.advisories,
-            checklist: &result.checklist,
-            execution_contract: &result.execution_contract,
-            comparison: &result.comparison,
-        };
-        assert_eq!(
-            serde_json::to_vec(&result).unwrap(),
-            serde_json::to_vec(&legacy).unwrap()
-        );
-    }
-}
-
-#[test]
-fn next_action_output_overflow_refuses_instead_of_dropping_advice_or_plan_text() {
-    let mut request: Request = serde_json::from_value(
-        json!({"mode":"plan","prompt":"Objective: retain exact text",
-        "max_output_bytes":16384,"next_action":{"intent":"inspect_failure","allow_read_advice":true,
-        "path":"src/a.rs","symbol":"parse"}}),
-    )
-    .unwrap();
-    let size = serde_json::to_vec(&analyze(&request).unwrap())
-        .unwrap()
-        .len();
-    assert!(size > MIN_OUTPUT_BYTES);
-    request.max_output_bytes = size - 1;
-    assert!(analyze(&request)
-        .err()
-        .unwrap()
-        .contains("protected output needs"));
 }

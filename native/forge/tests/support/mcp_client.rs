@@ -71,9 +71,6 @@ impl Mcp {
         self.try_receive().await.unwrap()
     }
     pub async fn try_receive(&mut self) -> Result<Value> {
-        self.try_receive_measured().await.map(|(value, _)| value)
-    }
-    pub async fn try_receive_measured(&mut self) -> Result<(Value, usize)> {
         let mut frame = Vec::new();
         ensure!(
             tokio::time::timeout(
@@ -83,8 +80,7 @@ impl Mcp {
             .await??,
             "MCP stdout EOF"
         );
-        let value = serde_json::from_slice(&frame).context("invalid MCP JSON reply")?;
-        Ok((value, frame.len() + 1))
+        serde_json::from_slice(&frame).context("invalid MCP JSON reply")
     }
     pub async fn assert_no_frame(&mut self, timeout: Duration) {
         let mut frame = Vec::new();
