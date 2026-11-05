@@ -1,6 +1,7 @@
 use super::*;
 use crate::mutation_run_test_support::{change, git as run_git, repository, write};
 use std::os::unix::fs::PermissionsExt;
+use std::process::Command;
 
 fn host(files: &[&str]) -> tempfile::TempDir {
     let dir = repository(files);
@@ -186,7 +187,7 @@ fn a_failed_snapshot_removes_its_own_directory() {
     let dir = tempfile::tempdir().unwrap();
     let before = snapshot_roots();
     let error = Snapshot::create(dir.path()).unwrap_err();
-    assert!(error.starts_with("git clone"), "{error}");
+    assert!(error.starts_with("snapshot preparation"), "{error}");
     assert!(snapshot_roots().is_subset(&before));
 }
 
@@ -301,5 +302,179 @@ fn optional_guest_never_discovers_a_host_venv_and_validates_explicit_configurati
         );
         assert!(configured_snapshot_python(dir.path()).is_err());
         assert!(snapshot_python(dir.path()).is_err());
+    }
+}
+
+#[test]
+fn configured_filter_is_never_executed_and_conversion_is_refused() {
+    let dir = host(&["src/a.py"]);
+    let root = dir.path();
+    let marker = root.join("filter-marker");
+    let repository = git2::Repository::open(root).unwrap();
+    let mut config = repository.config().unwrap();
+    let command = format!("touch {}", marker.display());
+    for key in [
+        "filter.probe.clean",
+        "filter.probe.smudge",
+        "filter.probe.process",
+    ] {
+        config.set_str(key, &command).unwrap();
+    }
+    config.set_bool("filter.probe.required", true).unwrap();
+    write(root, ".gitattributes", "*.py filter=probe\n");
+    let before_index = fs::read(root.join(".git/index")).unwrap();
+    let before_objects = object_files(root);
+    let error = Snapshot::create(root).unwrap_err();
+    assert!(
+        error.contains("Git attributes input is unsupported"),
+        "{error}"
+    );
+    assert!(!marker.exists());
+    assert_eq!(fs::read(root.join(".git/index")).unwrap(), before_index);
+    assert_eq!(object_files(root), before_objects);
+}
+
+#[test]
+fn configured_hooks_templates_and_fsmonitor_do_not_run() {
+    let dir = host(&["src/a.py"]);
+    let root = dir.path();
+    let marker = root.join("hook-marker");
+    let hooks = root.join("host-hooks");
+    fs::create_dir(&hooks).unwrap();
+    let hook = hooks.join("post-checkout");
+    fs::write(&hook, format!("#!/bin/sh\ntouch {}\n", marker.display())).unwrap();
+    fs::set_permissions(&hook, fs::Permissions::from_mode(0o700)).unwrap();
+    let repository = git2::Repository::open(root).unwrap();
+    let mut config = repository.config().unwrap();
+    config
+        .set_str("core.hooksPath", hooks.to_str().unwrap())
+        .unwrap();
+    config
+        .set_str("core.fsmonitor", hook.to_str().unwrap())
+        .unwrap();
+    config
+        .set_str("init.templateDir", hooks.to_str().unwrap())
+        .unwrap();
+    let snapshot = Snapshot::create(root).unwrap();
+    assert!(!marker.exists());
+    snapshot.remove().unwrap();
+}
+
+#[test]
+fn staged_addition_is_not_an_untracked_overlay_and_head_overlay_is_live() {
+    let dir = host(&["src/a.py"]);
+    let root = dir.path();
+    write(root, "src/staged.py", "staged\n");
+    run_git(root, &["add", "src/staged.py"]);
+    write(root, "src/a.py", "staged version\n");
+    run_git(root, &["add", "src/a.py"]);
+    write(root, "src/a.py", "working version\n");
+    let before_index = fs::read(root.join(".git/index")).unwrap();
+    let snapshot = Snapshot::create(root).unwrap();
+    assert_eq!(read(&snapshot.worktree, "src/a.py"), "working version\n");
+    assert!(!snapshot.worktree.join("src/staged.py").exists());
+    assert_eq!(fs::read(root.join(".git/index")).unwrap(), before_index);
+}
+
+#[test]
+fn raw_snapshot_preserves_executable_mode_and_relative_symlink() {
+    use std::os::unix::fs::symlink;
+    let dir = host(&["src/a.py"]);
+    let root = dir.path();
+    fs::set_permissions(root.join("src/a.py"), fs::Permissions::from_mode(0o755)).unwrap();
+    symlink("a.py", root.join("src/alias.py")).unwrap();
+    let snapshot = Snapshot::create(root).unwrap();
+    let mode = fs::metadata(snapshot.worktree.join("src/a.py"))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_ne!(mode & 0o111, 0);
+    assert_eq!(
+        fs::read_link(snapshot.worktree.join("src/alias.py")).unwrap(),
+        Path::new("a.py")
+    );
+}
+
+#[test]
+fn sparse_index_and_symlinked_ancestors_refuse_without_following() {
+    use std::os::unix::fs::symlink;
+    let dir = host(&["src/a.py"]);
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let mut config = repo.config().unwrap();
+    config.set_bool("core.sparsecheckout", true).unwrap();
+    assert!(Snapshot::create(dir.path())
+        .unwrap_err()
+        .contains("core.sparsecheckout"));
+    config.set_bool("core.sparsecheckout", false).unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(outside.path().join("a.py"), "outside").unwrap();
+    fs::rename(dir.path().join("src"), dir.path().join("old-src")).unwrap();
+    symlink(outside.path(), dir.path().join("src")).unwrap();
+    assert!(Snapshot::create(dir.path()).is_err());
+    assert_eq!(
+        fs::read_to_string(outside.path().join("a.py")).unwrap(),
+        "outside"
+    );
+}
+
+#[test]
+fn held_ignore_rules_preserve_negation_and_parent_pruning() {
+    let dir = host(&["src/a.py"]);
+    let root = dir.path();
+    write(root, ".gitignore", "ignored/\n*.tmp\n!keep.tmp\n");
+    write(root, ".git/info/exclude", "info-only.py\n");
+    write(root, "ignored/hidden.py", "secret\n");
+    write(root, "tests/discard.tmp", "ignored\n");
+    write(root, "tests/keep.tmp", "keep\n");
+    write(root, "info-only.py", "ignored\n");
+    let paths = snapshot_untracked_paths(root).unwrap();
+    assert_eq!(paths, ["tests/keep.tmp"]);
+}
+
+#[test]
+fn held_ignore_file_and_absence_drift_are_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(".gitignore");
+    fs::write(&path, "*.tmp\n").unwrap();
+    let mut inputs = ignore_rules::Inputs::new();
+    inputs.read(&path).unwrap().unwrap();
+    let absent = dir.path().join(".gitattributes");
+    inputs.require_absent(&absent).unwrap();
+    inputs.verify().unwrap();
+    fs::write(&path, "*.rs\n").unwrap();
+    assert!(inputs.verify().is_err());
+    let mut inputs = ignore_rules::Inputs::new();
+    inputs.require_absent(&absent).unwrap();
+    fs::write(&absent, "*.rs filter=x\n").unwrap();
+    assert!(inputs.verify().is_err());
+}
+
+#[test]
+fn config_include_header_refusal_ignores_innocent_words() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("config");
+    fs::write(
+        &file,
+        "# include is only a comment\n[user]\nname = include maintainer\n",
+    )
+    .unwrap();
+    let mut inputs = ignore_rules::Inputs::new();
+    native::bounded_config(&file, &mut inputs).unwrap();
+    for header in [
+        "[include]",
+        "\u{feff}[include]",
+        "[ INCLUDE ]",
+        "[includeIf \"gitdir:somewhere\"]",
+        "[ Include.path ]",
+    ] {
+        fs::write(&file, format!("{header}\npath = somewhere\n")).unwrap();
+        let mut inputs = ignore_rules::Inputs::new();
+        assert!(
+            native::bounded_config(&file, &mut inputs)
+                .unwrap_err()
+                .to_string()
+                .contains("includes"),
+            "{header}"
+        );
     }
 }

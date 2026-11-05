@@ -93,6 +93,56 @@ pub(crate) fn generated_errors_with_installed(
     }
     errors.extend(survivor_errors(payload, campaign));
     errors.extend(generated_outcome_errors(payload));
+    errors.extend(cargo_value_errors(payload, campaign));
+    errors
+}
+fn cargo_value_errors(payload: &Map<String, Value>, campaign: &CampaignContract) -> Vec<Rejection> {
+    let mut errors = Vec::new();
+    if let Some(metadata) = &campaign.generated_value {
+        let cleanup = payload.get("cargo_value_process_cleanup");
+        let commands = metadata["declaration"]["baseline_repetitions"]
+            .as_u64()
+            .and_then(|count| count.checked_add(1));
+        if cleanup.and_then(|value| value.get("complete")) != Some(&Value::Bool(true))
+            || cleanup
+                .and_then(|value| value.get("commands_observed"))
+                .and_then(Value::as_u64)
+                != commands
+            || payload
+                .get("snapshot")
+                .and_then(|value| value.get("removed"))
+                != Some(&Value::Bool(true))
+        {
+            errors.push(reject(
+                RejectionKind::SchemaError,
+                "Cargo value process or snapshot cleanup is not complete",
+            ));
+        }
+        let result = crate::mutation_evidence::cargo_value_receipt::evaluate(
+            metadata,
+            &campaign.source_sha256,
+            payload.get("mutants").unwrap_or(&Value::Null),
+            payload
+                .get("cargo_value_observations")
+                .unwrap_or(&Value::Null),
+        );
+        match result {
+            Ok((value, attribution))
+                if payload.get("test_value") == Some(&value)
+                    && payload.get("attribution") == Some(&attribution) => {}
+            Ok(_) => errors.push(reject(
+                RejectionKind::SchemaError,
+                "Cargo value or attribution differs from recomputed observations",
+            )),
+            Err(error) => errors.push(reject(
+                RejectionKind::SchemaError,
+                format!("Cargo value observations invalid: {error}"),
+            )),
+        }
+        if let Some(contract) = &campaign.value_analysis {
+            errors.extend(value_receipt_errors(payload.get("test_value"), contract));
+        }
+    }
     errors
 }
 fn identity_errors(payload: &Map<String, Value>, campaign: &CampaignContract) -> Vec<Rejection> {

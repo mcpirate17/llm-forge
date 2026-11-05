@@ -69,6 +69,8 @@ pub(crate) struct CampaignContract {
     pub(crate) poll_seconds: u64,
     pub(crate) environment: Map<String, Value>,
     pub(crate) host_read_dependencies: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) generated_value: Option<Value>,
     pub(crate) value_analysis_payload: Option<Value>,
     pub(crate) value_analysis: Option<ValueContract>,
     pub(crate) source_drifted: bool,
@@ -903,6 +905,9 @@ pub(crate) fn generated_campaign_contract_with(
     mutation_engine: &str,
     hash: impl Fn(&str) -> Option<String>,
 ) -> Result<CampaignContract, String> {
+    if payload.contains_key("generated_value") {
+        return Err("generated_value requires independently captured Cargo inventory".into());
+    }
     let generator = object(payload.get("generator"), "generator")?;
     let source_sha256 = digest_map(payload, "source_sha256")?;
     let test_sha256 = digest_map(payload, "test_sha256")?;
@@ -979,6 +984,7 @@ pub(crate) fn generated_campaign_contract_with(
         poll_seconds: 0,
         environment,
         host_read_dependencies: Vec::new(),
+        generated_value: None,
         value_analysis_payload: None,
         value_analysis: None,
         source_drifted,
@@ -993,7 +999,10 @@ mod capture;
 #[path = "mutation_manifest_legacy.rs"]
 mod legacy;
 include!("mutation_manifest_load.rs");
-pub(crate) use capture::load_captured as load_contract_captured;
+pub(crate) use capture::{
+    load_captured as load_contract_captured,
+    load_captured_with_cargo as load_contract_captured_with_cargo,
+};
 
 /// A registered campaign whose manifest could not be loaded, kept for reporting.
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -348,9 +348,14 @@ struct Execution<'a> {
     planned: &'a mut Option<u64>,
 }
 
-/// Engine, then identity checks, then cleanup: the snapshot never outlives this.
+/// Engine, then identity checks and cleanup. Opt-in Cargo snapshots are retained
+/// whenever the confined execution owner cannot establish process-tree cleanup.
 fn in_snapshot(parts: Execution) -> Step<()> {
-    let snapshot = Snapshot::create(parts.repo_root)?;
+    let mut snapshot = Snapshot::create(parts.repo_root)?;
+    let requires_tree_cleanup = parts.campaign.generated_value.is_some();
+    if requires_tree_cleanup {
+        snapshot.preserve();
+    }
     parts.receipt.insert(
         "snapshot".into(),
         json!({
@@ -360,6 +365,12 @@ fn in_snapshot(parts: Execution) -> Step<()> {
             "removed": false,
         }),
     );
+    if requires_tree_cleanup {
+        parts.receipt.insert("cargo_value_process_cleanup".into(),
+            json!({"complete":false,"commands_observed":0,"scope":"awaiting confined execution owner"}));
+        // Identify retained recovery paths durably before a child can be launched.
+        write_receipt(parts.output_path, parts.receipt)?;
+    }
     let mut run = EngineRun {
         campaign: parts.campaign,
         receipt: parts.receipt,
@@ -378,12 +389,35 @@ fn in_snapshot(parts: Execution) -> Step<()> {
         run.verify_identities()
     });
     *parts.planned = run.planned;
-    let removal = snapshot.remove();
-    parts.receipt["snapshot"]["removed"] = json!(removal.is_ok());
-    if let Err(error) = &removal {
-        parts.receipt["snapshot"]["removal_error"] = json!(error);
-    }
+    let removal = dispose_snapshot(snapshot, parts.receipt, requires_tree_cleanup);
     finished?;
+    removal
+}
+
+fn dispose_snapshot(
+    mut snapshot: Snapshot,
+    receipt: &mut Receipt,
+    requires_tree_cleanup: bool,
+) -> Step<()> {
+    if requires_tree_cleanup
+        && receipt
+            .get("cargo_value_process_cleanup")
+            .and_then(|value| value.get("complete"))
+            != Some(&Value::Bool(true))
+    {
+        snapshot.preserve();
+        receipt["snapshot"]["removed"] = json!(false);
+        receipt["snapshot"]["retained_reason"] = json!("process-tree cleanup is unverified");
+        return Err(Stop::Refused(format!(
+            "process-tree cleanup is unverified; snapshot retained at {}",
+            snapshot.root.display()
+        )));
+    }
+    let removal = snapshot.remove();
+    receipt["snapshot"]["removed"] = json!(removal.is_ok());
+    if let Err(error) = &removal {
+        receipt["snapshot"]["removal_error"] = json!(error);
+    }
     Ok(removal?)
 }
 

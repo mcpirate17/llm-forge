@@ -189,7 +189,7 @@ remain unverified mission gaps. The new installed identity path retains explicit
 operator pins; a candidate-controlled lock or receipt cannot authorize that identity.
 The installed global Forge remains a separate artifact.
 
-**Active correctness increment — 2026-11-05:** #186 now has an explicit installed
+**Delivered correctness increment — 2026-11-05:** #186 now has an explicit installed
 native pin path in candidate review/gate and live/commit corpus audits, plus a
 read-only identity command. Complete source inventories take precedence; partial
 inventories refuse installed fallback. Native evidence no longer requires a Python
@@ -205,14 +205,49 @@ tests. All 14 negative pin/lock/inventory/source cases refused. The whole experi
 remains **incomplete**: candidate review failed the unchanged test-value/attribution
 gate and the synthetic fixture's CI attestation checks. No receipt or gate was
 modified to pass. See [the exact evidence and earlier failed attempts](performance.md#installed-native-identity--2026-11-05).
-Independent review confirmed this distinction. Publication checks remain pending;
-global installation and client activation are unchanged. The next correctness slice
-is #190's automatic target-bound Cargo attribution, using engine-generated scenario
-logs and existing native value validators; outbound MCP follows that gap.
+Independent review confirmed this distinction. [PR #191](https://github.com/mcpirate17/llm-forge/pull/191)
+merged as `c066e8540c90e9f115e1d150bf92da7afe4bb077`, with the same tree as checked
+commit `b82da144ff552d811113fcca715a3d2a04b9fc0c`. All 18 local-check steps and
+local-verify passed: 4,548 passing test executions, zero failures, 145 ignored
+across 177 harnesses. Global installation and client activation are unchanged.
+**Implemented correctness increment, publication pending:** #190's opt-in target-bound
+Cargo attribution uses original engine scenarios and the shared native value analyzer.
+The clean release trial at `015e66e` killed two mutants and admitted one newly added
+`CORE` test through candidate mutation-evidence. Live and commit audits were `CLEAN`;
+four stale-input cases refused. Overall fixture review still failed its independent
+attestation and implicit test-selection obligations; no gate was waived. See
+[measurements, exact scope and earlier failed attempts](performance.md#automatic-cargo-test-value--2026-11-05).
+Review also identified
+[#192](https://github.com/mcpirate17/llm-forge/issues/192): legacy mutation supervision
+can miss detached descendants and remove a snapshot after uncertain cleanup.
+That correctness gap precedes outbound MCP work. Existing process-group receipts
+do not establish cleanup of every descendant. The new value-evidence runtime uses
+the existing strict sandbox and owned cgroup execution owner; all three command groups
+were cleaned in the release trial. Focused suites passed (54 Forge Cargo tests, 78
+shared-core Cargo tests, 11 runtime tests, two snapshot disposition tests and seven
+sandbox integration tests), as did strict native Clippy. The runtime cases overlap
+the Forge suite; these counts are not a unique-test total. Matched help/symbol
+comparisons passed the unchanged 10% budget across 404 samples. Independent review
+checked implementation boundaries and real artifacts. All 18 local-check steps and
+local-verify passed at `f99737d`: 4,628 passing executions, zero failures and 145 ignored
+tests across 177 harnesses. Publication was held for
+[#193](https://github.com/mcpirate17/llm-forge/issues/193): inherited Git snapshot setup
+could run configured filters or hooks outside the engine actor. Snapshot preparation
+now uses native raw Git objects, held ignore rules and no Git child; 22 focused tests
+and strict Clippy pass. The integrated mutation suite passed 272 tests with 12 ignored.
+Its real release engine trial passed the bounded mutation admission checks above;
+independent review verified source, receipt and cleanup identities. Fresh matched
+help/symbol comparisons also passed across 404 samples. The full publication gate
+for this final source remains pending.
+The capture is point-in-time and not an atomic filesystem snapshot. The previous
+gate receipt does not attest these later changes. The opt-in declaration and supported scope are described
+in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
 two lints. The fixes preserve behavior, passed independent review and focused core
-tests/Clippy, and require a fresh full publication receipt. The failed attempt is
+tests/Clippy, and passed the fresh full publication gate above. Its receipt is
+`.git/forge-checks/run-1793857972189846328-621424/receipt.json` (SHA-256
+`295a57dcaaf06102a089362d39a3c9a4fe496fd19745f140fd8ef52ce919e553`). The failed attempt is
 retained at `.git/forge-checks/run-1793857262705128812-559687/receipt.json`.
 
 ## Historical roadmap and delivery provenance

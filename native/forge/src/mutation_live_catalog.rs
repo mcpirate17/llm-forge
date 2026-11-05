@@ -106,13 +106,46 @@ fn campaign(
         Ok(paths) => paths,
         Err(error) => return Ok(Err(format!("{error:#}"))),
     };
-    let mut files = BTreeMap::new();
+    let mut files = BTreeMap::from([(manifest.clone(), bytes)]);
+    let cargo_path = match engine::cargo_value::declaration_path(&raw) {
+        Ok(value) => value,
+        Err(error) => return Ok(Err(error)),
+    };
+    let cargo = if let Some(declaration) = cargo_path {
+        let sources = match crate::candidate_review_mutation::registry::cargo_sources(&raw) {
+            Ok(value) => value,
+            Err(error) => return Ok(Err(format!("{error:#}"))),
+        };
+        match capture.cargo_inventory(&declaration, &sources, &mut files) {
+            Ok(held) => Some(held),
+            Err(error) => return Ok(Err(format!("{error:#}"))),
+        }
+    } else {
+        None
+    };
     for path in paths {
+        if files.contains_key(&path) {
+            continue;
+        }
         if let Some(bytes) = capture.read(&path)? {
             files.insert(path, bytes.to_vec());
         }
     }
-    Ok(engine::load_campaign_captured(&manifest, &files, &[]).map(|contract| (contract, raw)))
+    let contract = match &cargo {
+        Some(held) => {
+            engine::load_campaign_captured_with_cargo(&manifest, &files, &[], held.inventory())
+        }
+        None => engine::load_campaign_captured(&manifest, &files, &[]),
+    };
+    match contract {
+        Ok(contract) => {
+            if let Some(held) = cargo {
+                capture.retain_cargo(held);
+            }
+            Ok(Ok((contract, raw)))
+        }
+        Err(error) => Ok(Err(error)),
+    }
 }
 pub(crate) fn catalog(capture: &mut LiveInputs, registry: &Value) -> Result<Catalog> {
     let manifests = strings(&registry["manifests"])?;

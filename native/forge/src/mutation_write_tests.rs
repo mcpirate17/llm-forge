@@ -8,6 +8,49 @@ fn manifest(id: &str) -> Value {
 }
 
 #[test]
+fn held_input_failure_prevents_publication() {
+    let dir = tempfile::tempdir().unwrap();
+    let result = write_manifests_checked(
+        &[manifest("a")],
+        dir.path(),
+        REGISTRY,
+        CAMPAIGNS,
+        false,
+        &|_| Err("held input drifted".into()),
+    );
+    assert!(result.unwrap_err().contains("held input drifted"));
+    assert!(!dir.path().join("campaigns/a.json").exists());
+    assert!(!dir.path().join("campaigns/registry.d/a.json").exists());
+}
+
+#[test]
+fn publication_checkpoint_refuses_late_drift_without_registering_manifest() {
+    let dir = tempfile::tempdir().unwrap();
+    let calls = std::cell::Cell::new(0);
+    let result = write_manifests_checked(
+        &[manifest("a")],
+        dir.path(),
+        REGISTRY,
+        CAMPAIGNS,
+        false,
+        &|_| {
+            let n = calls.get() + 1;
+            calls.set(n);
+            if n == 4 {
+                Err("late drift".into())
+            } else {
+                Ok(())
+            }
+        },
+    );
+    assert!(result
+        .unwrap_err()
+        .contains("earlier manifest remains published"));
+    assert!(dir.path().join("campaigns/a.json").exists());
+    assert!(!dir.path().join("campaigns/registry.d/a.json").exists());
+}
+
+#[test]
 fn writes_a_sorted_manifest_then_its_fragment() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();

@@ -700,3 +700,31 @@ fn installed_candidate_requires_held_complete_inventory_absence() {
     assert!(capture.native_source_fingerprint().unwrap().is_none());
     assert!(!capture.native_inventory_absent().unwrap());
 }
+
+#[test]
+fn candidate_cargo_inventory_is_git_bound_and_held_until_verify() {
+    let f = Fixture::new();
+    f.write("Cargo.toml", "[package]\nname='demo'\nversion='0.1.0'\n[[test]]\nname='contract'\npath='tests/contract.rs'\n");
+    f.write(
+        "Cargo.lock",
+        "version=4\n[[package]]\nname='demo'\nversion='0.1.0'\n",
+    );
+    f.write("src/lib.rs", "pub mod a;");
+    f.write("src/a.rs", "pub fn value() -> u8 { 1 }");
+    f.write(
+        "tests/contract.rs",
+        "#[test] fn check() { assert_eq!(demo::a::value(), 1); }",
+    );
+    f.write("declaration.json", &json!({"schema_version":1,"target":{"manifest_path":"Cargo.toml","package":"demo","test":"contract"},"baseline_repetitions":2,"required_contracts":[{"id":"c","criticality":"high","active_paths":["src/a.rs"]}],"ranked_tests":[{"rank":1,"nodeid":"tests/contract.rs::check","contract":"c","rationale":"behavior"}]}).to_string());
+    let (source, snapshot, candidate, policy) = f.captured();
+    let mut capture = inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    let mut files = BTreeMap::new();
+    let held = capture
+        .cargo_inventory("declaration.json", &["src/a.rs".into()], &mut files)
+        .unwrap();
+    assert!(files.contains_key("src/a.rs"));
+    capture.retain_cargo(held);
+    capture.verify().unwrap();
+    fs::write(snapshot.path().join("src/new.rs"), "fn new() {}").unwrap();
+    assert!(capture.verify().is_err());
+}

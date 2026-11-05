@@ -436,6 +436,10 @@ const CANONICAL_TEST_PATTERNS: &[&str] = &[
     "**/*_test.cxx",
 ];
 
+#[path = "mutation_cargo_value.rs"]
+pub mod cargo_value;
+#[path = "mutation_cargo_value_receipt.rs"]
+pub mod cargo_value_receipt;
 /// Full existing contract rules over held actual file bytes; no ambient source reads.
 pub fn load_campaign_captured(
     path: &str,
@@ -443,6 +447,15 @@ pub fn load_campaign_captured(
     selected: &[String],
 ) -> Result<Value, String> {
     crate::mutation_manifest::load_contract_captured(path, files, selected)
+}
+
+pub fn load_campaign_captured_with_cargo(
+    path: &str,
+    files: &BTreeMap<String, Vec<u8>>,
+    selected: &[String],
+    inventory: &crate::mutation_cargo_inventory::Inventory,
+) -> Result<Value, String> {
+    crate::mutation_manifest::load_contract_captured_with_cargo(path, files, selected, inventory)
 }
 
 #[path = "mutation_evidence_capture.rs"]

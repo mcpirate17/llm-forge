@@ -226,6 +226,7 @@ pub struct Campaign {
     pub survivor_baseline: Vec<String>,
     pub survivor_baseline_recorded: bool,
     pub environment: BTreeMap<String, String>,
+    pub generated_value: Option<Value>,
 }
 
 impl Campaign {
@@ -302,6 +303,7 @@ impl Campaign {
                 .get("survivor_baseline_recorded")
                 .map_or(recorded_by_default, python_truth),
             environment,
+            generated_value: payload.get("generated_value").cloned(),
         })
     }
 

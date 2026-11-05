@@ -28,6 +28,7 @@ pub(crate) struct LiveInputs {
     absent: BTreeSet<String>,
     directories: BTreeMap<String, Option<Directory>>,
     native_inventory: Option<Vec<PathBuf>>,
+    cargo_inventories: Vec<crate::mutation_cargo_capture::Held>,
     native_fingerprint: Option<String>,
     total: usize,
 }
@@ -45,6 +46,7 @@ impl LiveInputs {
             absent: BTreeSet::new(),
             directories: BTreeMap::new(),
             native_inventory: None,
+            cargo_inventories: Vec::new(),
             native_fingerprint: None,
             total: 0,
         };
@@ -245,6 +247,46 @@ impl LiveInputs {
             names,
         }))
     }
+    pub(crate) fn cargo_inventory(
+        &mut self,
+        declaration: &str,
+        selected: &[String],
+        files: &mut BTreeMap<String, Vec<u8>>,
+    ) -> Result<crate::mutation_cargo_capture::Held> {
+        let budget =
+            crate::candidate_review_mutation::inputs::cargo_budget(&self.cargo_inventories)?;
+        let held = crate::mutation_cargo_capture::Held::capture_with_limit(
+            &self.canonical,
+            declaration,
+            selected,
+            budget,
+        )?;
+        ensure!(
+            held.file_count() <= budget,
+            "Cargo held file budget exceeded"
+        );
+        let mut paths: Vec<String> = held.inventory().files().keys().cloned().collect();
+        paths.push(declaration.to_owned());
+        for path in paths {
+            if let std::collections::btree_map::Entry::Vacant(entry) = files.entry(path.clone()) {
+                let bytes = self
+                    .read(&path)?
+                    .with_context(|| format!("Cargo input disappeared: {path}"))?
+                    .to_vec();
+                entry.insert(bytes);
+            }
+        }
+        ensure!(
+            files
+                .get(declaration)
+                .is_some_and(|bytes| bytes == held.declaration_bytes()),
+            "Cargo declaration changed during capture"
+        );
+        Ok(held)
+    }
+    pub(crate) fn retain_cargo(&mut self, held: crate::mutation_cargo_capture::Held) {
+        self.cargo_inventories.push(held);
+    }
     pub(crate) fn verify(&self) -> Result<()> {
         self.verify_root()?;
         if let Some(paths) = &self.native_inventory {
@@ -268,6 +310,9 @@ impl LiveInputs {
                 &self.directory(path)? == expected,
                 "corpus inventory changed: {path}"
             );
+        }
+        for held in &self.cargo_inventories {
+            held.verify()?;
         }
         self.verify_root()
     }

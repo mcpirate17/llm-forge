@@ -199,6 +199,18 @@ async fn c_compiler_produces_and_runs_an_executable_in_confined_scratch() {
     success(sandbox.command(&host.0.join("scratch/hello")).unwrap()).await;
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn stdlib_copy_and_matching_file_modes_remain_confined() {
+    let host = support::Host::new();
+    let sandbox = Sandbox::prepare(policy(&host)).unwrap();
+    success(probe(&sandbox, "copy-modes")).await;
+    assert_eq!(
+        fs::read(host.0.join("scratch/copied")).unwrap(),
+        b"original"
+    );
+    assert_eq!(fs::read(host.0.join("source/code")).unwrap(), b"original");
+}
+
 #[test]
 fn confined_child() {
     let Ok(mode) = std::env::var("FORGE_SANDBOX_MODE") else {
@@ -213,6 +225,7 @@ fn confined_child() {
     assert!(std::env::var_os("SSH_AUTH_SOCK").is_none());
     assert_eq!(std::env::var_os("HOME").unwrap(), root.join("scratch"));
     match mode.as_str() {
+        "copy-modes" => copied_modes(&root),
         "filesystem" => filesystem(&root),
         "network" => network(&root),
         "signals" => signals(),
@@ -428,6 +441,54 @@ fn syscalls() {
     assert!(fd >= 0);
     let mut file = unsafe { File::from_raw_fd(fd) };
     file.write_all(b"private").unwrap();
+}
+
+fn copied_modes(root: &Path) {
+    let copied = root.join("scratch/copied");
+    fs::copy(root.join("source/code"), &copied).unwrap();
+    let file = File::open(&copied).unwrap();
+    assert_eq!(
+        unsafe { libc::fchmod(file.as_raw_fd(), libc::S_IFREG | 0o640) },
+        0
+    );
+    assert_eq!(file.metadata().unwrap().mode() & 0o777, 0o640);
+    assert_eq!(
+        unsafe {
+            libc::syscall(
+                libc::SYS_fchmod,
+                file.as_raw_fd(),
+                (1u64 << 32) | u64::from(libc::S_IFREG | 0o600),
+            )
+        },
+        -1
+    );
+    for mode in [
+        libc::S_IFDIR | 0o700,
+        libc::S_IFIFO | 0o600,
+        libc::S_IFLNK | 0o777,
+        libc::S_IFREG | 0o4755,
+        libc::S_IFREG | 0o2755,
+        libc::S_IFREG | 0o1755,
+        0x8000_0000 | 0o600,
+    ] {
+        assert_eq!(
+            unsafe { libc::fchmod(file.as_raw_fd(), mode) },
+            -1,
+            "accepted mode {mode:o}"
+        );
+    }
+    let directory = root.join("scratch/copied-dir");
+    fs::create_dir(&directory).unwrap();
+    let directory = File::open(directory).unwrap();
+    assert_eq!(
+        unsafe { libc::fchmod(directory.as_raw_fd(), libc::S_IFDIR | 0o750) },
+        0
+    );
+    assert_eq!(directory.metadata().unwrap().mode() & 0o777, 0o750);
+    assert_eq!(
+        unsafe { libc::fchmod(directory.as_raw_fd(), libc::S_IFREG | 0o750) },
+        -1
+    );
 }
 
 fn metadata(root: &Path) {

@@ -97,6 +97,14 @@ pub struct ScopeArgs {
     /// after SOURCE. Repeatable. Python subjects only.
     #[arg(long = "extra-test", value_name = "SOURCE=TEST")]
     pub extra_test: Vec<String>,
+
+    /// Explicit source/test-value declaration for one supported Rust package.
+    #[arg(long, requires = "rust_value_contract_sha256")]
+    pub rust_value_contract: Option<String>,
+
+    /// Independently selected SHA-256 of the declaration's exact bytes.
+    #[arg(long, requires = "rust_value_contract")]
+    pub rust_value_contract_sha256: Option<String>,
 }
 
 #[derive(Args)]
@@ -124,6 +132,7 @@ struct Planned {
     repo_root: PathBuf,
     registry: String,
     campaigns: String,
+    cargo_value: Option<crate::mutation_cargo_capture::Held>,
 }
 
 pub fn resolve_repo_root(explicit: Option<PathBuf>) -> Result<PathBuf> {
@@ -199,12 +208,22 @@ fn plan(args: ScopeArgs) -> Result<Planned, String> {
         include_covered: args.include_covered,
         extra_tests,
     };
+    let mut result = compute_plan(&request)?;
+    let cargo_value = match (args.rust_value_contract, args.rust_value_contract_sha256) {
+        (Some(path), Some(hash)) => Some(
+            crate::mutation_cargo_plan::attach(&mut result, &repo_root, &path, &hash)
+                .map_err(|error| format!("{error:#}"))?,
+        ),
+        (None, None) => None,
+        _ => return Err("Rust value declaration requires both path and SHA-256".into()),
+    };
     Ok(Planned {
-        result: compute_plan(&request)?,
+        result,
         scope,
         repo_root,
         registry,
         campaigns,
+        cargo_value,
     })
 }
 
@@ -272,24 +291,41 @@ fn report(outcome: Result<Map<String, Value>, String>) -> Result<i32> {
 /// `plan`: report what would be written; writes nothing.
 pub fn run(args: PlanArgs) -> Result<i32> {
     let verbose = args.verbose;
-    report(plan(args.scope).map(|planned| summarise(&planned, verbose)))
+    report(plan(args.scope).and_then(|planned| {
+        if let Some(held) = &planned.cargo_value {
+            held.verify().map_err(|error| format!("{error:#}"))?;
+        }
+        Ok(summarise(&planned, verbose))
+    }))
 }
 
 /// `write`: one manifest and one registry fragment per planned subject.
 pub fn write(args: WriteArgs) -> Result<i32> {
     let force = args.force;
     report(plan(args.scope).and_then(|planned| {
+        if let Some(held) = &planned.cargo_value {
+            held.verify().map_err(|error| format!("{error:#}"))?;
+        }
         let manifests = planned.result["manifests"]
             .as_array()
             .cloned()
             .unwrap_or_default();
-        let written = mutation_write::write_manifests(
+        let written = mutation_write::write_manifests_checked(
             &manifests,
             &planned.repo_root,
             &planned.registry,
             &planned.campaigns,
             force,
+            &|path| {
+                planned.cargo_value.as_ref().map_or(Ok(()), |held| {
+                    held.check_output(path)
+                        .map_err(|error| format!("{error:#}"))
+                })
+            },
         )?;
+        if let Some(held) = &planned.cargo_value {
+            held.verify().map_err(|error| format!("{error:#}"))?;
+        }
         let mut payload = summarise(&planned, false);
         payload.insert("written".into(), json!(written));
         Ok(payload)
