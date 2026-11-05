@@ -1,11 +1,15 @@
 //! Bounded child processes for a mutation run.
 //!
 //! Each child owns a session, dies with this process, and is recorded in the
-//! live-pgid registry for exactly its lifetime, so a run orphaned by a killed
+//! native-pgid registry until cleanup is verified, so a run orphaned by a killed
 //! forge stays findable. The leader stays unreaped until its group is killed:
 //! a zombie leader pins the pgid, so the kill cannot reach a recycled group.
 //! Spawning stays on the calling thread because `PR_SET_PDEATHSIG` binds a child
 //! to the thread that forked it; reader threads only drain pipes.
+//! Native records use a separate filename/schema from legacy Python reapers.
+//! `make mutation-reap` does not cover these records. Retained error records are
+//! diagnostic: the leader may already be reaped. Manual recovery requires fresh
+//! process identity verification before signalling anything.
 
 use crate::json_canon::python_pretty;
 use crate::mutation_campaign::{Step, Stop};
@@ -24,11 +28,25 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 const OUTPUT_TAIL_CHARS: usize = 4000;
+// Fest returns structured JSON on stdout; retain a complete bounded report, not
+// a tail that could parse as partial evidence. Stderr is only used for diagnostics.
+const STDOUT_LIMIT_BYTES: usize = 16 * 1024 * 1024;
+const STDERR_LIMIT_BYTES: usize = 1024 * 1024;
+
+#[derive(Clone, Copy)]
+struct CaptureLimits {
+    stdout: usize,
+    stderr: usize,
+}
+const CAPTURE_LIMITS: CaptureLimits = CaptureLimits {
+    stdout: STDOUT_LIMIT_BYTES,
+    stderr: STDERR_LIMIT_BYTES,
+};
 const GROUP_DRAIN_SECONDS: u64 = 30;
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 const MEMORY_CAP_ENV: &str = "MUTATION_MEMORY_CAP_GIB";
 const DEFAULT_MEMORY_CAP_GIB: f64 = 8.0;
-const LIVE_PGIDS_FILENAME: &str = "live_pgids.json";
+const NATIVE_PGIDS_FILENAME: &str = "native_pgids.json";
 const BYTES_PER_GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 
 /// One finished command: enough for a receipt, bounded by the output tails.
@@ -130,7 +148,9 @@ fn cap_from(raw: Option<&str>) -> Result<Option<MemoryCap>, String> {
     }))
 }
 
-/// The pgid registry: the receipts' own `.iterations` scratch directory.
+/// The native-only registry in the receipts' `.iterations` scratch directory.
+/// The legacy filename and `live` key are deliberately never emitted: installed
+/// Python reapers lack process-start identity verification and cannot consume it.
 pub fn live_pgids_path(repo_root: &Path) -> Result<PathBuf, String> {
     let registry = project_paths::resolve(repo_root)?
         .get(1)
@@ -141,7 +161,7 @@ pub fn live_pgids_path(repo_root: &Path) -> Result<PathBuf, String> {
         .join(campaigns)
         .join("receipts")
         .join(".iterations")
-        .join(LIVE_PGIDS_FILENAME))
+        .join(NATIVE_PGIDS_FILENAME))
 }
 
 fn live_entries(path: &Path) -> Result<Vec<Value>, String> {
@@ -150,29 +170,78 @@ fn live_entries(path: &Path) -> Result<Vec<Value>, String> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(format!("cannot read {}: {error}", path.display())),
     };
-    serde_json::from_str::<Value>(&text)
+    let entries = serde_json::from_str::<Value>(&text)
         .ok()
-        .and_then(|payload| payload.get("live").and_then(Value::as_array).cloned())
+        .and_then(|payload| payload.get("native").and_then(Value::as_array).cloned())
         .ok_or_else(|| {
             format!(
-                "live pgid registry {} is not a JSON object with a list under 'live'",
+                "native pgid registry {} is not a JSON object with a list under 'native'",
                 path.display()
             )
-        })
+        })?;
+    for entry in &entries {
+        let valid_pid = |key: &str| {
+            entry
+                .get(key)
+                .and_then(Value::as_u64)
+                .is_some_and(|pid| pid > 0 && pid <= i32::MAX as u64)
+        };
+        if !valid_pid("pgid")
+            || !valid_pid("engine_pid")
+            || !entry
+                .get("argv0")
+                .and_then(Value::as_str)
+                .is_some_and(|s| !s.is_empty())
+        {
+            return Err(format!(
+                "native pgid registry {} contains an invalid process record",
+                path.display()
+            ));
+        }
+    }
+    Ok(entries)
 }
 
 fn write_entries(path: &Path, entries: Vec<Value>) -> Result<(), String> {
-    let body = python_pretty(json!({"live": entries})).map_err(|error| error.to_string())?;
+    let body = python_pretty(json!({"native": entries})).map_err(|error| error.to_string())?;
     atomic_write(path, &body)
 }
 
+fn registry_lock(path: &Path) -> Result<crate::file_lock::Lease, String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "pgid registry has no parent".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
+    let mut name = path.as_os_str().to_os_string();
+    name.push(".lock");
+    let lock_path = PathBuf::from(name);
+    let deadline = Instant::now() + Duration::from_secs(GROUP_DRAIN_SECONDS);
+    loop {
+        match crate::file_lock::try_owned(&lock_path, true)
+            .map_err(|error| format!("cannot lock {}: {error:#}", lock_path.display()))?
+        {
+            Some(lease) => return Ok(lease),
+            None if Instant::now() < deadline => thread::sleep(POLL_INTERVAL),
+            None => {
+                return Err(format!(
+                    "pgid registry lock {} remained busy",
+                    lock_path.display()
+                ))
+            }
+        }
+    }
+}
+
 fn record_live_pgid(path: &Path, pgid: u32, argv0: &str) -> Result<(), String> {
+    let _lock = registry_lock(path)?;
     let mut entries = live_entries(path)?;
     entries.push(json!({"argv0": argv0, "engine_pid": std::process::id(), "pgid": pgid}));
     write_entries(path, entries)
 }
 
 fn forget_live_pgid(path: &Path, pgid: u32) -> Result<(), String> {
+    let _lock = registry_lock(path)?;
     if !path.exists() {
         return Ok(());
     }
@@ -184,10 +253,8 @@ fn forget_live_pgid(path: &Path, pgid: u32) -> Result<(), String> {
         return write_entries(path, remaining);
     }
     fs::remove_file(path).map_err(|error| format!("cannot remove {}: {error}", path.display()))?;
-    if let Some(parent) = path.parent() {
-        // Another run may still own the directory; emptiness is its only claim.
-        let _ = fs::remove_dir(parent);
-    }
+    // Keep the lock inode and its directory: unlinking either could let another
+    // publisher lock a replacement inode while a waiter owns the original one.
     Ok(())
 }
 
@@ -209,17 +276,51 @@ fn returncode(status: ExitStatus) -> Option<i32> {
 }
 
 struct Drain {
-    stdout: JoinHandle<Vec<u8>>,
-    stderr: JoinHandle<Vec<u8>>,
+    stdout: JoinHandle<Result<Vec<u8>, String>>,
+    stderr: JoinHandle<Result<Vec<u8>, String>>,
 }
 
-fn drain<R: Read + Send + 'static>(mut pipe: R) -> JoinHandle<Vec<u8>> {
-    thread::spawn(move || {
-        let mut bytes = Vec::new();
-        // A read error ends the capture early; the exit status still reports the run.
-        let _ = pipe.read_to_end(&mut bytes);
-        bytes
-    })
+fn capture<R: Read>(mut pipe: R, limit: usize, label: &str) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    let mut buffer = [0; 8192];
+    let mut failure = bytes
+        .try_reserve_exact(limit)
+        .err()
+        .map(|error| format!("cannot retain mutation {label}: {error}"));
+    loop {
+        let count = match pipe.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => count,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(format!("cannot read mutation {label}: {error}")),
+        };
+        let keep = limit.saturating_sub(bytes.len()).min(count);
+        if failure.is_none() {
+            bytes.extend_from_slice(&buffer[..keep]);
+            if keep < count {
+                failure = Some(format!(
+                    "mutation {label} exceeds {limit}-byte capture limit"
+                ));
+            }
+        }
+        // Even after overflow/allocation failure, consume until EOF so a child
+        // cannot block on its output pipe and manufacture a supervisor deadlock.
+    }
+    match failure {
+        Some(error) => Err(error),
+        None => Ok(bytes),
+    }
+}
+
+fn drain<R: Read + Send + 'static>(
+    pipe: R,
+    limit: usize,
+    label: &'static str,
+) -> Result<JoinHandle<Result<Vec<u8>, String>>, String> {
+    thread::Builder::new()
+        .name(format!("mutation-{label}"))
+        .spawn(move || capture(pipe, limit, label))
+        .map_err(|error| format!("cannot start mutation {label} reader: {error}"))
 }
 
 impl Drain {
@@ -228,12 +329,12 @@ impl Drain {
     }
 
     /// Wait for EOF on both pipes after the group died, within the drain bound.
-    fn settle(&self, argv: &[String]) -> Result<(), String> {
-        let deadline = Instant::now() + Duration::from_secs(GROUP_DRAIN_SECONDS);
+    fn settle(&self, argv: &[String], timeout: Duration) -> Result<(), String> {
+        let deadline = Instant::now() + timeout;
         while !self.finished() {
             if Instant::now() >= deadline {
                 return Err(format!(
-                    "pgid still held its pipes {GROUP_DRAIN_SECONDS}s after SIGKILL; \
+                    "pgid still held its pipes {timeout:?} after SIGKILL; \
                      surviving descendants must be killed by hand: {argv:?}"
                 ));
             }
@@ -242,11 +343,17 @@ impl Drain {
         Ok(())
     }
 
-    fn collect(self) -> (String, String) {
-        let text = |handle: JoinHandle<Vec<u8>>| {
-            String::from_utf8_lossy(&handle.join().unwrap_or_default()).into_owned()
+    fn collect(self) -> Result<(String, String), String> {
+        let text = |handle: JoinHandle<Result<Vec<u8>, String>>, label| {
+            handle
+                .join()
+                .map_err(|_| format!("mutation {label} reader thread panicked"))?
+                .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
         };
-        (text(self.stdout), text(self.stderr))
+        // Join both, even when the first failed, before propagating the refusal.
+        let stdout = text(self.stdout, "stdout");
+        let stderr = text(self.stderr, "stderr");
+        Ok((stdout?, stderr?))
     }
 }
 
@@ -330,6 +437,25 @@ impl Supervisor<'_> {
         timeout_seconds: i64,
         environment: &BTreeMap<String, String>,
     ) -> Step<(CommandResult, String)> {
+        self.run_with_limits(
+            argv,
+            cwd,
+            timeout_seconds,
+            environment,
+            Duration::from_secs(GROUP_DRAIN_SECONDS),
+            CAPTURE_LIMITS,
+        )
+    }
+
+    fn run_with_limits(
+        &self,
+        argv: &[String],
+        cwd: &Path,
+        timeout_seconds: i64,
+        environment: &BTreeMap<String, String>,
+        drain_timeout: Duration,
+        capture_limits: CaptureLimits,
+    ) -> Step<(CommandResult, String)> {
         let started = Instant::now();
         let mut group = self.spawn(argv, cwd, environment)?;
         let pgid = group.id();
@@ -339,20 +465,28 @@ impl Supervisor<'_> {
             return Err(Stop::Refused(error));
         }
         let drain = Drain {
-            stdout: drain(group.take_stdout().expect("stdout is piped")),
-            stderr: drain(group.take_stderr().expect("stderr is piped")),
+            stdout: drain(
+                group.take_stdout().expect("stdout is piped"),
+                capture_limits.stdout,
+                "stdout",
+            )?,
+            stderr: drain(
+                group.take_stderr().expect("stderr is piped"),
+                capture_limits.stderr,
+                "stderr",
+            )?,
         };
         let deadline = started + Duration::from_secs(timeout_seconds.max(0) as u64);
         let ending = self.wait(pgid, &drain, deadline);
         // Kills what the leader left behind, then reaps it, in that order.
         let status = group.stop();
-        let settled = drain.settle(argv);
-        let forgotten = forget_live_pgid(&self.registry, pgid);
-        let ending = ending?;
-        settled?;
-        forgotten?;
+        let settled = drain.settle(argv, drain_timeout);
+        // An unresolved process or inherited pipe must remain discoverable.
         let status = status.map_err(|error| format!("cannot reap {}: {error}", argv[0]))?;
-        let (stdout, stderr) = drain.collect();
+        settled?;
+        let (stdout, stderr) = drain.collect()?;
+        forget_live_pgid(&self.registry, pgid)?;
+        let ending = ending?;
         let timed_out = matches!(ending, Ending::TimedOut);
         if let Ending::Cancelled(signal) = ending {
             return Err(Stop::Cancelled(signal));

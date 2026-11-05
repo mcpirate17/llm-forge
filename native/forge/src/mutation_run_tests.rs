@@ -1,6 +1,5 @@
 use super::*;
 use crate::mutation_run_test_support::{campaign, manifest, write};
-use conductor_native::mutation_native_runner::COMPONENT_PATHS;
 
 const STAMP: BuildStamp = BuildStamp {
     forge_version: "0.0.0",
@@ -49,26 +48,6 @@ fn pinned_host(dir: &Path) -> (PathBuf, Campaign) {
 }
 
 #[test]
-fn the_compiled_component_list_is_the_one_validators_read() {
-    let compiled: Vec<&str> = COMPONENTS.iter().map(|(path, _)| *path).collect();
-    assert_eq!(compiled, COMPONENT_PATHS);
-}
-
-#[test]
-fn each_component_hash_is_of_the_bytes_compiled_in() {
-    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for (path, bytes) in COMPONENTS {
-        assert_eq!(fs::read(repository.join(path)).unwrap(), bytes, "{path}");
-    }
-    let hashes = components_sha256();
-    assert_eq!(hashes.len(), COMPONENTS.len());
-    assert_eq!(
-        hashes["native/forge/src/mutation_run.rs"],
-        sha256_hex(COMPONENTS[10].1)
-    );
-}
-
-#[test]
 fn a_receipt_names_the_compiled_runner_and_no_python_file() {
     let dir = tempfile::tempdir().unwrap();
     let (root, subject) = pinned_host(dir.path());
@@ -90,7 +69,7 @@ fn a_receipt_names_the_compiled_runner_and_no_python_file() {
         runner["executable_sha256"],
         sha256_path(Path::new("/proc/self/exe")).unwrap()
     );
-    assert_eq!(runner["components_sha256"].as_object().unwrap().len(), 15);
+    assert!(runner.get("components_sha256").is_none());
     for absent in [
         "runner_sha256",
         "runner_components_sha256",
@@ -146,6 +125,34 @@ fn a_default_receipt_lands_in_the_receipt_root_under_a_stamped_name() {
         "{name}"
     );
     assert!(relative.ends_with(&name));
+}
+
+#[test]
+fn default_receipt_refuses_traversal_and_symlinks_before_creating_directories() {
+    let dir = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let mut subject = campaign(root, json!({}));
+    subject.campaign_id = "../../../escaped".into();
+    assert!(resolve_receipt_path(&subject, None, root, 0.0)
+        .unwrap_err()
+        .contains("campaign_id"));
+    assert!(!root.join("research").exists());
+
+    subject.campaign_id = "fixture".into();
+    write(
+        root,
+        "pyproject.toml",
+        "[tool.conductor]\nmutation_receipt_root='link/nested'\n",
+    );
+    std::os::unix::fs::symlink(outside.path(), root.join("link")).unwrap();
+    let error = resolve_receipt_path(&subject, None, root, 0.0).unwrap_err();
+    assert!(error.contains("inside the repository"), "{error}");
+    let explicit = Path::new("missing/../link/nested/receipt.json");
+    let error = resolve_receipt_path(&subject, Some(explicit), root, 0.0).unwrap_err();
+    assert!(error.contains("inside the repository"), "{error}");
+    assert!(!root.join("missing").exists());
+    assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
 }
 
 #[test]

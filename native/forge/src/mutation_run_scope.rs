@@ -71,7 +71,10 @@ fn mull_sources(campaign: &Campaign, root: &Path) -> Result<Vec<String>, String>
     Ok(selected.into_iter().collect())
 }
 
-fn targets_of(campaign: &Campaign, repo_root: &Path) -> Result<BTreeSet<String>, String> {
+pub(crate) fn targets_of(
+    campaign: &Campaign,
+    repo_root: &Path,
+) -> Result<BTreeSet<String>, String> {
     if campaign.mutation_engine == "mull" {
         return Ok(mull_sources(campaign, repo_root)?.into_iter().collect());
     }
@@ -129,11 +132,27 @@ pub fn validate_run_scope(
     only: &[String],
 ) -> Result<Vec<String>, String> {
     let targets = targets_of(campaign, repo_root)?;
-    let pinned = targets
+    let canonical = |path: &str| -> Result<PathBuf, String> {
+        let path = exact_file(repo_root, path)?;
+        repo_root
+            .join(path)
+            .canonicalize()
+            .map_err(|error| error.to_string())
+    };
+    let selected = targets
         .iter()
-        .all(|target| campaign.source_sha256.contains_key(target));
-    if targets.is_empty() || !pinned {
+        .map(|path| canonical(path))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let pins = campaign
+        .source_sha256
+        .keys()
+        .map(|path| canonical(path))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    if targets.is_empty() || !selected.is_subset(&pins) {
         return Err("every mutation target must be pinned in source_sha256".into());
+    }
+    if pins != selected {
+        return Err("extra source_sha256 supporting pins are unsupported: every source pin must be a selected mutation target".into());
     }
     let mut changed = changed_sources(base, repo_root, owner)?;
     if !only.is_empty() {

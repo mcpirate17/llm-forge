@@ -77,7 +77,11 @@ is different from Python required to orchestrate Forge itself.
 
 ### P1 — Automatic mutation campaign generation and execution
 
-**Status:** implemented on `feat/native-mutation-runner-20261103`.
+**Status:** implementation on `feat/native-mutation-runner-20261103`, pending
+review repairs and fresh validation in PR #185. The 2026-11-04 review found
+incomplete executable-target ownership (#184), unsafe output publication,
+concurrent process-registry updates and incomplete native receipt source binding.
+See [the current engineering checkpoint](roadmap.md#current-mission-checkpoint--2026-11-04).
 `forge mutation plan|write|inspect|run` replace the writer and runner, and
 `make mutation-plan`, `mutation-generate` and `mutation-engine-run` call them, through
 the `forge` on `PATH`: a binary older than this branch exits 2 with `unrecognized

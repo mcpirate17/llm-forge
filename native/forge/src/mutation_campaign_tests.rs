@@ -65,6 +65,30 @@ fn a_hand_rolled_or_foreign_manifest_is_refused() {
 }
 
 #[test]
+fn campaign_identifiers_cannot_be_paths_or_oversized_filenames() {
+    for id in [
+        "../escape",
+        "/absolute",
+        "a/b",
+        "a\\b",
+        ".",
+        "..",
+        "a\n",
+        "a\0",
+        "",
+    ] {
+        assert!(
+            refusal(json!({"campaign_id": id})).contains("campaign_id"),
+            "{id:?}"
+        );
+    }
+    assert!(refusal(json!({"campaign_id": "a".repeat(201)})).contains("campaign_id"));
+    for id in ["fixture", "lane-1_module.v2", "caf\u{e9}"] {
+        assert!(validate_campaign_id(id).is_ok());
+    }
+}
+
+#[test]
 fn a_manifest_must_pin_what_it_will_mutate_and_run() {
     let generator = json!({"source": [], "run_timeout_seconds": 60});
     assert!(refusal(json!({"generator": generator})).contains("at least one glob"));

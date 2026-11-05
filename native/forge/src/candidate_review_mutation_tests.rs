@@ -604,3 +604,56 @@ fn mutation_waiver_reads_captured_test_and_source_hashes_and_base() {
     waiver_policy.document["mutation_waivers"][0]["integration_base"] = json!("0".repeat(40));
     assert_eq!(run(&waiver_policy)[0]["active"], false);
 }
+
+#[test]
+fn held_candidate_native_inventory_matches_and_detects_snapshot_drift() {
+    use conductor_native::source_fingerprint::{self, EXTRA_FILES, SOURCE_TREES};
+    let fixture = Fixture::new();
+    for name in SOURCE_TREES {
+        for suffix in ["Cargo.toml", "Cargo.lock", "src/lib.rs"] {
+            fixture.write(&format!("native/{name}/{suffix}"), "original");
+        }
+    }
+    for path in EXTRA_FILES {
+        fixture.write(path, "original");
+    }
+    fixture.write("native/forge/src/process_group.rs", "original");
+    let (source, snapshot, candidate, policy) = fixture.captured();
+    let root = fixture.root.join("repo");
+    let paths = source_fingerprint::files(&root).unwrap();
+    // String ordering puts forge-cli before forge/, unlike Path component ordering.
+    let forge = paths
+        .iter()
+        .position(|path| path == Path::new("native/forge/src/lib.rs"))
+        .unwrap();
+    let cli = paths
+        .iter()
+        .position(|path| path == Path::new("native/forge-cli/build.rs"))
+        .unwrap();
+    assert!(forge < cli);
+    let expected = source_fingerprint::fingerprint(&root, &paths).unwrap();
+    let added = snapshot.path().join("native/forge/src/untracked.rs");
+    fs::write(&added, "untracked").unwrap();
+    let mut rejected =
+        inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    assert!(rejected.native_source_fingerprint().is_err());
+    drop(rejected);
+    fs::remove_file(&added).unwrap();
+    let mut captured =
+        inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    assert_eq!(
+        captured.native_source_fingerprint().unwrap(),
+        Some(expected)
+    );
+    captured.verify().unwrap();
+    fs::write(&added, "untracked").unwrap();
+    assert!(captured.verify().is_err());
+    fs::remove_file(added).unwrap();
+    captured.verify().unwrap();
+    fs::write(
+        snapshot.path().join("native/forge/src/process_group.rs"),
+        "changed",
+    )
+    .unwrap();
+    assert!(captured.verify().is_err());
+}

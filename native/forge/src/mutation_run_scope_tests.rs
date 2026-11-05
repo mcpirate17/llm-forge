@@ -46,6 +46,7 @@ fn agent_scope_and_explicit_selection_cannot_admit_a_neighbour() {
     refused(&subject, root, &[], "outside this agent's changes");
     refused(&subject, root, &["other.py"], "--only names files outside");
     set_sources(&mut subject, &["mine.py"]);
+    subject.source_sha256 = pins(&["mine.py"]);
     assert_eq!(
         validate(&subject, root, &["mine.py"]),
         Ok(vec!["mine.py".to_string()])
@@ -53,6 +54,7 @@ fn agent_scope_and_explicit_selection_cannot_admit_a_neighbour() {
 
     change(root, &["other.py"]);
     set_sources(&mut subject, &["mine.py", "other.py"]);
+    subject.source_sha256 = pins(&["mine.py", "other.py"]);
     assert_eq!(
         validate(&subject, root, &[]).expect("both changed").len(),
         2
@@ -70,6 +72,7 @@ fn a_changed_test_admits_only_its_named_source() {
 
     refused(&subject, root, &[], "other.py");
     set_sources(&mut subject, &["subject.py"]);
+    subject.source_sha256 = pins(&["subject.py"]);
     assert_eq!(
         validate(&subject, root, &[]),
         Ok(vec!["subject.py".to_string()])
@@ -89,6 +92,7 @@ fn a_test_named_by_two_sources_admits_neither_beyond_its_own_directory() {
 
     refused(&subject, root, &[], "b/subject.py");
     set_sources(&mut subject, &["a/subject.py"]);
+    subject.source_sha256 = pins(&["a/subject.py"]);
     assert_eq!(
         validate(&subject, root, &[]),
         Ok(vec!["a/subject.py".to_string()])
@@ -222,4 +226,14 @@ fn mull_globs_are_expanded_to_pins_before_the_ownership_check() {
 fn python_escape_matches_re_escape() {
     assert_eq!(python_escape("/a-b.c d"), "/a\\-b\\.c\\ d");
     assert_eq!(python_escape("plain_name/1"), "plain_name/1");
+}
+
+#[test]
+fn unselected_supporting_source_pins_are_refused() {
+    let repo = repository(&["mine.py", "helper.py"]);
+    let root = repo.path();
+    change(root, &["mine.py"]);
+    let (_dir, mut subject) = scoped(&["mine.py"], "fest");
+    subject.source_sha256 = pins(&["mine.py", "helper.py"]);
+    refused(&subject, root, &[], "supporting pins are unsupported");
 }

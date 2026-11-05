@@ -9,9 +9,7 @@
 use crate::instant::{format_compact_utc, isoformat_utc, now};
 use crate::json_canon::python_pretty;
 use crate::mutation_bytecode::{isolated_python_env, scratch_root_for};
-use crate::mutation_campaign::{
-    drift, sha256_hex, sha256_path, Campaign, Step, Stop, KILLED, SURVIVED,
-};
+use crate::mutation_campaign::{drift, sha256_path, Campaign, Step, Stop, KILLED, SURVIVED};
 use crate::mutation_engine_cargo as cargo;
 use crate::mutation_engine_fest as fest;
 use crate::mutation_engine_mull as mull;
@@ -34,76 +32,12 @@ use std::path::{Path, PathBuf};
 
 /// The receipt schema `conductor_native::mutation_receipt` validates.
 const RECEIPT_SCHEMA: &str = "llm.mutation-testing.receipt.v3";
-/// `project_paths::resolve` order; see `mutation_plan::REGISTRY_INDEX`.
-const RECEIPT_ROOT_INDEX: usize = 3;
 const INTERPRETER_FAILURES: [&str; 3] = [
     "python3: not found",
     "ModuleNotFoundError",
     "No module named",
 ];
 const SNAPSHOT_PYTHON_ENV: &str = "CONDUCTOR_SNAPSHOT_PYTHON";
-
-macro_rules! component {
-    ($repo_path:literal, $relative:literal) => {
-        ($repo_path, include_bytes!($relative).as_slice())
-    };
-}
-
-/// The runner sources as compiled in, so a receipt names what actually ran.
-/// `conductor_native::mutation_native_runner::COMPONENT_PATHS` is the same list.
-const COMPONENTS: [(&str, &[u8]); 15] = [
-    component!(
-        "native/conductor-native/src/mutation_value.rs",
-        "../../conductor-native/src/mutation_value.rs"
-    ),
-    component!(
-        "native/conductor-native/src/mutation_value_inputs.rs",
-        "../../conductor-native/src/mutation_value_inputs.rs"
-    ),
-    component!(
-        "native/conductor-native/src/receipt_slim.rs",
-        "../../conductor-native/src/receipt_slim.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_attribution.rs",
-        "mutation_attribution.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_bytecode.rs",
-        "mutation_bytecode.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_campaign.rs",
-        "mutation_campaign.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_engine_cargo.rs",
-        "mutation_engine_cargo.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_engine_fest.rs",
-        "mutation_engine_fest.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_engine_mull.rs",
-        "mutation_engine_mull.rs"
-    ),
-    component!(
-        "native/forge/src/mutation_process.rs",
-        "mutation_process.rs"
-    ),
-    component!("native/forge/src/mutation_run.rs", "mutation_run.rs"),
-    component!(
-        "native/forge/src/mutation_run_scope.rs",
-        "mutation_run_scope.rs"
-    ),
-    component!("native/forge/src/mutation_score.rs", "mutation_score.rs"),
-    component!("native/forge/src/mutation_scope.rs", "mutation_scope.rs"),
-    component!(
-        "native/forge/src/mutation_snapshot.rs",
-        "mutation_snapshot.rs"
-    ),
-];
 
 /// What the CLI knows about the binary that is running.
 #[derive(Clone, Copy, Debug)]
@@ -263,13 +197,6 @@ pub fn write_receipt(path: &Path, receipt: &Receipt) -> Result<(), String> {
     atomic_write(path, &body)
 }
 
-fn components_sha256() -> Map<String, Value> {
-    COMPONENTS
-        .iter()
-        .map(|(path, bytes)| ((*path).to_string(), json!(sha256_hex(bytes))))
-        .collect()
-}
-
 /// The compiled runner's identity, in place of the Python runner's file hashes.
 fn native_runner(stamp: &BuildStamp) -> Result<Value, String> {
     Ok(json!({
@@ -280,7 +207,6 @@ fn native_runner(stamp: &BuildStamp) -> Result<Value, String> {
         "compiled_source_sha256": stamp.source_sha256,
         "compiled_git_commit": stamp.git_commit,
         "source_matches_git": stamp.source_matches_git,
-        "components_sha256": components_sha256(),
     }))
 }
 
@@ -341,26 +267,28 @@ fn resolve_receipt_path(
     repo_root: &Path,
     opened: f64,
 ) -> Result<(PathBuf, String), String> {
-    let output = match explicit {
-        Some(path) if path.is_absolute() => absolute_resolved(path)?,
-        Some(path) => absolute_resolved(&repo_root.join(path))?,
+    crate::mutation_campaign::validate_campaign_id(&campaign.campaign_id)?;
+    let selected = match explicit {
+        Some(path) => path.to_path_buf(),
         None => {
-            let root = project_paths::resolve(repo_root)?[RECEIPT_ROOT_INDEX]
-                .0
-                .clone();
+            let root = project_paths::resolve_key(repo_root, "mutation_receipt_root")?.0;
             let directory = repo_root.join(root);
-            fs::create_dir_all(&directory).map_err(|error| {
-                format!(
-                    "cannot create mutation receipt directory {}: {error}",
-                    directory.display()
-                )
-            })?;
             let stamp = format_compact_utc(opened);
             directory.join(format!("{}_{stamp}Z.json", campaign.campaign_id))
         }
     };
+    let output = crate::mutation_write::confined_output(repo_root, &selected, "receipt path")?;
     let relative = relative_to_repo(&output, repo_root)
         .ok_or_else(|| "receipt path must be inside the repository".to_string())?;
+    if explicit.is_none() {
+        let directory = output.parent().ok_or("receipt path has no parent")?;
+        fs::create_dir_all(directory).map_err(|error| {
+            format!(
+                "cannot create mutation receipt directory {}: {error}",
+                directory.display()
+            )
+        })?;
+    }
     Ok((output, relative))
 }
 
@@ -421,6 +349,7 @@ fn in_snapshot(parts: Execution) -> Step<()> {
         if let Some(signal) = interrupted(parts.supervisor)? {
             return Err(Stop::Cancelled(signal));
         }
+        crate::mutation_source_coverage::require(run.campaign, run.worktree, run.receipt)?;
         run.verify_identities()
     });
     *parts.planned = run.planned;

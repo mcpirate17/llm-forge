@@ -6,8 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-#[path = "source_fingerprint.rs"]
-mod source_fingerprint;
+use forge::source_fingerprint;
 
 fn native(root: &Path, args: &[&str], timeout: u64) -> Result<Value> {
     let mut command = Command::new(std::env::current_exe()?);

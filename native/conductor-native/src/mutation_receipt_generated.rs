@@ -10,7 +10,14 @@ pub(super) fn generated_receipt_errors(
         payload,
         campaign,
         context.runner,
-        |path| sha256_file(&binding_root(context, path).join(path)),
+        |path| {
+            if path == native_runner::FINGERPRINT_KEY {
+                let files = crate::source_fingerprint::files(context.repo_root).ok()?;
+                crate::source_fingerprint::fingerprint(context.repo_root, &files).ok()
+            } else {
+                sha256_file(&binding_root(context, path).join(path))
+            }
+        },
         |recorded| lineage_accepts(recorded, context.package_root),
     )
 }

@@ -1,13 +1,11 @@
 //! Native port of `conductor.mutation_campaign_generate`'s `plan` step.
 //!
-//! Ports the changed-file walk, package-relative test pairing, exception filter
-//! and manifest emission (`python_subjects`, `rust_subjects`, `fest_manifest`,
-//! `cargo_manifest`, `existing_subjects`, `_admit_extra_tests`, `_plan_python`,
-//! `_plan_rust`, `plan`) from `src/conductor/mutation_campaign_generate.py`.
-//! Byte-identical output for the same inputs. `changed_sources()` (git diff plus
-//! ownership-claim narrowing) and `[tool.conductor]` config resolution stay in
-//! Python / the `forge` CLI wiring -- this module takes an already-resolved
-//! `repo_root`, `campaigns_root` and `only_sources` scope.
+//! Pairs scoped sources with tests and emits campaign manifests. Rust planning
+//! also validates Cargo target ownership: an external binary's modules cannot
+//! be assigned to the library package merely because it holds their files.
+//! Changed-file selection, ownership-claim narrowing and `[tool.conductor]`
+//! config resolution stay at the CLI boundary; this module takes an already
+//! resolved `repo_root`, `campaigns_root` and `only_sources` scope.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
@@ -24,6 +22,8 @@ use sha2::{Digest, Sha256};
 #[path = "mutation_plan_priority.rs"]
 mod priority;
 pub use priority::PriorityOptions;
+#[path = "mutation_plan_rust_ownership.rs"]
+mod rust_ownership;
 
 const SKIP_PARTS: &[&str] = &[
     ".git",
@@ -317,6 +317,7 @@ struct RustCrate {
     manifest: String,
     files: Vec<String>,
     lines: u64,
+    unsupported_sources: BTreeMap<String, String>,
 }
 
 fn package_name(manifest: &Path) -> Option<String> {
@@ -340,38 +341,19 @@ fn package_name(manifest: &Path) -> Option<String> {
     None
 }
 
-/// A package whose every declared target sits outside its own directory owns no
-/// sources to mutate: `native/forge-cli` builds `../forge/src/main.rs`, and those
-/// files are subjects of the crate that holds them.
-fn targets_live_elsewhere(manifest: &Path) -> bool {
-    let Some(parsed) = fs::read_to_string(manifest)
-        .ok()
-        .and_then(|text| text.parse::<toml::Table>().ok())
-    else {
-        return false;
-    };
-    let mut targets: Vec<&toml::Value> = Vec::new();
-    targets.extend(parsed.get("lib"));
-    for kind in ["bin", "example", "test", "bench"] {
-        if let Some(rows) = parsed.get(kind).and_then(toml::Value::as_array) {
-            targets.extend(rows);
-        }
-    }
-    !targets.is_empty()
-        && targets.iter().all(|target| {
-            target
-                .get("path")
-                .and_then(toml::Value::as_str)
-                .is_some_and(|path| path.starts_with("../"))
-        })
+fn rust_subjects(repo_root: &Path) -> Result<Vec<RustCrate>, String> {
+    rust_subjects_with_ownership(repo_root).map(|(subjects, _)| subjects)
 }
 
-fn rust_subjects(repo_root: &Path) -> Result<Vec<RustCrate>, String> {
+fn rust_subjects_with_ownership(
+    repo_root: &Path,
+) -> Result<(Vec<RustCrate>, rust_ownership::Ownership), String> {
     let mut manifests = collect_files(repo_root, "toml")
         .into_iter()
         .filter(|path| path.file_name().is_some_and(|n| n == "Cargo.toml"))
         .collect::<Vec<_>>();
     manifests.sort();
+    let ownership = rust_ownership::Ownership::discover(repo_root, &manifests)?;
 
     let mut crates = Vec::new();
     for manifest in &manifests {
@@ -392,7 +374,7 @@ fn rust_subjects(repo_root: &Path) -> Result<Vec<RustCrate>, String> {
             .collect();
         files.sort();
         if files.is_empty() {
-            if targets_live_elsewhere(manifest) {
+            if ownership.has_only_external_targets(manifest) {
                 continue;
             }
             return Err(format!(
@@ -400,15 +382,17 @@ fn rust_subjects(repo_root: &Path) -> Result<Vec<RustCrate>, String> {
             ));
         }
         let lines = files.iter().map(|f| line_count(&repo_root.join(f))).sum();
+        let unsupported_sources = ownership.unsupported_sources(manifest, &files)?;
         crates.push(RustCrate {
             package,
             root,
             manifest: relative_manifest,
             files,
             lines,
+            unsupported_sources,
         });
     }
-    Ok(crates)
+    Ok((crates, ownership))
 }
 
 fn rust_test_files(subject: &RustCrate, repo_root: &Path) -> Result<Vec<String>, String> {
@@ -522,6 +506,7 @@ fn cargo_manifest(
     run_timeout_seconds: i64,
     sources: Option<&[String]>,
 ) -> Result<Value, String> {
+    rust_ownership::require_supported(subject, sources)?;
     let selected: Vec<String> = match sources {
         None => subject.files.clone(),
         Some(explicit) => {
@@ -760,7 +745,12 @@ fn plan_rust(
     jobs: i64,
     run_timeout_seconds: i64,
 ) -> RustPlanResult {
-    let mut crates = rust_subjects(repo_root)?;
+    let (mut crates, ownership) = rust_subjects_with_ownership(repo_root)?;
+    ownership.require_contained_sources(scope, &crates)?;
+    let selected = scope.map(|scope| scope.iter().cloned().collect::<Vec<_>>());
+    for subject in &crates {
+        rust_ownership::require_supported(subject, selected.as_deref())?;
+    }
     let mut scoped_sources: HashMap<String, Vec<String>> = HashMap::new();
     if let Some(scope) = scope {
         for crate_ in &crates {

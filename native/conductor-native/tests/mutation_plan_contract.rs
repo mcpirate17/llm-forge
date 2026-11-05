@@ -9,6 +9,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[path = "mutation_plan_contract/rust_ownership.rs"]
+mod rust_ownership;
+
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 struct Tree(PathBuf);
@@ -638,8 +641,11 @@ fn package_with_a_local_target_path_and_no_sources_is_still_refused() {
          [[bin]]\nname = \"widget\"\npath = \"main.rs\"\n",
     );
 
-    let error = tree.plan("rust", None).expect_err("no sources");
-    assert_eq!(error, "crate cli declares a package but has no src/*.rs");
+    let error = tree.plan("rust", None).expect_err("missing target");
+    assert!(
+        error.contains("cannot resolve Rust target/module") && error.contains("main.rs"),
+        "{error}"
+    );
 }
 
 #[test]

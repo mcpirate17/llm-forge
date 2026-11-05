@@ -173,6 +173,7 @@ pub mod file_lock;
 pub mod graph_context_cache_storage;
 #[cfg(target_os = "linux")]
 pub mod harness;
+pub mod identity;
 pub mod instant;
 pub mod json_canon;
 pub mod local_ai_policy;
@@ -258,6 +259,8 @@ pub mod mutation_engine_fest;
 #[cfg(target_os = "linux")]
 pub mod mutation_engine_mull;
 #[cfg(target_os = "linux")]
+pub mod mutation_plan;
+#[cfg(target_os = "linux")]
 pub mod mutation_process;
 #[cfg(target_os = "linux")]
 pub mod mutation_receipt_verify;
@@ -271,6 +274,7 @@ pub mod mutation_scope;
 pub mod mutation_score;
 #[cfg(target_os = "linux")]
 pub mod mutation_snapshot;
+pub mod mutation_source_coverage;
 #[cfg(target_os = "linux")]
 pub mod mutation_write;
 

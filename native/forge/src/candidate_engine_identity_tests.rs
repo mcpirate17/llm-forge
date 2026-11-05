@@ -40,10 +40,15 @@ impl Fixture {
         let fixture = Self { root, repo };
         fixture.write("candidate.toml", POLICY.as_bytes());
         if native {
-            for path in REQUIRED {
+            for path in source_fingerprint::EXTRA_FILES {
                 fixture.write(path, format!("content {path}\n").as_bytes());
             }
-            for base in CRATES {
+            for name in source_fingerprint::SOURCE_TREES {
+                let base = format!("native/{name}");
+                for suffix in ["Cargo.toml", "Cargo.lock"] {
+                    let path = format!("{base}/{suffix}");
+                    fixture.write(&path, format!("content {path}\n").as_bytes());
+                }
                 fixture.write(
                     &format!("{base}/src/lib.rs"),
                     format!("// {base}\n").as_bytes(),
@@ -142,6 +147,41 @@ fn git_tree_fingerprint_matches_existing_build_framing_and_ignores_dirty_checkou
     );
     assert_eq!(evidence.executable_sha256.len(), 64);
     assert_eq!(evidence.provenance, "self_observation_not_attestation");
+}
+
+#[test]
+fn embedded_asset_changes_are_bound_in_git_and_build_fingerprints() {
+    let fixture = Fixture::new(true);
+    let root = fixture.root.join("repo");
+    let source = fixture.source();
+    let original = tree_fingerprint(&source, &fixture.tree())
+        .unwrap()
+        .0
+        .unwrap();
+    for path in [
+        "src/conductor/memory_sources.toml",
+        "src/conductor/embedding_routes.toml",
+    ] {
+        fixture.write(path, b"changed asset\n");
+        let changed = tree_fingerprint(&source, &fixture.tree())
+            .unwrap()
+            .0
+            .unwrap();
+        let inventory = source_fingerprint::files(&root).unwrap();
+        assert_eq!(
+            changed,
+            source_fingerprint::fingerprint(&root, &inventory).unwrap()
+        );
+        assert_ne!(changed, original, "{path}");
+        fixture.write(path, format!("content {path}\n").as_bytes());
+    }
+    assert_eq!(
+        tree_fingerprint(&source, &fixture.tree())
+            .unwrap()
+            .0
+            .unwrap(),
+        original
+    );
 }
 #[test]
 fn mismatch_missing_stamp_policy_drift_and_tree_drift_refuse_clean_status() {

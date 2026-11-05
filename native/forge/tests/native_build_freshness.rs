@@ -49,6 +49,12 @@ impl Fixture {
             "native/forge/src/source_fingerprint.rs",
             include_str!("../src/source_fingerprint.rs"),
         );
+        fixture.write(
+            "native/conductor-native/src/source_fingerprint.rs",
+            include_str!("../../conductor-native/src/source_fingerprint.rs"),
+        );
+        fixture.write("src/conductor/memory_sources.toml", "fixture\n");
+        fixture.write("src/conductor/embedding_routes.toml", "fixture\n");
         fixture.write("native/forge-cli/Cargo.toml", "[package]\nname='stamp-fixture'\nversion='0.0.0'\nedition='2021'\n[workspace]\n[[bin]]\nname='stamp-fixture'\npath='../forge/src/main.rs'\n[build-dependencies]\nsha1='0.10'\nsha2='0.10'\nlibc='0.2'\n");
         fixture.write("native/forge/src/main.rs", "fn main() { println!(\"{} {} {}\", env!(\"FORGE_GIT_FULL_REV\"), env!(\"FORGE_SOURCE_SHA256\"), env!(\"FORGE_SOURCE_MATCHES_GIT\")); }\n");
         fixture.write("ledger/routing_policy.toml", "fixture\n");
@@ -163,6 +169,15 @@ fn native_stamp_is_fresh_and_tracks_source_inventory_without_watching_caches() {
         include_str!("../../slop-core/build.rs"),
     );
     assert_eq!(f.build(true, true), original);
+    for asset in [
+        "src/conductor/memory_sources.toml",
+        "src/conductor/embedding_routes.toml",
+    ] {
+        f.write(asset, "changed embedded asset\n");
+        assert_ne!(f.build(true, false)[1], original[1]);
+        f.write(asset, "fixture\n");
+        assert_eq!(f.build(true, true), original);
+    }
 }
 
 #[test]

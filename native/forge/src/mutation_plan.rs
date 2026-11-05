@@ -16,7 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::civil::civil_from_days;
 use crate::identity;
-use forge::{mutation_scope, mutation_write};
+use crate::{mutation_scope, mutation_write};
 
 /// `[tool.conductor]`-resolved path order: see `project_paths::resolve`.
 const REGISTRY_INDEX: usize = 1;
@@ -126,7 +126,7 @@ struct Planned {
     campaigns: String,
 }
 
-pub(crate) fn resolve_repo_root(explicit: Option<PathBuf>) -> Result<PathBuf> {
+pub fn resolve_repo_root(explicit: Option<PathBuf>) -> Result<PathBuf> {
     match explicit {
         Some(path) => Ok(path),
         None => find_repo_root(&env::current_dir().context("reading the current directory")?)
@@ -134,7 +134,7 @@ pub(crate) fn resolve_repo_root(explicit: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-pub(crate) fn resolve_lane(owner: Option<String>, repo_root: &Path) -> Result<String, String> {
+pub fn resolve_lane(owner: Option<String>, repo_root: &Path) -> Result<String, String> {
     match owner {
         Some(owner) => Ok(owner),
         None => identity::resolve_owner(Some(repo_root), &env::vars().collect())

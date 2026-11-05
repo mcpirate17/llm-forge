@@ -22,11 +22,6 @@ const PATHS: &[&str] = &[
     "native/slop-core/Cargo.lock",
     "native/slop-core/src",
     "native/slop-core/build.rs",
-    "native/forge-cli/Cargo.toml",
-    "native/forge-cli/build.rs",
-    "native/forge-cli/source_identity.rs",
-    "ledger/routing_policy.toml",
-    "native/forge/tests/fixtures/ledger/calibration.json",
 ];
 const MAX_LIST: u64 = 32 * 1024 * 1024;
 fn command(root: &Path) -> Command {
@@ -92,6 +87,7 @@ pub fn revision(root: &Path) -> Option<String> {
 fn listing(root: &Path, head: &str) -> Option<BTreeMap<PathBuf, String>> {
     let mut args = vec!["ls-tree", "-r", "-z", "--full-tree", head, "--"];
     args.extend_from_slice(PATHS);
+    args.extend_from_slice(&crate::source_fingerprint::EXTRA_FILES);
     let raw = git_output(root, &args, MAX_LIST)?;
     let mut files = BTreeMap::new();
     for row in raw.split(|byte| *byte == 0).filter(|row| !row.is_empty()) {

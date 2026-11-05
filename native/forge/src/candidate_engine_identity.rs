@@ -7,7 +7,7 @@ use crate::{
     candidate_policy::{self, Policy},
     candidate_snapshot::Snapshot,
     candidate_source::{Candidate, Source, TreeEntry},
-    source_fingerprint::Fingerprint,
+    source_fingerprint::{self, Fingerprint},
 };
 use anyhow::{ensure, Context, Result};
 use serde::Serialize;
@@ -24,35 +24,6 @@ use std::{
 
 const MAX_EXECUTABLE: u64 = 1024 * 1024 * 1024;
 const MAX_INPUT_JSON: usize = 64 * 1024 * 1024;
-const REQUIRED: &[&str] = &[
-    "native/forge/Cargo.toml",
-    "native/forge/Cargo.lock",
-    "native/conductor-native/Cargo.toml",
-    "native/conductor-native/Cargo.lock",
-    "native/slop-core/Cargo.toml",
-    "native/slop-core/Cargo.lock",
-    "native/forge-cli/Cargo.toml",
-    "native/forge-cli/build.rs",
-    "native/forge-cli/source_identity.rs",
-    "ledger/routing_policy.toml",
-    "native/forge/tests/fixtures/ledger/calibration.json",
-];
-#[cfg(test)]
-const CRATES: &[&str] = &[
-    "native/forge",
-    "native/conductor-native",
-    "native/slop-core",
-];
-const SOURCES: &[&str] = &[
-    "native/forge/src/",
-    "native/conductor-native/src/",
-    "native/slop-core/src/",
-];
-const OPTIONAL: &[&str] = &[
-    "native/forge/build.rs",
-    "native/conductor-native/build.rs",
-    "native/slop-core/build.rs",
-];
 
 #[derive(Debug, Serialize)]
 pub struct Evidence {
@@ -280,9 +251,7 @@ fn hash_json(value: &impl Serialize) -> Result<String> {
 }
 
 fn relevant(path: &str) -> bool {
-    REQUIRED.contains(&path)
-        || OPTIONAL.contains(&path)
-        || SOURCES.iter().any(|prefix| path.starts_with(prefix))
+    source_fingerprint::includes(path)
 }
 fn source_tree_fingerprint(
     source: &Source,
@@ -309,15 +278,24 @@ fn source_tree_fingerprint(
         files.len() <= 4096,
         "candidate native source inventory exceeds 4096 files"
     );
-    for required in REQUIRED {
+    for required in source_fingerprint::EXTRA_FILES {
         ensure!(
             files.contains_key(required),
             "candidate native source inventory is incomplete: {required}"
         );
     }
-    for prefix in SOURCES {
+    for name in source_fingerprint::SOURCE_TREES {
+        let base = format!("native/{name}/");
+        for suffix in ["Cargo.toml", "Cargo.lock"] {
+            let required = format!("{base}{suffix}");
+            ensure!(
+                files.contains_key(required.as_str()),
+                "candidate native source inventory is incomplete: {required}"
+            );
+        }
+        let prefix = format!("{base}src/");
         ensure!(
-            files.keys().any(|path| path.starts_with(prefix)),
+            files.keys().any(|path| path.starts_with(&prefix)),
             "candidate native source directory is absent: {prefix}"
         );
     }

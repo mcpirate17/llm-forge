@@ -190,6 +190,19 @@ fn optional_int(payload: &Map<String, Value>, key: &str) -> Result<Option<i64>, 
     }
 }
 
+/// Campaign identifiers become output filenames, never relative paths.
+pub(crate) fn validate_campaign_id(id: &str) -> Result<(), String> {
+    if id.len() > 200
+        || !id.starts_with(char::is_alphanumeric)
+        || !id
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        return Err("campaign_id must be a single filename component of at most 200 bytes, starting with a letter or digit and containing only letters, digits, '.', '_' or '-'".into());
+    }
+    Ok(())
+}
+
 /// A manifest for an engine that generates its own mutants.
 #[derive(Clone, Debug)]
 pub struct Campaign {
@@ -232,6 +245,7 @@ impl Campaign {
 
     fn from_payload(path: &Path, payload: &Map<String, Value>) -> Result<Self, String> {
         let campaign_id = required_text(payload, "campaign_id")?;
+        validate_campaign_id(&campaign_id)?;
         let title = required_text(payload, "title")?;
         let language = required_text(payload, "language")?;
         let mutation_engine = required_text(payload, "mutation_engine")?;

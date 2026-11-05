@@ -1141,7 +1141,7 @@ fn a_failing_status_cannot_be_offered_as_evidence() {
 
 mod native_runner_binding {
     use super::*;
-    use crate::mutation_native_runner::{COMPONENT_PATHS, RUNNER_KIND, RUNNER_SCHEMA};
+    use crate::mutation_native_runner::{RUNNER_KIND, RUNNER_SCHEMA};
 
     fn generated_rule(
         payload: &Map<String, Value>,
@@ -1163,10 +1163,6 @@ mod native_runner_binding {
     }
 
     fn native(extra: Value) -> Map<String, Value> {
-        let map: Map<String, Value> = COMPONENT_PATHS
-            .iter()
-            .map(|path| ((*path).to_owned(), json!("c".repeat(64))))
-            .collect();
         let mut payload = receipt(extra);
         for key in [
             "runner_sha256",
@@ -1179,14 +1175,19 @@ mod native_runner_binding {
         }
         payload.insert("runner_kind".into(), json!(RUNNER_KIND));
         payload.insert(
+            "mutants".into(),
+            json!([{"id":"fixture-kill","path":"conductor/subject.py","outcome":"KILLED"}]),
+        );
+        payload.insert("source_coverage".into(), json!({"schema_version":1,"complete":true,"scored_by_source":{"conductor/subject.py":1},"missing":[]}));
+        payload.insert(
             "native_runner".into(),
             json!({
                 "schema_version": RUNNER_SCHEMA,
+                "forge_version": "0.0.0",
                 "executable_sha256": "d".repeat(64),
                 "compiled_source_sha256": "e".repeat(64),
                 "compiled_git_commit": "f".repeat(40),
                 "source_matches_git": true,
-                "components_sha256": map,
             }),
         );
         payload
@@ -1201,7 +1202,7 @@ mod native_runner_binding {
 
     #[test]
     fn a_native_receipt_needs_no_python_runner_hash() {
-        let found = generated_rule(&native(json!({"survivors": []})), |_| Some("c".repeat(64)));
+        let found = generated_rule(&native(json!({"survivors": []})), |_| Some("e".repeat(64)));
         assert!(runner_rows(&found).is_empty(), "{found:?}");
     }
 
@@ -1211,7 +1212,7 @@ mod native_runner_binding {
         assert!(
             found
                 .iter()
-                .any(|row| row.contains("match neither this tree nor any lineage")),
+                .any(|row| row.contains("source fingerprint is unavailable or differs")),
             "{found:?}"
         );
     }

@@ -86,23 +86,22 @@ fn missing_invalid_and_inert_value_evidence_are_distinct() {
 
 mod native_receipts {
     use super::*;
-    use crate::mutation_native_runner::{COMPONENT_PATHS, RUNNER_KIND, RUNNER_SCHEMA};
+    use crate::mutation_native_runner::{RUNNER_KIND, RUNNER_SCHEMA};
 
     fn native_receipt() -> Value {
-        let map: serde_json::Map<String, Value> = COMPONENT_PATHS
-            .iter()
-            .map(|path| ((*path).to_owned(), json!("c")))
-            .collect();
         json!({
             "status": "RATCHET_HELD",
             "runner_kind": RUNNER_KIND,
+            "source_sha256": {"src/a.rs": "e".repeat(64)},
+            "mutants": [{"path":"src/a.rs","outcome":"KILLED"}],
+            "source_coverage": {"schema_version":1,"complete":true,"scored_by_source":{"src/a.rs":1},"missing":[]},
             "native_runner": {
                 "schema_version": RUNNER_SCHEMA,
-                "executable_sha256": "d",
-                "compiled_source_sha256": "e",
-                "compiled_git_commit": "f",
+                "forge_version": "0.0.0",
+                "executable_sha256": "d".repeat(64),
+                "compiled_source_sha256": "e".repeat(64),
+                "compiled_git_commit": "f".repeat(40),
                 "source_matches_git": true,
-                "components_sha256": map,
             },
         })
     }
@@ -128,11 +127,10 @@ mod native_receipts {
     #[test]
     fn native_receipts_bind_to_this_tree_or_lineage() {
         let receipt = native_receipt();
-        assert_eq!(judged(&receipt, "c", false), None);
-        assert_eq!(judged(&receipt, "other", true), None);
+        assert_eq!(judged(&receipt, &"e".repeat(64), false), None);
         assert_eq!(
             judged(&receipt, "other", false).as_deref(),
-            Some("native runner components match neither this tree nor any lineage entry")
+            Some("native runner source fingerprint is unavailable or differs from this tree")
         );
     }
 

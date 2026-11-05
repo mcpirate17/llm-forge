@@ -1,5 +1,148 @@
 # llm-forge roadmap: native execution and agent productivity
 
+## Current mission checkpoint — 2026-11-04
+
+Forge supplies bounded native tools to existing coding agents. The mission is to
+improve verified task outcomes, context use and execution cost while preserving
+correctness and explicit operator authority. Native implementation, installation,
+runtime activation and demonstrated agent benefit are separate milestones.
+
+This checkpoint audits source baseline `9117c2fb6436251d0de50038db85ef7fbb81e4b3`,
+on pending [PR #185](https://github.com/mcpirate17/llm-forge/pull/185), plus the
+working changes and scoped validation below. It does not certify the eventual
+PR head. The canonical measurement and effectiveness report is
+[performance.md](performance.md); historical delivery notes follow this checkpoint.
+Open defects live in the [issue tracker](https://github.com/mcpirate17/llm-forge/issues),
+not a parallel local defect ledger.
+
+### Architecture, evidence and disposition
+
+Paths below are relative to `native/forge/src/` unless qualified.
+
+| Area | Actual implementation | Gap and available evidence | Disposition |
+| --- | --- | --- | --- |
+| Agent intelligence | `route.rs`, `ledger/`, `local_clerk/generate.rs`, `workspace_runtime_eval.rs`; existing client/model remains the agent | Routing, accounting and clerical generation exist. Runtime matrix completeness is not task-quality evaluation; no matched agent-success study | Retain accounting and deterministic tools; improve real-task controls. Local models are clerical only and cannot approve, authorize, promote or launch work |
+| Context and tokens | `context_tools.rs`, `context_window.rs`, `context_store.rs`, `tokenizer.rs`, `context_telemetry.rs`; `conductor-native/src/context_projection.rs` | Composition, deferred catalog-definition lookup, exact supplied-text counts and recoverable compaction already exist. A deterministic prompt-strengthening/mode-selection and tool-recommendation engine is absent; historical reductions omit provider envelopes, rereads and task-quality effects | Retain these primitives; measure actual provider usage and recovery cost before expanding compression |
+| CLI | `main.rs`, `dispatch.rs`, `candidate_cli.rs`, `project.rs` | Native command dispatch and hook adapters exist; matched startup/signature comparisons remain within the 10% regression budget. Host adoption requires independent verification | Improve readiness and exact workload profiling; retire duplicate interpreted callers only after parity and caller migration |
+| MCP server | `harness_mcp.rs`, `harness_mcp_protocol.rs`, `harness_catalog.rs`, `harness_transport.rs`, `mcp_setup.rs` | Tools discovery/calls, schema validation, bounded concurrency and operator-selected capabilities exist. Custom wire integration tests exist; actual-client selection and complete transport cost remain unmeasured | Retain the native service/adapter split; improve client setup, lifecycle and actual-client validation |
+| MCP client and prompts | `src/conductor/crg_mcp_probe.py` is a narrow diagnostic client; `context_tools.rs` searches supplied catalog snapshots | No reusable native outbound MCP session or MCP prompts/resources methods found. Existing prompt composition is not protocol prompt discovery | Build the authorized outbound integration and deterministic prompt/tool layer using composition/schema/catalog APIs; keep protocol prompt discovery distinct |
+| Performance | `performance.rs`, `performance_identity.rs`, `conductor-native/src/performance_receipt.rs`, `native/forge/benches/` | Sealed matched-receipt comparisons and component benchmarks exist. Current CLI baselines and historical retrieval/projection evidence do not establish productivity | Retain receipt integrity; improve transport/task measurements and include preparation/resource costs |
+| Quality and tests | `native/forge/tests/`, `native/conductor-native/tests/`, `local_check.rs`, `sweep.rs`, `mutation_run.rs` | Native unit/integration suites, full local checks and clean-host sweep exist; live-service tests are opt-in. Focused repair tests pass; full final-tree verification remains pending below | Retain ordinary tests and automatic scoped mutation engines; verify exact committed tree before landing |
+| Rust migration | `native/forge-cli/Cargo.toml` owns the executable using `../forge/src/main.rs`; `native/forge` owns reusable code; `native/conductor-native` supplies shared contracts | `rg --files src -g '*.py'` currently finds 83 files. File count is not migration completion; caller/dependency retirement and clean-install/runtime evidence remain necessary | Prioritize measured live interpreted boundaries; retire replaced bodies and stale compatibility plumbing after complete caller migration |
+
+### Actual dispatch and dependency flow
+
+```mermaid
+flowchart TD
+  Client[Existing agent client] -->|stdio MCP| Adapter[harness_mcp + protocol]
+  Adapter -->|new Unix socket per call| Service[harness + operator catalog]
+  Service --> Source[Source / search / context / workspace tools]
+  Service --> Terminal[Confined PTYs + task journal]
+  CLI[forge-cli: main.rs] --> Dispatch[CLI dispatch / native hooks]
+  Dispatch --> Native[forge library + conductor-native contracts]
+  Source --> Native
+  Terminal --> Controls[Linux enforcement + systemd + SQLite]
+  Python[Remaining Python entry points] -->|selected adapters| CLI
+  Dispatch --> Evidence[Performance receipts / ledger / local checks]
+```
+
+The service compiles its catalog/schema/grammar once; it cannot grant new paths,
+executables, networking or budgets from model requests. RPC cancellation suppresses
+an adapter response; it does not undo a daemon operation. Same-UID unconfined
+programs remain trusted. See [the harness contract](native-harness.md).
+
+Native graph inventory at `.git/forge-program-graph.db`: 1,300 files, 18,327
+definitions, 19,434 resolved references, 84,910 unresolved references and 54,387
+dynamic references. These are syntactic inventory counts, without embeddings,
+not a full semantic graph or proof that all dependency edges resolve. The external
+code-review graph MCP was unavailable in this session; do not imply it validated
+this audit.
+
+### Ordered continuation and acceptance criteria
+
+1. Complete the bounded mutation prerequisites tracked in
+   [#184](https://github.com/mcpirate17/llm-forge/issues/184): the active planner
+   change removes the fatal refusal for a package without local `src/`. The
+   planner and identity now belong to the shared library; the exact issue command
+   returns `READY` (skipping the registered crate), adding `--include-covered`
+   returns one `forge` campaign, and `cargo-mutants 27.1.0 --list` discovers 38
+   planner mutations. This is discovery, not executed mutation coverage. CLI-only
+   modules retain explicit unsupported-ownership errors. Complete full checks and
+   integrate the reviewed publication, process and receipt-freshness repairs.
+2. Validate one real client: setup, advertised tools, an agent-selected read,
+   allowed/denied/failure cases, reconnect and undo. Test the client-specific
+   configuration rather than treating a custom wire client as client adoption.
+3. Build deterministic prompt strengthening with explicit task modes and tool
+   recommendations, reusing composition, catalog filtering, token counts and
+   recovery. Verify that strengthened prompts retain requirements and report
+   changes/overhead; composition alone does not satisfy this deliverable.
+4. Measure matched CLI versus actual MCP adapter calls with equivalent outputs;
+   separate service/adapter startup and discovery from warm dispatch. Include
+   schema/policy checks, socket connection and serialization in declared scope.
+5. Complete the authorized inbound/outbound MCP workflow: retain the existing
+   inbound server, add bounded native outbound sessions with explicit endpoint,
+   executable, credential and cancellation policy, then exercise discovery and
+   calls through the actual consumer.
+6. Run bounded matched agent tasks with the same model, budget, source and tasks;
+   independently verify outputs, report repetitions and failed/censored/unstarted
+   cases, provider usage, recovery/rereads and embedding preparation.
+7. Improve performance/effectiveness reporting and test intelligence using
+   provenance-bound measurements, conservative affected-test selection and
+   independent task oracles. Report uncertainty and selection coverage.
+8. Use those measurements to simplify native migration, hook overhead and context
+   paths. Retire proven duplicates and interpreted boundaries after caller/parity
+   verification; add readiness/setup/status/undo without parallel machinery.
+
+**Ongoing checkpoint:** the source audit and two pre-change CLI baselines are
+complete. The pending repair covers package ownership, configured receipt paths,
+contained atomic publication, serialized process diagnostics, bounded child output
+and shared native-source freshness. Independent review exposed and resolved
+module-path edge cases, snapshot inventory drift, canonical path ordering and
+aggregate mutation counts concealing an unmeasured selected file. All three
+engines now require a reconciled per-source report; source coverage is not line or
+operator coverage. Native diagnostic PGIDs remain separate from legacy reaper
+signal authority. See [the detailed contract](mutation.md).
+
+Latest completed checks include strict Clippy for both native workspaces,
+579 conductor library tests, 41 planner cases (one benchmark ignored), eight
+configured-path cases, the Forge library suite, two real Cargo build-freshness
+cases and nine session-start cases. The isolated Python bridge passed freshness,
+schema and per-source report checks against the newly compiled extension without
+installation. The full `make test` run passed 4,498 test executions with 144
+ignored executions across 172 harness invocations; repeated feature matrices are
+included, so these are not unique-test counts. Earlier fixture and Clippy failures
+are repaired. A final review removed Make's premature output-directory creation
+and corrected censored known-survivor scoring; focused regression checks cover
+those follow-ups. Logs are under `.git/forge-program-*`. Full committed-tree
+`make local-check` / `make local-verify` are the publication gates; consult their
+source-bound receipts under `.git/forge-checks/` for the exact checked revision.
+
+Two real, automatically generated cargo-mutants campaigns verified root
+`Cargo.toml` handling: one measured source plus an unmeasured source yields
+`INCOMPLETE`; two measured sources yield `PASS`. Both snapshots were removed.
+The [performance report](performance.md#native-mutation-behavior-checks--2026-11-04)
+retains exact identities and accounting. These tiny-host behavior checks are not
+registered source-freshness evidence. Earlier failed attempts remain preserved.
+
+Matched original/repaired binary comparisons pass the unchanged 10% budget for
+CLI help and signature context (404 successful measured samples); an earlier
+environment-mismatched replay remains recorded. This is scoped working-tree
+evidence, not final-head certification or real-client productivity. Resume with
+publication of item 1, remove Rust/Mull's unnecessary interpreter prerequisite,
+then advance to the shared prompt/tool layer and actual transport measurements.
+The installed global Forge remains a separate artifact.
+
+## Historical roadmap and delivery provenance
+
+The remainder records dated plans, assignments and measurements. Its statements
+about “current”, “today”, “this week”, installed host state and unfinished work
+apply to their original dates, not this checkpoint. Historical model assignments,
+ownership rules and policy exceptions are superseded by current `AGENTS.md` and
+the user's instructions: local models are clerical only, with no approval or
+execution authority. Historical model-quality and latency claims are not refreshed
+measurements. The old 117-file Python inventory is superseded by the scoped count
+above; neither count measures completion.
+
 The [2026-10-31 native orchestration blueprint](../ARCHITECTURE.md) records the
 current substrate audit and the next independently buildable capability milestones.
 The historical baseline and delivery phases below remain as provenance.
@@ -21,8 +164,8 @@ toolchain shim, and compatibility target are retired; the existing policy IDs
 route uncached command and version calls through Forge. Execution is fresh and
 does not reuse a result cache. Full review orchestration, remaining builtins,
 evidence and waiver verification, test-engine migration, reporting, attestation
-and legacy caller retirement remain. There are still 117 Python source files
-under `src/`; the native migration is incomplete. See the
+and legacy caller retirement remained at that historical checkpoint. Its 117-file
+Python inventory is superseded above; the native migration remains incomplete. See the
 [execution contract](native-candidate-review.md#execute-a-selected-batch),
 [native Cargo lint contract](native-cargo-lint.md), and
 [scan measurements](performance.md#native-scan-admission-and-line-lookup).
@@ -54,7 +197,7 @@ receipts remain enforced while reusable library and test builds retain their
 caches. See [native local verification](local-checks.md). Native receipt export
 is available, and direct cppcheck execution replaces its deleted Python wrapper.
 
-Status as of 2026-09-13; source of truth for llm-forge direction
+Historical status as of 2026-09-13; retained delivery provenance
 
 Synthesized 2026-09-13 from three measured reports in this directory:
 `hook_token_cost_audit.md`, `agent_efficiency_gaps.md`, `rust_port_plan.md`.

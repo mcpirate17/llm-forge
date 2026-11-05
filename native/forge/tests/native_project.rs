@@ -18,6 +18,7 @@ fn command(host: &support::Host, args: &[&str]) -> Output {
         .env("CONDUCTOR_PYTHON", "/nonexistent/interpreter")
         .env_remove("CONDUCTOR_CANDIDATE_POLICY")
         .env_remove("CONDUCTOR_INTEGRATION_BRANCH")
+        .env_remove("CONDUCTOR_MUTATION_RECEIPT_ROOT")
         .args(["project", "--host"])
         .arg(&host.0)
         .args(args)
@@ -242,4 +243,60 @@ fn competing_writer_lock_fails_before_creating_manifest_or_backup() {
     assert!(!host.0.join("forge.toml.forge-native.bak.json").exists());
     drop(lock);
     parsed(command(&host, &["init", "--apply"]));
+}
+
+#[test]
+fn scalar_path_resolves_only_selected_key_without_interpreter() {
+    let host = host();
+    write(
+        &host.0.join("pyproject.toml"),
+        "[tool.conductor]\nmutation_receipt_root='relocated/evidence'\nnotes_root=12\n",
+    );
+    let output = command(&host, &["path", "mutation-receipt-root"]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(output.stdout, b"relocated/evidence\n");
+    assert!(!host.0.join("relocated").exists());
+    fail(command(&host, &["path", "notes-root"]), "must be a string");
+    fail(command(&host, &["path", "unknown"]), "invalid value");
+}
+
+#[test]
+fn scalar_path_honors_native_manifest_and_environment_precedence_and_errors() {
+    let host = host();
+    write(
+        &host.0.join("pyproject.toml"),
+        "[tool.conductor]\nmutation_receipt_root='legacy/evidence'\n",
+    );
+    write(
+        &host.0.join("forge.toml"),
+        "schema_version=1\n[conductor]\nmutation_receipt_root='native/evidence'\n",
+    );
+    let args = ["project", "path", "mutation-receipt-root"];
+    let output = command(&host, &["path", "mutation-receipt-root"]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(output.stdout, b"native/evidence\n");
+    let output = host
+        .command()
+        .env("PATH", "")
+        .env("CONDUCTOR_MUTATION_RECEIPT_ROOT", "override/evidence")
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(output.stdout, b"override/evidence\n");
+    let output = host
+        .command()
+        .env("CONDUCTOR_MUTATION_RECEIPT_ROOT", "../escape")
+        .args(args)
+        .output()
+        .unwrap();
+    fail(output, "CONDUCTOR_MUTATION_RECEIPT_ROOT");
+    write(
+        &host.0.join("forge.toml"),
+        "schema_version=1\n[conductor]\nmutation_receipt_root=12\n",
+    );
+    fail(
+        command(&host, &["path", "mutation-receipt-root"]),
+        "must be a string",
+    );
 }

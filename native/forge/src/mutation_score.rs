@@ -70,6 +70,10 @@ pub struct Tally {
     pub unstarted: Option<u64>,
 }
 
+fn source_coverage_complete(receipt: &Receipt) -> bool {
+    conductor_native::mutation_source_coverage::validate(receipt).is_ok()
+}
+
 /// Record planned, completed, failed, censored and unstarted mutants.
 ///
 /// Every receipt gets this, however the run ended. `planned` is the engine's
@@ -95,23 +99,30 @@ pub fn account(receipt: &mut Receipt, planned: Option<u64>) -> Result<Tally, Str
     );
     receipt.insert(
         "complete_campaign".into(),
-        Value::Bool(unstarted == Some(0) && counts[ROW_ERROR] == 0),
+        Value::Bool(
+            unstarted == Some(0) && counts[ROW_ERROR] == 0 && source_coverage_complete(receipt),
+        ),
     );
     Ok(Tally { counts, unstarted })
 }
 
 /// Whether the engine itself finished: the validator rejects any receipt whose
 /// `engine_result` did not, so a clean-looking report must not read as PASS.
-fn engine_finished(receipt: &Receipt) -> bool {
-    receipt.get("engine_result").is_none_or(|engine| {
-        engine.get("returncode").and_then(Value::as_i64) == Some(0)
-            && engine.get("timed_out") == Some(&Value::Bool(false))
+fn engine_finished(campaign: &Campaign, receipt: &Receipt, survivors: usize) -> bool {
+    receipt.get("engine_result").is_some_and(|engine| {
+        let code = engine.get("returncode").and_then(Value::as_i64);
+        engine.get("timed_out") == Some(&Value::Bool(false))
+            && (code == Some(0)
+                || (campaign.mutation_engine == "cargo-mutants"
+                    && code == Some(2)
+                    && survivors > 0))
     })
 }
 
 fn verdict(
     tally: &Tally,
     finished: bool,
+    source_coverage: bool,
     reported: usize,
     survivors: usize,
     new_survivors: usize,
@@ -119,15 +130,19 @@ fn verdict(
     let counts = &tally.counts;
     if counts[ROW_ERROR] > 0 {
         ERROR
+    } else if !source_coverage {
+        INCOMPLETE
     } else if new_survivors > 0 {
         FAIL
-    } else if tally.unstarted != Some(0) || reported == 0 {
+    } else if tally.unstarted != Some(0)
+        || reported == 0
+        || !finished
+        || counts[TIMED_OUT] + counts[NO_COVERAGE] + counts[UNVIABLE] > 0
+    {
         INCOMPLETE
     } else if survivors > 0 {
         // Green would be a lie: recorded survivors are known gaps nobody closed.
         RATCHET_HELD
-    } else if !finished || counts[TIMED_OUT] + counts[NO_COVERAGE] + counts[UNVIABLE] > 0 {
-        INCOMPLETE
     } else {
         PASS
     }
@@ -140,6 +155,11 @@ pub fn score(
     planned: Option<u64>,
 ) -> Result<(), String> {
     let tally = account(receipt, planned)?;
+    let source_coverage = source_coverage_complete(receipt)
+        && receipt.get("source_sha256") == Some(&json!(campaign.source_sha256));
+    if !source_coverage {
+        receipt.insert("complete_campaign".into(), json!(false));
+    }
     let counts = &tally.counts;
     let denominator = counts[KILLED] + counts[SURVIVED];
     let mutation_score = (denominator > 0).then(|| counts[KILLED] as f64 / denominator as f64);
@@ -151,13 +171,21 @@ pub fn score(
     let baseline: BTreeSet<String> = campaign.survivor_baseline.iter().cloned().collect();
     let new_survivors: Vec<&String> = survivors.difference(&baseline).collect();
     let resolved: Vec<&String> = baseline.difference(&survivors).collect();
+    let finished = engine_finished(campaign, receipt, survivors.len());
     let verdict = verdict(
         &tally,
-        engine_finished(receipt),
+        finished,
+        source_coverage,
         rows(receipt).len(),
         survivors.len(),
         new_survivors.len(),
     );
+    if verdict == INCOMPLETE
+        || !finished
+        || counts[TIMED_OUT] + counts[NO_COVERAGE] + counts[UNVIABLE] > 0
+    {
+        receipt.insert("complete_campaign".into(), json!(false));
+    }
     let outcome_counts: Map<String, Value> = counts
         .iter()
         .map(|(outcome, count)| ((*outcome).to_string(), json!(count)))

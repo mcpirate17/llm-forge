@@ -30,12 +30,8 @@ REVIEW_ARGS ?=
 MUTATION_LANGUAGE ?= python
 MUTATION_BASE ?= origin/main
 MUTATION_CAMPAIGN ?=
-# A run's default receipt root is not evidence. campaigns/registry.json declares
-# campaigns/receipts as this repository's receipt directory, and a receipt written
-# anywhere else is invisible to evidence verification, so name it here. It is a
-# literal so the native runner never waits on `uv run`, which rebuilds the native
-# tree after any edit under native/.
-MUTATION_RECEIPT ?= campaigns/receipts
+# Empty overrides select the host's native project-path configuration at execution.
+MUTATION_RECEIPT ?=
 RUN_STAMP ?= $(shell date -u +%Y%m%dT%H%M%SZ)
 MUTATION_PATHS ?=
 MUTATION_GENERATE_ARGS ?=
@@ -121,25 +117,38 @@ mutation-generate:  ## Write campaigns for THIS BRANCH's changed files (nothing 
 # ever needs the final one, so a loop that commits each iteration was paying
 # for all of them in every clone. `mutation-receipt-promote` copies the newest
 # iteration receipt into the tracked directory when the loop settles.
-MUTATION_RECEIPT_ITERATIONS ?= $(MUTATION_RECEIPT)/.iterations
+MUTATION_RECEIPT_ITERATIONS ?=
+
+# Expand inside a recipe so native path failures stop the target, never Make parsing.
+define mutation-receipt-paths
+receipt_root="$(MUTATION_RECEIPT)"; \
+if [ -z "$$receipt_root" ]; then \
+    receipt_root=$$("$(FORGE)" project --host "$(CONDUCTOR_HOST_ROOT)" path mutation-receipt-root) || exit $$?; \
+fi; \
+test -n "$$receipt_root" || { echo "empty mutation receipt root" >&2; exit 2; }; \
+receipt_iterations="$(MUTATION_RECEIPT_ITERATIONS)"; \
+if [ -z "$$receipt_iterations" ]; then receipt_iterations="$$receipt_root/.iterations"; fi
+endef
 
 mutation-engine-run:  ## Run a generated campaign through its engine in a disposable snapshot
 	@test -n "$(MUTATION_CAMPAIGN)" || { echo "Set MUTATION_CAMPAIGN=campaigns/<id>.json"; exit 2; }
-	@mkdir -p "$(MUTATION_RECEIPT_ITERATIONS)"
+	@$(mutation-receipt-paths); \
 	"$(FORGE)" mutation run "$(MUTATION_CAMPAIGN)" \
 		--allow-mutations --base "$(MUTATION_BASE)" \
-		$(if $(MUTATION_RECEIPT),--receipt "$(MUTATION_RECEIPT_ITERATIONS)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json") \
-		$(MUTATION_ENGINE_ARGS)
-	@echo "iteration receipt: $(MUTATION_RECEIPT_ITERATIONS)/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json (gitignored)"
-	@echo "tracked receipts stay at $(MUTATION_RECEIPT)/ -- promote with 'make mutation-receipt-promote'"
+		--receipt "$$receipt_iterations/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json" \
+		$(MUTATION_ENGINE_ARGS) || exit $$?; \
+	echo "iteration receipt: $$receipt_iterations/$(notdir $(basename $(MUTATION_CAMPAIGN)))_$(RUN_STAMP).json (gitignored)"; \
+	echo "tracked receipts stay at $$receipt_root/ -- promote with 'make mutation-receipt-promote'"
 
 mutation-receipt-promote:  ## Copy the newest .iterations receipt of MUTATION_CAMPAIGN into the tracked receipt dir
 	@test -n "$(MUTATION_CAMPAIGN)" || { echo "Set MUTATION_CAMPAIGN=campaigns/<id>.json"; exit 2; }
-	@id=$(notdir $(basename $(MUTATION_CAMPAIGN))); \
-	newest=$$(ls -t "$(MUTATION_RECEIPT_ITERATIONS)/$${id}_"*.json 2>/dev/null | head -1); \
-	test -n "$$newest" || { echo "no iteration receipts for $$id under $(MUTATION_RECEIPT_ITERATIONS)/"; exit 2; }; \
-	cp "$$newest" "$(MUTATION_RECEIPT)/"; \
-	echo "promoted $$newest -> $(MUTATION_RECEIPT)/$$(basename $$newest) -- git add it with the PR"
+	@$(mutation-receipt-paths); \
+	id=$(notdir $(basename $(MUTATION_CAMPAIGN))); \
+	newest=$$(ls -t "$$receipt_iterations/$${id}_"*.json 2>/dev/null | head -1); \
+	test -n "$$newest" || { echo "no iteration receipts for $$id under $$receipt_iterations/"; exit 2; }; \
+	mkdir -p "$$receipt_root" || exit $$?; \
+	cp "$$newest" "$$receipt_root/" || exit $$?; \
+	echo "promoted $$newest -> $$receipt_root/$$(basename $$newest) -- git add it with the PR"
 
 mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or changed-since-MUTATION_BASE tests
 	@if [ -n "$(MUTATION_PATHS)" ]; then \

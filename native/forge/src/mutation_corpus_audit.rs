@@ -20,6 +20,9 @@ pub(crate) trait CorpusInputs {
 }
 impl CorpusInputs for Capture<'_> {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
+        if path == conductor_native::mutation_native_runner::FINGERPRINT_KEY {
+            return self.native_source_fingerprint();
+        }
         self.optional_hash(path)
     }
     fn present(&mut self, path: &str) -> Result<bool> {
@@ -37,6 +40,9 @@ impl CorpusInputs for Capture<'_> {
 }
 impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
+        if path == conductor_native::mutation_native_runner::FINGERPRINT_KEY {
+            return self.native_source_fingerprint();
+        }
         use sha2::{Digest, Sha256};
         Ok(self
             .read(path)?

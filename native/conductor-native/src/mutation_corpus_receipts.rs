@@ -42,18 +42,10 @@ pub fn rejection(
         return Ok(Some(format!("status={}", python_status(status))));
     }
     if native_runner::declared(object) {
-        let recorded = match native_runner::components(object) {
-            Ok(recorded) => recorded,
-            Err(reason) => return Ok(Some(reason)),
-        };
-        let mut current = true;
-        for (path, expected) in recorded {
-            current &= source_hash(path)?.as_deref() == expected.as_str();
-        }
-        if !current && !lineage_accepts(&Value::Object(recorded.clone()))? {
-            return Ok(Some(
-                "native runner components match neither this tree nor any lineage entry".into(),
-            ));
+        let current = source_hash(native_runner::FINGERPRINT_KEY)?;
+        let errors = native_runner::errors(object, |_| current.clone(), |_| false);
+        if let Some(reason) = errors.into_iter().next() {
+            return Ok(Some(reason));
         }
     } else {
         let Some(recorded) = object

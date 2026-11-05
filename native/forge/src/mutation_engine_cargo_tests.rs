@@ -256,6 +256,28 @@ fn a_crate_without_a_package_is_not_narrowed_to_one() {
 }
 
 #[test]
+fn root_manifests_have_an_explicit_parent_without_changing_nested_or_absolute_paths() {
+    let dir = tempfile::tempdir().unwrap();
+    for (manifest, expected) in [
+        ("Cargo.toml", "./Cargo.toml"),
+        ("./Cargo.toml", "./Cargo.toml"),
+        ("tools/Cargo.toml", "tools/Cargo.toml"),
+        ("/fixture/Cargo.toml", "/fixture/Cargo.toml"),
+    ] {
+        let subject = bounded(
+            dir.path(),
+            json!({"generator": cargo_generator(json!({"manifest_path": manifest}))}),
+        );
+        let argv = engine_argv(&subject, "/bin/cargo-mutants", Path::new("/out")).unwrap();
+        assert_eq!(argv[3], expected);
+        assert_eq!(
+            subject.option_text("manifest_path").as_deref(),
+            Some(manifest)
+        );
+    }
+}
+
+#[test]
 fn an_unresolved_bound_or_absent_manifest_path_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let unbounded = campaign(dir.path(), json!({"generator": cargo_generator(json!({}))}));

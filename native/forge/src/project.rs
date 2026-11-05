@@ -2,7 +2,7 @@
 //! comparison against the exact snapshot used to plan it. No services are started.
 use crate::config_store::{self as store, FileState};
 use anyhow::{ensure, Context, Result};
-use clap::{Args, Subcommand};
+use clap::{Args, Subcommand, ValueEnum};
 use conductor_native::project_config;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -20,6 +20,8 @@ pub(crate) struct ProjectArgs {
 enum Action {
     /// Show the selected manifest, key inventory and resolved paths, without its text.
     Show,
+    /// Print one resolved repository-relative path for scripts, without JSON.
+    Path { key: PathKey },
     /// Create forge.toml from existing host settings or defaults. Existing native
     /// manifests are validated and preserved. Default is a read-only plan.
     Init {
@@ -31,6 +33,30 @@ enum Action {
         #[arg(long)]
         apply: bool,
     },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum PathKey {
+    CandidatePolicy,
+    MutationRegistry,
+    PackageRoot,
+    MutationReceiptRoot,
+    NotesRoot,
+    NotesDb,
+    GuardrailAllowlist,
+    MemorySources,
+    CrateRoster,
+    NativeRoot,
+    RadonComplexityBaseline,
+}
+
+impl PathKey {
+    fn config_key(self) -> String {
+        self.to_possible_value()
+            .expect("declared project path")
+            .get_name()
+            .replace('-', "_")
+    }
 }
 
 fn summary(state: &Option<FileState>) -> Value {
@@ -134,6 +160,12 @@ pub(crate) fn run(args: ProjectArgs) -> Result<u8> {
     let root = args.host.canonicalize().context("resolve host directory")?;
     ensure!(root.is_dir(), "host must be an existing directory");
     let output = match args.action {
+        Action::Path { key } => {
+            let (path, _) = conductor_native::project_paths::resolve_key(&root, &key.config_key())
+                .map_err(anyhow::Error::msg)?;
+            println!("{path}");
+            return Ok(0);
+        }
         Action::Show => show(&root)?,
         Action::Init { apply } => init(&root, apply)?,
         Action::Rollback { apply } => rollback(&root, apply)?,

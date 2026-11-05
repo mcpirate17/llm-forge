@@ -227,6 +227,16 @@ pub(crate) fn engine_argv(
     let manifest = campaign.option_text("manifest_path").ok_or_else(|| {
         "generator.options.manifest_path must name the crate's Cargo.toml".to_string()
     })?;
+    // cargo-mutants resolves a leaf manifest's parent as an empty path. Preserve
+    // root-package manifests by spelling their current-directory parent explicitly.
+    let manifest = if Path::new(&manifest)
+        .parent()
+        .is_some_and(|parent| parent.as_os_str().is_empty())
+    {
+        format!("./{manifest}")
+    } else {
+        manifest
+    };
     let mut argv = vec![
         binary.to_string(),
         "mutants".to_string(),

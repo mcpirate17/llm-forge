@@ -206,6 +206,15 @@ pub fn crate_roster_relative(config: &ProjectConfig) -> Result<(String, bool), S
     configured_value(config, spec)
 }
 
+/// Resolve one declared path, preserving precedence without validating unrelated keys.
+pub fn resolve_key(root: &Path, key: &str) -> Result<(String, bool), String> {
+    let spec = PATHS
+        .iter()
+        .find(|spec| spec.key == key)
+        .ok_or_else(|| format!("unknown project path key: {key}"))?;
+    configured(root, &mut None, *spec)
+}
+
 /// Values are in ProjectPaths dataclass field order, followed by matching flags.
 pub fn resolve(root: &Path) -> Result<Vec<(String, bool)>, String> {
     let mut config = None;

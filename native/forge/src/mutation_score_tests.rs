@@ -1,6 +1,30 @@
 use super::*;
-use crate::mutation_run_test_support::{campaign, receipt};
+use crate::mutation_run_test_support::{campaign, receipt as base_receipt};
 use std::fs;
+
+fn receipt(outcomes: &[(&str, &str)]) -> Receipt {
+    let mut receipt = base_receipt(outcomes);
+    for row in receipt
+        .get_mut("mutants")
+        .and_then(Value::as_array_mut)
+        .expect("rows")
+    {
+        row["path"] = json!("src/a.py");
+    }
+    let pins = json!({"src/a.py": "0".repeat(64)});
+    let report = conductor_native::mutation_source_coverage::report(
+        pins.as_object().expect("pins"),
+        receipt["mutants"].as_array().expect("rows"),
+    )
+    .expect("coverage report");
+    receipt.insert("source_sha256".into(), pins);
+    receipt.insert("source_coverage".into(), report);
+    receipt.insert(
+        "engine_result".into(),
+        json!({"returncode": 0, "timed_out": false}),
+    );
+    receipt
+}
 
 fn fixture() -> (tempfile::TempDir, Campaign) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -154,6 +178,7 @@ fn a_clean_report_from_a_failed_engine_is_not_a_pass() {
 #[test]
 fn the_exit_a_survivor_causes_does_not_change_the_ratchet() {
     let (_dir, mut campaign) = fixture();
+    campaign.mutation_engine = "cargo-mutants".into();
     campaign.survivor_baseline = vec!["b".into()];
     let mut receipt = receipt(&[("a", KILLED), ("b", SURVIVED)]);
     receipt.insert(
@@ -286,4 +311,131 @@ fn a_run_with_unstarted_mutants_never_becomes_a_baseline() {
 
         assert!(!campaign.survivor_baseline_recorded);
     }
+}
+
+#[test]
+fn missing_source_coverage_prevents_a_complete_or_passing_verdict() {
+    let (_dir, campaign) = fixture();
+    let mut receipt = receipt(&[("a", KILLED)]);
+    receipt.insert(
+        "source_coverage".into(),
+        json!({"complete": false, "missing": ["b.rs"]}),
+    );
+    score(&campaign, &mut receipt, Some(1)).unwrap();
+    assert_eq!(receipt["complete_campaign"], false);
+    assert_eq!(status(&receipt), INCOMPLETE);
+}
+
+#[test]
+fn absent_or_forged_coverage_never_scores_as_complete() {
+    let (_dir, campaign) = fixture();
+    for corruption in 0..4 {
+        let mut receipt = receipt(&[("a", KILLED)]);
+        match corruption {
+            0 => {
+                receipt.remove("source_coverage");
+            }
+            1 => {
+                receipt.insert("source_coverage".into(), json!({"complete": true}));
+            }
+            2 => {
+                receipt.get_mut("source_coverage").unwrap()["scored_by_source"]["src/a.py"] =
+                    json!(2);
+            }
+            _ => {
+                receipt.insert("source_sha256".into(), json!({"other.py": "0".repeat(64)}));
+                receipt.get_mut("mutants").unwrap()[0]["path"] = json!("other.py");
+                receipt.insert("source_coverage".into(), json!({"schema_version":1,"complete":true,"scored_by_source":{"other.py":1},"missing":[]}));
+            }
+        }
+        score(&campaign, &mut receipt, Some(1)).unwrap();
+        assert_eq!(status(&receipt), INCOMPLETE, "case {corruption}");
+        assert_eq!(receipt["complete_campaign"], false, "case {corruption}");
+    }
+}
+
+#[test]
+fn running_account_without_source_report_is_incomplete() {
+    let mut receipt = base_receipt(&[("a", KILLED)]);
+    account(&mut receipt, Some(1)).unwrap();
+    assert_eq!(receipt["complete_campaign"], false);
+}
+
+#[test]
+fn known_survivors_do_not_hide_censored_or_unviable_rows() {
+    let (_dir, mut campaign) = fixture();
+    campaign.survivor_baseline = vec!["known".into()];
+    for outcome in [TIMED_OUT, NO_COVERAGE, UNVIABLE] {
+        let mut result = receipt(&[("known", SURVIVED), ("other", outcome)]);
+        score(&campaign, &mut result, Some(2)).unwrap();
+        assert_eq!(status(&result), INCOMPLETE, "{outcome}");
+        assert_eq!(result["complete_campaign"], false, "{outcome}");
+    }
+}
+
+#[test]
+fn known_survivors_do_not_hide_unfinished_or_invalid_engines() {
+    let (_dir, mut campaign) = fixture();
+    campaign.survivor_baseline = vec!["known".into()];
+    for engine in [
+        None,
+        Some(json!({"returncode":0,"timed_out":true})),
+        Some(json!({"returncode":null,"timed_out":false})),
+        Some(json!({"returncode":0})),
+        Some(json!({"returncode":1,"timed_out":false})),
+    ] {
+        let mut result = receipt(&[("known", SURVIVED)]);
+        match &engine {
+            Some(value) => {
+                result.insert("engine_result".into(), value.clone());
+            }
+            None => {
+                result.remove("engine_result");
+            }
+        }
+        score(&campaign, &mut result, Some(1)).unwrap();
+        assert_eq!(status(&result), INCOMPLETE, "{engine:?}");
+        assert_eq!(result["complete_campaign"], false, "{engine:?}");
+    }
+}
+
+#[test]
+fn survivor_exit_two_is_only_finished_for_cargo_with_a_survivor() {
+    let (_dir, mut campaign) = fixture();
+    campaign.survivor_baseline = vec!["known".into()];
+    for engine in ["cargo-mutants", "fest", "mull"] {
+        campaign.mutation_engine = engine.into();
+        let mut result = receipt(&[("known", SURVIVED)]);
+        result.insert(
+            "engine_result".into(),
+            json!({"returncode":2,"timed_out":false}),
+        );
+        score(&campaign, &mut result, Some(1)).unwrap();
+        assert_eq!(
+            status(&result),
+            if engine == "cargo-mutants" {
+                RATCHET_HELD
+            } else {
+                INCOMPLETE
+            },
+            "{engine}"
+        );
+    }
+    campaign.mutation_engine = "cargo-mutants".into();
+    let mut result = receipt(&[("killed", KILLED)]);
+    result.insert(
+        "engine_result".into(),
+        json!({"returncode":2,"timed_out":false}),
+    );
+    score(&campaign, &mut result, Some(1)).unwrap();
+    assert_eq!(status(&result), INCOMPLETE);
+}
+
+#[test]
+fn new_survivor_still_fails_despite_censored_rows() {
+    let (_dir, campaign) = fixture();
+    let mut result = receipt(&[("new", SURVIVED), ("other", TIMED_OUT)]);
+    score(&campaign, &mut result, Some(2)).unwrap();
+    assert_eq!(status(&result), FAIL);
+    assert_eq!(result["complete_campaign"], false);
 }
