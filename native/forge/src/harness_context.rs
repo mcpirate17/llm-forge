@@ -83,14 +83,7 @@ impl Worker {
     fn prompt(&self, input: &str) -> Result<Value> {
         use crate::prompt_contract;
         let request: prompt_contract::Request = serde_json::from_str(input)?;
-        let text_bytes = std::iter::once(request.prompt.as_str())
-            .chain(request.constraints.iter().map(String::as_str))
-            .chain(request.candidate.as_deref())
-            .try_fold(0usize, |total, text| {
-                total
-                    .checked_add(text.len())
-                    .context("prompt byte count overflow")
-            })?;
+        let text_bytes = request.total_text_bytes().map_err(anyhow::Error::msg)?;
         ensure!(
             text_bytes
                 <= self

@@ -47,7 +47,7 @@ model refinement or execution is performed in this slice.
 
 Requests reject unknown fields, explicit `candidate: null`, candidates outside
 compare mode, blank inputs and unsupported modes. Limits are 512 KiB serialized
-request, 64 KiB aggregate prompt/constraint/candidate UTF-8 text, 32 constraints and
+request, 64 KiB aggregate text (including next-action facts), 32 constraints and
 256 evidence/opaque spans. Output budgets range from 512 bytes to 256 KiB; overflow
 refuses rather than truncating protected content. The CLI emits compact UTF-8 JSON.
 Its byte budget excludes transport framing and model tokens. Use the existing
@@ -63,6 +63,55 @@ the smaller operator limit applies in the context worker, not before every ingre
 allocation. Existing transport/session limits remain independent. CLI/core parity and actual native
 MCP stdio protocol tests cover discovery, calls, errors and absent capability;
 these are not proof that a particular coding client selects the tool.
+
+### Optional next inspection
+
+When already preparing a `suggest` or `plan` request, callers can supply
+`next_action` to obtain at most one bounded `code_inspect` recommendation:
+
+```json
+{
+  "mode": "suggest",
+  "prompt": "Inspect the reported Rust failure while preserving the API.",
+  "max_output_bytes": 8192,
+  "next_action": {
+    "intent": "inspect_failure",
+    "allow_read_advice": true,
+    "path": "src/math.rs",
+    "symbol": "parse",
+    "recent_error": {"kind": "rustc", "exit_code": 101, "code": "E0308", "line": 12},
+    "max_results": 20,
+    "max_bytes": 2048
+  }
+}
+```
+
+The response's `next_action.call` names the existing MCP tool and its arguments.
+The caller decides whether to execute it through the normal capability gate.
+`allow_read_advice` is a caller filter, not an authorization grant. The same
+request works through `forge context prompt --request FILE` and MCP
+`context_prompt`; no extra discovery or recommendation command is introduced.
+Call `code_inspect` directly when its location and arguments are already known.
+
+The selector uses an explicit relative `path`, or the typed diagnostic's `path`.
+Conflicting paths, a missing location or disabled read advice produce no call.
+Diagnostic prose is opaque and cannot select an executable or grant permissions.
+File existence, supported language and source freshness are not checked during
+recommendation. Inspection returns signatures and source locations, not a
+diagnosis or complete function bodies; bounded output can truncate or omit the
+reported line. A diagnostic line is not an inspection filter.
+
+An optional `source_sha256` and `known_inspection` record can suppress an
+unchanged read. The record must declare `complete: true`, the same `path` and
+`symbol` selector, and a matching lowercase SHA-256. These are caller-reported
+facts; the response explicitly marks freshness as unverified. A partial or
+failed prior read must not be reported as complete. This is not a source cache.
+
+Omitting `next_action` preserves the previous output bytes. Explicit null,
+unknown fields, traversal paths, unsupported intents, and use in `inspect` or
+`compare` refuse. The recommendation allows 1–100 results and 512–8192 output
+bytes; all supplied text counts against the existing input and operator budgets.
+It adds no model call, filesystem read, execution, automatic retry or client hook.
 
 ## Tokenizer identity and counting scope
 

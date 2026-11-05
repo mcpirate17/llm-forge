@@ -68,9 +68,10 @@ broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
 requires independently bound dependency manifests as well as confined execution.
 The existing root-only profile cannot yet execute Forge's own workspace campaigns.
 
-1. Extend the shared prompt/tool layer from the bounded literal inspection slice
-   described below: useful tool recommendations and eligible strengthening need
-   explicit permissions, source-backed evidence and matched task controls.
+1. Evaluate the optional next-inspection advice now implemented in the shared
+   prompt/tool layer. It produces one existing inspection call from explicit
+   caller facts; broader recommendations and eligible strengthening still need
+   source-backed evidence and matched task controls.
    External-host native receipt acceptance has a separate tracked boundary
    in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
    works without vendored Forge sources. The explicit installed-identity path is
@@ -102,6 +103,19 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
 8. Use those measurements to simplify native migration, hook overhead and context
    paths. Retire proven duplicates and interpreted boundaries after caller/parity
    verification; add readiness/setup/status/undo without parallel machinery.
+
+**Current agent-assistance increment:** `context prompt` and MCP `context_prompt`
+accept optional next-inspection facts in suggest/plan mode. A deterministic
+selector proposes at most one bounded `code_inspect` call or abstains; it neither
+executes the call nor checks source freshness. Caller-reported complete matching
+inspection facts can suppress a repeated read. Omitting the new field preserves
+legacy output bytes. See [the request contract](native-context.md#optional-next-inspection).
+The 26 focused tests and seven release adapter tests passed, including all three
+opt-in owned MCP tests. Held-out cases check qualified signatures, UTF-8 bounds,
+missing files, empty matches and truncation through the actual adapter. These
+establish behavior, not agent task success. Strict Clippy and source-size checks
+passed; the measurement harness compares complete workflows and retains partial
+call accounting. Publication still requires the exact committed full local gate.
 
 **Completed repair cycle:** PR #185 closed
 [#184](https://github.com/mcpirate17/llm-forge/issues/184). The exact issue command

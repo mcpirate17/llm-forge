@@ -5,6 +5,8 @@ mod forge_binary;
 mod mcp_measurement;
 #[path = "support/memory_fixture.rs"]
 mod memory_fixture;
+#[path = "../tests/support/tokenizer_fixture.rs"]
+mod tokenizer_fixture;
 use anyhow::{ensure, Context, Result};
 use forge::harness::{policy::Policy, transport};
 use forge::managed_service::Service;
@@ -62,6 +64,10 @@ fn prepare(base: PathBuf) -> Result<(Directory, PathBuf, Service, Instant)> {
     fs::create_dir(&state)?;
     fs::set_permissions(&state, fs::Permissions::from_mode(0o700))?;
     fs::write(source.join("main.rs"), SOURCE)?;
+    let tokenizer = tokenizer_fixture::Fixture::new();
+    let mut tokenizer_config = tokenizer.config.clone();
+    tokenizer_config.path = base.join("tokenizer.json");
+    fs::copy(&tokenizer.config.path, &tokenizer_config.path)?;
     memory_fixture::memory_fixture(&base)?;
     conductor_native::memory_index_sidecar::build_sidecar(
         &base.join("memory.jsonl"),
@@ -70,6 +76,7 @@ fn prepare(base: PathBuf) -> Result<(Directory, PathBuf, Service, Instant)> {
     .map_err(anyhow::Error::msg)?;
     let policy = json!({"version":1,"source_root":source,"write_paths":[],"read_only":[],"programs":{},
         "workspace":{"identity":null,"max_chars":3500},
+        "context":{"tokenizer":tokenizer_config,"max_input_bytes":16384,"max_tokens":16384,"recovery_bytes":1048576},
         "memory_indexes":{"notes":{"source":base.join("memory.jsonl"),"snapshot":base.join("memory.mapped"),
             "fingerprint":format!("sha256:{}","b".repeat(64)),"dimension":64,"max_rows":4096,"max_mapped_mib":2}},
         "aggregate":{"cpu_millis":1000,"memory_mib":512,"processes":64},"session":{"cpu_millis":100,"memory_mib":32,"processes":8},

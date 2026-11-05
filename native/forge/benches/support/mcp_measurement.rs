@@ -1,6 +1,8 @@
 //! One matched CLI/raw-MCP workload, with retained failure accounting.
 #[path = "../../tests/support/mcp_client.rs"]
 mod mcp_client;
+#[path = "next_action_measurement.rs"]
+mod next_action_measurement;
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -100,6 +102,7 @@ pub fn input_identity(state: &Path, binary: &Path) -> Result<Value> {
     let mut files = serde_json::Map::new();
     for name in [
         "source/main.rs",
+        "tokenizer.json",
         "query.json",
         "memory.jsonl",
         "memory.mapped",
@@ -114,6 +117,8 @@ pub fn input_identity(state: &Path, binary: &Path) -> Result<Value> {
         "native/forge-cli/Cargo.toml",
         "native/forge/benches/harness.rs",
         "native/forge/benches/support/mcp_measurement.rs",
+        "native/forge/benches/support/next_action_measurement.rs",
+        "native/forge/tests/support/tokenizer_fixture.rs",
         "native/forge/benches/support/memory_fixture.rs",
         "native/forge/tests/support/mcp_client.rs",
         "native/forge/tests/support/forge_binary.rs",
@@ -131,7 +136,7 @@ pub fn input_identity(state: &Path, binary: &Path) -> Result<Value> {
         "benchmark_binary_sha256":hash_file(&std::env::current_exe()?)?,
         "source_inventory_sha256":forge::source_fingerprint::fingerprint(&repo,&inventory)?,
         "build_input_sha256":build_inputs,"fixture_sha256":files,
-        "request_sha256":digest(&call())?,"architecture":std::env::consts::ARCH,
+        "request_sha256":digest(&call())?,"next_action_request_sha256":next_action_measurement::request_fingerprint()?,"architecture":std::env::consts::ARCH,
         "scope":"observed source/build inputs and executables; not compiler authenticity attestation"}))
 }
 pub fn call() -> Value {
@@ -213,6 +218,7 @@ pub struct Measurement {
     client: Option<mcp_client::Mcp>,
     expected: Value,
     next_id: u64,
+    last_response_bytes: usize,
 }
 impl Measurement {
     pub fn new() -> Self {
@@ -224,9 +230,10 @@ impl Measurement {
         Self {
             report: json!({"valid":false,"measurement":"current-only matched native CLI/raw MCP; no task or token saving claim",
             "measurement_deadline_seconds_from_driver_start":90,"sample_deadline_seconds":CALL_SECONDS,"service_lifetime_seconds":120,
-            "deadline_scope":"cooperative measurement deadline; setup, synchronous filesystem work and cleanup are not preempted. Use an outer forge performance benchmark timeout for a whole-process bound.",
+            "deadline_scope":"cooperative measurement deadline; setup, synchronous filesystem work and owned cleanup are not preempted",
             "identity_scope":"before/after point-in-time hashes; transient replace-and-restore and compiler authenticity are not attested",
             "protocol_accounting":counts(4),"mcp":arm(),"cli":arm(),"unix_diagnostic":legacy,
+            "next_action":next_action_measurement::empty(),
             "clock_ticks_per_second":if ticks>0 {Some(ticks)} else {None},
             "resource_scope":"per-process /proc warm batch deltas and RSS/HWM observations; no summed tree peak. Waited-child CPU covers reaped children. Outer performance receipt excludes systemd daemon; not total MCP resources.",
             "protocol_accounting_scope":"initialize and two tools/list replies validated; initialized notification counted as completed write, not acknowledged processing",
@@ -236,21 +243,24 @@ impl Measurement {
             client: None,
             expected: Value::Null,
             next_id: 3,
+            last_response_bytes: 0,
         }
     }
     async fn exchange(&mut self, request: Value, reply: bool) -> Result<Value> {
         let duration = limit(self.deadline)?;
         let client = self.client.as_mut().context("MCP adapter absent")?;
-        tokio::time::timeout(duration, async {
+        let (value, bytes) = tokio::time::timeout(duration, async {
             client.try_send(request).await?;
             if reply {
-                client.try_receive().await
+                client.try_receive_measured().await
             } else {
-                Ok(Value::Null)
+                Ok((Value::Null, 0))
             }
         })
         .await
-        .context("MCP sample deadline exceeded")?
+        .context("MCP sample deadline exceeded")??;
+        self.last_response_bytes = bytes;
+        Ok(value)
     }
     async fn protocol(&mut self, request: Value, reply: bool) -> Result<Value> {
         start(&mut self.report["protocol_accounting"]);
@@ -310,6 +320,7 @@ impl Measurement {
         );
         self.report["catalog_sha256"] = json!(digest(&listed["result"])?);
         self.report["catalog_bytes"] = json!(serde_json::to_vec(&listed["result"])?.len());
+        next_action_measurement::initialize(self, &listed["result"])?;
         self.report["discovery_ns"] = json!(started.elapsed().as_nanos());
         self.report["adapter_setup_total_ns"] = json!(setup_started.elapsed().as_nanos());
         Ok(())
@@ -437,6 +448,11 @@ impl Measurement {
                 self.batch(mcp, &source, binary, service_pid).await?;
             }
         }
+        let adapter_pid = self.client.as_ref().context("MCP adapter absent")?.pid();
+        self.report["next_action"]["resources_before"] = resources(adapter_pid, service_pid);
+        let next_action_result = next_action_measurement::run(self).await;
+        self.report["next_action"]["resources_after"] = resources(adapter_pid, service_pid);
+        next_action_result?;
         let id = self.next_id;
         let listed = self
             .protocol(json!({"jsonrpc":"2.0","id":id,"method":"tools/list"}), true)
@@ -480,6 +496,7 @@ impl Measurement {
                 self.report[key]["p95_batch_mean_ns"] = json!(samples[29]);
             }
         }
+        next_action_measurement::finish(&mut self.report["next_action"]);
         for row in self.report["unix_diagnostic"].as_array_mut().unwrap() {
             finalize(&mut row["accounting"]);
         }
@@ -488,6 +505,11 @@ impl Measurement {
                 &self.report["mcp"]["accounting"],
                 &self.report["cli"]["accounting"],
             ])
+            .chain(
+                next_action_measurement::NAMES
+                    .iter()
+                    .map(|name| &self.report["next_action"][*name]["accounting"]),
+            )
             .chain(
                 self.report["unix_diagnostic"]
                     .as_array()
