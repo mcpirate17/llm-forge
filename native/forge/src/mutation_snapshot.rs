@@ -220,6 +220,7 @@ pub struct Snapshot {
     pub commit: String,
     pub included_untracked: Vec<String>,
     removed: bool,
+    preserved: bool,
 }
 
 impl Snapshot {
@@ -233,6 +234,7 @@ impl Snapshot {
             commit: String::new(),
             included_untracked: Vec::new(),
             removed: false,
+            preserved: false,
         };
         snapshot.populate(repo)?;
         Ok(snapshot)
@@ -292,6 +294,12 @@ impl Snapshot {
         Ok(())
     }
 
+    /// Disable automatic deletion while execution cleanup is uncertain. Explicit
+    /// removal remains available after the owning coordinator proves cleanup.
+    pub(crate) fn preserve(&mut self) {
+        self.preserved = true;
+    }
+
     /// Delete the snapshot and prove it is gone.
     pub fn remove(mut self) -> Result<(), String> {
         self.removed = true;
@@ -311,6 +319,10 @@ impl Snapshot {
 impl Drop for Snapshot {
     fn drop(&mut self) {
         if self.removed {
+            return;
+        }
+        if self.preserved {
+            eprintln!("forge: retained mutation snapshot: {}", self.root.display());
             return;
         }
         if let Err(error) = fs::remove_dir_all(&self.root) {

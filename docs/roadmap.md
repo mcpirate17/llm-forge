@@ -189,7 +189,7 @@ remain unverified mission gaps. The new installed identity path retains explicit
 operator pins; a candidate-controlled lock or receipt cannot authorize that identity.
 The installed global Forge remains a separate artifact.
 
-**Active correctness increment — 2026-11-05:** #186 now has an explicit installed
+**Delivered correctness increment — 2026-11-05:** #186 now has an explicit installed
 native pin path in candidate review/gate and live/commit corpus audits, plus a
 read-only identity command. Complete source inventories take precedence; partial
 inventories refuse installed fallback. Native evidence no longer requires a Python
@@ -205,14 +205,28 @@ tests. All 14 negative pin/lock/inventory/source cases refused. The whole experi
 remains **incomplete**: candidate review failed the unchanged test-value/attribution
 gate and the synthetic fixture's CI attestation checks. No receipt or gate was
 modified to pass. See [the exact evidence and earlier failed attempts](performance.md#installed-native-identity--2026-11-05).
-Independent review confirmed this distinction. Publication checks remain pending;
-global installation and client activation are unchanged. The next correctness slice
+Independent review confirmed this distinction. [PR #191](https://github.com/mcpirate17/llm-forge/pull/191)
+merged as `c066e8540c90e9f115e1d150bf92da7afe4bb077`, with the same tree as checked
+commit `b82da144ff552d811113fcca715a3d2a04b9fc0c`. All 18 local-check steps and
+local-verify passed: 4,548 passing test executions, zero failures, 145 ignored
+across 177 harnesses. Global installation and client activation are unchanged.
+The active correctness slice
 is #190's automatic target-bound Cargo attribution, using engine-generated scenario
-logs and existing native value validators; outbound MCP follows that gap.
+logs and existing native value validators. Review also identified
+[#192](https://github.com/mcpirate17/llm-forge/issues/192): legacy mutation supervision
+can miss detached descendants and remove a snapshot after uncertain cleanup.
+That correctness gap precedes outbound MCP work. Existing process-group receipts
+do not establish cleanup of every descendant. The new value-evidence runtime uses
+the existing strict sandbox and owned cgroup execution owner. Its 11 focused runtime
+tests and strict native Clippy pass; the automatic Cargo trial and full release
+validation remain pending. The opt-in declaration and supported scope are described
+in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
 two lints. The fixes preserve behavior, passed independent review and focused core
-tests/Clippy, and require a fresh full publication receipt. The failed attempt is
+tests/Clippy, and passed the fresh full publication gate above. Its receipt is
+`.git/forge-checks/run-1793857972189846328-621424/receipt.json` (SHA-256
+`295a57dcaaf06102a089362d39a3c9a4fe496fd19745f140fd8ef52ce919e553`). The failed attempt is
 retained at `.git/forge-checks/run-1793857262705128812-559687/receipt.json`.
 
 ## Historical roadmap and delivery provenance

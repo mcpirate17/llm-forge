@@ -21,6 +21,15 @@ pub fn atomic_write(path: &Path, text: &str) -> Result<(), String> {
 }
 
 fn atomic_publish(path: &Path, text: &str, replace: bool) -> Result<(), String> {
+    atomic_publish_checked(path, text, replace, &|_| Ok(()))
+}
+
+fn atomic_publish_checked(
+    path: &Path,
+    text: &str,
+    replace: bool,
+    check: &impl Fn(&Path) -> Result<(), String>,
+) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
@@ -39,6 +48,7 @@ fn atomic_publish(path: &Path, text: &str, replace: bool) -> Result<(), String> 
     let published = file
         .write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
+        .and_then(|()| check(path).map_err(std::io::Error::other))
         .and_then(|()| {
             if replace {
                 fs::rename(&temporary, path)
@@ -118,6 +128,27 @@ pub fn write_manifests(
     campaigns_relative: &str,
     force: bool,
 ) -> Result<Vec<String>, String> {
+    write_manifests_checked(
+        manifests,
+        repo_root,
+        registry_relative,
+        campaigns_relative,
+        force,
+        &|_| Ok(()),
+    )
+}
+
+/// Verify caller-held inputs immediately before publishing each file. This is
+/// not a transaction across files: an earlier manifest can remain unregistered
+/// if a later publication fails. It must pass normal runtime validation to run.
+pub(crate) fn write_manifests_checked(
+    manifests: &[Value],
+    repo_root: &Path,
+    registry_relative: &str,
+    campaigns_relative: &str,
+    force: bool,
+    check: &impl Fn(&Path) -> Result<(), String>,
+) -> Result<Vec<String>, String> {
     let canonical_root = absolute_resolved(repo_root)?;
     let repo_root = canonical_root.as_path();
     let registry = confined_output(repo_root, Path::new(registry_relative), "registry path")?;
@@ -137,11 +168,16 @@ pub fn write_manifests(
             ));
         }
         let fragment = pending_fragment(&registry, campaign_id, &relative, repo_root)?;
+        check(&destination)?;
+        if let Some((path, _)) = &fragment {
+            check(path)?;
+        }
         let body = python_pretty(manifest.clone()).map_err(|error| error.to_string())?;
-        atomic_publish(&destination, &body, force)?;
+        atomic_publish_checked(&destination, &body, force, check)?;
         written.push(relative);
         if let Some((path, body)) = fragment {
-            atomic_publish(&path, &body, false)?;
+            atomic_publish_checked(&path, &body, false, check).map_err(|error|
+                format!("{error}; earlier manifest remains published but this fragment was not registered"))?;
             written.push(relative_text(&path, repo_root));
         }
     }

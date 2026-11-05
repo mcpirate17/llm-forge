@@ -471,6 +471,7 @@ impl<R: CampaignReader> Builder<'_, R> {
             poll_seconds: self.poll_seconds,
             environment: self.environment,
             host_read_dependencies: self.host_read_dependencies,
+            generated_value: None,
             value_analysis_payload: self.payload.get("value_analysis").cloned(),
             value_analysis,
             source_drifted: self.source_drifted,
@@ -513,13 +514,17 @@ pub(super) fn load<'a, R: CampaignReader>(
         .and_then(Value::as_str)
         .unwrap_or_default();
     if GENERATED_ENGINES.contains(&engine) {
-        return generated_campaign_contract_with(
+        return generated(
+            root,
+            relative_manifest,
             &payload,
             manifest_bytes,
-            relative_manifest,
             engine,
-            |path| reader.hash(&root.join(path)),
+            reader,
         );
+    }
+    if payload.contains_key("generated_value") {
+        return Err("generated_value requires an automatic Cargo campaign".into());
     }
     let expected_mutations = payload
         .get("expected_mutations")
@@ -568,6 +573,40 @@ pub(super) fn load<'a, R: CampaignReader>(
     builder.scopes()?;
     builder.symbols()?;
     builder.finish()
+}
+fn generated<R: CampaignReader>(
+    root: &Path,
+    relative_manifest: &str,
+    payload: &Map<String, Value>,
+    manifest_bytes: Vec<u8>,
+    engine: &str,
+    reader: &R,
+) -> Result<CampaignContract, String> {
+    let mut ordinary = payload.clone();
+    let generated_value = ordinary.remove("generated_value");
+    let mut contract = generated_campaign_contract_with(
+        &ordinary,
+        manifest_bytes,
+        relative_manifest,
+        engine,
+        |path| reader.hash(&root.join(path)),
+    )?;
+    if generated_value.is_some() {
+        let inventory = reader
+            .cargo_inventory()
+            .ok_or("generated_value requires independently captured Cargo inventory")?;
+        let original = Value::Object(payload.clone());
+        let path = crate::mutation_evidence::cargo_value::declaration_path(&original)?
+            .ok_or("generated value declaration missing")?;
+        let declaration = reader.read(&root.join(path))?;
+        crate::mutation_evidence::cargo_value::apply(
+            &mut contract,
+            &original,
+            &declaration,
+            inventory,
+        )?;
+    }
+    Ok(contract)
 }
 struct Scope {
     path: String,

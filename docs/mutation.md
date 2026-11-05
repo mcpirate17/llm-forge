@@ -146,15 +146,106 @@ does not prove that it cannot generate tests. C/C++ function spelling alone cann
 establish a CTest case: without a verified CTest-to-source mapping, admission remains
 unsupported. These checks neither enable a host gate nor launch a campaign.
 
-The current Cargo generator still emits a generic multi-target command and does
-not bind `ranked_tests` or `value_analysis`. Consequently its generated campaigns
-cannot yet satisfy per-test Rust value admission through this workflow. The bound
-collector is usable only when an existing governed campaign supplies a verified
-single-target command and ranked tests; raw or multi-target output remains
-incomplete. Detecting native admission debt is separate from producing that
-evidence, and no campaign or receipt is authored manually to bridge this gap.
-Automatic production of that evidence is tracked in
-[#190](https://github.com/mcpirate17/llm-forge/issues/190).
+### Opt-in Cargo per-test value evidence
+
+The opt-in Cargo path binds one explicitly declared integration-test target to an
+exact selected production-source set. It runs two to five unmutated baseline
+repetitions and uses the automatic cargo-mutants scenarios and their observed test
+reports for per-test attribution. The ordinary generated Cargo path remains
+available without this opt-in; a generic multi-target run does not establish
+per-test value evidence. Neither an authored declaration nor a receipt alone
+approves a candidate or authenticates the producer.
+
+Author a repository-relative JSON declaration before planning. For example, a
+root package `demo` with `src/lib.rs` declaring `pub mod a; pub mod b;` and one
+`[[test]]` target named `contract` at `tests/contract.rs` can use:
+
+```json
+{
+  "schema_version": 1,
+  "target": {
+    "manifest_path": "Cargo.toml",
+    "package": "demo",
+    "test": "contract"
+  },
+  "baseline_repetitions": 2,
+  "required_contracts": [
+    {"id": "behavior", "criticality": "high", "active_paths": ["src/a.rs", "src/b.rs"]}
+  ],
+  "ranked_tests": [
+    {"rank": 1, "nodeid": "tests/contract.rs::checks_behavior", "contract": "behavior", "rationale": "checks both selected sources"}
+  ]
+}
+```
+
+This first slice accepts exactly one explicit contract, with criticality `high`
+or `critical`, whose unique `active_paths` equal the selected Rust source set.
+Ranks are ordered and contiguous from one; node IDs and libtest identities must
+be unique, resolve to the declared target's statically discovered tests, and map
+to the contract ID. `intentional_redundancy: true` is not supported. The
+criticality and rationale are operator/author declarations, not measured facts.
+
+Independently pin the declaration's exact bytes, then plan and write with the
+same scope and one worker. Use the actual manifest path printed by `write`:
+
+```sh
+DECL_SHA=$(sha256sum contracts/value.json | cut -d ' ' -f 1)
+forge mutation plan rust --owner my-lane --base origin/main \
+  --only src/a.rs --only src/b.rs --jobs 1 \
+  --rust-value-contract contracts/value.json --rust-value-contract-sha256 "$DECL_SHA"
+forge mutation write rust --owner my-lane --base origin/main \
+  --only src/a.rs --only src/b.rs --jobs 1 \
+  --rust-value-contract contracts/value.json --rust-value-contract-sha256 "$DECL_SHA"
+# After independently selecting the tools and an existing delegated cgroup:
+export RUSTUP_HOME=/absolute/rustup-home
+export CARGO="$RUSTUP_HOME/toolchains/TOOLCHAIN/bin/cargo"
+export FORGE_MUTATION_CGROUP_PARENT=/sys/fs/cgroup/DELEGATED_PARENT
+forge mutation run campaigns/PATH-FROM-WRITE.json --owner my-lane --base origin/main \
+  --only src/a.rs --only src/b.rs --allow-mutations --receipt evidence/cargo-value.json
+```
+
+The declaration is input to the automatic writer, not a hand-edited campaign or
+receipt. The generated test command binds `Cargo.toml`, package and integration
+target and uses `--locked --offline`. The declaration and SHA must agree with
+independently captured current bytes. Inventory metadata separately binds the
+root manifest, lockfile, all package Rust files and the declared test discovery;
+it does not widen `source_sha256` or mutation authority beyond selected sources.
+Adding a relevant Rust input or a forbidden Cargo configuration refuses stale
+metadata. Captured candidate and live inputs are held and rechecked.
+
+The supported first slice admits cargo-mutants 27.1.0 and a dependency-free root
+package with root `Cargo.toml` and `Cargo.lock`, an explicit standard-harness `[[test]]` target,
+and the supported static library/module and integration-test forms. Workspaces,
+nested manifests, `.cargo` configuration, build scripts, symlinks, dynamic
+includes, unsupported macros, conditional discovery and ambiguous targets or test
+identities are refused. This is bounded syntactic discovery, not compiler or
+runtime-data closure. During automatic collection, unrecognized report phases,
+missing attribution, red baselines, timeouts, stale inputs or failed restoration
+prevent complete per-test evidence. Later receipt validation does not independently
+replay those phases or prove their execution.
+
+The opt-in native actor requires `CARGO` to resolve to a direct canonical
+`<RUSTUP_HOME>/toolchains/<name>/bin/cargo` executable under the selected
+`RUSTUP_HOME`; Forge does not invoke rustup to select it. The operator must
+supply an existing delegated cgroup v2 parent, canonical and below `/sys/fs/cgroup`, through
+`FORGE_MUTATION_CGROUP_PARENT`; Forge does not enable controllers or create the
+parent. It refuses a configured Python guest or campaign environment overrides.
+Commands run with the captured source snapshot read-only, private writable runtime
+scratch and network denial. The sandbox grants read/execute access to the selected
+toolchain and fixed system roots including the broad `/usr` tree (and, when
+present, `/lib`, `/lib64` and `/etc/ld.so.cache`); it does not grant arbitrary
+home directories or the cgroup filesystem to the child. Verify that these grants
+and the delegated cgroup match the host's policy before using the path.
+
+The receipt records normalized report and phase observations, scenario-log
+hashes, and tool and cleanup observations. A scenario-log hash binds its captured
+whole log; it is not a per-phase byte hash or an authenticated producer claim.
+Retained phase metadata and log hashes are not independent execution proof.
+The observations do not attest compiler or dynamic library closure or prove that
+a later execution used the same environment. If
+owned process cleanup is unknown, the actor retains its runtime and snapshot
+rather than claiming safe cleanup. Review the receipt's accounting, attribution,
+test-value and cleanup results independently of any candidate approval.
 
 ## Receipt format
 

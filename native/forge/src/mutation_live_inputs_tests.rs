@@ -103,3 +103,45 @@ fn symlinked_root_is_not_absent() {
     assert!(!held.native_inventory_absent().unwrap());
     assert!(held.native_source_fingerprint().unwrap().is_none());
 }
+
+#[test]
+fn live_cargo_inventory_retains_files_and_detects_new_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let write = |path: &str, text: &str| {
+        let full = root.join(path);
+        fs::create_dir_all(full.parent().unwrap()).unwrap();
+        fs::write(full, text).unwrap();
+    };
+    write("Cargo.toml", "[package]\nname='demo'\nversion='0.1.0'\n[[test]]\nname='contract'\npath='tests/contract.rs'\n");
+    write(
+        "Cargo.lock",
+        "version=4\n[[package]]\nname='demo'\nversion='0.1.0'\n",
+    );
+    write("src/lib.rs", "pub mod a;");
+    write("src/a.rs", "pub fn value() -> u8 { 1 }");
+    write(
+        "tests/contract.rs",
+        "#[test] fn check() { assert_eq!(demo::a::value(), 1); }",
+    );
+    write("declaration.json", &serde_json::json!({"schema_version":1,"target":{"manifest_path":"Cargo.toml","package":"demo","test":"contract"},"baseline_repetitions":2,"required_contracts":[{"id":"c","criticality":"high","active_paths":["src/a.rs"]}],"ranked_tests":[{"rank":1,"nodeid":"tests/contract.rs::check","contract":"c","rationale":"behavior"}]}).to_string());
+    let mut capture = LiveInputs::open(root).unwrap();
+    let mut files = BTreeMap::new();
+    let held = capture
+        .cargo_inventory("declaration.json", &["src/a.rs".into()], &mut files)
+        .unwrap();
+    assert!(files.contains_key("tests/contract.rs"));
+    capture.retain_cargo(held);
+    for _ in 1..8 {
+        let held = capture
+            .cargo_inventory("declaration.json", &["src/a.rs".into()], &mut files)
+            .unwrap();
+        capture.retain_cargo(held);
+    }
+    assert!(capture
+        .cargo_inventory("declaration.json", &["src/a.rs".into()], &mut files)
+        .is_err());
+    capture.verify().unwrap();
+    write("src/new.rs", "fn new() {}");
+    assert!(capture.verify().is_err());
+}

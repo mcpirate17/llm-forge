@@ -79,6 +79,10 @@ pub mod memory_chunking;
 pub mod memory_index;
 #[cfg(feature = "vector-search")]
 pub mod memory_index_sidecar;
+#[cfg(feature = "source-analysis")]
+pub mod mutation_cargo_inventory;
+#[cfg(feature = "source-analysis")]
+pub mod mutation_cargo_observations;
 pub mod mutation_corpus_delta;
 pub mod mutation_corpus_receipts;
 pub mod mutation_corpus_territory;
@@ -92,6 +96,8 @@ pub mod mutation_patch_anchor;
 pub mod mutation_plan;
 #[cfg(feature = "source-analysis")]
 mod mutation_receipt;
+#[cfg(feature = "source-analysis")]
+pub mod mutation_rust_value_contract;
 pub mod mutation_source_coverage;
 #[cfg(feature = "source-analysis")]
 #[cfg_attr(not(feature = "python"), allow(dead_code))]

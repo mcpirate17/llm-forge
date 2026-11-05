@@ -8,6 +8,46 @@ const STAMP: BuildStamp = BuildStamp {
     source_matches_git: true,
 };
 
+#[test]
+fn unverified_process_cleanup_retains_snapshot_and_refuses_disposition() {
+    for cleanup in [Value::Null, json!({"complete":false})] {
+        let host = crate::mutation_run_test_support::repository(&["src/a.rs"]);
+        let snapshot = Snapshot::create(host.path()).unwrap();
+        let root = snapshot.root.clone();
+        let mut receipt = Map::from_iter([
+            ("snapshot".into(), json!({"removed":false})),
+            ("cargo_value_process_cleanup".into(), cleanup),
+        ]);
+        assert!(dispose_snapshot(snapshot, &mut receipt, true).is_err());
+        assert!(root.join("worktree/src/a.rs").is_file());
+        assert_eq!(receipt["snapshot"]["removed"], false);
+        assert_eq!(
+            receipt["snapshot"]["retained_reason"],
+            "process-tree cleanup is unverified"
+        );
+        // No payload ran in this fixture. Only the test-owned retained snapshot is removed.
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[test]
+fn verified_process_cleanup_allows_explicit_snapshot_removal() {
+    let host = crate::mutation_run_test_support::repository(&["src/a.rs"]);
+    let mut snapshot = Snapshot::create(host.path()).unwrap();
+    snapshot.preserve();
+    let root = snapshot.root.clone();
+    let mut receipt = Map::from_iter([
+        ("snapshot".into(), json!({"removed":false})),
+        (
+            "cargo_value_process_cleanup".into(),
+            json!({"complete":true}),
+        ),
+    ]);
+    dispose_snapshot(snapshot, &mut receipt, true).unwrap();
+    assert!(!root.exists());
+    assert_eq!(receipt["snapshot"]["removed"], true);
+}
+
 fn result(stdout: &str, stderr: &str) -> CommandResult {
     CommandResult {
         returncode: Some(1),

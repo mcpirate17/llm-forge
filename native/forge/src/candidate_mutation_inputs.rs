@@ -1,11 +1,21 @@
 //! Reuse held candidate inputs for every registry/config/source/test/receipt byte.
 use super::*;
+/// Bound repeated held inventories and their file descriptors before opening more.
+pub(crate) fn cargo_budget(held: &[crate::mutation_cargo_capture::Held]) -> Result<usize> {
+    ensure!(held.len() < 8, "Cargo held inventory count exceeds 8");
+    let existing: usize = held.iter().map(|item| item.file_count()).sum();
+    256usize
+        .checked_sub(existing)
+        .filter(|remaining| *remaining > 0)
+        .context("Cargo held file budget exceeds 256")
+}
 pub(crate) struct Capture<'a> {
     pub inputs: Inputs<'a>,
     pub ledger: BTreeMap<String, Value>,
     copied_bytes: usize,
     native_fingerprint: Option<Option<String>>,
     native_inventory: Option<Vec<PathBuf>>,
+    cargo_inventories: Vec<crate::mutation_cargo_capture::Held>,
     snapshot: &'a Snapshot,
     pub failed: bool,
 }
@@ -109,6 +119,7 @@ impl<'a> Capture<'a> {
             copied_bytes: 0,
             native_fingerprint: None,
             native_inventory: None,
+            cargo_inventories: Vec::new(),
             snapshot,
             failed: false,
         })
@@ -179,6 +190,80 @@ impl<'a> Capture<'a> {
         self.inputs.absent("pyproject.toml")?;
         Ok(None)
     }
+    /// Build a Git-derived inventory, compare it with the held materialization,
+    /// and return the held scanner for the caller to retain after validation.
+    pub fn cargo_inventory(
+        &mut self,
+        declaration: &str,
+        selected: &[String],
+        files: &mut BTreeMap<String, Vec<u8>>,
+    ) -> Result<crate::mutation_cargo_capture::Held> {
+        use conductor_native::mutation_cargo_inventory::{self as cargo, Entry};
+        let budget = cargo_budget(&self.cargo_inventories)?;
+        let mut relevant_count = 0usize;
+        let mut map = BTreeMap::new();
+        let entries: Vec<_> = self.inputs.entries.values().cloned().collect();
+        ensure!(
+            entries.len() <= 16384,
+            "Cargo candidate inventory exceeds 16384 entries"
+        );
+        for entry in entries {
+            let path = &entry.path;
+            let mut parent = Path::new(path).parent();
+            while let Some(dir) = parent.filter(|dir| !dir.as_os_str().is_empty()) {
+                let dir = dir.to_str().context("Cargo directory must be UTF-8")?;
+                map.entry(dir.to_owned()).or_insert(Entry::Directory);
+                parent = Path::new(dir).parent();
+            }
+            let regular =
+                entry.object_type == "blob" && matches!(entry.mode.as_str(), "100644" | "100755");
+            let value = if !regular {
+                Entry::SymlinkOrSpecial
+            } else if !cargo::excluded(path) && (cargo::relevant(path) || path == declaration) {
+                relevant_count += 1;
+                ensure!(
+                    relevant_count <= budget,
+                    "Cargo held file budget exceeds 256"
+                );
+                if !files.contains_key(path) {
+                    files.insert(path.clone(), self.read(path, 2 * 1024 * 1024)?);
+                }
+                Entry::Regular(Some(files[path].clone()))
+            } else {
+                Entry::Regular(None)
+            };
+            ensure!(
+                map.insert(path.clone(), value).is_none(),
+                "Cargo Git inventory path collision"
+            );
+            ensure!(
+                map.len() <= 16384,
+                "Cargo candidate inventory exceeds 16384 entries"
+            );
+        }
+        let declared = files
+            .get(declaration)
+            .context("Cargo declaration missing from candidate")?;
+        let git_inventory = cargo::build(declared, selected, &map).map_err(anyhow::Error::msg)?;
+        let held = crate::mutation_cargo_capture::Held::capture_with_limit(
+            &self.snapshot.path(),
+            declaration,
+            selected,
+            budget,
+        )?;
+        ensure!(
+            held.file_count() <= budget,
+            "Cargo held file budget exceeded"
+        );
+        ensure!(
+            &git_inventory == held.inventory() && declared.as_slice() == held.declaration_bytes(),
+            "Cargo materialization differs from captured Git inventory"
+        );
+        Ok(held)
+    }
+    pub fn retain_cargo(&mut self, held: crate::mutation_cargo_capture::Held) {
+        self.cargo_inventories.push(held);
+    }
     pub fn verify(&self) -> Result<()> {
         ensure!(
             !self.failed,
@@ -189,6 +274,9 @@ impl<'a> Capture<'a> {
                 &conductor_native::source_fingerprint::files(&self.snapshot.path())? == expected,
                 "materialized native source inventory changed"
             );
+        }
+        for held in &self.cargo_inventories {
+            held.verify()?;
         }
         self.inputs.verify()
     }

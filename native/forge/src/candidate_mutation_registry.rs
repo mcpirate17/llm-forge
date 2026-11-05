@@ -144,7 +144,19 @@ fn campaign(capture: &mut Capture<'_>, path: &str, selected: &[String]) -> Resul
         capture.inputs.absent(&path)?;
         anyhow::bail!("registered campaign is absent: {path}");
     }
-    let raw = capture.json(&path)?;
+    let manifest_bytes = capture.read(&path, 2 * 1024 * 1024)?;
+    let raw = crate::tool_schema::parse_document_with_limit(
+        std::str::from_utf8(&manifest_bytes)?,
+        2 * 1024 * 1024,
+    )?;
+    let mut files = BTreeMap::from([(path.clone(), manifest_bytes)]);
+    let cargo_path = engine::cargo_value::declaration_path(&raw).map_err(anyhow::Error::msg)?;
+    let cargo = if let Some(declaration) = cargo_path {
+        let sources = cargo_sources(&raw)?;
+        Some(capture.cargo_inventory(&declaration, &sources, &mut files)?)
+    } else {
+        None
+    };
     let mut wanted = BTreeSet::from([path.clone()]);
     for key in [
         "source_sha256",
@@ -185,17 +197,35 @@ fn campaign(capture: &mut Capture<'_>, path: &str, selected: &[String]) -> Resul
         wanted.len() <= 4096,
         "campaign capture references exceed4096"
     );
-    let mut files = BTreeMap::new();
     for input in wanted {
+        if files.contains_key(&input) {
+            continue;
+        }
         if capture.inputs.entries.contains_key(&input) {
             files.insert(input.clone(), capture.read(&input, 2 * 1024 * 1024)?);
         } else {
             capture.inputs.absent(&input)?;
         }
     }
-    let contract =
-        engine::load_campaign_captured(&path, &files, selected).map_err(anyhow::Error::msg)?;
+    let contract = match &cargo {
+        Some(held) => {
+            engine::load_campaign_captured_with_cargo(&path, &files, selected, held.inventory())
+        }
+        None => engine::load_campaign_captured(&path, &files, selected),
+    }
+    .map_err(anyhow::Error::msg)?;
+    if let Some(held) = cargo {
+        capture.retain_cargo(held);
+    }
     Ok((contract, raw))
+}
+pub(crate) fn cargo_sources(raw: &Value) -> Result<Vec<String>> {
+    raw["source_sha256"]
+        .as_object()
+        .context("Cargo source map missing")?
+        .keys()
+        .map(|path| normalize(path))
+        .collect()
 }
 fn normalize(path: &str) -> Result<String> {
     let value = engine::normalize_path(path).map_err(anyhow::Error::msg)?;

@@ -3,6 +3,9 @@ use super::*;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 pub(super) trait CampaignReader {
+    fn cargo_inventory(&self) -> Option<&crate::mutation_cargo_inventory::Inventory> {
+        None
+    }
     fn resolve(&self, path: &Path) -> Result<PathBuf, String>;
     fn read(&self, path: &Path) -> Result<Vec<u8>, String>;
     fn hash(&self, path: &Path) -> Option<String> {
@@ -57,8 +60,12 @@ impl CampaignReader for FsCampaignReader {
 }
 struct Captured<'a> {
     files: &'a BTreeMap<String, Vec<u8>>,
+    inventory: Option<&'a crate::mutation_cargo_inventory::Inventory>,
 }
 impl CampaignReader for Captured<'_> {
+    fn cargo_inventory(&self) -> Option<&crate::mutation_cargo_inventory::Inventory> {
+        self.inventory
+    }
     fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
         lexical_absolute(path)
     }
@@ -78,6 +85,22 @@ pub(crate) fn load_captured(
     path: &str,
     files: &BTreeMap<String, Vec<u8>>,
     selected: &[String],
+) -> Result<Value, String> {
+    load_captured_inner(path, files, selected, None)
+}
+pub(crate) fn load_captured_with_cargo(
+    path: &str,
+    files: &BTreeMap<String, Vec<u8>>,
+    selected: &[String],
+    inventory: &crate::mutation_cargo_inventory::Inventory,
+) -> Result<Value, String> {
+    load_captured_inner(path, files, selected, Some(inventory))
+}
+fn load_captured_inner(
+    path: &str,
+    files: &BTreeMap<String, Vec<u8>>,
+    selected: &[String],
+    inventory: Option<&crate::mutation_cargo_inventory::Inventory>,
 ) -> Result<Value, String> {
     if files.len() > 4096 || selected.len() > 4096 {
         return Err("captured campaign inventory exceeds4096".into());
@@ -112,7 +135,7 @@ pub(crate) fn load_captured(
         }
     }
     let selected = selected.iter().cloned().collect();
-    let reader = Captured { files };
+    let reader = Captured { files, inventory };
     let contract = super::legacy::load(
         Path::new("/"),
         &path,

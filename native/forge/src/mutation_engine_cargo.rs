@@ -3,6 +3,9 @@
 //! mutants survived, the ordinary reading of an uncurated corpus, so the
 //! survivor set decides the verdict rather than the exit code.
 
+#[path = "mutation_cargo_execute.rs"]
+mod value;
+
 use crate::mutation_campaign::{
     identify, py_repr, require_no_drift, Campaign, Step, ERROR, KILLED, SURVIVED, TIMED_OUT,
     UNVIABLE,
@@ -312,6 +315,9 @@ fn summary(report: &Value, rows: &[Value]) -> Value {
 
 /// Run the crate's own tests, then cargo-mutants, into the receipt.
 pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
+    if run.campaign.generated_value.is_some() {
+        return value::execute(run, binary);
+    }
     require_no_drift(run.campaign, run.worktree)?;
     let worktree = run.worktree.to_path_buf();
     let timeout = run.campaign.run_timeout_seconds;

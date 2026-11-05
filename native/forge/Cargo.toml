@@ -94,6 +94,7 @@ slop-core = { path = "../slop-core", default-features = false }
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 regex = "1"
 walkdir = "2"
+tempfile = "3"
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = "0.10"
 # Checksum rewritten Git index bytes when discarding the reconstructible TREE cache.
@@ -122,7 +123,6 @@ lto = "thin"
 codegen-units = 1
 
 [dev-dependencies]
-tempfile = "3"
 quick-xml = "0.41"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
