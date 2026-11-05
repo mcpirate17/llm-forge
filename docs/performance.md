@@ -10,6 +10,70 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Automatic Cargo test value — 2026-11-05
+
+The [automatic fixture observations](../research/performance/forge-program-20261105-cargo-value.json)
+bind a clean release build at `e153067ad28a93740346b140e8cb6c9388c56b79`, executable
+SHA-256 `3e8952bae5825b7ccb543c97d6daf5b0edc31d29038912c05de055fd558dc50e`.
+The writer and cargo-mutants 27.1.0 produced two killed mutants, one per selected
+source, two passing independent baselines, complete attribution, and one `CORE`
+test. The test was absent on the fixture's `main` and added on its topic branch.
+Live and commit corpus audits were `CLEAN`; candidate `mutation-evidence` passed
+with one covered test, zero missing tests and the new node admitted without a waiver.
+
+This closes the bounded automatic-evidence gap observed in the earlier identity
+trial below. **Overall candidate review still did not pass:** the fixture lacks
+Agent trailers and local tree attestations, and implicit test selection lacks its
+required evidence. Twelve checks completed, with zero failed/censored command
+lifecycles and no failed expectations; expected refusal exit codes are retained.
+Two checks were explicitly unstarted: a malformed-matrix engine scenario (no
+fabricated receipt) and the driver-labelled independent CI-attestation check.
+Forge has no hosted CI. Malformed matrices remain covered by the native validator
+tests. Wrong declaration hashes, new Rust inputs, changed node IDs and stale
+contracts each produced the expected campaign-specific refusal.
+
+Three supervised commands ran: two Cargo baselines and one cargo-mutants invocation.
+The receipt's generic `subprocess_scaling` field describes scaling, not an exact
+process count; internal engine subprocess count was not measured. Actor wall
+observations were 106, 19 and 587 ms; the complete run command took 1.015 seconds
+including driver capture/wait overhead. These single observations are not latency
+benchmarks. CPU and RSS were not sampled for the campaign; configured cgroup limits
+are not usage measurements. All three owned cgroups, the runtime and snapshot were
+absent after cleanup, independently checked along with receipt, source and test hashes.
+
+The trial exposed and fixed two real integration defects: an ignored generated
+campaign need not be present in the Git snapshot, and ordinary `std::fs::copy`
+supplies harmless file-type bits with permissions. The confined-copy regression
+failed before the narrow broker fix and passed afterwards; the broker still rejects
+mismatched types, special modes and writes outside owned scratch. Earlier refused
+attempts and the successful debug trial remain separately identified in the artifact.
+
+A matched release comparison against the previous checked `b82da144` binary used
+101 successful samples and five warmups per arm, the same literal commands, input
+bytes and cleared environment. All 404 samples completed; both comparisons pass
+the unchanged 10% regression budget.
+
+| Workload | Wall p50 before / after, ms | Wall p95 before / after, ms | CPU p50 before / after, ms | Max RSS before / after, bytes | Sealed comparison |
+| --- | ---: | ---: | ---: | ---: | --- |
+| CLI help | 1.633172 / 1.629052 | 1.816312 / 1.814333 | 1.153 / 1.171 | 12,722,176 / 12,521,472 | [help](../research/performance/forge-program-20261105-cargo-value-help-comparison.json) |
+| Symbol context | 2.182666 / 2.133135 | 2.349877 / 2.330526 | 1.709 / 1.649 | 17,059,840 / 17,358,848 | [symbol](../research/performance/forge-program-20261105-cargo-value-symbol-comparison.json) |
+
+The shared host and warm filesystem limit these observations to these workloads.
+The benchmark driver initially could not overwrite its read-only private subject
+after the baseline; no current samples had started. It verified and replaced that
+exact subject, preserved the baseline receipts and then measured the current arm.
+The performance runner's ambient Rust probe is not a build attestation; both selected
+binaries were built with Rust 1.98.0. Source pins bind the executed binaries; the
+comparison's ambient HEAD does not rebuild or reattribute the older executable.
+
+Reproduce the [documented declaration and automatic commands](mutation.md#opt-in-cargo-per-test-value-evidence)
+with the artifact's exact fixture, tool pins and operator configuration. Original
+scenario logs were parsed before cleanup; retained hashes and normalized observations
+do not authenticate a producer. Private Python orchestrated this experiment, while
+production Forge remained native. No model tokens, dollars, actual agent task success,
+client adoption or general speedup were measured. Publication validation is recorded
+separately in the [engineering status](roadmap.md).
+
 ### Installed native identity — 2026-11-05
 
 The [machine-generated observations](../research/performance/forge-program-20261105-installed-native-identity.json)
@@ -26,9 +90,10 @@ tests, after adding the separately required matching candidate lock. Fourteen
 negative cases refused missing/mismatched pins and locks, partial inventories or
 source drift. All 22 final command attempts completed; none was censored or unstarted.
 
-**Full candidate review did not pass.** The automatic Cargo receipt lacks complete
-per-test attribution and admitted test-value evidence, tracked in
-[#190](https://github.com/mcpirate17/llm-forge/issues/190). The fixture also lacks CI
+**Full candidate review did not pass.** This earlier automatic Cargo receipt lacks
+complete per-test attribution and admitted test-value evidence, tracked in
+[#190](https://github.com/mcpirate17/llm-forge/issues/190) and addressed by the separate
+automatic-value trial above. The fixture also lacks CI
 commit attestations and Agent trailers. The original experiment retains
 `all_expectations_met: false` and `INCOMPLETE_OR_REFUSED`; identity acceptance does
 not change those outcomes. No debt baseline, value waiver, manually authored mutant

@@ -210,16 +210,26 @@ merged as `c066e8540c90e9f115e1d150bf92da7afe4bb077`, with the same tree as chec
 commit `b82da144ff552d811113fcca715a3d2a04b9fc0c`. All 18 local-check steps and
 local-verify passed: 4,548 passing test executions, zero failures, 145 ignored
 across 177 harnesses. Global installation and client activation are unchanged.
-The active correctness slice
-is #190's automatic target-bound Cargo attribution, using engine-generated scenario
-logs and existing native value validators. Review also identified
+**Implemented correctness increment, publication pending:** #190's opt-in target-bound
+Cargo attribution uses original engine scenarios and the shared native value analyzer.
+The clean release trial at `e153067` killed two mutants and admitted one newly added
+`CORE` test through candidate mutation-evidence. Live and commit audits were `CLEAN`;
+four stale-input cases refused. Overall fixture review still failed its independent
+attestation and implicit test-selection obligations; no gate was waived. See
+[measurements, exact scope and earlier failed attempts](performance.md#automatic-cargo-test-value--2026-11-05).
+Review also identified
 [#192](https://github.com/mcpirate17/llm-forge/issues/192): legacy mutation supervision
 can miss detached descendants and remove a snapshot after uncertain cleanup.
 That correctness gap precedes outbound MCP work. Existing process-group receipts
 do not establish cleanup of every descendant. The new value-evidence runtime uses
-the existing strict sandbox and owned cgroup execution owner. Its 11 focused runtime
-tests and strict native Clippy pass; the automatic Cargo trial and full release
-validation remain pending. The opt-in declaration and supported scope are described
+the existing strict sandbox and owned cgroup execution owner; all three command groups
+were cleaned in the release trial. Focused suites passed (54 Forge Cargo tests, 78
+shared-core Cargo tests, 11 runtime tests, two snapshot disposition tests and seven
+sandbox integration tests), as did strict native Clippy. The runtime cases overlap
+the Forge suite; these counts are not a unique-test total. Matched help/symbol
+comparisons passed the unchanged 10% budget across 404 samples. Independent review
+checked implementation boundaries and real artifacts. Full local-check/local-verify
+and PR integration remain pending. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
