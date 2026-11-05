@@ -266,6 +266,8 @@ pub mod mutation_engine_fest;
 #[cfg(target_os = "linux")]
 pub mod mutation_engine_mull;
 #[cfg(target_os = "linux")]
+pub(crate) mod mutation_execution;
+#[cfg(target_os = "linux")]
 pub mod mutation_plan;
 #[cfg(target_os = "linux")]
 pub mod mutation_process;

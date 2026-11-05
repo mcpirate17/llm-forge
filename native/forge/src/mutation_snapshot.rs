@@ -128,8 +128,14 @@ pub fn snapshot_untracked_paths(repo: &Path) -> Result<Vec<String>, String> {
     native::untracked(repo)
 }
 
-fn private_root() -> Result<PathBuf, String> {
-    let template = env::temp_dir().join("llm-orchestrator-snapshot-XXXXXX");
+fn private_root(parent: &Path) -> Result<PathBuf, String> {
+    let parent = parent
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve snapshot parent: {error}"))?;
+    if !parent.is_dir() {
+        return Err("snapshot parent must be a directory".into());
+    }
+    let template = parent.join("llm-orchestrator-snapshot-XXXXXX");
     let template = CString::new(template.as_os_str().as_bytes())
         .map_err(|error| format!("temporary path holds a NUL: {error}"))?;
     let mut bytes = template.into_bytes_with_nul();
@@ -159,25 +165,45 @@ pub struct Snapshot {
 impl Snapshot {
     /// Build a clean snapshot without writing objects into the host repository.
     pub fn create(repo: &Path) -> Result<Self, String> {
-        let root = private_root()?;
+        let mut snapshot = Self::allocate(&env::temp_dir())?;
+        snapshot.populate(repo)?;
+        Ok(snapshot)
+    }
+
+    /// Allocate only the empty private root for sandbox admission.
+    pub(crate) fn allocate(parent: &Path) -> Result<Self, String> {
+        let root = private_root(parent)?;
         let worktree = root.join("worktree");
-        let mut snapshot = Self {
+        Ok(Self {
             root,
             worktree,
             commit: String::new(),
             included_untracked: Vec::new(),
             removed: false,
             preserved: false,
-        };
-        snapshot.populate(repo)?;
-        Ok(snapshot)
+        })
     }
 
-    fn populate(&mut self, repo: &Path) -> Result<(), String> {
+    pub(crate) fn populate(&mut self, repo: &Path) -> Result<(), String> {
         let (commit, untracked) = native::populate(repo, &self.root, &self.worktree)?;
         self.commit = commit;
         self.included_untracked = untracked;
         Ok(())
+    }
+
+    /// The legacy confined slice has no host Git capability. Its synthetic
+    /// HEAD stays local, but parent/history objects are deliberately unavailable.
+    pub(crate) fn disable_git_alternate(&self) -> Result<(), String> {
+        let path = self.worktree.join(".git/objects/info/alternates");
+        fs::remove_file(&path)
+            .map_err(|error| format!("cannot remove snapshot Git alternate: {error}"))?;
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!(
+                "cannot verify removed snapshot Git alternate: {error}"
+            )),
+            Ok(_) => Err("snapshot Git alternate survived removal".into()),
+        }
     }
 
     /// Disable automatic deletion while execution cleanup is uncertain. Explicit
