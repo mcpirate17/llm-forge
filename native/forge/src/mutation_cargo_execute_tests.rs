@@ -2,21 +2,24 @@
 use super::*;
 
 #[test]
-fn manifest_pair_holds_original_and_snapshot_and_rejects_digest_or_replacement() {
-    let dir = tempfile::tempdir().unwrap();
-    let first = dir.path().join("original.json");
-    let second = dir.path().join("snapshot.json");
+fn coordinator_holds_campaign_without_a_snapshot_copy_and_rejects_drift() {
+    let dir = crate::mutation_run_test_support::repository(&["src/a.rs"]);
+    fs::write(dir.path().join(".gitignore"), "/campaigns/\n").unwrap();
+    fs::create_dir(dir.path().join("campaigns")).unwrap();
+    let first = dir.path().join("campaigns/generated.json");
     let bytes = br#"{"generated_value":{"schema_version":1}}"#;
     fs::write(&first, bytes).unwrap();
-    fs::write(&second, bytes).unwrap();
-    let (held, payload) = manifest_pair(&first, &second, &sha256_hex(bytes)).unwrap();
+    let snapshot = crate::mutation_snapshot::Snapshot::create(dir.path()).unwrap();
+    assert!(!snapshot.worktree.join("campaigns/generated.json").exists());
+    let (held, payload) = capture_manifest(&first, &sha256_hex(bytes)).unwrap();
     assert_eq!(payload["generated_value"]["schema_version"], 1);
-    assert!(manifest_pair(&first, &second, &"0".repeat(64)).is_err());
-    fs::write(&second, b"{}").unwrap();
-    assert!(manifest_pair(&first, &second, &sha256_hex(bytes)).is_err());
+    assert!(capture_manifest(&first, &"0".repeat(64)).is_err());
+    fs::write(&first, b"{}").unwrap();
+    assert!(capture_manifest(&first, &sha256_hex(bytes)).is_err());
+    assert!(held.verify().is_err());
     fs::remove_file(&first).unwrap();
     fs::write(&first, bytes).unwrap();
-    assert!(held[0].verify().is_err());
+    assert!(held.verify().is_err());
 }
 #[test]
 fn clean_environment_contains_only_fixed_toolchain_and_owned_paths() {

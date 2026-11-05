@@ -63,24 +63,19 @@ fn ancestors(root: &Path) -> Result<(), String> {
 fn capture(path: &Path, maximum: usize) -> Result<(BoundFile, Vec<u8>), String> {
     candidate_inputs::repository_live(path, maximum).map_err(error)
 }
-fn manifest_pair(
-    repo: &Path,
-    snapshot: &Path,
-    expected_sha: &str,
-) -> Result<(Vec<BoundFile>, Value), String> {
-    let (repo_manifest, bytes) = capture(repo, observations::MAX_REPORT_BYTES)?;
-    let (snapshot_manifest, snapshot_bytes) = capture(snapshot, observations::MAX_REPORT_BYTES)?;
-    if sha256_hex(&bytes) != expected_sha || bytes != snapshot_bytes {
-        return Err("held original/snapshot campaign bytes differ from Campaign digest".into());
+fn capture_manifest(path: &Path, expected_sha: &str) -> Result<(BoundFile, Value), String> {
+    let (held, bytes) = capture(path, observations::MAX_REPORT_BYTES)?;
+    if sha256_hex(&bytes) != expected_sha {
+        return Err("held campaign bytes differ from Campaign digest".into());
     }
     let manifest = conductor_native::mutation_evidence::parse_request(
         std::str::from_utf8(&bytes).map_err(error)?,
     )?;
-    Ok((vec![repo_manifest, snapshot_manifest], manifest))
+    Ok((held, manifest))
 }
 struct Inputs {
     manifest: Value,
-    manifests: Vec<BoundFile>,
+    manifest_file: BoundFile,
     repo: Held,
     snapshot: Held,
 }
@@ -96,12 +91,12 @@ impl Inputs {
         }
         let root = run.repo_root.canonicalize().map_err(error)?;
         let named = run.campaign.manifest_path.canonicalize().map_err(error)?;
-        let relative = named
+        named
             .strip_prefix(&root)
             .map_err(|_| "campaign manifest is outside host root")?;
-        let snapshot_path = run.worktree.join(relative);
-        let (manifests, manifest) =
-            manifest_pair(&named, &snapshot_path, &run.campaign.manifest_sha256)?;
+        // Generated campaigns may be Git-ignored. Only the trusted coordinator
+        // consumes these held bytes; snapshot source/discovery is captured below.
+        let (manifest_file, manifest) = capture_manifest(&named, &run.campaign.manifest_sha256)?;
         if manifest.get("generated_value") != run.campaign.generated_value.as_ref() {
             return Err("Campaign generated value differs from original manifest".into());
         }
@@ -120,7 +115,7 @@ impl Inputs {
         }
         let input = Self {
             manifest,
-            manifests,
+            manifest_file,
             repo,
             snapshot,
         };
@@ -128,9 +123,7 @@ impl Inputs {
         Ok(input)
     }
     fn verify(&self, run: &EngineRun) -> Result<(), String> {
-        for held in &self.manifests {
-            held.verify().map_err(error)?;
-        }
+        self.manifest_file.verify().map_err(error)?;
         self.repo.verify().map_err(error)?;
         self.snapshot.verify().map_err(error)?;
         ancestors(run.repo_root)?;
