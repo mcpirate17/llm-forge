@@ -1,5 +1,6 @@
 //! Corpus reproducibility observations over caller-held campaign, runner and receipt facts.
 //! This helper does not acquire/authenticate inputs, execute mutants, or issue PASS evidence.
+use crate::mutation_native_runner as native_runner;
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -40,17 +41,25 @@ pub fn rejection(
     if !matches!(status.as_str(), Some("PASS" | "RATCHET_HELD")) {
         return Ok(Some(format!("status={}", python_status(status))));
     }
-    let Some(recorded) = object
-        .get("runner_components_sha256")
-        .and_then(Value::as_object)
-    else {
-        return Ok(Some("no runner component map".into()));
-    };
-    let recorded_value = Value::Object(recorded.clone());
-    if &recorded_value != runner_components && !lineage_accepts(&recorded_value)? {
-        return Ok(Some(
-            "runner components match neither this runner nor any lineage entry".into(),
-        ));
+    if native_runner::declared(object) {
+        let current = source_hash(native_runner::FINGERPRINT_KEY)?;
+        let errors = native_runner::errors(object, |_| current.clone(), |_| false);
+        if let Some(reason) = errors.into_iter().next() {
+            return Ok(Some(reason));
+        }
+    } else {
+        let Some(recorded) = object
+            .get("runner_components_sha256")
+            .and_then(Value::as_object)
+        else {
+            return Ok(Some("no runner component map".into()));
+        };
+        let recorded_value = Value::Object(recorded.clone());
+        if &recorded_value != runner_components && !lineage_accepts(&recorded_value)? {
+            return Ok(Some(
+                "runner components match neither this runner nor any lineage entry".into(),
+            ));
+        }
     }
     let hashes = match object.get("source_sha256") {
         None | Some(Value::Null) => None,

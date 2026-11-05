@@ -27,6 +27,8 @@ pub(crate) struct LiveInputs {
     files: BTreeMap<String, (BoundFile, Vec<u8>)>,
     absent: BTreeSet<String>,
     directories: BTreeMap<String, Option<Directory>>,
+    native_inventory: Option<Vec<PathBuf>>,
+    native_fingerprint: Option<String>,
     total: usize,
 }
 impl LiveInputs {
@@ -42,6 +44,8 @@ impl LiveInputs {
             files: BTreeMap::new(),
             absent: BTreeSet::new(),
             directories: BTreeMap::new(),
+            native_inventory: None,
+            native_fingerprint: None,
             total: 0,
         };
         this.verify_root()?;
@@ -133,6 +137,31 @@ impl LiveInputs {
                 .as_slice(),
         ))
     }
+    pub(crate) fn native_source_fingerprint(&mut self) -> Result<Option<String>> {
+        use conductor_native::source_fingerprint::{self, Fingerprint};
+        if let Some(value) = &self.native_fingerprint {
+            return Ok(Some(value.clone()));
+        }
+        let paths = match source_fingerprint::files(&self.canonical) {
+            Ok(paths) => paths,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        let mut digest = Fingerprint::new();
+        for path in &paths {
+            let relative = path.to_str().context("native source path must be UTF-8")?;
+            let bytes = self.read(relative)?.context("native source disappeared")?;
+            digest.add(path, bytes)?;
+        }
+        ensure!(
+            source_fingerprint::files(&self.canonical)? == paths,
+            "native source inventory changed while capturing"
+        );
+        self.native_inventory = Some(paths);
+        let value = digest.finish();
+        self.native_fingerprint = Some(value.clone());
+        Ok(Some(value))
+    }
     pub(crate) fn json_files(&mut self, relative: &str) -> Result<Vec<String>> {
         if !self.directories.contains_key(relative) {
             ensure!(
@@ -196,6 +225,12 @@ impl LiveInputs {
     }
     pub(crate) fn verify(&self) -> Result<()> {
         self.verify_root()?;
+        if let Some(paths) = &self.native_inventory {
+            ensure!(
+                &conductor_native::source_fingerprint::files(&self.canonical)? == paths,
+                "native source inventory changed"
+            );
+        }
         for (path, (held, _)) in &self.files {
             held.verify()
                 .with_context(|| format!("corpus input changed: {path}"))?;

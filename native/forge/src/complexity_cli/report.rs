@@ -2,7 +2,7 @@ use super::{MAX_BASELINE, MAX_ROWS};
 use anyhow::{ensure, Context, Result};
 use conductor_native::radon_complexity::Block;
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, fmt::Write, path::Path};
+use std::{collections::BTreeMap, path::Path};
 fn flagged(block: &Block, minimum: &str) -> bool {
     block.rank >= minimum
 }
@@ -128,25 +128,12 @@ pub(super) fn check(path: &Path, blocks: &[Block], minimum: &str) -> Result<u8> 
     Ok(1)
 }
 /// Python json.dumps(indent=2,sort_keys=True,ensure_ascii=True) for admitted JSON.
-fn ascii_pretty(mut value: Value) -> Result<Vec<u8>> {
-    value.sort_all_objects();
-    let pretty = serde_json::to_string_pretty(&value)?;
-    let mut result = String::new();
-    for ch in pretty.chars() {
-        if (ch as u32) < 0x7f {
-            result.push(ch);
-        } else {
-            let mut units = [0; 2];
-            for unit in ch.encode_utf16(&mut units) {
-                write!(result, "\\u{unit:04x}")?;
-            }
-        }
-        ensure!(
-            result.len() < MAX_BASELINE,
-            "complexity baseline exceeds 16 MiB output budget"
-        );
-    }
-    result.push('\n');
+fn ascii_pretty(value: Value) -> Result<Vec<u8>> {
+    let result = crate::json_canon::python_pretty(value)?;
+    ensure!(
+        result.len() <= MAX_BASELINE,
+        "complexity baseline exceeds 16 MiB output budget"
+    );
     Ok(result.into_bytes())
 }
 pub(super) fn write(

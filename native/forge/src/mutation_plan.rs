@@ -1,28 +1,32 @@
-//! `forge mutation plan`: native entry point for conductor-native's mutation
-//! plan computation (`conductor_native::mutation_plan::compute_plan`).
+//! `forge mutation plan` / `forge mutation write`: the native campaign writer.
 //!
-//! This binary calls `compute_plan` directly -- no pyo3 call, no Python
-//! interpreter -- so `forge mutation plan` starts zero interpreters. Scope
-//! resolution (branch diff via `--base`, owner identity, `--all-files`) stays
-//! in the Python CLI (`conductor.mutation_campaign_generate`) per the task
-//! brief: this binary takes the same lower-level inputs
-//! `conductor_native::mutation_plan::PlanRequest` does, one flag per field.
+//! Both start zero interpreters. Scope is this branch's changed files bounded by
+//! the lane's live claims, an exact `--only` list, or an explicit `--all-files`
+//! maintenance sweep; `conductor_native::mutation_plan::compute_plan` does the
+//! pairing and manifest emission, and `mutation_write` publishes the result.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Args;
 use conductor_native::mutation_plan::{compute_plan, PlanRequest, PriorityOptions};
-use std::collections::BTreeMap;
+use conductor_native::project_paths;
+use serde_json::{json, Map, Value};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::civil::civil_from_days;
+use crate::identity;
+use crate::{mutation_scope, mutation_write};
+
+/// `[tool.conductor]`-resolved path order: see `project_paths::resolve`.
+const REGISTRY_INDEX: usize = 1;
 
 #[derive(Args)]
 pub struct PriorityArgs {
     /// Rank only changed production/validation sources in this policy's [risk].high.
-    #[arg(long, requires = "priority_base")]
+    #[arg(long)]
     pub priority_policy: Option<String>,
+    /// Priority diff base; defaults to `--base`.
     #[arg(long, requires = "priority_policy")]
     pub priority_base: Option<String>,
     /// Optional unverified caller-supplied hints bound to tree and source/test hashes.
@@ -34,7 +38,7 @@ pub struct PriorityArgs {
 }
 
 #[derive(Args)]
-pub struct PlanArgs {
+pub struct ScopeArgs {
     #[command(flatten)]
     pub priority: Box<PriorityArgs>,
     /// "python" or "rust"
@@ -45,16 +49,22 @@ pub struct PlanArgs {
     #[arg(long)]
     pub repo_root: Option<PathBuf>,
 
-    /// Lane that owns the generated campaign IDs.
-    #[arg(long, default_value = "claude")]
-    pub owner: String,
+    /// Lane that owns the dirty scope and prefixes generated campaign IDs;
+    /// defaults to this process's resolved governance identity.
+    #[arg(long)]
+    pub owner: Option<String>,
 
     /// `YYYYMMDD`; defaults to today (UTC).
     #[arg(long)]
     pub day: Option<String>,
 
+    /// Rust workers per crate.
     #[arg(long, default_value_t = 4)]
     pub jobs: i64,
+
+    /// Positive Python workers (default 1).
+    #[arg(long = "python-jobs")]
+    pub python_jobs: Option<i64>,
 
     #[arg(long = "run-timeout", default_value_t = 1800)]
     pub run_timeout: i64,
@@ -65,10 +75,19 @@ pub struct PlanArgs {
     #[arg(long)]
     pub campaigns_root: Option<String>,
 
-    /// Repository-relative source path to plan; repeatable. Omit for the
-    /// whole tree.
+    /// Exact repository-relative source to plan; repeatable. Omit for the
+    /// files this branch changed.
     #[arg(long = "only")]
     pub only: Vec<String>,
+
+    /// Branch base for the changed-file scope.
+    #[arg(long, default_value = "origin/main")]
+    pub base: String,
+
+    /// Maintenance sweep of the WHOLE TREE. The default, and the only thing an
+    /// agent landing a change should run, is the files this branch changed.
+    #[arg(long = "all-files", conflicts_with = "only")]
+    pub all_files: bool,
 
     /// Also plan sources an existing campaign already names.
     #[arg(long = "include-covered")]
@@ -80,80 +99,204 @@ pub struct PlanArgs {
     pub extra_test: Vec<String>,
 }
 
-pub fn run(args: PlanArgs) -> Result<i32> {
-    let priority_args = *args.priority;
-    let repo_root = match args.repo_root {
-        Some(path) => path,
-        None => find_repo_root(&env::current_dir().context("reading the current directory")?)
-            .context("no .git found above the current directory; pass --repo-root")?,
-    };
-    let campaigns_root = match args.campaigns_root {
-        Some(value) => value,
-        None => default_campaigns_root(&repo_root)?,
-    };
-    let day = args.day.unwrap_or_else(today_utc);
-    let extra_tests = parse_extra_tests(&args.extra_test)?;
-    let only_sources = if args.only.is_empty() {
-        None
-    } else {
-        Some(args.only)
-    };
+#[derive(Args)]
+pub struct PlanArgs {
+    #[command(flatten)]
+    pub scope: ScopeArgs,
+    /// Also list campaign IDs, full manifests and unpaired subjects.
+    #[arg(long)]
+    pub verbose: bool,
+}
 
+#[derive(Args)]
+pub struct WriteArgs {
+    #[command(flatten)]
+    pub scope: ScopeArgs,
+    /// Replace an existing manifest, recorded survivor baseline included.
+    #[arg(long)]
+    pub force: bool,
+}
+
+/// One resolved plan: the planner's result plus how its scope was selected.
+struct Planned {
+    result: Value,
+    scope: String,
+    repo_root: PathBuf,
+    registry: String,
+    campaigns: String,
+}
+
+pub fn resolve_repo_root(explicit: Option<PathBuf>) -> Result<PathBuf> {
+    match explicit {
+        Some(path) => Ok(path),
+        None => find_repo_root(&env::current_dir().context("reading the current directory")?)
+            .context("no .git found above the current directory; pass --repo-root"),
+    }
+}
+
+pub fn resolve_lane(owner: Option<String>, repo_root: &Path) -> Result<String, String> {
+    match owner {
+        Some(owner) => Ok(owner),
+        None => identity::resolve_owner(Some(repo_root), &env::vars().collect())
+            .map_err(|error| format!("cannot resolve campaign owner: {}", error.0)),
+    }
+}
+
+/// Whole-tree maintenance, exact files, or this lane's changed files.
+fn select_scope(
+    args: &ScopeArgs,
+    repo_root: &Path,
+    owner: &str,
+) -> Result<(Option<Vec<String>>, String), String> {
+    if args.all_files {
+        return Ok((None, "all-files".into()));
+    }
+    if !args.only.is_empty() {
+        let scope = mutation_scope::explicit_scope(&args.only, repo_root)?;
+        return Ok((Some(scope), "exact --only paths".into()));
+    }
+    let scope = mutation_scope::branch_scope(&args.base, repo_root, owner)?;
+    Ok((Some(scope), format!("changed vs {}", args.base)))
+}
+
+fn priority_options(args: &ScopeArgs) -> Option<PriorityOptions> {
+    let priority = &args.priority;
+    priority
+        .priority_policy
+        .clone()
+        .map(|policy_path| PriorityOptions {
+            policy_path,
+            base_ref: priority
+                .priority_base
+                .clone()
+                .unwrap_or_else(|| args.base.clone()),
+            telemetry_path: priority.priority_telemetry.clone(),
+            budget_seconds: priority.priority_budget_seconds,
+        })
+}
+
+fn plan(args: ScopeArgs) -> Result<Planned, String> {
+    let repo_root = resolve_repo_root(args.repo_root.clone()).map_err(|error| error.to_string())?;
+    let owner = resolve_lane(args.owner.clone(), &repo_root)?;
+    let (only_sources, scope) = select_scope(&args, &repo_root, &owner)?;
+    let extra_tests = mutation_scope::extra_tests(&args.extra_test, &repo_root)?;
+    let registry = resolved_registry(&repo_root)?;
+    let campaigns = match args.campaigns_root.clone() {
+        Some(value) => value,
+        None => registry_parent(&registry),
+    };
     let request = PlanRequest {
-        priority: priority_args
-            .priority_policy
-            .map(|policy_path| PriorityOptions {
-                policy_path,
-                base_ref: priority_args
-                    .priority_base
-                    .expect("clap requires priority base"),
-                telemetry_path: priority_args.priority_telemetry,
-                budget_seconds: priority_args.priority_budget_seconds,
-            }),
+        priority: priority_options(&args),
         language: args.language,
         repo_root: repo_root.to_string_lossy().into_owned(),
-        owner: args.owner,
-        day,
+        owner,
+        day: args.day.unwrap_or_else(today_utc),
         jobs: args.jobs,
-        python_jobs: None,
+        python_jobs: args.python_jobs,
         run_timeout_seconds: args.run_timeout,
-        campaigns_root,
+        campaigns_root: campaigns.clone(),
         only_sources,
         include_covered: args.include_covered,
         extra_tests,
     };
-
-    match compute_plan(&request) {
-        Ok(value) => {
-            println!("{}", serde_json::to_string_pretty(&value)?);
-            Ok(0)
-        }
-        Err(message) => {
-            let refused = serde_json::json!({"status": "REFUSED", "error": message});
-            println!("{}", serde_json::to_string_pretty(&refused)?);
-            Ok(4)
-        }
-    }
+    Ok(Planned {
+        result: compute_plan(&request)?,
+        scope,
+        repo_root,
+        registry,
+        campaigns,
+    })
 }
 
-fn parse_extra_tests(pairs: &[String]) -> Result<BTreeMap<String, Vec<String>>> {
-    let mut extra_tests: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for pair in pairs {
-        let Some((source, test)) = pair.split_once('=') else {
-            bail!("--extra-test must be SOURCE=TEST, got {pair:?}");
-        };
-        if source.is_empty() || test.is_empty() {
-            bail!("--extra-test must be SOURCE=TEST, got {pair:?}");
-        }
-        extra_tests
-            .entry(source.to_string())
-            .or_default()
-            .push(test.to_string());
-    }
-    Ok(extra_tests)
+fn count(result: &Value, key: &str) -> usize {
+    result
+        .get(key)
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len)
 }
 
-fn find_repo_root(start: &Path) -> Option<PathBuf> {
+/// The compact report: what a plan would write and what it refuses to cover.
+fn summarise(planned: &Planned, verbose: bool) -> Map<String, Value> {
+    let result = &planned.result;
+    let mut payload = Map::new();
+    payload.insert("status".into(), json!("READY"));
+    payload.insert("scope".into(), json!(planned.scope));
+    payload.insert("language".into(), result["language"].clone());
+    payload.insert("campaigns".into(), json!(count(result, "manifests")));
+    payload.insert(
+        "subjects_without_a_named_test".into(),
+        json!(count(result, "unpaired")),
+    );
+    payload.insert(
+        "lines_without_a_named_test".into(),
+        result["unpaired_lines"].clone(),
+    );
+    payload.insert(
+        "already_covered".into(),
+        json!(count(result, "already_covered")),
+    );
+    payload.insert(
+        "crates_with_no_tests".into(),
+        json!(count(result, "untested")),
+    );
+    if verbose {
+        let ids: Vec<Value> = result["manifests"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|manifest| manifest["campaign_id"].clone())
+            .collect();
+        payload.insert("campaign_ids".into(), Value::Array(ids));
+        payload.insert("manifests".into(), result["manifests"].clone());
+        payload.insert("unpaired".into(), result["unpaired"].clone());
+        payload.insert(
+            "already_covered_subjects".into(),
+            result["already_covered"].clone(),
+        );
+    }
+    if let Some(priority) = result.get("priority") {
+        payload.insert("priority".into(), priority.clone());
+    }
+    payload
+}
+
+fn report(outcome: Result<Map<String, Value>, String>) -> Result<i32> {
+    let (payload, code) = match outcome {
+        Ok(payload) => (Value::Object(payload), 0),
+        Err(message) => (json!({"status": "REFUSED", "error": message}), 4),
+    };
+    println!("{}", serde_json::to_string_pretty(&payload)?);
+    Ok(code)
+}
+
+/// `plan`: report what would be written; writes nothing.
+pub fn run(args: PlanArgs) -> Result<i32> {
+    let verbose = args.verbose;
+    report(plan(args.scope).map(|planned| summarise(&planned, verbose)))
+}
+
+/// `write`: one manifest and one registry fragment per planned subject.
+pub fn write(args: WriteArgs) -> Result<i32> {
+    let force = args.force;
+    report(plan(args.scope).and_then(|planned| {
+        let manifests = planned.result["manifests"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let written = mutation_write::write_manifests(
+            &manifests,
+            &planned.repo_root,
+            &planned.registry,
+            &planned.campaigns,
+            force,
+        )?;
+        let mut payload = summarise(&planned, false);
+        payload.insert("written".into(), json!(written));
+        Ok(payload)
+    }))
+}
+
+pub(crate) fn find_repo_root(start: &Path) -> Option<PathBuf> {
     let mut current = start;
     loop {
         if current.join(".git").exists() {
@@ -172,36 +315,13 @@ fn today_utc() -> String {
     format!("{year:04}{month:02}{day:02}")
 }
 
-/// `[tool.conductor].mutation_registry`'s parent directory, mirroring
-/// `conductor.project_paths.campaigns_relative`: `$CONDUCTOR_MUTATION_REGISTRY`
-/// wins, then `pyproject.toml`, then the default.
-fn default_campaigns_root(repo_root: &Path) -> Result<String> {
-    if let Ok(env_value) = env::var("CONDUCTOR_MUTATION_REGISTRY") {
-        let trimmed = env_value.trim();
-        if !trimmed.is_empty() {
-            return Ok(registry_parent(trimmed));
-        }
-    }
-    let pyproject = repo_root.join("pyproject.toml");
-    if pyproject.is_file() {
-        let text = std::fs::read_to_string(&pyproject)
-            .with_context(|| format!("reading {}", pyproject.display()))?;
-        let parsed: toml::Value = text
-            .parse()
-            .with_context(|| format!("parsing {}", pyproject.display()))?;
-        if let Some(value) = parsed
-            .get("tool")
-            .and_then(|table| table.get("conductor"))
-            .and_then(|table| table.get("mutation_registry"))
-            .and_then(|value| value.as_str())
-        {
-            return Ok(registry_parent(value));
-        }
-    }
-    Ok("conductor/mutation_campaigns".to_string())
+/// The configured registry path; the environment override and project
+/// manifest resolve through the shared native project paths.
+pub(crate) fn resolved_registry(repo_root: &Path) -> Result<String, String> {
+    project_paths::resolve(repo_root).map(|paths| paths[REGISTRY_INDEX].0.clone())
 }
 
-fn registry_parent(registry_path: &str) -> String {
+pub(crate) fn registry_parent(registry_path: &str) -> String {
     Path::new(registry_path)
         .parent()
         .map(|parent| parent.to_string_lossy().into_owned())
@@ -212,28 +332,6 @@ fn registry_parent(registry_path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_extra_tests_groups_by_source() {
-        let pairs = vec![
-            "a/x.py=a/test_x.py".to_string(),
-            "a/x.py=a/test_x_extra.py".to_string(),
-        ];
-        let parsed = parse_extra_tests(&pairs).expect("parses");
-        assert_eq!(
-            parsed.get("a/x.py"),
-            Some(&vec![
-                "a/test_x.py".to_string(),
-                "a/test_x_extra.py".to_string()
-            ])
-        );
-    }
-
-    #[test]
-    fn parse_extra_tests_rejects_missing_equals() {
-        let pairs = vec!["a/x.py".to_string()];
-        assert!(parse_extra_tests(&pairs).is_err());
-    }
 
     #[test]
     fn registry_parent_strips_the_filename() {

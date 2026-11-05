@@ -4,9 +4,71 @@ pub(crate) struct Capture<'a> {
     pub inputs: Inputs<'a>,
     pub ledger: BTreeMap<String, Value>,
     copied_bytes: usize,
+    native_fingerprint: Option<Option<String>>,
+    native_inventory: Option<Vec<PathBuf>>,
+    snapshot: &'a Snapshot,
     pub failed: bool,
 }
 impl<'a> Capture<'a> {
+    /// Fingerprint the complete native inventory from the held candidate tree.
+    pub fn native_source_fingerprint(&mut self) -> Result<Option<String>> {
+        if let Some(value) = &self.native_fingerprint {
+            return Ok(value.clone());
+        }
+        use conductor_native::source_fingerprint::{self, Fingerprint, EXTRA_FILES, SOURCE_TREES};
+        let mut paths: Vec<String> = self
+            .inputs
+            .entries
+            .keys()
+            .filter(|path| source_fingerprint::includes(path))
+            .cloned()
+            .collect();
+        // The build and live inventories sort Path components, not UTF-8 strings.
+        paths.sort_by(|left, right| Path::new(left).cmp(Path::new(right)));
+        if EXTRA_FILES
+            .iter()
+            .any(|path| !self.inputs.entries.contains_key(*path))
+            || SOURCE_TREES.iter().any(|name| {
+                let base = format!("native/{name}/");
+                ["Cargo.toml", "Cargo.lock"]
+                    .iter()
+                    .any(|file| !self.inputs.entries.contains_key(&format!("{base}{file}")))
+                    || !paths
+                        .iter()
+                        .any(|path| path.starts_with(&format!("{base}src/")))
+            })
+        {
+            self.native_fingerprint = Some(None);
+            return Ok(None);
+        }
+        ensure!(
+            paths.len() <= 4096,
+            "native source inventory exceeds 4096 files"
+        );
+        let expected: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        ensure!(
+            source_fingerprint::files(&self.snapshot.path())? == expected,
+            "materialized native source inventory differs from candidate tree"
+        );
+        let mut fingerprint = Fingerprint::new();
+        for path in paths {
+            let entry = &self.inputs.entries[&path];
+            ensure!(
+                matches!(entry.mode.as_str(), "100644" | "100755") && entry.object_type == "blob",
+                "native source is not a regular file: {path}"
+            );
+            let bytes = self.read(&path, 2 * 1024 * 1024)?;
+            fingerprint.add(Path::new(&path), &bytes)?;
+        }
+        let value = Some(fingerprint.finish());
+        ensure!(
+            source_fingerprint::files(&self.snapshot.path())? == expected,
+            "materialized native source inventory changed during capture"
+        );
+        self.native_inventory = Some(expected);
+        self.native_fingerprint = Some(value.clone());
+        Ok(value)
+    }
     pub fn new(
         source: &Source,
         snapshot: &'a Snapshot,
@@ -18,6 +80,9 @@ impl<'a> Capture<'a> {
             inputs: Inputs::new(source, snapshot, candidate, policy, today)?,
             ledger: BTreeMap::new(),
             copied_bytes: 0,
+            native_fingerprint: None,
+            native_inventory: None,
+            snapshot,
             failed: false,
         })
     }
@@ -92,6 +157,12 @@ impl<'a> Capture<'a> {
             !self.failed,
             "mutation capture admission failed; no complete observation available"
         );
+        if let Some(expected) = &self.native_inventory {
+            ensure!(
+                &conductor_native::source_fingerprint::files(&self.snapshot.path())? == expected,
+                "materialized native source inventory changed"
+            );
+        }
         self.inputs.verify()
     }
 }

@@ -1,5 +1,167 @@
 # Measuring performance
 
+## Current program evidence — 2026-11-04
+
+This is the canonical performance and effectiveness report; current mission status
+and ordered continuation are in [the roadmap](roadmap.md#current-mission-checkpoint--2026-11-04).
+Source baseline is `9117c2fb6436251d0de50038db85ef7fbb81e4b3`, on pending
+[PR #185](https://github.com/mcpirate17/llm-forge/pull/185). Pre-change observations,
+repaired working-tree measurements and matched binary comparisons are separated
+below. They do not certify the eventual PR head or installed runtime. Test and
+publication status are in the current [engineering status](roadmap.md).
+
+### Fresh current-only CLI baselines
+
+Both workloads completed 31 successful samples after three warmups, with a
+10-second per-sample timeout, on the same shared AMD Ryzen 9 9950X3D host.
+Each call launches a new process; the filesystem was warm. This is not a cold-host,
+isolated-host or matched before/after experiment. The common executable SHA-256 is
+`5839e685955891abdd5d888fd039212b2ae456f5530f7a8527f7b060bf23ba36`.
+
+| Workload | Wall p50 / p95, ms | CPU p50, ms | Maximum child RSS, bytes | Retained receipt |
+| --- | ---: | ---: | ---: | --- |
+| CLI `--help` | 1.649971 / 1.832543 | 1.214 | 11,333,632 | [cli-help-baseline.json](../research/performance/forge-program-20261104-cli-help-baseline.json) |
+| Signature context for `relocate_console_scripts`, graph disabled | 2.198525 / 2.371676 | 1.765 | 15,224,832 | [symbol-baseline.json](../research/performance/forge-program-20261104-symbol-baseline.json) |
+
+Receipt seals are respectively
+`399008ee5a58a2369b79971dc7c5d927caf1c790c7eb2a52c6a3e7bc0aa29a71` and
+`06965a70eee78a057eab806e262b6800fdb85c32be447a99b629cb5376183508`.
+These cooperative seals bind recorded content, not cryptographic execution
+attestation. Source scopes are deliberately narrow: help binds
+`native/forge-cli/Cargo.toml`, `native/forge/src/main.rs` and the executable;
+symbol lookup binds `native/forge/src/code_tools.rs` and the executable.
+They do not bind every transitive implementation file. The symbol workload digest
+also binds the inspected `native/forge/src/worktree_runtime.rs` via `--input`.
+Retain the recorded
+literal commands, environment/platform/toolchain and workload digests when
+interpreting these observations. Broader correctness claims need broader evidence.
+
+Reproduce the declared workloads with new output paths; new binary/source/workload
+identities create new evidence, never replacement identities for these results:
+
+```sh
+forge performance benchmark \
+  --command './native/forge/target/release/forge --help' \
+  --source native/forge-cli/Cargo.toml --source native/forge/src/main.rs \
+  --source native/forge/target/release/forge \
+  --samples 31 --warmups 3 --timeout-seconds 10 \
+  --output research/performance/forge-program-cli-help-replay.json
+forge performance benchmark \
+  --command './native/forge/target/release/forge code --root . context --symbol relocate_console_scripts --no-graph --json -- native/forge/src/worktree_runtime.rs' \
+  --source native/forge/src/code_tools.rs --source native/forge/target/release/forge \
+  --input native/forge/src/worktree_runtime.rs \
+  --samples 31 --warmups 3 --timeout-seconds 10 \
+  --output research/performance/forge-program-symbol-replay.json
+```
+
+For a broader prospective signature experiment, enumerate affected transitive
+source paths as well. A changed receipt scope creates separate evidence and does
+not retroactively strengthen this baseline.
+
+### Matched repair comparison
+
+The first post-repair replay retained 31 samples per command:
+[help](../research/performance/forge-program-20261104-cli-help-current.json) and
+[symbol](../research/performance/forge-program-20261104-symbol-current.json).
+Their environment digests differ from the original observations, so the native
+comparison refused both pairs. The apparent help p95 increase from 1.833 to
+2.122 ms is an unmatched observation, not accepted regression evidence.
+
+A fresh paired experiment used the preserved original binary and repaired binary,
+sequentially copied to `.git/forge-program-benchmark/forge`, with identical literal
+commands, source path scope, input bytes and a cleared environment containing only
+`PATH=/home/tim/.cargo/bin:/usr/bin:/bin`, `HOME=/home/tim`, and `LANG=C.UTF-8`.
+Each command completed 101 samples after five warmups, with a ten-second timeout.
+Both comparisons pass the existing 10% budget; it was not increased.
+
+| Workload | Wall p50 before / after, ms | Wall p95 before / after, ms | CPU p50 before / after, ms | Max RSS before / after, bytes | Sealed comparison |
+| --- | ---: | ---: | ---: | ---: | --- |
+| CLI help | 1.557519 / 1.551719 | 1.741850 / 1.681190 | 1.130 / 1.121 | 12,910,592 / 12,468,224 | [help](../research/performance/forge-program-20261104-cli-help-paired-comparison.json) |
+| Symbol context | 2.118182 / 2.116422 | 2.227342 / 2.268532 | 1.689 / 1.679 | 16,863,232 / 16,912,384 | [symbol](../research/performance/forge-program-20261104-symbol-paired-comparison.json) |
+
+The comparison files contain both complete sealed receipts; separate copies are
+not committed. All 404 measured samples succeeded, with zero failed, censored or
+unstarted samples. Scope binds the executed binary, plus the symbol input where
+applicable; it does not rebind the old binary to today's source files. Binary
+SHA-256 values are `5839e685955891abdd5d888fd039212b2ae456f5530f7a8527f7b060bf23ba36`
+and `b87c81950eb293fb60fff90787904866b4cd5df95cab1ce02e90bdd7c2caa35e`.
+Both ELF compiler comments report Rust 1.98.0; the receipt's ambient `rustc`
+probe reports 1.93.1 and is not a build attestation. The host remains shared,
+the filesystem warm and the process newly launched. These observations support
+no material regression in these two workloads, not a general speedup or agent
+productivity claim. Reproduce using the literal commands and pinned binaries in
+the embedded receipts; never edit receipt identities to retrofit a match.
+
+### Transport, task value and missing controls
+
+`native/forge/benches/harness.rs` measures validated calls using a reused Unix
+socket. Actual `harness_mcp.rs::forward` calls `harness_transport.rs::request`,
+which opens a fresh Unix socket per forwarded call. The socket benchmark omits
+that per-call connection cost, MCP envelopes, discovery and actual agent tool
+selection; it is not an end-to-end MCP measurement. The opt-in live MCP tests
+exercise a custom wire client and service, not a real Claude/Codex client.
+
+| Evidence | What it supports | What remains unmeasured |
+| --- | --- | --- |
+| Fresh CLI receipts above | Process-cold/filesystem-warm latency, child CPU/RSS and matched repair comparison for two exact commands | Cold-host behavior, allocation counts, concurrent calls and other workloads |
+| Existing schema/context/component benchmarks | Scoped implementation costs and deterministic fixture outputs | Full dispatch, client selection, provider envelope and task success |
+| Historical [product-value observations](native-product-value-measurements.md) | Native relocation slowdown and a signature projection's smaller supplied payload | General speedup, net billed savings or equivalent full-file semantics |
+| Historical [retrieval run](native-code-retrieval-measurement.md) | 144 completed retrievals; 0 failed/censored/unstarted; frozen agent-authored labels | Independent broad relevance, agent success and full resource attribution; preparation took 23.6 minutes |
+| Existing context composition, counting, recovery and usage reports | Reusable native primitives; exact supplied-text token counts when pinned | Actual model usage in a matched experiment, recovery/reread cost and task-quality effect |
+| Hook and service integration fixtures | Handler/protocol/control behavior within tested scopes | Hooks enabled/disabled overhead, concurrent MCP latency and actual-client enforcement |
+
+No current evidence establishes higher verified agent success, faster complete
+tasks, net provider cost savings or an optimal context budget. Prioritize actual
+client validation, matched MCP/CLI transport and hooks controls, then repeated
+agent tasks with independent correctness checks and complete outcome counts.
+Record model/version/budget, source/binary identities, preparation, cache/load,
+provider usage, rereads and failures. Allocate optimization effort from those
+measurements; native relocation's recorded slowdown remains visible rather than
+being generalized into a language-performance claim.
+
+## Benchmark and comparison contract
+
+### Native mutation behavior checks — 2026-11-04
+
+Two tiny, independent Git fixtures used the automatic native campaign writer and
+cargo-mutants 27.1.0, with one worker and a 120-second engine bound. No campaigns,
+mutants or receipts were authored or repaired by hand. The
+[machine-generated summary](../research/performance/forge-program-20261104-mutation-behavior.json)
+binds binary, engine, generated manifests, source/test bytes and receipt hashes;
+raw fixture evidence remains at its recorded local paths.
+
+| Selected sources | Actual result | Planned / completed / failed / censored / unstarted mutants | Source counts | Snapshot removed |
+| --- | --- | --- | --- | --- |
+| Boolean function plus a type alias with no mutation sites | `INCOMPLETE`, exit 4 | 1 / 1 / 0 / 0 / 0 | a: 1, b: 0 | Yes |
+| Two tested Boolean functions | `PASS`, exit 0 | 2 / 2 / 0 / 0 / 0 | a: 1, b: 1 | Yes |
+
+All reported mutants were killed. The negative case preserves the engine's actual
+one-mutant plan while separately rejecting the unmeasured selected source; it
+does not invent an unstarted mutant. Source coverage is not per-line coverage.
+Both generated manifests retain `Cargo.toml`; the adapter supplies `./Cargo.toml`
+to cargo-mutants. The initial root-layout failure and intervening nested-layout
+probes are preserved separately in the summary's local attempt history.
+
+The executed binary SHA-256 is
+`9d662e91c9d4a808b2ddc09c9f9c644a3c5c625dc1823fec6b4aa400b73617da`.
+These checks used the repair working tree, and the small hosts lack Forge's full
+native source inventory. Their receipts are **behavior evidence, not registered
+PASS evidence or proof of receipt freshness for a deployed host**. They measure
+neither agent productivity nor an end-to-end speedup.
+
+To reproduce, create a dependency-free Rust library named `coverage_fixture`,
+edition 2021. Its `src/lib.rs` declares `pub mod a; pub mod b;`. `a.rs` contains
+`pub fn value() -> bool { true }`; `b.rs` contains either `pub type Byte = u8;`
+or the same function. An integration test asserts `a::value()` and either the
+alias size (one byte) or `b::value()`. Commit a baseline on `main`, then commit a
+comment-only change to exactly `a.rs` and `b.rs` on the fixture branch. Configure
+the host's receipt/registry paths and existing snapshot interpreter, then use
+`forge mutation write rust --base main --owner fixture --jobs 1 --run-timeout 120
+--only src/a.rs --only src/b.rs`, followed by `forge mutation run` on the emitted
+manifest with the same base, owner and selectors plus `--allow-mutations`.
+
+### Receipt benchmark rules
+
 `forge performance benchmark` creates numerical evidence for a successful bounded
 shell workload. It uses native Linux process measurement, so no profiler needs
 to be installed for benchmarking:

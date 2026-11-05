@@ -1,0 +1,183 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1793841926,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "9117c2fb6436251d0de50038db85ef7fbb81e4b3",
+    "source_files": {
+      "native/forge/src/code_tools.rs": "9e7a14e1cdcd3120b63eebd0c2c4cfa37f9c6467511c076501b54d678a761efb",
+      "native/forge/target/release/forge": "5839e685955891abdd5d888fd039212b2ae456f5530f7a8527f7b060bf23ba36"
+    },
+    "command": "./native/forge/target/release/forge code --root . context --symbol relocate_console_scripts --no-graph --json -- native/forge/src/worktree_runtime.rs",
+    "workload_sha256": "59be80ad2a4688a116b6d59dac193155d6e8f6bc1e5ac63e170c31b29de35dee",
+    "environment_sha256": "651783e700a1551b6f8afc0ac1fd5deaf89a7debed165014f8af00709040ba88",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.93.1 (01f6ddf75 2026-02-11)",
+    "warmups": 3,
+    "timeout_seconds": 10
+  },
+  "samples": [
+    {
+      "wall_ms": 2.344067,
+      "cpu_ms": 1.918,
+      "max_rss_bytes": 15212544
+    },
+    {
+      "wall_ms": 2.1985249999999996,
+      "cpu_ms": 1.739,
+      "max_rss_bytes": 14979072
+    },
+    {
+      "wall_ms": 2.303876,
+      "cpu_ms": 1.867,
+      "max_rss_bytes": 14991360
+    },
+    {
+      "wall_ms": 2.371676,
+      "cpu_ms": 1.85,
+      "max_rss_bytes": 14692352
+    },
+    {
+      "wall_ms": 2.2401560000000003,
+      "cpu_ms": 1.799,
+      "max_rss_bytes": 14774272
+    },
+    {
+      "wall_ms": 2.389926,
+      "cpu_ms": 1.926,
+      "max_rss_bytes": 14884864
+    },
+    {
+      "wall_ms": 2.263436,
+      "cpu_ms": 1.811,
+      "max_rss_bytes": 15065088
+    },
+    {
+      "wall_ms": 2.2365559999999998,
+      "cpu_ms": 1.779,
+      "max_rss_bytes": 14893056
+    },
+    {
+      "wall_ms": 2.161485,
+      "cpu_ms": 1.727,
+      "max_rss_bytes": 14938112
+    },
+    {
+      "wall_ms": 2.196155,
+      "cpu_ms": 1.751,
+      "max_rss_bytes": 14811136
+    },
+    {
+      "wall_ms": 2.191625,
+      "cpu_ms": 1.736,
+      "max_rss_bytes": 14712832
+    },
+    {
+      "wall_ms": 2.217185,
+      "cpu_ms": 1.765,
+      "max_rss_bytes": 14979072
+    },
+    {
+      "wall_ms": 2.183845,
+      "cpu_ms": 1.734,
+      "max_rss_bytes": 15224832
+    },
+    {
+      "wall_ms": 2.219245,
+      "cpu_ms": 1.767,
+      "max_rss_bytes": 14639104
+    },
+    {
+      "wall_ms": 2.1697740000000003,
+      "cpu_ms": 1.724,
+      "max_rss_bytes": 15093760
+    },
+    {
+      "wall_ms": 2.1950950000000002,
+      "cpu_ms": 1.773,
+      "max_rss_bytes": 14696448
+    },
+    {
+      "wall_ms": 2.214445,
+      "cpu_ms": 1.759,
+      "max_rss_bytes": 14856192
+    },
+    {
+      "wall_ms": 2.325976,
+      "cpu_ms": 1.917,
+      "max_rss_bytes": 14983168
+    },
+    {
+      "wall_ms": 2.224535,
+      "cpu_ms": 1.831,
+      "max_rss_bytes": 14872576
+    },
+    {
+      "wall_ms": 2.179745,
+      "cpu_ms": 1.744,
+      "max_rss_bytes": 15081472
+    },
+    {
+      "wall_ms": 2.2399859999999996,
+      "cpu_ms": 1.822,
+      "max_rss_bytes": 14798848
+    },
+    {
+      "wall_ms": 2.186795,
+      "cpu_ms": 1.77,
+      "max_rss_bytes": 14917632
+    },
+    {
+      "wall_ms": 2.319206,
+      "cpu_ms": 1.918,
+      "max_rss_bytes": 15110144
+    },
+    {
+      "wall_ms": 2.144545,
+      "cpu_ms": 1.759,
+      "max_rss_bytes": 14884864
+    },
+    {
+      "wall_ms": 2.243946,
+      "cpu_ms": 1.835,
+      "max_rss_bytes": 15040512
+    },
+    {
+      "wall_ms": 2.1420139999999996,
+      "cpu_ms": 1.741,
+      "max_rss_bytes": 15085568
+    },
+    {
+      "wall_ms": 2.111485,
+      "cpu_ms": 1.705,
+      "max_rss_bytes": 14680064
+    },
+    {
+      "wall_ms": 2.150885,
+      "cpu_ms": 1.732,
+      "max_rss_bytes": 15167488
+    },
+    {
+      "wall_ms": 2.163135,
+      "cpu_ms": 1.752,
+      "max_rss_bytes": 14766080
+    },
+    {
+      "wall_ms": 2.115745,
+      "cpu_ms": 1.68,
+      "max_rss_bytes": 14942208
+    },
+    {
+      "wall_ms": 2.1591549999999997,
+      "cpu_ms": 1.743,
+      "max_rss_bytes": 15171584
+    }
+  ],
+  "summary": {
+    "p50_ms": 2.1985249999999996,
+    "p95_ms": 2.371676,
+    "cpu_p50_ms": 1.765,
+    "max_rss_bytes": 15224832
+  },
+  "receipt_sha256": "06965a70eee78a057eab806e262b6800fdb85c32be447a99b629cb5376183508"
+}

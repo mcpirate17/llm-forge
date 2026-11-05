@@ -385,10 +385,22 @@ impl<'a> Build<'a> {
                 )?);
             }
         }
-        let runtime = self
+        let mut runtime = self
             .bundle
             .as_ref()
             .map(|b| json!({"runner":b.runner,"binding_sha256":b.bindings,"lineage":b.lineage}));
+        if let Some(runtime) = runtime.as_mut().filter(|_| {
+            catalog
+                .receipts
+                .iter()
+                .any(|row| row.text.contains("forge-native"))
+        }) {
+            if let Some(fingerprint) = self.capture.native_source_fingerprint()? {
+                runtime["binding_sha256"]
+                    [conductor_native::mutation_native_runner::FINGERPRINT_KEY] =
+                    json!(fingerprint);
+            }
+        }
         let verified=conductor_native::mutation_evidence::verify_captured(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
             "runtime":runtime,"broken_campaigns":catalog.broken,"malformed_receipts":catalog.malformed}),&catalog.receipts,
             |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}"))).map_err(anyhow::Error::msg)?;

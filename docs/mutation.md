@@ -1,8 +1,10 @@
 # Mutation testing in llm-forge
 
-How campaigns are generated, run and audited. The commands live in
-`conductor.mutation_campaign_generate` (write/refresh), `conductor.mutation_engine_generated`
-(run), `conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
+How campaigns are generated, run and audited. `forge mutation plan|write` is the
+native campaign writer and `forge mutation inspect|run` the native runner; hosts that
+have not migrated keep `conductor.mutation_campaign_generate` and
+`conductor.mutation_engine_generated`. The remaining commands live in
+`conductor.mutation_patch_audit` (corpus audit), `conductor.complete_scope_drift`
 (local check for `complete`-mode scope drift before the audit catches it) and
 `conductor.mutation_retention` (sweep); `make mutation-*` wraps the common flows.
 Forge ships these capabilities without requiring mutation campaigns or receipts for
@@ -10,13 +12,22 @@ its own changes. A host such as LLM can adopt a separate evidence policy.
 
 ## Optional risk-ranked planning
 
-The existing native planner can rank an exact changed-file scope without running
-an engine or writing campaigns:
+`forge mutation plan` reports what `forge mutation write` would publish. Without
+`--only` it covers the files this branch changed against `--base` (default
+`origin/main`), plus dirty files inside this lane's active ownership claims; a dirty
+checkout with no claim is refused, as is a branch with nothing changed. `--all-files`
+is the explicit whole-tree maintenance sweep. `--verbose` adds the full manifests.
+Refusals print `{"status": "REFUSED", "error": ...}` and exit 4. `write` refuses to
+replace an existing manifest, whose recorded survivor baseline would be lost, unless
+`--force` is given.
+
+The planner can also rank an exact changed-file scope without running an engine or
+writing campaigns:
 
 ```bash
 forge mutation plan rust \
   --priority-policy candidate_policy.toml --priority-base origin/main \
-  --only native/forge/src/mutation_plan.rs
+  --only native/forge/src/mutation_write.rs
 ```
 
 `--priority-policy` must name the host's configured candidate policy, resolved
@@ -25,9 +36,29 @@ explicit `[risk].high` production/validation paths are eligible. A different
 permissive policy cannot widen the host's scope. Missing policy data fails
 explicitly; discovery paths remain exempt. Priority requires exact `--only`
 paths and a verifiable base commit; it does not support a whole-tree inventory.
-The Python `mutation_campaign_generate plan/write` wrapper exposes the same
-`--priority-policy` option and uses its existing `--base` and owner-limited scope.
-Commands without the priority option retain ordinary planner behavior.
+`--priority-base` defaults to `--base`, and the Python
+`mutation_campaign_generate plan/write` wrapper exposes the same `--priority-policy`
+option. Commands without the priority option retain ordinary planner behavior.
+
+Rust source ownership follows declared targets and module reachability when a
+package borrows source from another package's directory. CLI-only modules in
+Forge's external `forge-cli` target are currently refused explicitly; assigning
+them to the neighboring `forge` library would test the wrong package. Ordinary
+library scopes remain available. The #184 reproduction is addressed by moving the
+planner and lane identity into the shared library:
+`forge mutation plan rust --only native/forge/src/mutation_plan.rs --include-covered`
+now selects package `forge`. `cargo mutants --list --manifest-path
+native/forge/Cargo.toml --package forge --file src/mutation_plan.rs` discovers
+38 mutations at this change. Discovery is not execution or mutation PASS evidence.
+Other CLI-only modules still require a supported package/source layout.
+Without `--include-covered`, an already registered crate is skipped; `READY` with
+zero newly generated campaigns is not evidence that its current sources passed.
+This is bounded syntactic ownership discovery, not Cargo macro expansion. Unknown
+item-generating macros and conditional path transformations are refused rather
+than treated as proof of ownership.
+Explicit imports that shadow `include!` are refused; glob-imported macro names,
+procedural expansion and function-generated modules are outside this syntactic
+analysis. Engine discovery and execution remain separate evidence.
 
 Priority produces one campaign per eligible changed source. Cargo `--file`
 patterns remain package-relative; source/test hash keys remain repository-relative.
@@ -203,23 +234,112 @@ The host decides how these results affect its workflow. Locally,
 `make mutation-evidence MUTATION_BASE=<ref>` runs this optional check against any
 ref (`origin/main` by default). It is not a Forge landing requirement.
 
+### The native runner
+
+`forge mutation run <manifest> --allow-mutations` runs a generated campaign in a
+disposable snapshot, then proves the pinned sources and tests held in both the
+snapshot and the live repository before it scores anything.
+
+| exit | meaning |
+|---|---|
+| 0 | `PASS` or `RATCHET_HELD` |
+| 1 | a verdict that is not green: `FAIL`, `ERROR`, `INCOMPLETE` or `CANCELLED` |
+| 4 | refused, with `{"status": "REFUSED", "error": ...}` on stdout |
+
+`forge mutation inspect` exits 0 for `READY`, 3 for `NOT_READY` and 4 when it cannot
+read the manifest.
+
+Every receipt carries `accounting`, with `planned`, `completed`, `failed`, `censored`
+and `unstarted` counts, and `complete_campaign`. `planned` comes from the engine's own
+total, so a run that stopped early shows the gap. An unfinished engine, any
+`TIMED_OUT`, `NO_COVERAGE` or `UNVIABLE` row, or an unstarted mutant prevents a
+complete campaign and yields `INCOMPLETE` unless a new survivor or row error
+already requires `FAIL` or `ERROR`. Known survivors cannot hide these gaps as
+`RATCHET_HELD`. Cargo-mutants exit 2 is a completed survivor verdict only with a
+reported survivor; other engine failures remain incomplete. `CANCELLED` means a
+signal stopped it; `unstarted` stays null if the engine
+had not yet said how many it planned. Neither is PASS evidence. A cancelled run never
+records a survivor baseline, and neither does a run with unstarted mutants. An
+`INCOMPLETE` verdict that reaches scoring with every planned mutant reported can
+record one. That cannot weaken the ratchet: a censored mutant is not in the
+baseline, so if it survives later it counts as a new survivor and the run is `FAIL`.
+
+All three native engines require at least one scored (`KILLED` or `SURVIVED`)
+mutant for **each selected source**. A versioned `source_coverage` report records
+per-source counts and missing files. One measured source cannot conceal another
+source with zero mutants: the run is refused (exit 4), its receipt is `INCOMPLETE`
+with `complete_campaign: false`, and no survivor baseline is recorded. An engine
+exclusion cannot waive a selected source. Supporting hashes outside the selected
+source set are refused as ambiguous scope; the runner never expands mutation
+authority to cover those files. Distinct symlink aliases are unsupported; redundant
+dot segments are normalized.
+
+Native validators independently recompute this report from source pins and mutant
+rows. The scorer also checks the campaign's exact source pins. Missing or forged
+counts cannot establish completion. These checks prove a nonempty measured mutant
+set per selected file, not per-line coverage or exhaustive mutation operators.
+
+The Cargo adapter spells a root-package manifest as `./Cargo.toml` when invoking
+cargo-mutants, preserving a nonempty parent directory without modifying the
+generated manifest. Nested and absolute manifest argument spelling is preserved.
+
+Three things still need Python. fest is a Python tool, the campaign's interpreter must
+be able to import `conductor` for the `mutation_pycache_evict` pytest plugin, and it
+needs `pytest-cov` (the `mutation` extra), or the baseline fails on `--cov`.
+`[tool.conductor].snapshot_python` names that interpreter. The current runner also
+resolves an interpreter for Rust and Mull runs to support guest test adapters;
+removing that unconditional dependency remains migration work.
+
+A receipt names its runner with `runner_kind: forge-native` and a `native_runner`
+block in place of the Python runner's hashes. A build whose native fingerprint
+inputs differ from HEAD records `source_matches_git: false`, and validators reject
+its receipts. Unrelated dirty documentation does not change that stamp. Evidence
+requires committed native inputs.
+
+Native-runner schema v2 compares the compiled source fingerprint with the audited
+native source inventory: source trees, Cargo manifests/lockfiles, build scripts
+and declared embedded assets. The former v1 partial component list is rejected;
+lineage cannot waive a stale native fingerprint. Missing Forge sources in a host
+cannot establish current native-runner identity. This is source freshness,
+not authenticated producer identity, compiler equivalence or binary attestation.
+Captured candidate/corpus inputs retain their own freshness checks; ambient
+compatibility reads remain filesystem observations.
+
+Native process capture retains at most 16 MiB of stdout and 1 MiB of stderr.
+It drains excess bytes so children can exit, then refuses completion; overflow,
+read errors and reader failures cannot turn truncated output into a successful
+run. Existing engine deadlines still bound execution.
+
 ### Ratchet iterations
 
-`make mutation-engine-run` writes its receipt under
-`campaigns/receipts/.iterations/` (gitignored): a ratchet loop that commits
+`make mutation-engine-run` resolves the receipt root through
+`forge project --host ROOT path mutation-receipt-root` and writes beneath its
+`.iterations/` directory (`campaigns/receipts/.iterations/` in this repository).
+`MUTATION_RECEIPT` and `MUTATION_RECEIPT_ITERATIONS` remain explicit overrides;
+configuration failures stop the target before execution. The Make runner leaves
+directory creation to the native runner after path confinement. A ratchet loop that commits
 every iteration was growing the tracked tree by ~350 KB per run, and every
 clone and CI checkout paid for it. When a loop settles,
 `make mutation-receipt-promote` copies the newest iteration receipt into the
-tracked directory; only that copy is committed.
+tracked directory; only that copy is committed. Promotion remains an
+operator-controlled shell maintenance adapter using `mkdir`/`cp`, without the
+native publication confinement or no-overwrite guarantee; its migration is pending.
+
+Campaign identifiers are single filename components, at most 200 UTF-8 bytes,
+starting with a letter or digit and containing letters, digits, dots, underscores
+or hyphens. Native campaign and receipt publication reject parent traversal and
+resolved paths outside the repository before creating output directories. Temporary files use exclusive
+creation; unforced campaign publication cannot overwrite a concurrent winner.
+Configured ancestors remain trusted against concurrent replacement.
 
 ### Bytecode isolation
 
 Every child command an engine spawns — the baseline suite, the engine binary
 (and the per-mutant test commands it spawns in turn), attribution's re-applied
 mutants — and the gate's two pytest collect probes run against a
-`PYTHONPYCACHEPREFIX` scratch that is private to the run, wired once in
-`mutation_engine_generated.run` (the choke point all engine children flow
-through) and `gate.preflight_pytest_config`. CPython validates a
+`PYTHONPYCACHEPREFIX` scratch that is private to the run, wired once in the
+runner (the choke point all engine children flow through) and
+`gate.preflight_pytest_config`. CPython validates a
 `__pycache__` entry by source mtime and size, so a same-size rewrite within
 one mtime second leaves a stale `.pyc` that later interpreters keep
 executing — and applying a mutant *is* a same-size same-second rewrite, which
@@ -253,16 +373,21 @@ outcomes and survivor set identical in every run):
 
 ### Orphaned runs
 
-`run_command` starts every engine in its own session and binds it to the
+The runner starts every engine in its own session and binds it to the
 engine process's lifetime with `PR_SET_PDEATHSIG`, so the kernel kills the
 engine binary the moment the process that spawned it dies (Ctrl-C, session
 end, OOM, sandbox teardown) — but the mutants that engine already spawned
-inherit nothing and keep running. Belt and braces: every live run also
-records its pgid in `campaigns/receipts/.iterations/live_pgids.json`
-(appended on start, removed on exit). `make mutation-reap` lists the
-recorded groups whose engine is dead while the group still lives, and
-`MUTATION_REAP_APPLY=1 make mutation-reap` SIGKILLs exactly those — nothing
-outside the registry is ever signalled.
+inherit nothing and may keep running. The native runner serializes registration
+and removal under a persistent interprocess lock. Its separate
+`native_pgids.json` uses a `native` array and preserves diagnostics when process,
+pipe or capture cleanup fails. A recorded numeric PID/PGID is not authority to
+signal a later process: manual recovery must establish current process identity.
+
+Legacy Python runners use `live_pgids.json` with a `live` array. The legacy
+`make mutation-reap` command does not consume native records, including with an
+older installed Python adapter. Native supervision handles ordinary completion,
+timeouts and cancellation; verified automatic recovery after a hard-killed
+native supervisor remains a separate capability to implement.
 
 
 ## Contextual new-test admission

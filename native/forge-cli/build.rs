@@ -5,7 +5,7 @@
 
 use std::path::Path;
 use std::process::Command;
-#[path = "../forge/src/source_fingerprint.rs"]
+#[path = "../conductor-native/src/source_fingerprint.rs"]
 mod source_fingerprint;
 #[path = "source_identity.rs"]
 mod source_identity;

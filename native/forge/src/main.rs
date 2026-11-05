@@ -22,7 +22,7 @@ mod handlers;
 mod handoff;
 mod hook_protocol;
 mod hooks_install;
-mod identity;
+use forge::identity;
 use forge::instant;
 mod interpreter;
 use forge::json_canon;
@@ -36,8 +36,9 @@ mod local_check_receipt;
 mod mailbox;
 mod mcp_setup;
 mod merge;
-mod mutation_plan;
+use forge::mutation_plan;
 mod mutation_results;
+mod mutation_run_cli;
 use forge::mutation_receipt_verify;
 use forge::notes_index;
 mod obsidian_sync;
@@ -294,12 +295,16 @@ enum LedgerCommand {
 
 #[derive(Subcommand)]
 enum MutationCommand {
-    /// Report what `conductor.mutation_campaign_generate write` would emit,
-    /// without writing anything. Same computation as the public Python
-    /// `plan()` wrapper, which delegates to the native planner.
+    /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
+    /// Write one manifest and registry fragment per planned subject.
+    Write(Box<mutation_plan::WriteArgs>),
     /// Parse a test report into ordered attribution JSON without running tests.
     Results(mutation_results::ResultsArgs),
+    /// Report whether a generated campaign could run now; runs nothing.
+    Inspect(mutation_run_cli::InspectArgs),
+    /// Generate, run and score a campaign's mutants in a disposable snapshot.
+    Run(Box<mutation_run_cli::RunArgs>),
 }
 
 #[derive(Subcommand)]
@@ -519,6 +524,21 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
         MutationCommand::Plan(args) => command_exit(
             "mutation plan",
             mutation_plan::run(*args).map(|code| code as u8),
+            1,
+        ),
+        MutationCommand::Write(args) => command_exit(
+            "mutation write",
+            mutation_plan::write(*args).map(|code| code as u8),
+            1,
+        ),
+        MutationCommand::Inspect(args) => command_exit(
+            "mutation inspect",
+            mutation_run_cli::inspect(args).map(|code| code as u8),
+            1,
+        ),
+        MutationCommand::Run(args) => command_exit(
+            "mutation run",
+            mutation_run_cli::run(*args).map(|code| code as u8),
             1,
         ),
     }

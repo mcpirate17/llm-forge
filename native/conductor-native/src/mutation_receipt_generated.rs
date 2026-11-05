@@ -1,5 +1,6 @@
 //! Shared generated-receipt rules for ambient and trusted-captured inputs.
 use super::*;
+use crate::mutation_native_runner as native_runner;
 pub(super) fn generated_receipt_errors(
     payload: &Map<String, Value>,
     campaign: &CampaignContract,
@@ -9,9 +10,25 @@ pub(super) fn generated_receipt_errors(
         payload,
         campaign,
         context.runner,
-        |path| sha256_file(&context.package_root.join(path)),
+        |path| {
+            if path == native_runner::FINGERPRINT_KEY {
+                let files = crate::source_fingerprint::files(context.repo_root).ok()?;
+                crate::source_fingerprint::fingerprint(context.repo_root, &files).ok()
+            } else {
+                sha256_file(&binding_root(context, path).join(path))
+            }
+        },
         |recorded| lineage_accepts(recorded, context.package_root),
     )
+}
+/// `conductor/...` bindings resolve from the package's parent; native runner
+/// sources are spelled from the repository root.
+fn binding_root<'a>(context: &ValidationContext<'a>, path: &str) -> &'a Path {
+    if path.starts_with("native/") {
+        context.repo_root
+    } else {
+        context.package_root
+    }
 }
 pub(crate) fn generated_errors_with(
     payload: &Map<String, Value>,
@@ -55,8 +72,12 @@ pub(crate) fn generated_errors_with(
         }
     }
     errors.extend(identity_errors(payload, campaign));
-    errors.extend(runner_errors_with(payload, runner, lineage));
-    errors.extend(binding_errors(payload, campaign, hash));
+    if native_runner::declared(payload) {
+        errors.extend(native_binding_errors(payload, campaign, hash, lineage));
+    } else {
+        errors.extend(runner_errors_with(payload, runner, lineage));
+        errors.extend(binding_errors(payload, campaign, hash));
+    }
     errors.extend(survivor_errors(payload, campaign));
     errors.extend(generated_outcome_errors(payload));
     errors
@@ -99,6 +120,35 @@ fn identity_errors(payload: &Map<String, Value>, campaign: &CampaignContract) ->
         ));
     }
     errors
+}
+/// A native receipt pins the compiled runner, not the Python files that did
+/// not execute; the engine still has to be one this rule knows how to judge.
+fn native_binding_errors(
+    payload: &Map<String, Value>,
+    campaign: &CampaignContract,
+    hash: impl Fn(&str) -> Option<String>,
+    lineage: impl Fn(Option<&Value>) -> bool,
+) -> Vec<Rejection> {
+    let mut errors: Vec<Rejection> = native_runner::errors(payload, hash, lineage)
+        .into_iter()
+        .map(|detail| reject(RejectionKind::RunnerMapMismatch, detail))
+        .collect();
+    if !matches!(
+        campaign.mutation_engine.as_str(),
+        "cargo-mutants" | "fest" | "mull"
+    ) {
+        errors.push(unsupported_engine(campaign));
+    }
+    errors
+}
+fn unsupported_engine(campaign: &CampaignContract) -> Rejection {
+    reject(
+        RejectionKind::SchemaError,
+        format!(
+            "unsupported generated mutation engine: {}",
+            campaign.mutation_engine
+        ),
+    )
 }
 fn binding_errors(
     payload: &Map<String, Value>,
@@ -147,13 +197,7 @@ fn binding_errors(
                 ));
             }
         }
-        None => errors.push(reject(
-            RejectionKind::SchemaError,
-            format!(
-                "unsupported generated mutation engine: {}",
-                campaign.mutation_engine
-            ),
-        )),
+        None => errors.push(unsupported_engine(campaign)),
     }
     errors
 }

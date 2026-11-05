@@ -196,6 +196,9 @@ def _receipts_by_campaign(
 # export added there would invalidate all of them.
 PASSING_RECEIPT_STATUSES = frozenset({"PASS", "RATCHET_HELD"})
 
+# Native receipt source identity is validated by the shared native implementation.
+NATIVE_RUNNER_KIND = "forge-native"
+
 
 class _TreeHasher:
     """Hash the audited tree once per file, not once per receipt pinning it."""
@@ -203,6 +206,20 @@ class _TreeHasher:
     def __init__(self, repo_root: Path) -> None:
         self._root = repo_root
         self._cache: dict[str, str | None] = {}
+        self._native_fingerprint: str | None = None
+        self._native_fingerprint_loaded = False
+
+    def native_fingerprint(self) -> str | None:
+        """Capture the shared native source fingerprint once per audit."""
+        if not self._native_fingerprint_loaded:
+            import conductor_native
+
+            try:
+                self._native_fingerprint = conductor_native.native_source_fingerprint(str(self._root))
+            except OSError:
+                self._native_fingerprint = None
+            self._native_fingerprint_loaded = True
+        return self._native_fingerprint
 
     def sha(self, relative: str) -> str | None:
         """The file's digest, or ``None`` when the audited tree lacks it."""
@@ -213,6 +230,17 @@ class _TreeHasher:
             except OSError:
                 self._cache[relative] = None
         return self._cache[relative]
+
+
+def _native_runner_rejection(
+    receipt: Mapping[str, Any], package_root: Path, tree: _TreeHasher
+) -> str | None:
+    """Check native source freshness with the shared native validator."""
+
+    import conductor_native
+
+    return conductor_native.native_runner_rejection(json.dumps(receipt), tree.native_fingerprint())
+
 
 
 def _receipt_rejection(
@@ -244,11 +272,16 @@ def _receipt_rejection(
     status = receipt.get("status")
     if status not in PASSING_RECEIPT_STATUSES:
         return f"status={status}"
-    recorded = receipt.get("runner_components_sha256")
-    if not isinstance(recorded, dict):
-        return "no runner component map"
-    if not (recorded == dict(current) or _lineage_accepts(recorded, package_root)):
-        return "runner components match neither this runner nor any lineage entry"
+    if receipt.get("runner_kind") == NATIVE_RUNNER_KIND:
+        native_rejection = _native_runner_rejection(receipt, package_root, tree)
+        if native_rejection:
+            return native_rejection
+    else:
+        recorded = receipt.get("runner_components_sha256")
+        if not isinstance(recorded, dict):
+            return "no runner component map"
+        if not (recorded == dict(current) or _lineage_accepts(recorded, package_root)):
+            return "runner components match neither this runner nor any lineage entry"
     stale_sources = sorted(
         relative
         for relative, pinned in (receipt.get("source_sha256") or {}).items()

@@ -187,3 +187,21 @@ fn repository_and_package_discovery_prefer_host_configuration() {
     assert_eq!(host_root(Some(&package)).unwrap(), repo);
     assert_eq!(package_tree_root(&package).unwrap(), repo);
 }
+
+#[test]
+fn selected_path_does_not_resolve_unrelated_invalid_keys() {
+    let case = Case::new();
+    case.write("[tool.conductor]\nmutation_receipt_root='custom/evidence'\nnotes_root=12\n");
+    let selected = conductor_native::project_paths::resolve_key;
+    assert_eq!(
+        selected(case.root(), "mutation_receipt_root").unwrap(),
+        ("custom/evidence".into(), true)
+    );
+    assert!(selected(case.root(), "notes_root")
+        .unwrap_err()
+        .contains("must be a string"));
+    assert_eq!(
+        selected(case.root(), "unknown").unwrap_err(),
+        "unknown project path key: unknown"
+    );
+}

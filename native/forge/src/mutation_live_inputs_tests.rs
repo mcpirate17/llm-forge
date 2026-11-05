@@ -48,3 +48,30 @@ fn refuses_symlink_files_and_ancestor_escapes() {
     assert!(held.read("leak.json").is_err());
     assert!(held.read("link/outside").is_err());
 }
+
+#[test]
+fn native_inventory_matches_shared_fingerprint_and_detects_new_files() {
+    use conductor_native::source_fingerprint::{self, EXTRA_FILES, SOURCE_TREES};
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let write = |path: &str| {
+        let file = root.join(path);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, b"source").unwrap();
+    };
+    for name in SOURCE_TREES {
+        for suffix in ["Cargo.toml", "Cargo.lock", "src/lib.rs"] {
+            write(&format!("native/{name}/{suffix}"));
+        }
+    }
+    for path in EXTRA_FILES {
+        write(path);
+    }
+    let files = source_fingerprint::files(root).unwrap();
+    let expected = source_fingerprint::fingerprint(root, &files).unwrap();
+    let mut held = LiveInputs::open(root).unwrap();
+    assert_eq!(held.native_source_fingerprint().unwrap(), Some(expected));
+    held.verify().unwrap();
+    write("native/forge/src/new_module.rs");
+    assert!(held.verify().is_err());
+}

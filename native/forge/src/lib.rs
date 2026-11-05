@@ -173,6 +173,7 @@ pub mod file_lock;
 pub mod graph_context_cache_storage;
 #[cfg(target_os = "linux")]
 pub mod harness;
+pub mod identity;
 pub mod instant;
 pub mod json_canon;
 pub mod local_ai_policy;
@@ -246,7 +247,36 @@ pub mod tool_schema;
 pub mod write_targets;
 
 #[cfg(target_os = "linux")]
+pub mod mutation_attribution;
+#[cfg(target_os = "linux")]
+pub mod mutation_bytecode;
+#[cfg(target_os = "linux")]
+pub mod mutation_campaign;
+#[cfg(target_os = "linux")]
+pub mod mutation_engine_cargo;
+#[cfg(target_os = "linux")]
+pub mod mutation_engine_fest;
+#[cfg(target_os = "linux")]
+pub mod mutation_engine_mull;
+#[cfg(target_os = "linux")]
+pub mod mutation_plan;
+#[cfg(target_os = "linux")]
+pub mod mutation_process;
+#[cfg(target_os = "linux")]
 pub mod mutation_receipt_verify;
+#[cfg(target_os = "linux")]
+pub mod mutation_run;
+#[cfg(target_os = "linux")]
+pub mod mutation_run_scope;
+#[cfg(target_os = "linux")]
+pub mod mutation_scope;
+#[cfg(target_os = "linux")]
+pub mod mutation_score;
+#[cfg(target_os = "linux")]
+pub mod mutation_snapshot;
+pub mod mutation_source_coverage;
+#[cfg(target_os = "linux")]
+pub mod mutation_write;
 
 #[cfg(target_os = "linux")]
 pub mod graph_test_select;
@@ -276,6 +306,8 @@ pub(crate) mod mutation_live_catalog;
 pub(crate) mod mutation_live_cli;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_live_inputs;
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) mod mutation_run_test_support;
 
 #[cfg(target_os = "linux")]
 pub mod candidate_gate;

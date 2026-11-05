@@ -83,3 +83,74 @@ fn missing_invalid_and_inert_value_evidence_are_distinct() {
     };
     assert!(value_findings(&generated, None).unwrap().0.is_empty());
 }
+
+mod native_receipts {
+    use super::*;
+    use crate::mutation_native_runner::{RUNNER_KIND, RUNNER_SCHEMA};
+
+    fn native_receipt() -> Value {
+        json!({
+            "status": "RATCHET_HELD",
+            "runner_kind": RUNNER_KIND,
+            "source_sha256": {"src/a.rs": "e".repeat(64)},
+            "mutants": [{"path":"src/a.rs","outcome":"KILLED"}],
+            "source_coverage": {"schema_version":1,"complete":true,"scored_by_source":{"src/a.rs":1},"missing":[]},
+            "native_runner": {
+                "schema_version": RUNNER_SCHEMA,
+                "forge_version": "0.0.0",
+                "executable_sha256": "d".repeat(64),
+                "compiled_source_sha256": "e".repeat(64),
+                "compiled_git_commit": "f".repeat(40),
+                "source_matches_git": true,
+            },
+        })
+    }
+
+    fn judged(receipt: &Value, hash: &str, lineage: bool) -> Option<String> {
+        let symbols = std::collections::BTreeSet::new();
+        let campaign = Campaign {
+            campaign_id: "c",
+            generated: true,
+            declares_value_analysis: false,
+            source_symbols: &symbols,
+        };
+        rejection(
+            &campaign,
+            receipt,
+            &json!({}),
+            |_| Ok(Some(hash.to_owned())),
+            |_| Ok(lineage),
+        )
+        .expect("rejection")
+    }
+
+    #[test]
+    fn native_receipts_bind_to_this_tree_or_lineage() {
+        let receipt = native_receipt();
+        assert_eq!(judged(&receipt, &"e".repeat(64), false), None);
+        assert_eq!(
+            judged(&receipt, "other", false).as_deref(),
+            Some("native runner source fingerprint is unavailable or differs from this tree")
+        );
+    }
+
+    #[test]
+    fn a_dirty_native_build_is_not_corpus_evidence() {
+        let mut receipt = native_receipt();
+        receipt["native_runner"]["source_matches_git"] = json!(false);
+        assert_eq!(
+            judged(&receipt, "c", true).as_deref(),
+            Some("native_runner was built from a dirty source tree")
+        );
+    }
+
+    #[test]
+    fn a_non_passing_native_status_stops_before_identity() {
+        let mut receipt = native_receipt();
+        receipt["status"] = json!("CANCELLED");
+        assert_eq!(
+            judged(&receipt, "c", true).as_deref(),
+            Some("status=CANCELLED")
+        );
+    }
+}

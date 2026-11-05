@@ -3,7 +3,7 @@
 ## Current execution policy
 
 **Mutate only what you changed** -- the files this branch modified and the tests
-that exercise them, never the whole repository. `mutation_campaign_generate`
+that exercise them, never the whole repository. `forge mutation write`
 scopes itself to `git diff <base>...HEAD` plus the invoking owner's claimed
 dirty files. Repeated `--only` selectors narrow the task scope. `--all-files`
 is an inventory/planning option, not authorization to execute a whole-tree run.
@@ -67,16 +67,17 @@ reporting that nothing ran. They meet at four shared things:
 
 1. **One manifest schema.** `conductor/mutation_campaigns/<id>.json` declares the
    subject, the test command, the bounds and the survivor baseline.
-2. **One CLI.** `python -m conductor.mutation_engine_generated`; the adapter is
-   chosen from the manifest's `mutation_engine`.
+2. **One CLI.** `forge mutation run`; the adapter is chosen from the manifest's
+   `mutation_engine`. Hosts that have not migrated keep
+   `python -m conductor.mutation_engine_generated`.
 3. **One receipt schema.** `llm.mutation-testing.receipt.v3`, with one outcome
    vocabulary across all three engines.
 4. **One scoring rule.** The survivor set, compared against the baseline.
 
 An engine adapter supplies exactly two things: where its binary is, and how to
-turn one run into receipt rows. `mutation_engine_fest.py`,
-`mutation_engine_cargo.py` and `mutation_engine_mull.py` are 276, 300 and 572
-lines respectively; everything else is shared in `mutation_engine_generated.py`.
+turn one run into receipt rows. They are `mutation_engine_fest.rs`,
+`mutation_engine_cargo.rs` and `mutation_engine_mull.rs` in `native/forge/src`;
+everything else is shared through `mutation_run.rs`.
 
 ### Outcomes
 
@@ -120,9 +121,9 @@ Generate a campaign per subject -- one Python module with the tests that name it
 or exact changed Rust source files with their crate's tests:
 
 ```
-python -m conductor.mutation_campaign_generate plan  rust --verbose
-python -m conductor.mutation_campaign_generate write rust
-python -m conductor.mutation_campaign_generate write python --only conductor/gate_rollout.py
+forge mutation plan  rust --verbose
+forge mutation write rust
+forge mutation write python --only conductor/gate_rollout.py
 ```
 
 `plan` writes nothing. It reports what `write` would emit, which subjects a
@@ -131,8 +132,8 @@ committed campaign already covers, and which have no test named after them.
 Check a manifest, then run it:
 
 ```
-python -m conductor.mutation_engine_generated inspect conductor/mutation_campaigns/<id>.json
-python -m conductor.mutation_engine_generated run     conductor/mutation_campaigns/<id>.json \
+forge mutation inspect conductor/mutation_campaigns/<id>.json
+forge mutation run     conductor/mutation_campaigns/<id>.json \
     --allow-mutations --receipt research/reports/mutation/<id>.json
 ```
 
@@ -200,8 +201,13 @@ enforced in the adapters and asserted in `test_mutation_engine_*.py`.
   seconds, and its effective budget is `max(baseline * 10, minimum-timeout)`.
   These suites run in under 10 ms, so `baseline * 10` truncated to 0 and produced
   309 spurious timeouts. `--minimum-timeout` is manifest data.
-- **Exit codes are not verdicts.** cargo-mutants exits 2 and mull-runner exits
-  non-zero whenever any mutant survives, which is the normal case.
+- **Exit codes are not verdicts, but some are failures.** cargo-mutants exits 2
+  when a mutant survives and 3 when one times out, which is the normal case, and
+  the survivor set decides. Its other exits (1 usage, 4 red baseline, 70 internal)
+  mean nothing was measured, so the runner refuses whatever report they left.
+  fest exits 0 with survivors, and mull-runner does once the runner passes
+  `--allow-surviving`, so any non-zero exit from either is a failure, refused the
+  same way.
 - **All three engines default to host-sized parallelism**, and all three jitter
   the survivor set until the width is pinned. fest was measured giving
   4/5/5/6/5 survivors over five identical runs. cargo-mutants workers sharing one

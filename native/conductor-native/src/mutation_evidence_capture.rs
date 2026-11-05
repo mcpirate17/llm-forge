@@ -235,13 +235,27 @@ fn summary_current(
     let Some(runtime) = runtime else {
         return false;
     };
+    let runner_current = if let Some(payload) = receipt
+        .value
+        .as_object()
+        .filter(|p| crate::mutation_native_runner::declared(p))
+    {
+        crate::mutation_native_runner::errors(
+            payload,
+            |path| runtime.binding_sha256.get(path).cloned(),
+            |_| false,
+        )
+        .is_empty()
+    } else {
+        Some(&receipt.value["runner_components_sha256"]) == runtime.runner.components.as_ref()
+            && receipt.value["runner_sha256"].as_str()
+                == runtime.runner.mutation_testing_sha256.as_deref()
+    };
     !campaign.source_drifted
         && receipt.value["manifest_sha256"] == campaign.manifest_sha256
         && receipt.value["source_sha256"] == campaign.source_sha256
         && receipt.value["test_sha256"] == campaign.test_sha256
-        && Some(&receipt.value["runner_components_sha256"]) == runtime.runner.components.as_ref()
-        && receipt.value["runner_sha256"].as_str()
-            == runtime.runner.mutation_testing_sha256.as_deref()
+        && runner_current
 }
 fn error_rows(errors: &[Rejection]) -> Value {
     json!(errors

@@ -1,5 +1,4 @@
-#[path = "../src/source_fingerprint.rs"]
-mod source_fingerprint;
+use forge::source_fingerprint;
 #[allow(dead_code)]
 mod support;
 use serde_json::{json, Value};
@@ -204,6 +203,8 @@ fn native_tree(host: &support::Host) {
     for path in [
         "ledger/routing_policy.toml",
         "native/forge/tests/fixtures/ledger/calibration.json",
+        "src/conductor/memory_sources.toml",
+        "src/conductor/embedding_routes.toml",
     ] {
         fs::create_dir_all(host.0.join(path).parent().unwrap()).unwrap();
         fs::write(host.0.join(path), "fixture").unwrap();
@@ -272,6 +273,8 @@ fn source_identity_binds_cli_manifest_stamp_main_and_shared_workspace_lock() {
         ),
         ("native/forge/src/main.rs", "main", "noop"),
         ("native/forge/Cargo.lock", "version = 4", "version = 3"),
+        ("src/conductor/memory_sources.toml", "fixture", "changed"),
+        ("src/conductor/embedding_routes.toml", "fixture", "changed"),
     ] {
         let destination = host.0.join(path);
         let original = fs::read_to_string(&destination).unwrap();
@@ -296,20 +299,22 @@ fn source_identity_binds_cli_manifest_stamp_main_and_shared_workspace_lock() {
 }
 
 #[test]
-fn cli_manifest_and_stamp_are_required_even_with_shared_lock_and_source() {
+fn cli_inputs_and_embedded_assets_are_required_with_shared_lock_and_source() {
     let host = host();
     native_tree(&host);
     for path in [
         "native/forge-cli/Cargo.toml",
         "native/forge-cli/build.rs",
         "native/forge-cli/source_identity.rs",
+        "src/conductor/memory_sources.toml",
+        "src/conductor/embedding_routes.toml",
     ] {
         let destination = host.0.join(path);
         let original = fs::read(&destination).unwrap();
         fs::remove_file(&destination).unwrap();
         assert!(
             source_fingerprint::files(&host.0).is_err(),
-            "missing required CLI input: {path}"
+            "missing required native input: {path}"
         );
         fs::write(destination, original).unwrap();
         assert!(source_fingerprint::files(&host.0).is_ok());

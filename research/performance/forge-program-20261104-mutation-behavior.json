@@ -1,0 +1,126 @@
+{
+  "schema": "forge.behavior-check-summary.v1",
+  "started_unix": 1793847195.1316,
+  "private_evidence_root": "/tmp/forge-program-real-engine-3hugimyi",
+  "engine_bound_seconds": 120,
+  "evidence_scope": "Behavior checks only. Dirty compiled source and tiny hosts lacking full Forge inventory; not valid registered PASS evidence.",
+  "cases": [
+    {
+      "fixture": "/tmp/forge-program-real-engine-3hugimyi/zero-selected-source",
+      "generated_manifest": "/tmp/forge-program-real-engine-3hugimyi/zero-selected-source/campaigns/fixture__cargo_20261104.json",
+      "generated_manifest_sha256_before_run": "fa7e9c8bdf553aa7f601c7b89ec98cbd53e9352b98e73fbe53d3a5a49a622425",
+      "generated_manifest_sha256_after_run": "fa7e9c8bdf553aa7f601c7b89ec98cbd53e9352b98e73fbe53d3a5a49a622425",
+      "receipt": "/tmp/forge-program-real-engine-3hugimyi/zero-selected-source/evidence/result.json",
+      "receipt_sha256": "9fa135d5abe7d5917ee5b6e3a5e4753bf17ffb99a35b49f2c8513f72020dc477",
+      "cli_returncode": 4,
+      "receipt_status": "INCOMPLETE",
+      "accounting": {
+        "censored": 0,
+        "completed": 1,
+        "failed": 0,
+        "planned": 1,
+        "unstarted": 0
+      },
+      "source_coverage": {
+        "complete": false,
+        "missing": [
+          "src/b.rs"
+        ],
+        "schema_version": 1,
+        "scored_by_source": {
+          "src/a.rs": 1,
+          "src/b.rs": 0
+        }
+      },
+      "snapshot_removed": true,
+      "native_runner": {
+        "compiled_git_commit": "9117c2fb6436251d0de50038db85ef7fbb81e4b3",
+        "compiled_source_sha256": "3b53f052cb90eb5150378a0a312c644210264c392a8294e9661dce1c3a779300",
+        "executable_sha256": "9d662e91c9d4a808b2ddc09c9f9c644a3c5c625dc1823fec6b4aa400b73617da",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": false
+      },
+      "source_sha256": {
+        "src/a.rs": "b0c2d44a2d4c64101938c20636ed5d3ae3f66a2969e38fbdd37d46e08cd585af",
+        "src/b.rs": "5b97456c33e6a310a87a8c9a297e4322c9bb6d82fe30e5bbde3016912a33c152"
+      },
+      "test_sha256": {
+        "tests/contract.rs": "0fb48c35aff0d4c659549f8edade3ea686ff9c1a6b039e0f0048f9869e92928a"
+      },
+      "mutant_count": 1,
+      "mutant_outcomes": {
+        "KILLED": 1,
+        "SURVIVED": 0,
+        "TIMED_OUT": 0,
+        "UNVIABLE": 0,
+        "ERROR": 0
+      },
+      "checks_passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "/tmp/forge-program-real-engine-3hugimyi/both-selected-sources",
+      "generated_manifest": "/tmp/forge-program-real-engine-3hugimyi/both-selected-sources/campaigns/fixture__cargo_20261104.json",
+      "generated_manifest_sha256_before_run": "878de2d398dfa77f3702b25ffd28230015cc66b16bbd0b48385c659bde0df946",
+      "generated_manifest_sha256_after_run": "38de5070bcc598da37a9d25490531133bba06897e2ee00b160ab326bf9dc67df",
+      "receipt": "/tmp/forge-program-real-engine-3hugimyi/both-selected-sources/evidence/result.json",
+      "receipt_sha256": "5d08bf95a2871bf8ef5aab11eda2003ec66bf54117f6551f64c2e34ea3c951ff",
+      "cli_returncode": 0,
+      "receipt_status": "PASS",
+      "accounting": {
+        "censored": 0,
+        "completed": 2,
+        "failed": 0,
+        "planned": 2,
+        "unstarted": 0
+      },
+      "source_coverage": {
+        "complete": true,
+        "missing": [],
+        "schema_version": 1,
+        "scored_by_source": {
+          "src/a.rs": 1,
+          "src/b.rs": 1
+        }
+      },
+      "snapshot_removed": true,
+      "native_runner": {
+        "compiled_git_commit": "9117c2fb6436251d0de50038db85ef7fbb81e4b3",
+        "compiled_source_sha256": "3b53f052cb90eb5150378a0a312c644210264c392a8294e9661dce1c3a779300",
+        "executable_sha256": "9d662e91c9d4a808b2ddc09c9f9c644a3c5c625dc1823fec6b4aa400b73617da",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": false
+      },
+      "source_sha256": {
+        "src/a.rs": "b0c2d44a2d4c64101938c20636ed5d3ae3f66a2969e38fbdd37d46e08cd585af",
+        "src/b.rs": "b0c2d44a2d4c64101938c20636ed5d3ae3f66a2969e38fbdd37d46e08cd585af"
+      },
+      "test_sha256": {
+        "tests/contract.rs": "c1a272ce109a9a30df6eed0dc21feeaf1643c3c642f7fdd8b2153915131364f5"
+      },
+      "mutant_count": 2,
+      "mutant_outcomes": {
+        "KILLED": 2,
+        "SURVIVED": 0,
+        "TIMED_OUT": 0,
+        "UNVIABLE": 0,
+        "ERROR": 0
+      },
+      "checks_passed": true,
+      "failures": []
+    }
+  ],
+  "completed": true,
+  "previous_attempt_summary": "/home/tim/Projects/llm-forge/.git/forge-program-real-engine-summary-attempt-1793847195131614298.json",
+  "fixture_layout": "root Cargo.toml; production adapter must normalize its CLI path without modifying generated manifest",
+  "source_binary": "/home/tim/Projects/llm-forge/native/forge/target/release/forge",
+  "private_binary": "/tmp/forge-program-real-engine-3hugimyi/bin/forge",
+  "binary_sha256": "9d662e91c9d4a808b2ddc09c9f9c644a3c5c625dc1823fec6b4aa400b73617da",
+  "forge_version": "forge 0.8.21 (git 9117c2f)",
+  "engine_version": "cargo-mutants 27.1.0",
+  "engine_binary": "/home/tim/.cargo/bin/cargo-mutants",
+  "engine_sha256": "5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2",
+  "finished_unix": 1793847196.3594599
+}
