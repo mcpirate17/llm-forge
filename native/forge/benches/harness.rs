@@ -79,7 +79,7 @@ fn prepare(base: PathBuf) -> Result<(Directory, PathBuf, Service, Instant)> {
         "context":{"tokenizer":tokenizer_config,"max_input_bytes":16384,"max_tokens":16384,"recovery_bytes":1048576},
         "memory_indexes":{"notes":{"source":base.join("memory.jsonl"),"snapshot":base.join("memory.mapped"),
             "fingerprint":format!("sha256:{}","b".repeat(64)),"dimension":64,"max_rows":4096,"max_mapped_mib":2}},
-        "aggregate":{"cpu_millis":1000,"memory_mib":512,"processes":64},"session":{"cpu_millis":100,"memory_mib":32,"processes":8},
+        "aggregate":{"cpu_millis":1000,"memory_mib":1024,"processes":64},"session":{"cpu_millis":100,"memory_mib":32,"processes":8},
         "max_sessions":1,"max_retained_sessions":1,"max_tasks":1,"lifetime_seconds":120,"session_seconds":5,
         "retention_seconds":1,"replay_bytes":1024,"log_bytes":1024});
     let parsed: Policy = serde_json::from_value(policy.clone())?;
