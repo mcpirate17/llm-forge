@@ -345,3 +345,70 @@ fn fest_requires_a_guest_and_keeps_pinned_python_commands_and_environment() {
         },
     );
 }
+
+/// Synthetic shell protocol exercises the adapter through the confined actor;
+/// these fixture results are not mutation campaign evidence.
+fn delegated_fest_failure(coverage: bool) {
+    let fixture = crate::mutation_run_test_support::Delegated::new(Some("/venv/bin/python"));
+    let root = fixture.path();
+    write(root, "src/a.py", "x = 1\n");
+    write(root, "tests/test_a.py", "def test_a(): pass\n");
+    // `fest` is /bin/sh; its first generated argument is `run`, so the shell
+    // reads this file in the owned worktree. No external test plugin is needed.
+    write(
+        root,
+        "run",
+        "printf 'not-json'\nprintf ran > engine-marker\n",
+    );
+    let source = crate::mutation_campaign::sha256_path(&root.join("src/a.py")).unwrap();
+    let test = crate::mutation_campaign::sha256_path(&root.join("tests/test_a.py")).unwrap();
+    let baseline = if coverage { ": > .coverage" } else { ":" };
+    fixture.with_run(
+        Some("/venv/bin/python"),
+        json!({
+            "source_sha256": {"src/a.py": source},
+            "test_sha256": {"tests/test_a.py": test},
+            "test_argv": ["/bin/sh", "-c", baseline],
+        }),
+        |run| {
+            let error = execute(run, "/bin/sh").unwrap_err();
+            let detail = match error {
+                crate::mutation_campaign::Stop::Refused(detail) => detail,
+                other => panic!("expected explicit refusal: {other:?}"),
+            };
+            assert_eq!(run.receipt["baseline"]["returncode"], 0);
+            assert!(!run.receipt.contains_key("mutants"));
+            assert!(!run.receipt.contains_key("engine_summary"));
+            let commands = run.receipt["process_commands"].as_array().unwrap();
+            if coverage {
+                assert!(detail.contains("fest produced no JSON report"), "{detail}");
+                assert_eq!(commands.len(), 2);
+                assert_eq!(
+                    fs::read_to_string(root.join("engine-marker")).unwrap(),
+                    "ran"
+                );
+                assert_eq!(run.receipt["engine_result"]["returncode"], 0);
+            } else {
+                assert!(
+                    detail.contains("baseline produced no coverage database"),
+                    "{detail}"
+                );
+                assert_eq!(commands.len(), 1);
+                assert!(!root.join("engine-marker").exists());
+                assert!(!run.receipt.contains_key("engine_result"));
+            }
+        },
+    );
+}
+
+#[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+fn successful_baseline_without_coverage_refuses_before_fest() {
+    delegated_fest_failure(false);
+}
+
+#[test]
+#[ignore = "requires strict sandbox and explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+fn non_json_fest_output_refuses_after_clean_baseline() {
+    delegated_fest_failure(true);
+}

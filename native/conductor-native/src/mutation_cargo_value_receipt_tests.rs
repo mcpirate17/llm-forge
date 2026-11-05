@@ -58,7 +58,7 @@ fn generated_fixture() -> (crate::mutation_manifest::CampaignContract, Value) {
         "native_runner":{"schema_version":crate::mutation_native_runner::RUNNER_SCHEMA,"forge_version":"fixture",
         "executable_sha256":"d".repeat(64),"compiled_source_sha256":"e".repeat(64),"compiled_git_commit":"f".repeat(40),"source_matches_git":true},
         "test_value":value,"attribution":attribution,"cargo_value_observations":observations,
-        "cargo_value_process_cleanup":{"complete":true,"commands_observed":3},"snapshot":{"removed":true}});
+        "cargo_value_process_cleanup":{"complete":true,"commands_observed":3},"cargo_value_commands":[{"state":"observed","confinement":{"cleanup_complete":true,"outcome":"exited","exit_code":0,"signal":null,"resources":{"verified":true},"errors":[]}},{"state":"observed","confinement":{"cleanup_complete":true,"outcome":"exited","exit_code":0,"signal":null,"resources":{"verified":true},"errors":[]}},{"state":"observed","confinement":{"cleanup_complete":true,"outcome":"exited","exit_code":0,"signal":null,"resources":{"verified":true},"errors":[]}}],"snapshot":{"removed":true}});
     (campaign, payload)
 }
 

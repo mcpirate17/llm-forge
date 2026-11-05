@@ -1174,6 +1174,13 @@ mod native_runner_binding {
             payload.remove(key);
         }
         payload.insert("runner_kind".into(), json!(RUNNER_KIND));
+        payload.insert("execution_grants_sha256".into(), json!("a".repeat(64)));
+        payload.insert(
+            "process_cleanup".into(),
+            json!({"schema_version":1,"complete":true,"commands_observed":1}),
+        );
+        payload.insert("process_commands".into(), json!([{"state":"observed","confinement":{"cleanup_complete":true,"outcome":"exited","exit_code":0,"signal":null,"resources":{"verified":true},"errors":[]}}]));
+        payload.insert("snapshot".into(), json!({"removed":true}));
         payload.insert(
             "mutants".into(),
             json!([{"id":"fixture-kill","path":"conductor/subject.py","outcome":"KILLED"}]),

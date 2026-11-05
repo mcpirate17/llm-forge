@@ -60,6 +60,12 @@ this audit.
 
 ### Ordered continuation and acceptance criteria
 
+The next correctness priority is [#192](https://github.com/mcpirate17/llm-forge/issues/192):
+legacy mutation runners must prove descendant cleanup before snapshot deletion.
+An execution-owner capture prerequisite is implemented on the active branch and
+tested; the runner migration is still in progress. It takes precedence over the
+product backlog below.
+
 1. Extend the shared prompt/tool layer from the bounded literal inspection slice
    described below: useful tool recommendations and eligible strengthening need
    explicit permissions, source-backed evidence and matched task controls.
@@ -67,8 +73,10 @@ this audit.
    in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
    works without vendored Forge sources. The explicit installed-identity path is
    now implemented and measured below; receipt-supplied identity cannot authorize
-   itself. Automatic Cargo test attribution remains a separate gap in
-   [#190](https://github.com/mcpirate17/llm-forge/issues/190).
+   itself. The bounded automatic Cargo attribution slice from
+   [#190](https://github.com/mcpirate17/llm-forge/issues/190) landed in
+   [PR #194](https://github.com/mcpirate17/llm-forge/pull/194); broader target and
+   dependency support remains outside its verified scope.
 2. Validate one real client: setup, advertised tools, an agent-selected read,
    allowed/denied/failure cases, reconnect and undo. Test the client-specific
    configuration rather than treating a custom wire client as client adoption.
@@ -210,7 +218,7 @@ merged as `c066e8540c90e9f115e1d150bf92da7afe4bb077`, with the same tree as chec
 commit `b82da144ff552d811113fcca715a3d2a04b9fc0c`. All 18 local-check steps and
 local-verify passed: 4,548 passing test executions, zero failures, 145 ignored
 across 177 harnesses. Global installation and client activation are unchanged.
-**Implemented correctness increment, publication pending:** #190's opt-in target-bound
+**Delivered correctness increment:** #190's opt-in target-bound
 Cargo attribution uses original engine scenarios and the shared native value analyzer.
 The clean release trial at `015e66e` killed two mutants and admitted one newly added
 `CORE` test through candidate mutation-evidence. Live and commit audits were `CLEAN`;
@@ -237,11 +245,99 @@ now uses native raw Git objects, held ignore rules and no Git child; 22 focused 
 and strict Clippy pass. The integrated mutation suite passed 272 tests with 12 ignored.
 Its real release engine trial passed the bounded mutation admission checks above;
 independent review verified source, receipt and cleanup identities. Fresh matched
-help/symbol comparisons also passed across 404 samples. The full publication gate
-for this final source remains pending.
-The capture is point-in-time and not an atomic filesystem snapshot. The previous
-gate receipt does not attest these later changes. The opt-in declaration and supported scope are described
+help/symbol comparisons also passed across 404 samples. [PR #194](https://github.com/mcpirate17/llm-forge/pull/194)
+merged as `da276a8f1f41632e6df6ab29a3ababbfc9f461be`, with the same tree as checked
+head `ed4beb7faea1f9cc994763723435607e4c6a69a3`. All 18 local-check steps and
+local-verify passed: 4,636 passing executions, zero failures and 145 ignored across
+177 harnesses. Receipt SHA-256:
+`4eedee9a1bb3ff28c95bc16330f7009adf90b58a4f9074cb67352bc2a9397a70`.
+The capture is point-in-time and not an atomic filesystem snapshot. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
+
+**Active [#192](https://github.com/mcpirate17/llm-forge/issues/192) and
+[#195](https://github.com/mcpirate17/llm-forge/issues/195):** ordinary native
+execution now requires pinned operator grants and the shared sandbox/cgroup
+command owner. The initial supported profile is a dependency-free root Cargo
+package with one explicit integration target. Unsupported Fest, Mull, workspace
+and dependency profiles refuse before payload launch; restoring those profiles
+under the same guarantees is tracked in
+[#196](https://github.com/mcpirate17/llm-forge/issues/196). Current native PASS
+admission requires consistent owned cleanup and snapshot removal. Historical
+process-group-only receipts remain readable but do not meet that admission.
+See [execution grants](mutation.md#ordinary-cargo-execution-grants).
+
+The clean release built from `adec2a6` completed both real automatic-engine
+fixtures: the declared killer test produced two killed mutants and PASS; the
+extra, unpinned killer target produced two survivors and RATCHET_HELD, which is
+not PASS. The earlier release control incorrectly produced two kills and PASS
+in that mixed-target fixture. Both baseline and engine now explicitly select the
+declared target. Independent review verified generated source/test pins, exact
+arguments, receipt hashes and removal of owned cgroups and snapshots. These are
+bounded execution observations, not producer attestation or agent-productivity
+results. [The compact evidence](../research/performance/forge-program-20261105-owned-mutation.json)
+preserves all three earlier failed attempts, debug and release runs, and the old
+control. The per-test value release compatibility trial completed 12 checks with
+zero failures and two unstarted checks; its mutation admission passed while the
+overall candidate gate still failed on separate obligations.
+
+Focused verification passed 171 core mutation tests and 278 Forge mutation tests
+(with 26 ignored in that invocation). All 14 newly delegated runner/attribution/
+environment cases were then explicitly executed and passed, including detached
+sessions, timeout, cancellation and snapshot retention on unknown cleanup. The
+unknown-ledger case injects state; it does not simulate a kernel failure. Earlier
+capture suites passed 42 tests (four ignored), 15 pipe tests and 14 explicitly
+delegated execution-owner tests. Counts overlap and must not be added as unique
+tests. Strict Clippy and file/function limits passed. The complete-output mode
+bounds stdout at 16 MiB and stderr at 1 MiB and fails through owned cleanup on
+overflow. Matched read-only CLI/help and symbol-context comparisons passed the
+unchanged 10% budget across 404 measured executions; symbol p95 increased 8.64%.
+Mutation workflow overhead is unmeasured because review rejected the proposed
+unsafe timeout harness before execution. The first full gate at `abebaa1`
+passed 17 of 18 steps, including dependency audits, but failed the Forge test step:
+28 old CLI integration cases still assumed unconfined Fest/Cargo fixtures. The
+run recorded 3,390 passing, 28 failing and 68 ignored executions across 66
+harnesses; Cargo stopped that test step before later Forge harnesses ran. The
+failed receipt is `.git/forge-checks/run-1793873392819466207-932448/receipt.json`,
+SHA-256 `3c78064165d9eee53df3195959233c9c105e54f6d54d56575bbbef41435d70b8`.
+The migrated CLI suite now passes all 15 cases, including 10 explicitly delegated
+public Cargo cases with real confinement, and two separate Fest adapter cases
+pass through the same owner. Those adapter tests preserve missing-coverage and
+non-JSON refusals; public Fest execution remains unsupported. Scorer/parser
+unit tests retain protocol-specific outcome assertions. The first migrated run
+had one incorrect baseline-status expectation; after correcting it to
+BASELINE_FAILED, all cases passed with zero ignored. Strict Clippy and size
+limits passed. The repeat full gate and local-verify passed at
+`0674d34b72e84e301e7a8927221a1bd86980573a`: all 18 steps, 4,623 passing
+executions, zero failures and 172 ignored across 177 harnesses. Receipt SHA-256:
+`3dc97c137d20aefbbabdc3139980c938e74d85634e69a884cfe27f3919ee9d47`.
+All 45 explicit release executions then passed with zero ignored: 15 CLI,
+two Fest adapter, five runner, eight attribution, one guest-environment and
+14 execution-owner cases. These overlap default suites and are not a unique-test
+total. Final release automatic-engine trials from that same source repeated the
+ordinary 14/14 check result and the Cargo-value 12 completed/two unstarted result;
+the compact artifact retains all 11 trials. Native binary SHA-256:
+`00fe167a21c5084a1f9a523d1776fb3980e01c8df52ba28dd232b1f1a564f06f`;
+compiled source fingerprint:
+`974a19a1506ad33281875d7b8d19f6a8b1c9bdd3c585d692e7273e63e6e4a39a`.
+Publication revalidates the committed documentation/evidence update against the
+same production implementation. Global installation and client activation have
+not changed.
+
+Read-only review also identified a pre-existing supporting-input freshness gap,
+tracked in [#197](https://github.com/mcpirate17/llm-forge/issues/197): ordinary
+receipts bind selected source/test files, but later admission does not bind all
+unselected Rust inputs, Cargo manifests or added relevant files. Run-time
+holdings are not a later freshness guarantee. A fresh automatic PASS fixture then
+completed 32 diagnostic checks: an unused helper appended to `src/lib.rs`, a Cargo
+edition change and a new Rust binary file each left the original receipt accepted
+by live and committed corpus admission, with selected source/test/receipt bytes
+held unchanged. Exact authored restoration returned to the original tree after
+each probe. [Reproduction inputs and observations](../research/performance/forge-program-20261105-supporting-input-freshness.json)
+preserve native CLI arguments, hashes and raw log references. These establish an
+input-freshness gap, not demonstrated behavior changes, compiler-input closure or
+whole-candidate approval. Cargo.lock drift is not yet probed. This correctness
+prerequisite comes before broader dependency support in #196.
+
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
 two lints. The fixes preserve behavior, passed independent review and focused core

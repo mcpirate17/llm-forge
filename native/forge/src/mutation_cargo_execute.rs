@@ -4,11 +4,11 @@ use super::{engine_argv, located, require_baseline, require_verdict_exit, rows, 
 use crate::{
     candidate_engine_identity::{executable_file, BinaryIdentity},
     candidate_inputs::{self, BoundFile},
-    cgroup::{Cgroup, Limits as GroupLimits},
-    confined_execution::{self, Outcome, Resources},
+    cgroup::Limits as GroupLimits,
     mutation_bytecode::isolated_python_env,
     mutation_campaign::{sha256_hex, Step, Stop},
     mutation_cargo_capture::Held,
+    mutation_execution::{Capture, CommandSession},
     mutation_process::{CommandResult, MemoryCap},
     mutation_run::EngineRun,
     mutation_snapshot::{is_executable, on_path},
@@ -25,7 +25,6 @@ use std::{
     fs::{self, File, OpenOptions},
     os::unix::{fs::symlink, fs::OpenOptionsExt},
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 fn error(value: impl std::fmt::Display) -> String {
@@ -394,18 +393,6 @@ fn group_limits(cap: Option<MemoryCap>) -> Result<GroupLimits, String> {
         processes: 64,
     })
 }
-async fn read_interrupt(signal: &crate::process_io::Descriptor) -> Result<i32, String> {
-    let mut bytes = [0u8; std::mem::size_of::<libc::signalfd_siginfo>()];
-    let count = signal.read(&mut bytes).await.map_err(error)?;
-    if count != bytes.len() {
-        return Err("short interrupt event".into());
-    }
-    let number = u32::from_ne_bytes(bytes[..4].try_into().map_err(error)?) as i32;
-    if !matches!(number, libc::SIGINT | libc::SIGTERM) {
-        return Err("unexpected interrupt event".into());
-    }
-    Ok(number)
-}
 fn operator_cgroup_parent() -> Result<PathBuf, String> {
     let raw=std::env::var_os("FORGE_MUTATION_CGROUP_PARENT").ok_or("Cargo value execution requires operator FORGE_MUTATION_CGROUP_PARENT naming an existing delegated cgroup v2 parent; no controllers are enabled automatically")?;
     let path = PathBuf::from(raw);
@@ -539,122 +526,27 @@ fn read_roots(repo: &Path, snapshot: &Path, runtime: &Runtime) -> Result<Vec<Pat
     }
     Ok(roots)
 }
-struct NoResources;
-impl Resources for NoResources {
-    fn arm(&mut self) {}
-    fn finish(self: Box<Self>, _cleanup_safe: bool) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
 impl Runtime {
-    async fn observe(
-        &self,
-        plan: crate::sandbox::CommandPlan,
-        run: &mut EngineRun<'_>,
-        seconds: i64,
-        index: usize,
-    ) -> Result<confined_execution::Report, String> {
-        let signal = run
-            .supervisor
-            .interrupts
-            .register_reactor()
-            .map_err(error)?;
-        let pending = run.supervisor.interrupts.signal().map_err(error)?;
-        let group = Cgroup::create(&self.cgroup_parent, self.limits).map_err(error)?;
-        run.receipt["cargo_value_commands"][index]["pending_cgroup"] = json!(group.report());
-        run.receipt["cargo_value_commands"][index]["cgroup_identity_scope"] =
-            json!("diagnostic only; not future kill permission");
-        // This durable boundary precedes every possible payload spawn.
-        run.write_receipt()?;
-        let limits = confined_execution::Limits {
-            timeout: Duration::from_secs(u64::try_from(seconds).map_err(error)?),
-            max_output_chars: 0,
-            cpu_seconds: None,
-            address_space_bytes: None,
-        };
-        let execution = confined_execution::start_filter_with_resources(
-            plan,
-            group,
-            limits,
-            Box::new(NoResources),
-            Vec::new(),
-            observations::MAX_LOG_BYTES,
-        )
-        .map_err(error)?;
-        let cancel = execution.cancellation();
-        let initial_wake = pending.map(|signal| {
-            self.signal.set(Some(signal));
-            cancel.cancel()
-        });
-        let wait = execution.wait();
-        tokio::pin!(wait);
-        let report = tokio::select! {
-            result=&mut wait=>result.map_err(error),
-            received=read_interrupt(&signal) => {
-                let wake=cancel.cancel();
-                let report=wait.await.map_err(error)?;
-                wake.map_err(error)?;
-                self.signal.set(Some(received?));
-                Ok(report)
-            }
-        }?;
-        if let Some(wake) = initial_wake {
-            wake.map_err(error)?;
-        }
-        Ok(report)
-    }
     fn command(
         &self,
         run: &mut EngineRun,
         argv: &[String],
         seconds: i64,
     ) -> Step<(CommandResult, String, Value)> {
-        if !self.cleanup_complete.get() {
-            return Err("previous confined command cleanup is unresolved".into());
-        }
-        let command = argv.first().ok_or("empty confined Cargo command")?;
-        let sandbox = self.sandbox.as_ref().ok_or("Cargo sandbox unavailable")?;
-        let mut plan = sandbox.command(Path::new(command)).map_err(error)?;
-        plan.command().args(&argv[1..]);
-        run.supervisor
-            .interrupts
-            .child_mask()
-            .configure(plan.command());
-        let commands = run
-            .receipt
-            .entry("cargo_value_commands")
-            .or_insert_with(|| json!([]))
-            .as_array_mut()
-            .ok_or("confined command ledger invalid")?;
-        let index = commands.len();
-        commands.push(json!({"argv":argv,"state":"pending"}));
-        run.receipt.insert("cargo_value_process_cleanup".into(),json!({"complete":false,"commands_observed":index,"scope":"actor disposition pending; retain snapshot/runtime on unknown"}));
-        self.cleanup_complete.set(false);
-        let observed = self
-            .reactor
-            .block_on(self.observe(plan, run, seconds, index))?;
-        self.cleanup_complete.set(observed.cleanup_complete);
-        run.receipt.insert("cargo_value_process_cleanup".into(),json!({"complete":observed.cleanup_complete,"commands_observed":index+1,"scope":"all admitted commands observed through owned cgroup cleanup"}));
-        let provenance = json!({"outcome":observed.outcome,"exit_code":observed.exit_code,"signal":observed.signal,"duration_ms":observed.duration_ms,"errors":observed.errors,"cleanup_complete":observed.cleanup_complete,"resources":observed.resources,"stdout_bytes":observed.stdout_bytes,"stderr_bytes":observed.stderr_bytes});
-        run.receipt["cargo_value_commands"][index] =
-            json!({"argv":argv,"state":"observed","confinement":provenance});
-        if let Some(signal) = self.signal.get() {
-            return Err(Stop::Cancelled(signal));
-        }
-        if !observed.cleanup_complete
-            || !observed.errors.is_empty()
-            || !matches!(observed.outcome, Outcome::Exited | Outcome::TimedOut)
-        {
-            return Err(format!("confined Cargo command failed: {provenance}").into());
-        }
-        let result = CommandResult {
-            returncode: observed.exit_code,
-            timed_out: observed.outcome == Outcome::TimedOut,
-            duration_seconds: observed.duration_ms as f64 / 1000.0,
-            stdout_tail: crate::mutation_run::last_chars(&observed.stdout, 4000),
-            stderr_tail: crate::mutation_run::last_chars(&observed.stderr, 4000),
+        let cwd = run.worktree.to_owned();
+        let session = CommandSession {
+            sandbox: self.sandbox.as_ref().ok_or("Cargo sandbox unavailable")?,
+            reactor: &self.reactor,
+            cgroup_parent: &self.cgroup_parent,
+            limits: self.limits,
+            cleanup_complete: &self.cleanup_complete,
+            signal: &self.signal,
+            programs: None,
+            scratch: &cwd,
+            max_wall_seconds: 86400,
+            cargo_value: true,
         };
-        Ok((result, observed.stdout, provenance))
+        session.command(run, argv, &cwd, seconds, Capture::Strict)
     }
 }
 fn baseline_runs(run: &mut EngineRun, inputs: &Inputs, runtime: &Runtime) -> Step<Vec<Value>> {

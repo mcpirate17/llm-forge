@@ -128,8 +128,14 @@ pub fn snapshot_untracked_paths(repo: &Path) -> Result<Vec<String>, String> {
     native::untracked(repo)
 }
 
-fn private_root() -> Result<PathBuf, String> {
-    let template = env::temp_dir().join("llm-orchestrator-snapshot-XXXXXX");
+fn private_root(parent: &Path) -> Result<PathBuf, String> {
+    let parent = parent
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve snapshot parent: {error}"))?;
+    if !parent.is_dir() {
+        return Err("snapshot parent must be a directory".into());
+    }
+    let template = parent.join("llm-orchestrator-snapshot-XXXXXX");
     let template = CString::new(template.as_os_str().as_bytes())
         .map_err(|error| format!("temporary path holds a NUL: {error}"))?;
     let mut bytes = template.into_bytes_with_nul();
@@ -159,25 +165,50 @@ pub struct Snapshot {
 impl Snapshot {
     /// Build a clean snapshot without writing objects into the host repository.
     pub fn create(repo: &Path) -> Result<Self, String> {
-        let root = private_root()?;
+        let mut snapshot = Self::allocate(&env::temp_dir())?;
+        snapshot.populate(repo)?;
+        Ok(snapshot)
+    }
+
+    /// Allocate only the empty private root for sandbox admission.
+    pub(crate) fn allocate(parent: &Path) -> Result<Self, String> {
+        let root = private_root(parent)?;
         let worktree = root.join("worktree");
-        let mut snapshot = Self {
+        Ok(Self {
             root,
             worktree,
             commit: String::new(),
             included_untracked: Vec::new(),
             removed: false,
             preserved: false,
-        };
-        snapshot.populate(repo)?;
-        Ok(snapshot)
+        })
     }
 
-    fn populate(&mut self, repo: &Path) -> Result<(), String> {
+    pub(crate) fn populate(&mut self, repo: &Path) -> Result<(), String> {
         let (commit, untracked) = native::populate(repo, &self.root, &self.worktree)?;
         self.commit = commit;
         self.included_untracked = untracked;
         Ok(())
+    }
+
+    /// Remove coordinator-created private Git metadata before a no-Git payload.
+    /// The synthetic commit remains diagnostic only; no Git history is promised.
+    pub(crate) fn remove_git_metadata(&self) -> Result<(), String> {
+        let path = self.worktree.join(".git");
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("cannot inspect snapshot Git metadata: {error}"))?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err("snapshot Git metadata is not a private directory".into());
+        }
+        fs::remove_dir_all(&path)
+            .map_err(|error| format!("cannot remove snapshot Git metadata: {error}"))?;
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!(
+                "cannot verify removed snapshot Git metadata: {error}"
+            )),
+            Ok(_) => Err("snapshot Git metadata survived removal".into()),
+        }
     }
 
     /// Disable automatic deletion while execution cleanup is uncertain. Explicit

@@ -8,7 +8,6 @@
 
 use crate::instant::{format_compact_utc, isoformat_utc, now};
 use crate::json_canon::python_pretty;
-use crate::mutation_bytecode::{isolated_python_env, scratch_root_for};
 use crate::mutation_campaign::{drift, sha256_path, Campaign, Step, Stop, KILLED, SURVIVED};
 use crate::mutation_engine_cargo as cargo;
 use crate::mutation_engine_fest as fest;
@@ -57,6 +56,8 @@ pub struct RunRequest {
     pub only: Vec<String>,
     pub allow_mutations: bool,
     pub receipt: Option<PathBuf>,
+    pub execution_grants: Option<PathBuf>,
+    pub execution_grants_sha256: Option<String>,
     pub stamp: BuildStamp,
 }
 
@@ -75,6 +76,9 @@ pub struct EngineRun<'a> {
     pub worktree: &'a Path,
     pub interpreter: Option<&'a str>,
     pub supervisor: &'a Supervisor<'a>,
+    pub(crate) runtime: Option<&'a crate::mutation_execution_legacy::Runtime<'a>>,
+    #[cfg(test)]
+    pub(crate) test_session: Option<&'a crate::mutation_execution::CommandSession<'a>>,
     /// The engine's own mutant count, set as soon as a report states one.
     pub planned: Option<u64>,
 }
@@ -82,16 +86,31 @@ pub struct EngineRun<'a> {
 impl<'a> EngineRun<'a> {
     /// One child, bound to the private bytecode cache of the directory it runs in.
     pub fn run(
-        &self,
+        &mut self,
         argv: &[String],
         cwd: &Path,
         timeout_seconds: i64,
-        environment: &BTreeMap<String, String>,
-        mutated_paths: &[PathBuf],
+        _environment: &BTreeMap<String, String>,
+        _mutated_paths: &[PathBuf],
     ) -> Step<(CommandResult, String)> {
-        let bound = self.guest_environment(environment);
-        let isolated = isolated_python_env(&bound, &scratch_root_for(cwd), mutated_paths)?;
-        self.supervisor.run(argv, cwd, timeout_seconds, &isolated)
+        #[cfg(test)]
+        if self.runtime.is_none() {
+            if let Some(session) = self.test_session {
+                return session
+                    .command(
+                        self,
+                        argv,
+                        cwd,
+                        timeout_seconds,
+                        crate::mutation_execution::Capture::Complete,
+                    )
+                    .map(|(report, stdout, _)| (report, stdout));
+            }
+        }
+        let runtime = self
+            .runtime
+            .ok_or("mutation payload requires an admitted confined execution session")?;
+        runtime.command(self, argv, cwd, timeout_seconds)
     }
 
     pub fn write_receipt(&self) -> Result<(), String> {
@@ -346,11 +365,16 @@ struct Execution<'a> {
     binary: &'a str,
     supervisor: &'a Supervisor<'a>,
     planned: &'a mut Option<u64>,
+    grants: Option<&'a crate::mutation_execution_grants::Grants>,
+    inputs: Option<&'a crate::mutation_execution_legacy::Inputs>,
 }
 
 /// Engine, then identity checks and cleanup. Opt-in Cargo snapshots are retained
 /// whenever the confined execution owner cannot establish process-tree cleanup.
 fn in_snapshot(parts: Execution) -> Step<()> {
+    if parts.campaign.generated_value.is_none() {
+        return in_legacy_snapshot(parts);
+    }
     let mut snapshot = Snapshot::create(parts.repo_root)?;
     let requires_tree_cleanup = parts.campaign.generated_value.is_some();
     if requires_tree_cleanup {
@@ -379,6 +403,9 @@ fn in_snapshot(parts: Execution) -> Step<()> {
         worktree: &snapshot.worktree,
         interpreter: parts.interpreter,
         supervisor: parts.supervisor,
+        runtime: None,
+        #[cfg(test)]
+        test_session: None,
         planned: None,
     };
     let finished = execute(&mut run, parts.binary).and_then(|()| {
@@ -394,6 +421,156 @@ fn in_snapshot(parts: Execution) -> Step<()> {
     removal
 }
 
+fn ledger_verified(receipt: &Receipt) -> bool {
+    let cleanup = &receipt["process_cleanup"];
+    let Some(commands) = receipt.get("process_commands").and_then(Value::as_array) else {
+        return false;
+    };
+    !commands.is_empty()
+        && cleanup["schema_version"] == 1
+        && cleanup["complete"] == true
+        && cleanup["commands_observed"].as_u64() == Some(commands.len() as u64)
+        && commands.iter().all(|command| {
+            command["state"] == "observed" && command["confinement"]["cleanup_complete"] == true
+        })
+}
+fn dispose_legacy_snapshot(
+    mut snapshot: Snapshot,
+    receipt: &mut Receipt,
+    verified: bool,
+) -> Step<()> {
+    if !verified || !ledger_verified(receipt) {
+        snapshot.preserve();
+        receipt["snapshot"]["removed"] = json!(false);
+        receipt["snapshot"]["retained_reason"] =
+            json!("process cleanup or execution input verification is incomplete");
+        return Err(Stop::Refused(format!(
+            "mutation cleanup or input verification is incomplete; snapshot retained at {}",
+            snapshot.root.display()
+        )));
+    }
+    let removal = snapshot.remove();
+    receipt["snapshot"]["removed"] = json!(removal.is_ok());
+    if let Err(error) = &removal {
+        receipt["snapshot"]["removal_error"] = json!(error);
+    }
+    Ok(removal?)
+}
+fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
+    let grants = parts
+        .grants
+        .ok_or("ordinary mutation execution requires operator grants")?;
+    let inputs = parts
+        .inputs
+        .ok_or("ordinary mutation admission is missing")?;
+    let mut snapshot = Snapshot::allocate(&grants.scratch_parent)?;
+    snapshot.preserve();
+    parts.receipt.insert(
+        "snapshot".into(),
+        json!({"root":snapshot.root,"removed":false}),
+    );
+    parts.receipt.insert("process_commands".into(), json!([]));
+    parts.receipt.insert("process_cleanup".into(), json!({"schema_version":1,"complete":false,"commands_observed":0,"scope":"awaiting confined execution owner"}));
+    parts
+        .receipt
+        .insert("execution_grants_sha256".into(), json!(grants.digest()));
+    write_receipt(parts.output_path, parts.receipt)?;
+    let runtime = crate::mutation_execution_legacy::Runtime::prepare(&snapshot, grants, inputs)
+        .map_err(|e| format!("execution admission: {e:#}"))?;
+    snapshot.populate(parts.repo_root)?;
+    snapshot.remove_git_metadata()?;
+    inputs
+        .verify_snapshot(&snapshot.worktree)
+        .map_err(|e| format!("Cargo snapshot admission: {e:#}"))?;
+    runtime
+        .verify(Some(&snapshot.worktree))
+        .map_err(|e| format!("execution input verification: {e:#}"))?;
+    parts.receipt["snapshot"]["commit"] = json!(snapshot.commit);
+    parts.receipt["snapshot"]["included_untracked"] = json!(snapshot.included_untracked);
+    parts.receipt["snapshot"]["git_history"] =
+        json!("private Git metadata removed; history unavailable");
+    write_receipt(parts.output_path, parts.receipt)?;
+    let mut run = EngineRun {
+        campaign: parts.campaign,
+        receipt: parts.receipt,
+        output_path: parts.output_path,
+        repo_root: parts.repo_root,
+        worktree: &snapshot.worktree,
+        interpreter: parts.interpreter,
+        supervisor: parts.supervisor,
+        runtime: Some(&runtime),
+        #[cfg(test)]
+        test_session: None,
+        planned: None,
+    };
+    let finished = execute(&mut run, parts.binary).and_then(|()| {
+        if let Some(signal) = interrupted(parts.supervisor)? {
+            return Err(Stop::Cancelled(signal));
+        }
+        crate::mutation_source_coverage::require(run.campaign, run.worktree, run.receipt)?;
+        run.verify_identities()
+    });
+    *parts.planned = run.planned;
+    let checked = runtime.verify(Some(&snapshot.worktree));
+    if let Err(error) = &checked {
+        parts.receipt.insert(
+            "execution_verification_error".into(),
+            json!(format!("{error:#}")),
+        );
+    }
+    let removal = dispose_legacy_snapshot(snapshot, parts.receipt, checked.is_ok());
+    finished?;
+    if let Err(error) = checked {
+        return Err(Stop::Refused(format!(
+            "execution input verification: {error:#}"
+        )));
+    }
+    removal
+}
+fn prepare_legacy(
+    request: &RunRequest,
+    campaign: &Campaign,
+    root: &Path,
+) -> Step<
+    Option<(
+        crate::mutation_execution_grants::Grants,
+        crate::mutation_execution_legacy::Inputs,
+    )>,
+> {
+    if campaign.generated_value.is_some() {
+        if request.execution_grants.is_some() || request.execution_grants_sha256.is_some() {
+            return Err("opt-in Cargo value execution uses its existing operator interface".into());
+        }
+        return Ok(None);
+    }
+    if campaign.language != "rust" || campaign.mutation_engine != "cargo-mutants" {
+        return Err("ordinary mutation profile is not yet supported; explicit confined Cargo grants are required".into());
+    }
+    let path = request.execution_grants.as_deref().ok_or(
+        "ordinary mutation execution requires --execution-grants and --execution-grants-sha256",
+    )?;
+    let sha = request.execution_grants_sha256.as_deref().ok_or(
+        "ordinary mutation execution requires --execution-grants and --execution-grants-sha256",
+    )?;
+    let source = crate::candidate_source::Source::open(root)
+        .map_err(|e| format!("source repository: {e:#}"))?;
+    let git_dir = source
+        .repository()
+        .path()
+        .canonicalize()
+        .map_err(|e| format!("Git directory: {e}"))?;
+    let grants = crate::mutation_execution_grants::Grants::load(
+        path,
+        sha,
+        source.root(),
+        source.common_dir(),
+        &git_dir,
+    )
+    .map_err(|e| format!("execution grants: {e:#}"))?;
+    let inputs = crate::mutation_execution_legacy::Inputs::capture(campaign, root)
+        .map_err(|e| format!("ordinary Cargo admission: {e:#}"))?;
+    Ok(Some((grants, inputs)))
+}
 fn dispose_snapshot(
     mut snapshot: Snapshot,
     receipt: &mut Receipt,
@@ -468,6 +645,11 @@ fn close_scored(
     planned: Option<u64>,
     relative: &str,
 ) -> Result<(), String> {
+    if campaign.generated_value.is_none()
+        && (!ledger_verified(receipt) || receipt["snapshot"]["removed"] != true)
+    {
+        return Err("owned process or snapshot cleanup is incomplete".into());
+    }
     score(campaign, receipt, planned)?;
     record_baseline(campaign, receipt, planned)?;
     receipt.insert("receipt_path".into(), json!(relative));
@@ -492,8 +674,19 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
         &request.base,
         &request.only,
     )?;
+    let legacy = prepare_legacy(request, &campaign, &repo_root)?;
     let interpreter = selected_interpreter(&campaign, &repo_root)?;
-    let binary = engine_binary(&campaign, interpreter.as_deref())?;
+    if legacy.is_some() && interpreter.is_some() {
+        return Err("ordinary Cargo profile refuses a configured Python guest".into());
+    }
+    let binary = match &legacy {
+        Some((grants, _)) => grants
+            .program("cargo-mutants")
+            .map_err(|e| format!("execution grants: {e:#}"))?
+            .to_string_lossy()
+            .into_owned(),
+        None => engine_binary(&campaign, interpreter.as_deref())?,
+    };
     let opened = now();
     let mut receipt = open_receipt(
         &campaign,
@@ -524,6 +717,8 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
         binary: &binary,
         supervisor: &supervisor,
         planned: &mut planned,
+        grants: legacy.as_ref().map(|(grants, _)| grants),
+        inputs: legacy.as_ref().map(|(_, inputs)| inputs),
     })
     .and_then(|()| {
         close_scored(&mut campaign, &mut receipt, planned, &relative).map_err(Stop::Refused)
@@ -538,6 +733,10 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
 /// Whether the campaign could run now, without running it.
 pub fn inspect(campaign: &Campaign, repo_root: &Path) -> Result<Map<String, Value>, String> {
     let mut reasons = Vec::new();
+    if campaign.generated_value.is_none() {
+        reasons
+            .push("ordinary mutation execution requires explicit pinned execution grants".into());
+    }
     let interpreter = selected_interpreter(campaign, repo_root);
     let binary = interpreter
         .and_then(|interpreter| engine_binary(campaign, interpreter.as_deref()))
@@ -575,3 +774,7 @@ pub fn inspect(campaign: &Campaign, repo_root: &Path) -> Result<Map<String, Valu
 #[cfg(test)]
 #[path = "mutation_run_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "mutation_run_owned_tests.rs"]
+mod owned_tests;

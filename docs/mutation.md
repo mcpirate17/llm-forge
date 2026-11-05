@@ -247,6 +247,69 @@ owned process cleanup is unknown, the actor retains its runtime and snapshot
 rather than claiming safe cleanup. Review the receipt's accounting, attribution,
 test-value and cleanup results independently of any candidate approval.
 
+## Ordinary Cargo execution grants
+
+On Linux, ordinary native `forge mutation run` admits a narrow, dependency-free
+root Cargo package with one explicit standard-harness integration test, one
+worker and no campaign environment overrides or configured Python guest. It
+selects the declared test explicitly and invokes Cargo locked and offline. It
+refuses workspaces, dependencies, unsupported Cargo configuration, and ordinary
+Fest, Mull and other profiles before launching a payload. `forge mutation
+plan` and `write` remain available for planning those profiles. The opt-in Cargo
+per-test value workflow above retains its own execution interface.
+
+Ordinary execution requires an operator-owned, pinned grant document:
+
+```sh
+forge mutation run campaigns/PATH-FROM-WRITE.json --owner my-lane --base origin/main \
+  --only src/a.rs --allow-mutations \
+  --execution-grants /operator/private/grants.json \
+  --execution-grants-sha256 SHA256_OF_EXACT_GRANT_BYTES
+```
+
+The strict JSON document has `version: 1`, `source_root`, `scratch_parent`,
+`cgroup_parent`, `read_only`, `programs`, `resources`, and `max_wall_seconds`;
+unknown fields are refused. Paths must be canonical absolute paths. `source_root`
+must be the repository root, `scratch_parent` an existing private-root parent,
+and `cgroup_parent` an existing delegated cgroup v2 parent. `read_only` lists
+explicit files or directories. `programs` maps each alias to an object with
+`path` and lowercase `sha256`; ordinary Cargo requires `cargo`, `cargo-mutants`,
+`rustc` and `rustdoc`, plus any helpers the toolchain actually needs. `resources`
+contains integer `cpu_millis`, `memory_mib` and `processes`; `max_wall_seconds`
+is an integer from 1 through 86400. Grant the loader, libraries and tools needed
+by the selected runtime explicitly. Directory grants also permit execution below
+those directories; aliases restrict Forge's command resolution, not everything
+the payload can execute within a granted directory. There is no implicit PATH or
+`/usr` grant. Do not grant credentials, the live repository or Git metadata.
+
+Forge holds and rechecks the grant and its bound inputs, prepares an owned private
+snapshot, removes its Git metadata before the payload, and runs commands under
+its sandbox and owned cgroup. A recorded snapshot commit is diagnostic; the
+payload does not receive Git history. Network access is denied. The actor retains
+the private root when cleanup or input verification is uncertain; there is no
+process-group cleanup fallback. Executable files and their ancestry must have
+safe ownership and permissions; a group-writable toolchain directory is refused.
+Provision a private verified runtime copy when necessary instead of weakening
+that check or modifying a shared installation. The declared integration target
+is used by both the baseline and cargo-mutants: an additional unpinned test must
+not supply kills for the declared test's campaign (regression #195).
+Ordinary `forge mutation inspect` reports
+`NOT_READY` because it does not validate grants or exercise confinement.
+
+Current native PASS evidence and corpus admission require a consistent owned
+cleanup ledger and a removed snapshot, including the prior opt-in Cargo-value
+ledger. Historical process-group-only receipts remain readable as records but
+do not establish current whole-tree cleanup admission. These ledger checks are
+structural consistency checks, not independent execution attestation.
+
+Ordinary supporting-input freshness is still limited: selected source/test pins
+are checked, but later receipt admission does not yet bind all unselected Rust
+inputs, Cargo manifests or relevant-file additions. Cargo inputs held during a
+run do not close that later-validation gap. This is tracked in
+[#197](https://github.com/mcpirate17/llm-forge/issues/197); do not treat an ordinary
+receipt as proof that every compiler input is unchanged. The opt-in Cargo-value
+workflow has separate inventory validation.
+
 ## Receipt format
 
 A mutation receipt is one JSON file with two blocks (slice L):

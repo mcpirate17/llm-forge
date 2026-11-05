@@ -322,11 +322,31 @@ pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
     let worktree = run.worktree.to_path_buf();
     let timeout = run.campaign.run_timeout_seconds;
     let bound = environment(run);
-    let baseline_argv = run.campaign.test_argv.clone();
+    let mut baseline_argv = run.campaign.test_argv.clone();
+    let test_name = run
+        .runtime
+        .ok_or("mutation payload requires an admitted confined execution session")?
+        .test_name()
+        .to_owned();
+    baseline_argv.extend([
+        "--test".into(),
+        test_name.clone(),
+        "--locked".into(),
+        "--offline".into(),
+    ]);
     let (baseline, _) = run.run(&baseline_argv, &worktree, timeout, &bound, &[])?;
     run.note_baseline(&baseline, &baseline_argv)?;
-    let output = worktree.join(".cargo-mutants-out");
-    let argv = engine_argv(run.campaign, binary, &output)?;
+    let output = run
+        .runtime
+        .ok_or("mutation payload requires an admitted confined execution session")?
+        .output();
+    let mut argv = engine_argv(run.campaign, binary, &output)?;
+    argv.extend([
+        "--no-config".into(),
+        "--cargo-arg=--locked".into(),
+        "--cargo-arg=--offline".into(),
+        format!("--cargo-test-arg=--test={test_name}"),
+    ]);
     let (result, _) = run.run(&argv, &worktree, timeout, &bound, &[])?;
     run.receipt
         .insert("engine_result".into(), result.as_value());

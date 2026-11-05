@@ -62,6 +62,9 @@ pub fn rejection_with_installed(
         return Ok(Some(format!("status={}", python_status(status))));
     }
     if native_runner::declared(object) {
+        if let Some(reason) = native_runner::owned_cleanup_error(object) {
+            return Ok(Some(reason));
+        }
         let current = source_hash(native_runner::FINGERPRINT_KEY)?;
         let errors =
             native_runner::errors_with_installed(object, |_| current.clone(), |_| false, installed);
