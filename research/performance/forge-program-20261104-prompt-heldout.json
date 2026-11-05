@@ -1,0 +1,484 @@
+{
+  "schema": "forge.prompt-heldout-eval.v1",
+  "started_unix": 1793852363.2081885,
+  "scope": "Four literal behavior checks only; no model/network use or coding-agent task-success, token, cost, or productivity evidence.",
+  "binary": "/home/tim/Projects/llm-forge/native/forge/target/release/forge",
+  "binary_sha256": "25e516118bcc460302b853b5659c9add262911151481269fae2ec96887de3a49",
+  "cases_file": "/home/tim/Projects/llm-forge/research/performance/forge-program-prompt-eval-cases-20261104.json",
+  "cases_sha256": "b3c7feeff5277bb67fbac8826e9b73ca6f75f973ca144e50775896bd1da9c5e1",
+  "harness_sha256": "36a42c6f045bf20a74b4f152190bdb0dc928cc26ea4664f26aa256b5a3addd39",
+  "bounds": {
+    "cases_bytes": 32768,
+    "request_bytes": 8192,
+    "stdout_stderr_file_bytes": 65536,
+    "case_seconds": 10
+  },
+  "accounting_definition": "completed = passed literal checks; failed/censored/unstarted are separate outcomes",
+  "completed": true,
+  "accounting": {
+    "planned": 4,
+    "completed": 4,
+    "failed": 0,
+    "censored": 0,
+    "unstarted": 0
+  },
+  "finished_unix": 1793852363.2956753,
+  "raw_evidence": ".git/forge-program-prompt-eval.json",
+  "cases": [
+    {
+      "id": "emoji-crlf-provenance",
+      "request_sha256": "b9aa6f3ccb9f2be91256ff6deda0a7742759331bf006b52341e7a25ada549dc3",
+      "request_bytes": 264,
+      "argv": [
+        "/tmp/forge-prompt-heldout-079v8oqs/forge",
+        "context",
+        "prompt",
+        "--request",
+        "/tmp/forge-prompt-heldout-079v8oqs/request.json"
+      ],
+      "outcome": "passed",
+      "elapsed_seconds": 0.004053247999763698,
+      "returncode": 0,
+      "stderr": "",
+      "output_sha256": "0b1e1234901101e5c5ebae7430a5d903261d7d6a2e7671d55f83128950e25730",
+      "output_bytes": 1987,
+      "output": {
+        "schema_version": 1,
+        "budget_scope": "compact UTF-8 JSON payload; transport framing and model tokens excluded",
+        "caveat": "No authority hierarchy or semantic equivalence has been determined; lexical evidence may be ambiguous.",
+        "mode": "plan",
+        "prompt": {
+          "source": "prompt",
+          "sha256": "560614b053cf0e13702d19e3c9b7cb5c68c0e4ab392f00701bb810323772a640",
+          "bytes": 115
+        },
+        "constraints": [
+          {
+            "source": "caller_constraint",
+            "sha256": "72280acac4a3511506e2cca10475bbd7e5a9d0d81b1a2b7e350acaa2380beb97",
+            "bytes": 19
+          },
+          {
+            "source": "caller_constraint",
+            "sha256": "72280acac4a3511506e2cca10475bbd7e5a9d0d81b1a2b7e350acaa2380beb97",
+            "bytes": 19
+          },
+          {
+            "source": "caller_constraint",
+            "sha256": "2f19ddc8ed65585d4be81f9bdc9dee4f5b2a5ee1eb37c9bc3dc1f7c93337aebe",
+            "bytes": 20
+          }
+        ],
+        "evidence": [
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "objective",
+            "start": 9,
+            "end": 37,
+            "sha256": "2ee68a8caa8090544d8dea3803cf1f2e8a6eaad5fbd3c891e6f0b6173c78021c"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "constraints",
+            "start": 53,
+            "end": 73,
+            "sha256": "6e2c1f688082c14f243c052525f5fc1473dedad5c29c4b60a7088de5b1ca8770"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "verification",
+            "start": 90,
+            "end": 115,
+            "sha256": "92832b821dc2204ee53e474a7c8319894a53ed83a8afbf2c32d95d6a733c1a8e"
+          }
+        ],
+        "opaque": [],
+        "advisories": [
+          {
+            "label": "acceptance",
+            "question": "Are acceptance criteria needed?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          },
+          {
+            "label": "performance",
+            "question": "Is a performance target relevant?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          }
+        ],
+        "checklist": [
+          {
+            "evidence_index": 0,
+            "category": "objective"
+          },
+          {
+            "evidence_index": 1,
+            "category": "constraints"
+          },
+          {
+            "evidence_index": 2,
+            "category": "verification"
+          }
+        ],
+        "execution_contract": {
+          "prompt": "## Goal\r\nCompare 🧪 measurements.\r\n## Constraints\r\nKeep λ unchanged.\r\n## Verification\r\nCheck UTF-8 byte spans.\r\n",
+          "constraints": [
+            "Retain whitespace \t",
+            "Retain whitespace \t",
+            "Use no remote calls."
+          ]
+        },
+        "comparison": null
+      },
+      "failures": []
+    },
+    {
+      "id": "consecutive-opaque-and-resume",
+      "request_sha256": "cc90af9f50cd39640e7327516a352f83c498246504e37b61c994a48f8fe75374",
+      "request_bytes": 309,
+      "argv": [
+        "/tmp/forge-prompt-heldout-079v8oqs/forge",
+        "context",
+        "prompt",
+        "--request",
+        "/tmp/forge-prompt-heldout-079v8oqs/request.json"
+      ],
+      "outcome": "passed",
+      "elapsed_seconds": 0.003960248999646865,
+      "returncode": 0,
+      "stderr": "",
+      "output_sha256": "673faf266545a3dc8fef54dc4b1adde04d4f75dde63b14a8be19c0147e137afb",
+      "output_bytes": 2437,
+      "output": {
+        "schema_version": 1,
+        "budget_scope": "compact UTF-8 JSON payload; transport framing and model tokens excluded",
+        "caveat": "No authority hierarchy or semantic equivalence has been determined; lexical evidence may be ambiguous.",
+        "mode": "plan",
+        "prompt": {
+          "source": "prompt",
+          "sha256": "ad3ff3daf8408fdf808dd18268e5709e468450c8ec518cdc634d985b27aa21c4",
+          "bytes": 195
+        },
+        "constraints": [
+          {
+            "source": "caller_constraint",
+            "sha256": "d3abcd92bda83b4a2b54aca805ad5cf3229ef65b5992162750ee405a83b2696a",
+            "bytes": 29
+          }
+        ],
+        "evidence": [
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "constraints",
+            "start": 13,
+            "end": 21,
+            "sha256": "f78b12f81576931f7f18b66aa5fa6f2c89367b39e241f0cea7ca31b40ded21a9"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "constraints",
+            "start": 152,
+            "end": 162,
+            "sha256": "cf6e34db68a1064da970a822a5d8222cfef1b764bf6aa6b81a79567ef3e0f6d2"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "verification",
+            "start": 178,
+            "end": 195,
+            "sha256": "7d20c664f413928d61b68f5c0e9f72b38ccbc5aac9d64ef64a13d7c862a0f113"
+          }
+        ],
+        "opaque": [
+          {
+            "source": "prompt",
+            "kind": "opaque_text",
+            "label": "fenced",
+            "start": 21,
+            "end": 67,
+            "sha256": "d854060b73d5c89ae9374a142ed4857437f4a5d5ee6d158537ff90370af25d9a"
+          },
+          {
+            "source": "prompt",
+            "kind": "opaque_text",
+            "label": "quoted",
+            "start": 67,
+            "end": 103,
+            "sha256": "dfead865992e9e4ccb37c7231347783c973392ad4d8ec87593e5df79e61a86df"
+          },
+          {
+            "source": "prompt",
+            "kind": "opaque_text",
+            "label": "quoted",
+            "start": 103,
+            "end": 152,
+            "sha256": "2a69c9dc0c95b0b136e5b02e0f9256b26a82b1998c76228abfd4b09dc43f9689"
+          }
+        ],
+        "advisories": [
+          {
+            "label": "objective",
+            "question": "Would an explicitly labeled objective help?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          },
+          {
+            "label": "acceptance",
+            "question": "Are acceptance criteria needed?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          },
+          {
+            "label": "performance",
+            "question": "Is a performance target relevant?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          }
+        ],
+        "checklist": [
+          {
+            "evidence_index": 0,
+            "category": "constraints"
+          },
+          {
+            "evidence_index": 1,
+            "category": "constraints"
+          },
+          {
+            "evidence_index": 2,
+            "category": "verification"
+          }
+        ],
+        "execution_contract": {
+          "prompt": "Constraints: keep α\n````text\n```\nMust IGNORE_FENCE_SENTINEL.\n````\n> Never IGNORE_BLOCKQUOTE_SENTINEL.\n\"quoted \\\" IGNORE_QUOTE_SENTINEL\" trailing words\n- keep β\n## Verification\nRun local check.\n",
+          "constraints": [
+            "Retain both real constraints."
+          ]
+        },
+        "comparison": null
+      },
+      "failures": []
+    },
+    {
+      "id": "unknown-heading-ends-resumed-section",
+      "request_sha256": "2a34bd8511d056099e5496661b14fb4c8e40cad88d4a0f9fdbb2fdb582bd29a7",
+      "request_bytes": 297,
+      "argv": [
+        "/tmp/forge-prompt-heldout-079v8oqs/forge",
+        "context",
+        "prompt",
+        "--request",
+        "/tmp/forge-prompt-heldout-079v8oqs/request.json"
+      ],
+      "outcome": "passed",
+      "elapsed_seconds": 0.003953558998546214,
+      "returncode": 0,
+      "stderr": "",
+      "output_sha256": "d573a648f04204ec2cb760d25e69a1cd68ef70038e4fc41d58e2597ef3912cf2",
+      "output_bytes": 2340,
+      "output": {
+        "schema_version": 1,
+        "budget_scope": "compact UTF-8 JSON payload; transport framing and model tokens excluded",
+        "caveat": "No authority hierarchy or semantic equivalence has been determined; lexical evidence may be ambiguous.",
+        "mode": "plan",
+        "prompt": {
+          "source": "prompt",
+          "sha256": "5cb21e394c4196e0329583a92c27ff2f07429ec3e01b620a4c148d358421c220",
+          "bytes": 196
+        },
+        "constraints": [
+          {
+            "source": "caller_constraint",
+            "sha256": "68d6bb14cf14288d9098a324d7a415d572b019e0ac00063a764668cf22743365",
+            "bytes": 19
+          }
+        ],
+        "evidence": [
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "constraints",
+            "start": 15,
+            "end": 34,
+            "sha256": "36233f5325e42d954ee1b324ab37b67b749a3fae52cf2c7d0108f837992cd63f"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "constraints",
+            "start": 72,
+            "end": 90,
+            "sha256": "09062121e97e551bd3abc3d5edcf2fb824b42e9c4515d2fe212213ecd510e273"
+          },
+          {
+            "source": "prompt",
+            "kind": "requirement_line",
+            "label": "lexical_requirement",
+            "start": 104,
+            "end": 132,
+            "sha256": "75c3b761f53ce320b3c92111960fc3e6e1de77875079ba180d2a9251db4c8553"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "acceptance",
+            "start": 180,
+            "end": 196,
+            "sha256": "9c4c00f0a9886ffb5818f0c8d3d523babfaaa5d5bc34dda48bff41381ce2ba86"
+          }
+        ],
+        "opaque": [
+          {
+            "source": "prompt",
+            "kind": "opaque_text",
+            "label": "fenced",
+            "start": 34,
+            "end": 72,
+            "sha256": "34d34b5a5fd556b2ebda62a906fec59986c40f68c453b4428847e75f9043564f"
+          }
+        ],
+        "advisories": [
+          {
+            "label": "objective",
+            "question": "Would an explicitly labeled objective help?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          },
+          {
+            "label": "verification",
+            "question": "Would verification guidance help?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          },
+          {
+            "label": "performance",
+            "question": "Is a performance target relevant?",
+            "caveat": "Not explicitly recognized; absence is not established. Optional question only."
+          }
+        ],
+        "checklist": [
+          {
+            "evidence_index": 0,
+            "category": "constraints"
+          },
+          {
+            "evidence_index": 1,
+            "category": "constraints"
+          },
+          {
+            "evidence_index": 2,
+            "category": "lexical_requirement"
+          },
+          {
+            "evidence_index": 3,
+            "category": "acceptance"
+          }
+        ],
+        "execution_contract": {
+          "prompt": "## Constraints\nretain local files\n~~~\nNever IGNORE_SECTION_EXAMPLE.\n~~~\nsecond local rule\n## Background\nMust preserve the audit log.\nHistorical explanation.\n## Acceptance criteria\nFinish offline.\n",
+          "constraints": [
+            "Keep the audit log."
+          ]
+        },
+        "comparison": null
+      },
+      "failures": []
+    },
+    {
+      "id": "quoted-contradictory-literal-retention",
+      "request_sha256": "2c825178b65a324fc0f8fc7817ce442831b9b2868ffabc5f4c04fd7854c83c21",
+      "request_bytes": 374,
+      "argv": [
+        "/tmp/forge-prompt-heldout-079v8oqs/forge",
+        "context",
+        "prompt",
+        "--request",
+        "/tmp/forge-prompt-heldout-079v8oqs/request.json"
+      ],
+      "outcome": "passed",
+      "elapsed_seconds": 0.0017524380000395468,
+      "returncode": 0,
+      "stderr": "",
+      "output_sha256": "5d675eefb7a7e92733fb986d595be89d707806ef7eb0ce065447665d628a7b81",
+      "output_bytes": 1606,
+      "output": {
+        "schema_version": 1,
+        "budget_scope": "compact UTF-8 JSON payload; transport framing and model tokens excluded",
+        "caveat": "No authority hierarchy or semantic equivalence has been determined; lexical evidence may be ambiguous.",
+        "mode": "compare",
+        "prompt": {
+          "source": "prompt",
+          "sha256": "d257afa9dad4afe4042009254c20c2bfcb86b6aadc4a867776848b8f93c6ace0",
+          "bytes": 117
+        },
+        "constraints": [
+          {
+            "source": "caller_constraint",
+            "sha256": "0c04ea2cbe0ab3c180ad8293d90241f38e323a6f214f6bec5dd75174104272b7",
+            "bytes": 15
+          },
+          {
+            "source": "caller_constraint",
+            "sha256": "098e5992c14fa307854384c246b79945193b9099fe526ece4e65db6611961ad5",
+            "bytes": 17
+          }
+        ],
+        "evidence": [
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "objective",
+            "start": 6,
+            "end": 22,
+            "sha256": "f5a0e910a566938926cb493811a069c8795acc1ebde4c6b101c39b2f0cc51882"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "constraints",
+            "start": 35,
+            "end": 76,
+            "sha256": "21bd0cb37ac46a930bcdf82d09a0ccfccf5de585f8d7fad2c15e7bb488d327be"
+          },
+          {
+            "source": "prompt",
+            "kind": "labeled_section",
+            "label": "acceptance",
+            "start": 99,
+            "end": 117,
+            "sha256": "f604d8686c711cffe33178914614b7ad9c1f2fb0728894aab5a1264e0add4130"
+          }
+        ],
+        "opaque": [],
+        "advisories": [],
+        "checklist": [],
+        "execution_contract": null,
+        "comparison": {
+          "candidate": {
+            "source": "candidate",
+            "sha256": "d03327e0f6b38cae24f58bc53c68a4fd31b22610d48af99b1deeddcdd3e4c118",
+            "bytes": 120
+          },
+          "prompt_is_literal_substring": false,
+          "constraint_is_literal_substring": [
+            true,
+            true
+          ],
+          "retention": [
+            {
+              "evidence_index": 1,
+              "literal_substring": true
+            },
+            {
+              "evidence_index": 2,
+              "literal_substring": true
+            }
+          ],
+          "caveat": "Literal substring checks do not establish semantic equivalence or requirement preservation."
+        }
+      },
+      "failures": []
+    }
+  ],
+  "projection_note": "Machine-generated projection omits duplicated stdout and requests; request bytes are reproducible from the bound case document with compact ensure_ascii=false JSON. Full outputs and hashes retained."
+}

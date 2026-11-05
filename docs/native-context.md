@@ -4,6 +4,66 @@
 native syntax inspection and immutable recovery artifacts. The persistent harness
 exposes the same operations. No model call, Python process or Node runtime runs.
 
+## Prompt contracts and literal retention
+
+`forge context prompt --request request.json` inspects explicitly supplied task
+text without a model. For example:
+
+```json
+{
+  "mode": "plan",
+  "prompt": "# Objective\nFix the Rust planner's external-target handling.\n# Constraints\nDo not change the selected source set.\nPreserve explicit refusals for unsupported ownership.\n# Verification\nRun the targeted ownership regression tests.\n# Acceptance criteria\nThe requested planner path returns READY.\n",
+  "constraints": ["Preserve unrelated working changes."],
+  "max_output_bytes": 8192
+}
+```
+
+- `inspect` returns ordered byte spans, hashes and categories for recognized
+  sections or explicit requirement lines. It does not echo the full prompt.
+- `suggest` adds optional clarification questions where no corresponding evidence
+  was recognized; it does not assert that the information is absent or required.
+- `plan` adds an ordered checklist referencing that evidence and an execution
+  contract containing the original prompt and caller-supplied constraints exactly,
+  including their order and duplicates. It is a checklist, not inferred dependency
+  scheduling or authorization to execute anything.
+- `compare` requires a nonblank `candidate` string and reports literal containment
+  separately for the whole prompt, each caller constraint and each recognized
+  non-objective evidence span. Objective and opaque spans have no individual
+  retention check. A quoted or contradicted requirement can still
+  be a literal match. Neither a match nor a nonmatch establishes semantic
+  preservation, equivalence, correctness or instruction priority.
+
+The lexical grammar recognizes known Markdown headings and colon labels for
+objective/goal, constraints, acceptance, verification/tests and performance, plus
+explicit requirement prefixes such as `must`, `do not` and `never`. Fenced,
+blockquote, angle-block and quote-leading physical lines are recorded as opaque
+context. Fence closers must match the opening character and length; trailing
+nonwhitespace is not a closer. Quote-leading lines never consume later lines.
+This is deliberately not a complete Markdown or natural-language parser. Unmarked
+repository/tool text cannot be distinguished from other caller-supplied text;
+the output never grants it instruction authority. Caller constraints remain
+separate provenance records, not higher-priority policy. No automatic rewriting,
+model refinement or execution is performed in this slice.
+
+Requests reject unknown fields, explicit `candidate: null`, candidates outside
+compare mode, blank inputs and unsupported modes. Limits are 512 KiB serialized
+request, 64 KiB aggregate prompt/constraint/candidate UTF-8 text, 32 constraints and
+256 evidence/opaque spans. Output budgets range from 512 bytes to 256 KiB; overflow
+refuses rather than truncating protected content. The CLI emits compact UTF-8 JSON.
+Its byte budget excludes transport framing and model tokens. Use the existing
+pinned tokenizer operations when exact supplied-text token counts are needed.
+
+The MCP tool is `context_prompt`, backed by the same Rust implementation and the
+existing bounded context worker. It is advertised only with an operator context
+capability whose byte budget is at least 512. That capability still requires its
+configured tokenizer, although contract analysis itself does not tokenize. Raw
+requests, aggregate text and output also obey the operator's byte limit. The MCP
+front end first reads and validates the frame under its global 1 MiB bound;
+the smaller operator limit applies in the context worker, not before every ingress
+allocation. Existing transport/session limits remain independent. CLI/core parity and actual native
+MCP stdio protocol tests cover discovery, calls, errors and absent capability;
+these are not proof that a particular coding client selects the tool.
+
 ## Tokenizer identity and counting scope
 
 The operator supplies a local Hugging Face `tokenizer.json` and a configuration:

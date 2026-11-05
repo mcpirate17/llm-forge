@@ -1,0 +1,186 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1793852383,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "782a16dbfb1bcb58b973ca891efb026ad61d93c2",
+    "source_files": {
+      "native/forge/src/context_tools.rs": "741aa6f0a2d867a8a767d477c378afece283081bf609af1f4674c9e874809e86",
+      "native/forge/src/harness_catalog.rs": "1c83c56cbc02124dcde7a0ab024b4f9e22da4e24d1dc0147fc9dd6cec8622a9a",
+      "native/forge/src/harness_context.rs": "11bd4e202292b323a59d69b8c839a7cf9029c8fa7f406adbd9afc9700b877771",
+      "native/forge/src/prompt_contract.rs": "f8499f065924d94c5882b75b6819f7715349e8cfef8f9b9da2f6ac9a75a302f6",
+      "native/forge/target/release/forge": "25e516118bcc460302b853b5659c9add262911151481269fae2ec96887de3a49"
+    },
+    "command": "./native/forge/target/release/forge context prompt --request research/performance/forge-program-prompt-request-20261104.json",
+    "workload_sha256": "9818de348645460d8a726d2c07b5e151b532405cf424484f1482dfe23d900653",
+    "environment_sha256": "ffef31f2c9252efcb5d7401bf33217a4cddb4bdd3c6f4239a3711a51b006f3c8",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.93.1 (01f6ddf75 2026-02-11)",
+    "warmups": 3,
+    "timeout_seconds": 10
+  },
+  "samples": [
+    {
+      "wall_ms": 1.6761879999999998,
+      "cpu_ms": 1.263,
+      "max_rss_bytes": 12795904
+    },
+    {
+      "wall_ms": 1.736008,
+      "cpu_ms": 1.231,
+      "max_rss_bytes": 13111296
+    },
+    {
+      "wall_ms": 1.651448,
+      "cpu_ms": 1.214,
+      "max_rss_bytes": 13058048
+    },
+    {
+      "wall_ms": 1.645038,
+      "cpu_ms": 1.221,
+      "max_rss_bytes": 13049856
+    },
+    {
+      "wall_ms": 1.6773980000000002,
+      "cpu_ms": 1.245,
+      "max_rss_bytes": 13012992
+    },
+    {
+      "wall_ms": 1.6472769999999999,
+      "cpu_ms": 1.204,
+      "max_rss_bytes": 12713984
+    },
+    {
+      "wall_ms": 1.677438,
+      "cpu_ms": 1.261,
+      "max_rss_bytes": 13021184
+    },
+    {
+      "wall_ms": 1.655087,
+      "cpu_ms": 1.278,
+      "max_rss_bytes": 13037568
+    },
+    {
+      "wall_ms": 1.670288,
+      "cpu_ms": 1.246,
+      "max_rss_bytes": 13004800
+    },
+    {
+      "wall_ms": 1.564748,
+      "cpu_ms": 1.16,
+      "max_rss_bytes": 12906496
+    },
+    {
+      "wall_ms": 1.581777,
+      "cpu_ms": 1.155,
+      "max_rss_bytes": 12959744
+    },
+    {
+      "wall_ms": 1.593458,
+      "cpu_ms": 1.16,
+      "max_rss_bytes": 12902400
+    },
+    {
+      "wall_ms": 1.5570169999999999,
+      "cpu_ms": 1.147,
+      "max_rss_bytes": 13312000
+    },
+    {
+      "wall_ms": 1.730488,
+      "cpu_ms": 1.295,
+      "max_rss_bytes": 13062144
+    },
+    {
+      "wall_ms": 2.0495,
+      "cpu_ms": 1.63,
+      "max_rss_bytes": 12795904
+    },
+    {
+      "wall_ms": 1.596687,
+      "cpu_ms": 1.187,
+      "max_rss_bytes": 12988416
+    },
+    {
+      "wall_ms": 1.714609,
+      "cpu_ms": 1.278,
+      "max_rss_bytes": 12955648
+    },
+    {
+      "wall_ms": 1.776918,
+      "cpu_ms": 1.33,
+      "max_rss_bytes": 12910592
+    },
+    {
+      "wall_ms": 1.707098,
+      "cpu_ms": 1.241,
+      "max_rss_bytes": 13258752
+    },
+    {
+      "wall_ms": 2.192061,
+      "cpu_ms": 1.767,
+      "max_rss_bytes": 12750848
+    },
+    {
+      "wall_ms": 1.749988,
+      "cpu_ms": 1.336,
+      "max_rss_bytes": 13152256
+    },
+    {
+      "wall_ms": 1.726518,
+      "cpu_ms": 1.276,
+      "max_rss_bytes": 12959744
+    },
+    {
+      "wall_ms": 1.752078,
+      "cpu_ms": 1.332,
+      "max_rss_bytes": 12808192
+    },
+    {
+      "wall_ms": 1.602388,
+      "cpu_ms": 1.172,
+      "max_rss_bytes": 12931072
+    },
+    {
+      "wall_ms": 1.643448,
+      "cpu_ms": 1.232,
+      "max_rss_bytes": 12627968
+    },
+    {
+      "wall_ms": 1.569197,
+      "cpu_ms": 1.147,
+      "max_rss_bytes": 13168640
+    },
+    {
+      "wall_ms": 1.5884070000000001,
+      "cpu_ms": 1.185,
+      "max_rss_bytes": 13373440
+    },
+    {
+      "wall_ms": 1.577957,
+      "cpu_ms": 1.167,
+      "max_rss_bytes": 13012992
+    },
+    {
+      "wall_ms": 1.517347,
+      "cpu_ms": 1.139,
+      "max_rss_bytes": 13131776
+    },
+    {
+      "wall_ms": 1.634028,
+      "cpu_ms": 1.168,
+      "max_rss_bytes": 13201408
+    },
+    {
+      "wall_ms": 1.597078,
+      "cpu_ms": 1.221,
+      "max_rss_bytes": 13393920
+    }
+  ],
+  "summary": {
+    "p50_ms": 1.651448,
+    "p95_ms": 2.0495,
+    "cpu_p50_ms": 1.231,
+    "max_rss_bytes": 13393920
+  },
+  "receipt_sha256": "e8fc9249af8373fd1ef413ab31e8ec7cd2eb8ed0b20b15d2f125e3d69c2c1d9e"
+}

@@ -1,6 +1,8 @@
 #![cfg(target_os = "linux")]
 #[path = "support/embedding_fixture.rs"]
 mod embedding_fixture;
+#[path = "support/mcp_client.rs"]
+mod mcp_client;
 #[allow(dead_code)]
 mod support;
 #[path = "support/tokenizer_fixture.rs"]
@@ -8,6 +10,7 @@ mod tokenizer_fixture;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use forge::harness::{policy::Policy, transport};
 use forge::managed_service::Service;
+use mcp_client::Mcp;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -744,69 +747,6 @@ async fn public_start_reports_verified_ready_socket_and_grammar() {
     assert!(!socket.parent().unwrap().join("failure.json").exists());
 }
 
-struct Mcp {
-    process: forge::process_group::ProcessGroup,
-    input: Option<forge::process_io::Descriptor>,
-    output: BufReader<forge::process_io::Descriptor>,
-}
-impl Mcp {
-    fn new(socket: &Path) -> Self {
-        use std::process::Command;
-        let mut command = Command::new(support::forge_binary::path());
-        command.args(["harness", "stdio", "--socket"]).arg(socket);
-        Self::from_command(command)
-    }
-    fn from_command(mut command: std::process::Command) -> Self {
-        use std::process::Stdio;
-        command
-            .env("PATH", "")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit());
-        let mut process = forge::process_group::ProcessGroup::spawn(&mut command).unwrap();
-        let input =
-            forge::process_io::Descriptor::new(process.take_stdin().unwrap().into()).unwrap();
-        let output =
-            forge::process_io::Descriptor::new(process.take_stdout().unwrap().into()).unwrap();
-        Self {
-            process,
-            input: Some(input),
-            output: BufReader::new(output),
-        }
-    }
-    async fn send(&mut self, value: Value) {
-        let mut bytes = serde_json::to_vec(&value).unwrap();
-        bytes.push(b'\n');
-        self.input
-            .as_mut()
-            .unwrap()
-            .write_all(&bytes)
-            .await
-            .unwrap();
-    }
-    async fn receive(&mut self) -> Value {
-        let mut frame = Vec::new();
-        assert!(tokio::time::timeout(
-            Duration::from_secs(5),
-            transport::read_frame(&mut self.output, &mut frame, 4 * 1024 * 1024)
-        )
-        .await
-        .unwrap()
-        .unwrap());
-        serde_json::from_slice(&frame).unwrap()
-    }
-    async fn finish(mut self) {
-        self.input.take();
-        let exit = forge::process_io::ChildExit::new(self.process.child()).unwrap();
-        assert!(tokio::time::timeout(Duration::from_secs(3), exit.wait())
-            .await
-            .unwrap()
-            .unwrap()
-            .success());
-        assert!(self.process.stop().unwrap().success());
-    }
-}
-
 fn modern_request(id: u64, method: &str, mut params: Value) -> Value {
     params["_meta"] = json!({"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}});
     json!({"jsonrpc":"2.0","id":id,"method":method,"params":params})
@@ -878,7 +818,7 @@ async fn project_mcp_configuration_runs_against_the_bound_live_service() {
 #[ignore = "exercises native MCP stdio against a bounded live harness"]
 async fn mcp_legacy_stdio_runs_without_an_interpreter_and_keeps_sessions_external() {
     let service = Running::new().await;
-    let mut client = Mcp::new(&service.socket());
+    let mut client = Mcp::new(Path::new(support::forge_binary::path()), &service.socket());
     client.send(json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25",
         "capabilities":{},"clientInfo":{"name":"native-test","version":"1"}}})).await;
     assert_eq!(
@@ -938,7 +878,7 @@ async fn mcp_modern_stdio_remains_responsive_during_a_cancelled_long_poll() {
     service
         .read_until("mcp-terminal", &mut cursor, "READY")
         .await;
-    let mut client = Mcp::new(&service.socket());
+    let mut client = Mcp::new(Path::new(support::forge_binary::path()), &service.socket());
     client
         .send(modern_request(1, "server/discover", json!({})))
         .await;
@@ -960,13 +900,7 @@ async fn mcp_modern_stdio_remains_responsive_during_a_cancelled_long_poll() {
         .await;
     client.send(modern_request(13, "ping", json!({}))).await;
     assert_eq!(client.receive().await["id"], 13);
-    let mut frame = Vec::new();
-    assert!(tokio::time::timeout(
-        Duration::from_millis(100),
-        transport::read_frame(&mut client.output, &mut frame, 4 * 1024 * 1024)
-    )
-    .await
-    .is_err());
+    client.assert_no_frame(Duration::from_millis(100)).await;
     client.finish().await;
 }
 

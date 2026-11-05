@@ -55,6 +55,20 @@ impl Contexts {
             .as_ref()
             .context("context tools lack an operator capability")?
             .clone();
+        if name == "context_prompt" {
+            ensure!(
+                worker.budget.max_input_bytes >= crate::prompt_contract::MIN_OUTPUT_BYTES,
+                "prompt tools lack a sufficient operator context byte capability"
+            );
+            ensure!(
+                input.len()
+                    <= worker
+                        .budget
+                        .max_input_bytes
+                        .min(crate::prompt_contract::MAX_REQUEST_BYTES),
+                "prompt request exceeds operator byte limit"
+            );
+        }
         let slot = self.slot.clone().acquire_owned().await?;
         let (name, input) = (name.to_owned(), input.to_owned());
         self.pool
@@ -66,8 +80,46 @@ impl Contexts {
     }
 }
 impl Worker {
+    fn prompt(&self, input: &str) -> Result<Value> {
+        use crate::prompt_contract;
+        let request: prompt_contract::Request = serde_json::from_str(input)?;
+        let text_bytes = std::iter::once(request.prompt.as_str())
+            .chain(request.constraints.iter().map(String::as_str))
+            .chain(request.candidate.as_deref())
+            .try_fold(0usize, |total, text| {
+                total
+                    .checked_add(text.len())
+                    .context("prompt byte count overflow")
+            })?;
+        ensure!(
+            text_bytes
+                <= self
+                    .budget
+                    .max_input_bytes
+                    .min(prompt_contract::MAX_TOTAL_TEXT_BYTES),
+            "prompt text exceeds operator byte limit"
+        );
+        ensure!(
+            (prompt_contract::MIN_OUTPUT_BYTES
+                ..=self
+                    .budget
+                    .max_input_bytes
+                    .min(prompt_contract::MAX_OUTPUT_BYTES))
+                .contains(&request.max_output_bytes),
+            "prompt output exceeds operator byte limit"
+        );
+        let result = prompt_contract::analyze(&request).map_err(anyhow::Error::msg)?;
+        let result = serde_json::to_value(result)?;
+        ensure!(
+            serde_json::to_vec(&result)?.len() <= request.max_output_bytes,
+            "prompt output exceeds requested byte limit"
+        );
+        Ok(result)
+    }
+
     fn call(&self, name: &str, input: &str) -> Result<Value> {
         match name {
+            "context_prompt" => self.prompt(input),
             "context_count" => {
                 let args: Count = serde_json::from_str(input)?;
                 ensure!(
