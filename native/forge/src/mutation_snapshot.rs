@@ -1,19 +1,21 @@
 //! Disposable git snapshots for autonomous mutation from a dirty checkout.
 //!
-//! A snapshot is a shared clone in a private temporary directory, checked out at
-//! a synthetic commit of the checkout's tracked and source-like untracked files.
-//! It writes no objects into the host repository. `remove` proves it is gone;
+//! A private raw-blob export and synthetic Git commit of the checkout's tracked
+//! and source-like untracked files. It writes no objects into the host repository. `remove` proves it is gone;
 //! `Drop` is the backstop for every early return.
 
 use conductor_native::project_config;
 use conductor_native::project_paths;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::env;
-use std::ffi::{CString, OsStr};
+use std::ffi::CString;
 use std::fs;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+#[path = "mutation_snapshot_ignore.rs"]
+mod ignore_rules;
+#[path = "mutation_snapshot_native.rs"]
+mod native;
 
 const SOURCE_SUFFIXES: [&str; 20] = [
     ".c", ".cc", ".cpp", ".cu", ".h", ".hpp", ".js", ".json", ".jsx", ".md", ".py", ".pyx", ".pxd",
@@ -24,50 +26,8 @@ const FIXED_EXCLUDED_PREFIXES: [&str; 3] = [
     "research/reports/",
     "tasks/",
 ];
-const UNTRACKED_CHUNK: usize = 100;
-const DETAIL_LIMIT: usize = 2000;
 const REGISTRY_INDEX: usize = 1;
 const RECEIPT_ROOT_INDEX: usize = 3;
-const SNAPSHOT_IDENTITY: [(&str, &str); 4] = [
-    ("GIT_AUTHOR_NAME", "Audit Orchestrator Snapshot"),
-    ("GIT_AUTHOR_EMAIL", "orchestrator@localhost"),
-    ("GIT_COMMITTER_NAME", "Audit Orchestrator Snapshot"),
-    ("GIT_COMMITTER_EMAIL", "orchestrator@localhost"),
-];
-
-fn git(
-    args: &[&OsStr],
-    cwd: &Path,
-    environment: &BTreeMap<String, String>,
-) -> Result<String, String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .envs(environment)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|error| format!("cannot start git: {error}"))?;
-    if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
-    }
-    let shown: Vec<String> = args
-        .iter()
-        .map(|arg| arg.to_string_lossy().into_owned())
-        .collect();
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let raw = if stderr.is_empty() { &stdout } else { &stderr };
-    let detail = match raw.trim() {
-        "" => "git command failed",
-        text => text,
-    };
-    let detail: String = detail.chars().take(DETAIL_LIMIT).collect();
-    Err(format!("git {} failed: {detail}", shown.join(" ")))
-}
-
-fn text_args<'a>(args: &'a [&'a str]) -> Vec<&'a OsStr> {
-    args.iter().map(OsStr::new).collect()
-}
 
 /// What never rides along: receipts, reports, task notes and the notes tree.
 fn excluded_prefixes(repo: &Path) -> Result<Vec<String>, String> {
@@ -165,34 +125,7 @@ pub fn is_executable(path: &Path) -> bool {
 
 /// Source and config files a snapshot needs, without generated artifacts.
 pub fn snapshot_untracked_paths(repo: &Path) -> Result<Vec<String>, String> {
-    let listed = git(
-        &text_args(&["ls-files", "--others", "--exclude-standard"]),
-        repo,
-        &BTreeMap::new(),
-    )?;
-    let excluded = excluded_prefixes(repo)?;
-    let extra = configured_extra_suffixes(repo)?;
-    let mut paths: Vec<String> = listed
-        .lines()
-        .filter(|path| !path.is_empty())
-        .filter(|path| {
-            !excluded
-                .iter()
-                .any(|prefix| path.starts_with(prefix.as_str()))
-        })
-        .filter(|path| {
-            let suffix = Path::new(path)
-                .extension()
-                .map(|ext| format!(".{}", ext.to_string_lossy().to_lowercase()))
-                .unwrap_or_default();
-            fixture_path(path)
-                || SOURCE_SUFFIXES.contains(&suffix.as_str())
-                || extra.contains(&suffix)
-        })
-        .map(str::to_string)
-        .collect();
-    paths.sort();
-    Ok(paths)
+    native::untracked(repo)
 }
 
 fn private_root() -> Result<PathBuf, String> {
@@ -241,55 +174,8 @@ impl Snapshot {
     }
 
     fn populate(&mut self, repo: &Path) -> Result<(), String> {
-        let resolved = repo
-            .canonicalize()
-            .map_err(|error| format!("cannot resolve {}: {error}", repo.display()))?;
-        let none = BTreeMap::new();
-        let mut clone = text_args(&["clone", "--shared", "--no-checkout", "--quiet"]);
-        clone.push(resolved.as_os_str());
-        clone.push(self.worktree.as_os_str());
-        git(&clone, repo, &none)?;
-        self.commit_state(repo)?;
-        git(
-            &text_args(&["checkout", "--detach", "--quiet", &self.commit]),
-            &self.worktree,
-            &none,
-        )?;
-        Ok(())
-    }
-
-    fn commit_state(&mut self, repo: &Path) -> Result<(), String> {
-        let path_text = |path: &Path| path.to_string_lossy().into_owned();
-        let mut environment: BTreeMap<String, String> = SNAPSHOT_IDENTITY
-            .iter()
-            .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
-            .collect();
-        environment.insert("GIT_DIR".into(), path_text(&self.worktree.join(".git")));
-        environment.insert("GIT_WORK_TREE".into(), path_text(repo));
-        environment.insert("GIT_INDEX_FILE".into(), path_text(&self.root.join("index")));
-        git(&text_args(&["read-tree", "HEAD"]), repo, &environment)?;
-        git(&text_args(&["add", "-u"]), repo, &environment)?;
-        let untracked = snapshot_untracked_paths(repo)?;
-        for chunk in untracked.chunks(UNTRACKED_CHUNK) {
-            let mut add = text_args(&["add", "--"]);
-            add.extend(chunk.iter().map(OsStr::new));
-            git(&add, repo, &environment)?;
-        }
-        let tree = git(&text_args(&["write-tree"]), repo, &environment)?;
-        let parent = git(&text_args(&["rev-parse", "HEAD"]), repo, &BTreeMap::new())?;
-        let commit = git(
-            &text_args(&[
-                "commit-tree",
-                tree.trim(),
-                "-p",
-                parent.trim(),
-                "-m",
-                "orchestrator snapshot",
-            ]),
-            repo,
-            &environment,
-        )?;
-        self.commit = commit.trim().to_string();
+        let (commit, untracked) = native::populate(repo, &self.root, &self.worktree)?;
+        self.commit = commit;
         self.included_untracked = untracked;
         Ok(())
     }

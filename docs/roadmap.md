@@ -228,8 +228,15 @@ shared-core Cargo tests, 11 runtime tests, two snapshot disposition tests and se
 sandbox integration tests), as did strict native Clippy. The runtime cases overlap
 the Forge suite; these counts are not a unique-test total. Matched help/symbol
 comparisons passed the unchanged 10% budget across 404 samples. Independent review
-checked implementation boundaries and real artifacts. Full local-check/local-verify
-and PR integration remain pending. The opt-in declaration and supported scope are described
+checked implementation boundaries and real artifacts. All 18 local-check steps and
+local-verify passed at `f99737d`: 4,628 passing executions, zero failures and 145 ignored
+tests across 177 harnesses. Publication was held for
+[#193](https://github.com/mcpirate17/llm-forge/issues/193): inherited Git snapshot setup
+could run configured filters or hooks outside the engine actor. Snapshot preparation
+now uses native raw Git objects, held ignore rules and no Git child; 22 focused tests
+and strict Clippy pass. Its real engine trial and fresh publication gate are pending.
+The capture is point-in-time and not an atomic filesystem snapshot. The previous
+gate receipt does not attest these later changes. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on

@@ -94,6 +94,7 @@ slop-core = { path = "../slop-core", default-features = false }
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 regex = "1"
 walkdir = "2"
+ignore = "0.4.34"
 tempfile = "3"
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = "0.10"

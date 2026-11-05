@@ -375,6 +375,30 @@ ref (`origin/main` by default). It is not a Forge landing requirement.
 disposable snapshot, then proves the pinned sources and tests held in both the
 snapshot and the live repository before it scores anything.
 
+Snapshot preparation uses native Git object APIs and raw file capture. It does not
+launch Git, run checkout hooks, invoke clean/smudge/process filters, or install
+templates. It overlays current bytes of HEAD-tracked files and the eligible
+untracked inventory into a private object database and synthetic commit; the host
+index and objects are not written. A staged addition is already indexed and is
+therefore not an untracked overlay. Executable modes and supported relative symlinks
+are preserved. The private repository may read parent objects through an alternate.
+
+Default Git ignore files, `info/exclude` and per-directory `.gitignore` files are
+parsed as bounded held data with normal rule precedence. HEAD, index, named Git
+routing, directory identities and rule inputs are rechecked. Unsupported conversions
+and configurations refuse explicitly: attributes files, config includes, custom
+attributes/excludes paths, sparse or conflicted indexes, intent-to-add entries,
+gitlinks and unsafe routing overrides. Missing optional rules must remain missing.
+This avoids silently substituting raw bytes for a configured conversion.
+
+Capture is bounded to 100,000 scanned entries, 32 MiB per source blob and 2 GiB of
+source data. It is a serialized, point-in-time capture, not an atomic filesystem
+snapshot. Libgit2 repository discovery can read metadata before the bounded
+configuration checks; no universal preemptive filesystem-I/O deadline is claimed.
+Engine process ownership is separate: the opt-in Cargo actor uses owned cgroups;
+legacy engine descendant cleanup remains tracked in
+[#192](https://github.com/mcpirate17/llm-forge/issues/192).
+
 | exit | meaning |
 |---|---|
 | 0 | `PASS` or `RATCHET_HELD` |
@@ -532,8 +556,10 @@ signal a later process: manual recovery must establish current process identity.
 
 Legacy Python runners use `live_pgids.json` with a `live` array. The legacy
 `make mutation-reap` command does not consume native records, including with an
-older installed Python adapter. Native supervision handles ordinary completion,
-timeouts and cancellation; verified automatic recovery after a hard-killed
+older installed Python adapter. Legacy native supervision handles its original
+process group on ordinary completion, timeouts and cancellation. A detached
+descendant can escape that group even on normal completion; this is not proof of
+whole-tree cleanup (see #192 above). Verified automatic recovery after a hard-killed
 native supervisor remains a separate capability to implement.
 
 
