@@ -553,3 +553,45 @@ async fn virtual_address_space_limit_is_distinct_from_cgroup_memory() {
         assert_eq!(report.resources.memory_max_bytes, 128 * 1024 * 1024);
     }
 }
+
+struct CaptureFinalizer(std::sync::Arc<std::sync::atomic::AtomicBool>);
+impl confined_execution::Resources for CaptureFinalizer {
+    fn arm(&mut self) {}
+    fn finish(self: Box<Self>, _cleanup_safe: bool) -> anyhow::Result<()> {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires explicitly delegated FORGE_TEST_CGROUP_PARENT"]
+async fn complete_output_overflow_fails_and_runs_owned_cleanup() {
+    let host = support::Host::new();
+    let (plan, group, path) = prepared(&host, std::path::Path::new("/usr/bin/yes"), &[]);
+    let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let execution = confined_execution::start_capture_with_resources(
+        plan,
+        group,
+        Limits {
+            timeout: Duration::from_secs(10),
+            ..limits()
+        },
+        Box::new(CaptureFinalizer(finished.clone())),
+    )
+    .unwrap();
+    let report = tokio::time::timeout(Duration::from_secs(20), execution.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.outcome, Outcome::Failed, "{report:?}");
+    assert!(
+        report
+            .errors
+            .iter()
+            .any(|e| e.contains("stdout output exceeds")),
+        "{report:?}"
+    );
+    assert!(report.stdout.len() <= 16 * 1024 * 1024);
+    assert!(!path.exists(), "owned cgroup survived overflow");
+    assert!(finished.load(std::sync::atomic::Ordering::SeqCst));
+}

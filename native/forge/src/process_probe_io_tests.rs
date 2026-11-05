@@ -185,3 +185,79 @@ fn nonreading_owned_filter_keeps_natural_signal_status() {
     assert_eq!(status.signal(), Some(libc::SIGKILL));
     assert!(!consumed);
 }
+
+#[test]
+fn complete_capture_preserves_stdout_larger_than_one_mib() {
+    let captured = capture(
+        Command::new("/usr/bin/head").args(["-c", "1179648", "/dev/zero"]),
+        Vec::new(),
+        CapturePolicy::CompleteSeparate {
+            stdout: 2 * 1024 * 1024,
+            stderr: 1024,
+        },
+    )
+    .unwrap();
+    assert_eq!(captured.stdout.len(), 1179648);
+    assert!(captured.stdout.iter().all(|byte| *byte == 0));
+    assert_eq!(captured.stdout_bytes, 1179648);
+    assert!(captured.lossy_utf8);
+}
+#[test]
+fn complete_capture_enforces_separate_stream_limits() {
+    let policy = CapturePolicy::CompleteSeparate {
+        stdout: 3,
+        stderr: 2,
+    };
+    let captured = capture(
+        Command::new("/bin/sh").args(["-c", "printf abc; printf de >&2"]),
+        Vec::new(),
+        policy,
+    )
+    .unwrap();
+    assert_eq!(captured.stdout, b"abc");
+    assert_eq!(captured.stderr, b"de");
+    for (script, stream) in [("printf abcd", "stdout"), ("printf def >&2", "stderr")] {
+        let error = capture(
+            Command::new("/bin/sh").args(["-c", script]),
+            Vec::new(),
+            policy,
+        )
+        .err()
+        .expect("overflow must fail");
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("probe {stream} output exceeds")),
+            "{error:#}"
+        );
+    }
+}
+#[test]
+fn complete_capture_bounds_do_not_expand_other_modes() {
+    assert!(CapturePolicy::CompleteSeparate {
+        stdout: 0,
+        stderr: 1
+    }
+    .validate()
+    .is_err());
+    assert!(CapturePolicy::CompleteSeparate {
+        stdout: 16 * 1024 * 1024 + 1,
+        stderr: 1
+    }
+    .validate()
+    .is_err());
+    assert!(CapturePolicy::CompleteSeparate {
+        stdout: 1,
+        stderr: 1024 * 1024 + 1
+    }
+    .validate()
+    .is_err());
+    assert!(CapturePolicy::StrictCombined(1024 * 1024 + 1)
+        .validate()
+        .is_err());
+    assert!(
+        CapturePolicy::TailChars(crate::process_capture_tail::MAX_OUTPUT_CHARS + 1)
+            .validate()
+            .is_err()
+    );
+}

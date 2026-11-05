@@ -186,6 +186,29 @@ pub fn start_with_resources(
     )
 }
 
+/// Capture complete legacy mutation output with independent raw byte limits.
+/// Stdout is bounded at 16 MiB and stderr at 1 MiB; overflows fail through the
+/// owning cleanup actor. Invalid UTF-8 uses the legacy replacement behavior.
+/// `max_output_chars` applies only to the default tail mode and is unused here.
+pub fn start_capture_with_resources(
+    plan: CommandPlan,
+    group: Cgroup,
+    limits: Limits,
+    resources: Box<dyn Resources>,
+) -> Result<Execution> {
+    start_inner(
+        plan,
+        group,
+        limits,
+        resources,
+        None,
+        CapturePolicy::CompleteSeparate {
+            stdout: 16 * 1024 * 1024,
+            stderr: 1024 * 1024,
+        },
+    )
+}
+
 /// Run a bounded UTF-8 filter without changing line endings or trimming output.
 /// Input and combined raw stdout/stderr are each limited to 1 MiB. Invalid UTF-8,
 /// incomplete stdin delivery, and output overflow fail through the owning actor.
@@ -504,17 +527,14 @@ async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut R
             if let Some(captured) = captured {
                 report.stdout_bytes = captured.stdout_bytes;
                 report.stderr_bytes = captured.stderr_bytes;
-                // TailBuffer emits valid UTF-8; strict capture retains raw bytes.
-                // Reject invalid UTF-8 instead of concealing it by replacement.
-                match (
-                    String::from_utf8(captured.stdout),
-                    String::from_utf8(captured.stderr),
-                ) {
-                    (Ok(out), Ok(err)) => {
+                // Tail and strict filter behavior stay unchanged. Only complete
+                // legacy capture decodes invalid bytes with replacement.
+                match decode_capture(captured) {
+                    Ok((out, err)) => {
                         report.stdout = out;
                         report.stderr = err;
                     }
-                    _ => {
+                    Err(_) => {
                         complete = false;
                         report
                             .errors
@@ -525,6 +545,21 @@ async fn cleanup(group: &mut Cgroup, mut owned: Option<Observed>, report: &mut R
         }
     }
     report.cleanup_complete = complete;
+}
+fn decode_lossy(bytes: Vec<u8>) -> String {
+    match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(error) => String::from_utf8_lossy(error.as_bytes()).into_owned(),
+    }
+}
+fn decode_capture(captured: readiness::Captured) -> Result<(String, String)> {
+    if captured.lossy_utf8 {
+        return Ok((decode_lossy(captured.stdout), decode_lossy(captured.stderr)));
+    }
+    Ok((
+        String::from_utf8(captured.stdout)?,
+        String::from_utf8(captured.stderr)?,
+    ))
 }
 async fn drain(mut monitor: Monitor<'static>) -> Result<(readiness::Captured, Option<String>)> {
     tokio::task::spawn_blocking(move || {
@@ -555,5 +590,34 @@ fn empty_report(group: &Cgroup, limits: Limits) -> Report {
         resources: group.report().clone(),
         cpu_seconds: limits.cpu_seconds,
         address_space_bytes: limits.address_space_bytes,
+    }
+}
+
+#[cfg(test)]
+mod capture_decoding_tests {
+    use super::*;
+    fn captured(lossy_utf8: bool) -> readiness::Captured {
+        readiness::Captured {
+            stdout: b"left\xffright".to_vec(),
+            stderr: b"bad\xfe".to_vec(),
+            stdout_bytes: 10,
+            stderr_bytes: 4,
+            lossy_utf8,
+        }
+    }
+    #[test]
+    fn complete_capture_reuses_valid_utf8_buffer() {
+        let bytes = b"valid json".to_vec();
+        let pointer = bytes.as_ptr();
+        let text = decode_lossy(bytes);
+        assert_eq!(text, "valid json");
+        assert_eq!(text.as_ptr(), pointer);
+    }
+    #[test]
+    fn complete_capture_decodes_lossily_but_strict_capture_rejects_invalid_utf8() {
+        let (out, err) = decode_capture(captured(true)).unwrap();
+        assert_eq!(out, "left\u{fffd}right");
+        assert_eq!(err, "bad\u{fffd}");
+        assert!(decode_capture(captured(false)).is_err());
     }
 }

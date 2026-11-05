@@ -15,6 +15,7 @@ const QUANTUM: usize = 64 * 1024;
 #[derive(Clone, Copy)]
 pub(crate) enum CapturePolicy {
     StrictCombined(usize),
+    CompleteSeparate { stdout: usize, stderr: usize },
     TailChars(usize),
 }
 impl CapturePolicy {
@@ -24,6 +25,16 @@ impl CapturePolicy {
                 (1..=1024 * 1024).contains(&limit),
                 "probe output limit must be 1..1048576 bytes"
             ),
+            Self::CompleteSeparate { stdout, stderr } => {
+                ensure!(
+                    (1..=16 * 1024 * 1024).contains(&stdout),
+                    "stdout capture limit must be 1..16777216 bytes"
+                );
+                ensure!(
+                    (1..=1024 * 1024).contains(&stderr),
+                    "stderr capture limit must be 1..1048576 bytes"
+                );
+            }
             Self::TailChars(limit) => {
                 ensure!(
                     (1..=crate::process_capture_tail::MAX_OUTPUT_CHARS).contains(&limit),
@@ -41,7 +52,9 @@ enum Capture {
 impl Capture {
     fn new(policy: CapturePolicy) -> Result<Self> {
         Ok(match policy {
-            CapturePolicy::StrictCombined(_) => Self::Bytes(Vec::new()),
+            CapturePolicy::StrictCombined(_) | CapturePolicy::CompleteSeparate { .. } => {
+                Self::Bytes(Vec::new())
+            }
             CapturePolicy::TailChars(n) => Self::Tail(TailBuffer::new(n)?),
         })
     }
@@ -69,6 +82,7 @@ pub(crate) struct Captured {
     pub stderr: Vec<u8>,
     pub stdout_bytes: u64,
     pub stderr_bytes: u64,
+    pub lossy_utf8: bool,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Observation {
@@ -179,7 +193,7 @@ impl Stream {
             libc::POLLIN,
         )
     }
-    fn drain(&mut self, policy: CapturePolicy, other: usize) -> Result<usize> {
+    fn drain(&mut self, policy: CapturePolicy, other: usize, stdout: bool) -> Result<usize> {
         let mut buffer = [0; 4096];
         let mut read = 0;
         while !self.eof && read < QUANTUM {
@@ -191,6 +205,24 @@ impl Stream {
                         ensure!(
                             self.capture.strict_len() + other + count <= limit,
                             "probe output exceeds {limit} bytes"
+                        );
+                    }
+                    if let CapturePolicy::CompleteSeparate {
+                        stdout: out_limit,
+                        stderr: err_limit,
+                    } = policy
+                    {
+                        let (limit, name) = if stdout {
+                            (out_limit, "stdout")
+                        } else {
+                            (err_limit, "stderr")
+                        };
+                        ensure!(
+                            self.capture
+                                .strict_len()
+                                .checked_add(count)
+                                .is_some_and(|size| size <= limit),
+                            "probe {name} output exceeds {limit} bytes"
                         );
                     }
                     self.capture.push(&buffer[..count]);
@@ -233,8 +265,12 @@ impl<'a> Monitor<'a> {
         })
     }
     fn drain_round(&mut self) -> Result<usize> {
-        let out = self.out.drain(self.policy, self.err.capture.strict_len())?;
-        let err = self.err.drain(self.policy, self.out.capture.strict_len())?;
+        let out = self
+            .out
+            .drain(self.policy, self.err.capture.strict_len(), true)?;
+        let err = self
+            .err
+            .drain(self.policy, self.out.capture.strict_len(), false)?;
         Ok(out + err)
     }
     /// Never kills or reaps. A pinned pidfd is owned by the enclosing supervisor.
@@ -305,6 +341,7 @@ impl<'a> Monitor<'a> {
             stderr: self.err.capture.finish(),
             stdout_bytes: self.out.total,
             stderr_bytes: self.err.total,
+            lossy_utf8: matches!(self.policy, CapturePolicy::CompleteSeparate { .. }),
         }
     }
 }

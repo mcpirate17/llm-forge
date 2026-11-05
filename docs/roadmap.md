@@ -60,6 +60,12 @@ this audit.
 
 ### Ordered continuation and acceptance criteria
 
+The next correctness priority is [#192](https://github.com/mcpirate17/llm-forge/issues/192):
+legacy mutation runners must prove descendant cleanup before snapshot deletion.
+An execution-owner capture prerequisite is implemented on the active branch and
+tested; the runner migration is still in progress. It takes precedence over the
+product backlog below.
+
 1. Extend the shared prompt/tool layer from the bounded literal inspection slice
    described below: useful tool recommendations and eligible strengthening need
    explicit permissions, source-backed evidence and matched task controls.
@@ -67,8 +73,10 @@ this audit.
    in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
    works without vendored Forge sources. The explicit installed-identity path is
    now implemented and measured below; receipt-supplied identity cannot authorize
-   itself. Automatic Cargo test attribution remains a separate gap in
-   [#190](https://github.com/mcpirate17/llm-forge/issues/190).
+   itself. The bounded automatic Cargo attribution slice from
+   [#190](https://github.com/mcpirate17/llm-forge/issues/190) landed in
+   [PR #194](https://github.com/mcpirate17/llm-forge/pull/194); broader target and
+   dependency support remains outside its verified scope.
 2. Validate one real client: setup, advertised tools, an agent-selected read,
    allowed/denied/failure cases, reconnect and undo. Test the client-specific
    configuration rather than treating a custom wire client as client adoption.
@@ -210,7 +218,7 @@ merged as `c066e8540c90e9f115e1d150bf92da7afe4bb077`, with the same tree as chec
 commit `b82da144ff552d811113fcca715a3d2a04b9fc0c`. All 18 local-check steps and
 local-verify passed: 4,548 passing test executions, zero failures, 145 ignored
 across 177 harnesses. Global installation and client activation are unchanged.
-**Implemented correctness increment, publication pending:** #190's opt-in target-bound
+**Delivered correctness increment:** #190's opt-in target-bound
 Cargo attribution uses original engine scenarios and the shared native value analyzer.
 The clean release trial at `015e66e` killed two mutants and admitted one newly added
 `CORE` test through candidate mutation-evidence. Live and commit audits were `CLEAN`;
@@ -237,11 +245,25 @@ now uses native raw Git objects, held ignore rules and no Git child; 22 focused 
 and strict Clippy pass. The integrated mutation suite passed 272 tests with 12 ignored.
 Its real release engine trial passed the bounded mutation admission checks above;
 independent review verified source, receipt and cleanup identities. Fresh matched
-help/symbol comparisons also passed across 404 samples. The full publication gate
-for this final source remains pending.
-The capture is point-in-time and not an atomic filesystem snapshot. The previous
-gate receipt does not attest these later changes. The opt-in declaration and supported scope are described
+help/symbol comparisons also passed across 404 samples. [PR #194](https://github.com/mcpirate17/llm-forge/pull/194)
+merged as `da276a8f1f41632e6df6ab29a3ababbfc9f461be`, with the same tree as checked
+head `ed4beb7faea1f9cc994763723435607e4c6a69a3`. All 18 local-check steps and
+local-verify passed: 4,636 passing executions, zero failures and 145 ignored across
+177 harnesses. Receipt SHA-256:
+`4eedee9a1bb3ff28c95bc16330f7009adf90b58a4f9074cb67352bc2a9397a70`.
+The capture is point-in-time and not an atomic filesystem snapshot. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
+
+**Active #192 prerequisite:** the existing confined execution owner now has a
+complete-output mode with separate 16 MiB stdout and 1 MiB stderr limits. Overflow
+still fails through owned cleanup; valid UTF-8 reuses its buffer and invalid bytes
+retain the legacy replacement behavior. Focused capture tests passed (42 passing,
+four ignored), all 15 pipe-observer tests passed, and all 14 explicitly delegated
+execution-owner integration tests passed with zero ignored. These suites overlap;
+they are not a unique-test count. Strict Clippy passed. This establishes the capture
+prerequisite only: ordinary engine routing, explicit grants and runner-level
+detached-descendant/disposition tests remain unfinished. No full publication gate
+has run for this active increment.
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on
 two lints. The fixes preserve behavior, passed independent review and focused core
