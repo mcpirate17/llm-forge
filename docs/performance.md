@@ -362,8 +362,9 @@ fixed while authored supporting inputs change independently.
 | Cargo.lock format version | Unmeasured | Rejected / rejected | Accepted / accepted |
 | Added Rust binary | Accepted / accepted | Rejected / rejected | Accepted / accepted |
 
-The fixed release is `9451943`, binary SHA-256
-`019c15b9baa08aa5fb4f49efc82c383cc6286564986b0e0da962035e6ab060ef`.
+The fixed release is `f07bd1f`, binary SHA-256
+`942f3fc9881d621a60e59be23c9f0b15ce5ef941e654556aa7dcdf8e965c56f9`.
+The compact artifact references the earlier successful `9451943` trial as well.
 All 43 phases and 114 commands completed, including expected nonzero refusals,
 without failures or censored/unstarted work. Baseline and restoration require both CLEAN and receipt acceptance; all
 eight drift checks require the specific supporting-input change refusal. Owned

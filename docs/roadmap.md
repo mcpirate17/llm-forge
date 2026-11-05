@@ -51,7 +51,7 @@ executables, networking or budgets from model requests. RPC cancellation suppres
 an adapter response; it does not undo a daemon operation. Same-UID unconfined
 programs remain trusted. See [the harness contract](native-harness.md).
 
-Native graph inventory at `.git/forge-program-graph.db`: 1,300 files, 18,327
+Initial 2026-11-04 native graph snapshot at `.git/forge-program-graph.db`: 1,300 files, 18,327
 definitions, 19,434 resolved references, 84,910 unresolved references and 54,387
 dynamic references. These are syntactic inventory counts, without embeddings,
 not a full semantic graph or proof that all dependency edges resolve. The external
@@ -61,9 +61,9 @@ this audit.
 ### Ordered continuation and acceptance criteria
 
 The descendant-cleanup and exact-test-target repairs landed in PR #198. The
-current increment addresses [#197](https://github.com/mcpirate17/llm-forge/issues/197):
+latest implemented correctness increment addresses [#197](https://github.com/mcpirate17/llm-forge/issues/197):
 ordinary Cargo discovery-input freshness now passes the real automatic-engine
-drift experiment below; final publication checks remain pending. Restoring the
+drift experiment and full source-bound gate below. Restoring the
 broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
 requires independently bound dependency manifests as well as confined execution.
 The existing root-only profile cannot yet execute Forge's own workspace campaigns.
@@ -329,7 +329,7 @@ PR #198 merged as `42ade902278121f7c7cbbd9c59577ea2b505dd8f`; its tree
 The temporary branch was retired. Global installation and client activation
 have not changed.
 
-**Active [#197](https://github.com/mcpirate17/llm-forge/issues/197):** ordinary
+**Implemented [#197](https://github.com/mcpirate17/llm-forge/issues/197):** ordinary
 native receipts now bind a versioned Rust/Cargo discovery inventory separately
 from the selected mutation source/test pins. Execution holds host and snapshot
 inputs; later native corpus and candidate checks independently reconstruct the
@@ -340,7 +340,7 @@ The [before-fix experiment](../research/performance/forge-program-20261105-suppo
 completed 32 checks at `adec2a6`: unpinned library bytes, Cargo edition and a new
 Rust binary each left the original receipt accepted in live and committed views.
 The [fixed release experiment](../research/performance/forge-program-20261105-supporting-input-validation.json)
-at `9451943c939656ff98176ae96e52b8c345a5e7ee` completed all 43 phases and 114
+at `f07bd1fbb0586a74e54d58cc3e0b3e4711d71a95` completed all 43 phases and 114
 commands, including expected nonzero refusals, with zero failed, censored or
 unstarted work. A real automatic campaign
 killed both mutants and produced PASS. Both admission modes accepted the baseline,
@@ -348,9 +348,11 @@ rejected all four independent changes (adding Cargo.lock format drift), and
 accepted every exact restoration. Selected source, test, campaign and receipt
 bytes remained fixed. Independent review rehashed all logs, tools and fixture
 pins and observed the snapshot and both cgroups absent. Binary SHA-256:
-`019c15b9baa08aa5fb4f49efc82c383cc6286564986b0e0da962035e6ab060ef`;
+`942f3fc9881d621a60e59be23c9f0b15ce5ef941e654556aa7dcdf8e965c56f9`;
 source fingerprint:
-`bc35057e28e79848800069e7c463fbc54e2a3ee3acfd7ca071c28b13e6b70b0c`.
+`bcf1a1a5ac79f8d3a2834ce1163fd4e0ba25c4c093dfbc7c605dc29c2ed01ae3`.
+The artifact also references the earlier successful `9451943` trial and its
+committed report, preserving both runs without duplicating the earlier payload.
 
 Focused tests passed 178 core and 308 Forge cases (28 Forge cases ignored in that
 invocation); strict Clippy and size limits passed. Independent review found and
@@ -369,7 +371,13 @@ an eight-argument validation function; receipt SHA-256:
 The correction represents captured supporting identity or failure as one typed
 result and preserves missing-capture refusal. Independent review, strict Clippy
 in both affected primary crates (including contract-registry), 178 core mutation
-tests and 24 candidate tests passed. A fresh full gate remains required.
+tests and 24 candidate tests passed. The fresh full gate and local-verify passed
+at `f07bd1f`: all 18 steps, 4,644 passing executions, zero failures and 172 ignored
+across 177 harnesses. Receipt SHA-256:
+`8b09589724fe4e47ebd1c66c4958deab9c3aa4a64d632f15182f60cf279c244e`.
+Its checked tree is `9faafe4ad393f3b72c2f02fefce2023fca9b4b31`. Publication still
+requires an exact-head receipt after any report-only commit, as required by the
+[local verification contract](local-checks.md).
 
 This establishes bounded input freshness, not changed program behavior, full
 compiler/runtime-data closure, execution authenticity or whole-candidate approval.
