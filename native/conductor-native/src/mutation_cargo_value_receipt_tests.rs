@@ -179,3 +179,49 @@ fn refuses_extra_missing_duplicate_mutants_and_source_or_inventory_drift() {
     changed[0]["outcome"] = json!("SURVIVED");
     assert!(evaluate(&metadata, &sources, &changed, &observed).is_err());
 }
+
+#[test]
+fn ordinary_native_rule_requires_independent_current_supporting_binding() {
+    use crate::mutation_cargo_supporting_binding::SupportingInputs;
+    let expected = SupportingInputs {
+        schema_version: 1,
+        algorithm: "sha256-framed-path-content-v1".into(),
+        scope: "cargo-root-rust-discovery-v1".into(),
+        digest: "a".repeat(64),
+        files: 4,
+    };
+    let (mut campaign, mut payload) = generated_fixture();
+    campaign.generated_value = None;
+    payload["supporting_inputs"] = serde_json::to_value(&expected).unwrap();
+    let runner = crate::mutation_receipt::RunnerState {
+        components: None,
+        error: None,
+        mutation_testing_sha256: None,
+    };
+    let check = |value: &Value, supporting: Option<&SupportingInputs>| {
+        crate::mutation_receipt::captured_generated_errors_with_installed(
+            value.as_object().unwrap(),
+            &campaign,
+            &runner,
+            |_| Some("e".repeat(64)),
+            |_| false,
+            None,
+            supporting,
+            None,
+        )
+    };
+    assert!(!check(&payload, Some(&expected))
+        .iter()
+        .any(|e| e.detail.contains("supporting")));
+    assert!(check(&payload, None)
+        .iter()
+        .any(|e| e.detail.contains("supporting")));
+    payload["supporting_inputs"]["files"] = json!(5);
+    assert!(check(&payload, Some(&expected))
+        .iter()
+        .any(|e| e.detail.contains("supporting")));
+    payload.as_object_mut().unwrap().remove("supporting_inputs");
+    assert!(check(&payload, Some(&expected))
+        .iter()
+        .any(|e| e.detail.contains("supporting")));
+}

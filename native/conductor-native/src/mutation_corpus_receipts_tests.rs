@@ -3,6 +3,8 @@ fn campaign<'a>(symbols: &'a BTreeSet<String>) -> Campaign<'a> {
     Campaign {
         campaign_id: "c",
         generated: false,
+        ordinary_cargo: false,
+        ordinary_contract: None,
         declares_value_analysis: false,
         source_symbols: symbols,
     }
@@ -110,11 +112,115 @@ mod native_receipts {
         })
     }
 
+    #[test]
+    fn ordinary_native_receipt_requires_independent_current_supporting_identity() {
+        use crate::mutation_cargo_supporting_binding::SupportingInputs;
+        let symbols = BTreeSet::new();
+        let contract = json!({"campaign_id":"c","manifest":"campaign.json","manifest_sha256":"f".repeat(64),
+            "source_sha256":{"src/a.rs":"e".repeat(64)},"test_sha256":{"tests/contract.rs":"b".repeat(64)}});
+        let campaign = Campaign {
+            campaign_id: "c",
+            generated: true,
+            ordinary_cargo: true,
+            ordinary_contract: Some(&contract),
+            declares_value_analysis: false,
+            source_symbols: &symbols,
+        };
+        let expected = SupportingInputs {
+            schema_version: 1,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "cargo-root-rust-discovery-v1".into(),
+            digest: "a".repeat(64),
+            files: 3,
+        };
+        let mut receipt = native_receipt();
+        receipt["campaign_id"] = contract["campaign_id"].clone();
+        receipt["manifest"] = contract["manifest"].clone();
+        receipt["manifest_sha256"] = contract["manifest_sha256"].clone();
+        receipt["test_sha256"] = contract["test_sha256"].clone();
+        receipt["supporting_inputs"] = serde_json::to_value(&expected).unwrap();
+        let check = |binding: &Campaign<'_>, value: &Value, identity: Option<&SupportingInputs>| {
+            rejection_with_supporting(
+                binding,
+                value,
+                &json!({}),
+                |_| Ok(Some("e".repeat(64))),
+                |_| Ok(false),
+                None,
+                identity,
+            )
+            .unwrap()
+        };
+        assert!(check(&campaign, &receipt, Some(&expected)).is_none());
+        let missing_contract = Campaign {
+            ordinary_contract: None,
+            ..campaign
+        };
+        assert!(check(&missing_contract, &receipt, Some(&expected))
+            .unwrap()
+            .contains("campaign binding unavailable"));
+
+        let mut older = receipt.clone();
+        older["generated_at"] = json!("2026-01-01");
+        for field in [
+            "campaign_id",
+            "manifest",
+            "manifest_sha256",
+            "source_sha256",
+            "test_sha256",
+        ] {
+            let mut forged = receipt.clone();
+            forged["generated_at"] = json!("2027-01-01");
+            forged[field] = match field {
+                "source_sha256" => json!({"src/a.rs":"0".repeat(64)}),
+                "test_sha256" => json!({"tests/contract.rs":"0".repeat(64)}),
+                _ => json!("wrong"),
+            };
+            assert!(
+                check(&campaign, &forged, Some(&expected))
+                    .unwrap()
+                    .contains(field),
+                "{field}"
+            );
+            let rows = vec![older.clone(), forged];
+            let chosen = newest_acceptable(&rows, |row| Ok(check(&campaign, row, Some(&expected))))
+                .unwrap()
+                .unwrap();
+            assert_eq!(chosen["generated_at"], "2026-01-01", "{field}");
+        }
+        let mut forged_detail = receipt.clone();
+        forged_detail["detail"] =
+            json!({"encoding":"json", "test_sha256":{"tests/contract.rs":"0".repeat(64)}});
+        assert!(check(&campaign, &forged_detail, Some(&expected))
+            .unwrap()
+            .contains("test_sha256"));
+        let rows = vec![older, forged_detail];
+        let chosen = newest_acceptable(&rows, |row| Ok(check(&campaign, row, Some(&expected))))
+            .unwrap()
+            .unwrap();
+        assert_eq!(chosen["generated_at"], "2026-01-01");
+        let mut python_row = receipt.clone();
+        python_row["runner_kind"] = json!("python");
+        python_row["detail"] = json!({"encoding":"json", "runner_kind":"forge-native"});
+        assert!(check(&campaign, &python_row, Some(&expected))
+            .unwrap()
+            .contains("changes runner identity"));
+        assert!(check(&campaign, &receipt, None).is_some());
+        let mut stale = receipt.clone();
+        stale["supporting_inputs"]["digest"] = json!("b".repeat(64));
+        assert!(check(&campaign, &stale, Some(&expected)).is_some());
+        let mut legacy = receipt;
+        legacy.as_object_mut().unwrap().remove("supporting_inputs");
+        assert!(check(&campaign, &legacy, Some(&expected)).is_some());
+    }
+
     fn judged(receipt: &Value, hash: &str, lineage: bool) -> Option<String> {
         let symbols = std::collections::BTreeSet::new();
         let campaign = Campaign {
             campaign_id: "c",
             generated: true,
+            ordinary_cargo: false,
+            ordinary_contract: None,
             declares_value_analysis: false,
             source_symbols: &symbols,
         };

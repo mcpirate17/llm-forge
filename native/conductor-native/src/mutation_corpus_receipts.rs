@@ -11,6 +11,9 @@ const MAX_PATH: usize = 4096;
 pub struct Campaign<'a> {
     pub campaign_id: &'a str,
     pub generated: bool,
+    pub ordinary_cargo: bool,
+    /// Independently loaded campaign fields, never derived from a receipt.
+    pub ordinary_contract: Option<&'a Value>,
     pub declares_value_analysis: bool,
     pub source_symbols: &'a BTreeSet<String>,
 }
@@ -48,20 +51,95 @@ pub fn rejection_with_installed(
     campaign: &Campaign<'_>,
     receipt: &Value,
     runner_components: &Value,
+    source_hash: impl FnMut(&str) -> Result<Option<String>>,
+    lineage_accepts: impl FnMut(&Value) -> Result<bool>,
+    installed: Option<&native_runner::InstalledIdentity>,
+) -> Result<Option<String>> {
+    rejection_with_supporting(
+        campaign,
+        receipt,
+        runner_components,
+        source_hash,
+        lineage_accepts,
+        installed,
+        None,
+    )
+}
+
+fn expand_ordinary(receipt: &Value, ordinary: bool) -> Result<Option<Value>, String> {
+    let raw = receipt.as_object().ok_or("receipt must be an object")?;
+    if !ordinary {
+        return Ok(None);
+    }
+    let expanded = crate::receipt_slim::expand_receipt(receipt)
+        .map_err(|error| format!("ordinary Cargo receipt detail invalid: {error}"))?;
+    let object = expanded
+        .as_object()
+        .ok_or("expanded ordinary Cargo receipt is not an object")?;
+    if raw.get("runner_kind") != object.get("runner_kind") {
+        return Err("ordinary Cargo receipt detail changes runner identity".into());
+    }
+    Ok(native_runner::declared(raw).then_some(expanded))
+}
+
+fn ordinary_binding_error(
+    object: &serde_json::Map<String, Value>,
+    campaign: &Campaign<'_>,
+) -> Option<String> {
+    let Some(contract) = campaign.ordinary_contract.and_then(Value::as_object) else {
+        return Some("independent ordinary Cargo campaign binding unavailable".into());
+    };
+    for field in [
+        "campaign_id",
+        "manifest",
+        "manifest_sha256",
+        "source_sha256",
+        "test_sha256",
+    ] {
+        if contract.get(field).is_none() || object.get(field) != contract.get(field) {
+            return Some(format!(
+                "ordinary Cargo receipt {field} differs from campaign"
+            ));
+        }
+    }
+    None
+}
+
+pub fn rejection_with_supporting(
+    campaign: &Campaign<'_>,
+    receipt: &Value,
+    runner_components: &Value,
     mut source_hash: impl FnMut(&str) -> Result<Option<String>>,
     mut lineage_accepts: impl FnMut(&Value) -> Result<bool>,
     installed: Option<&native_runner::InstalledIdentity>,
+    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
 ) -> Result<Option<String>> {
     ensure!(
         runner_components.is_object(),
         "current runner components must be an object"
     );
-    let object = receipt.as_object().context("receipt must be an object")?;
+    let raw = receipt.as_object().context("receipt must be an object")?;
+    let expanded = match expand_ordinary(receipt, campaign.ordinary_cargo) {
+        Ok(value) => value,
+        Err(error) => return Ok(Some(error)),
+    };
+    let object = expanded.as_ref().and_then(Value::as_object).unwrap_or(raw);
     let status = object.get("status").unwrap_or(&Value::Null);
     if !matches!(status.as_str(), Some("PASS" | "RATCHET_HELD")) {
         return Ok(Some(format!("status={}", python_status(status))));
     }
     if native_runner::declared(object) {
+        if campaign.ordinary_cargo {
+            if let Some(reason) = ordinary_binding_error(object, campaign) {
+                return Ok(Some(reason));
+            }
+            if let Err(reason) = crate::mutation_cargo_supporting_binding::compare(
+                object.get("supporting_inputs"),
+                supporting,
+            ) {
+                return Ok(Some(reason));
+            }
+        }
         if let Some(reason) = native_runner::owned_cleanup_error(object) {
             return Ok(Some(reason));
         }

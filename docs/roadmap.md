@@ -254,8 +254,8 @@ local-verify passed: 4,636 passing executions, zero failures and 145 ignored acr
 The capture is point-in-time and not an atomic filesystem snapshot. The opt-in declaration and supported scope are described
 in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 
-**Active [#192](https://github.com/mcpirate17/llm-forge/issues/192) and
-[#195](https://github.com/mcpirate17/llm-forge/issues/195):** ordinary native
+**Delivered [#192](https://github.com/mcpirate17/llm-forge/issues/192) and
+[#195](https://github.com/mcpirate17/llm-forge/issues/195), [PR #198](https://github.com/mcpirate17/llm-forge/pull/198):** ordinary native
 execution now requires pinned operator grants and the shared sandbox/cgroup
 command owner. The initial supported profile is a dependency-free root Cargo
 package with one explicit integration target. Unsupported Fest, Mull, workspace
@@ -319,9 +319,13 @@ the compact artifact retains all 11 trials. Native binary SHA-256:
 `00fe167a21c5084a1f9a523d1776fb3980e01c8df52ba28dd232b1f1a564f06f`;
 compiled source fingerprint:
 `974a19a1506ad33281875d7b8d19f6a8b1c9bdd3c585d692e7273e63e6e4a39a`.
-Publication revalidates the committed documentation/evidence update against the
-same production implementation. Global installation and client activation have
-not changed.
+The final documentation/evidence head `1bcc5a2` also passed all 18 full-gate
+steps with the same test counts and local-verify; receipt SHA-256:
+`d4311073b4d0b7381e6798d51066237898f1323f5008e8ae3eb2b2abd8618eb4`.
+PR #198 merged as `42ade902278121f7c7cbbd9c59577ea2b505dd8f`; its tree
+`6f2696ea0c961ae45ed9f4ef3e3dedd6941c11de` exactly matches the validated head.
+The temporary branch was retired. Global installation and client activation
+have not changed.
 
 Read-only review also identified a pre-existing supporting-input freshness gap,
 tracked in [#197](https://github.com/mcpirate17/llm-forge/issues/197): ordinary
@@ -336,7 +340,10 @@ each probe. [Reproduction inputs and observations](../research/performance/forge
 preserve native CLI arguments, hashes and raw log references. These establish an
 input-freshness gap, not demonstrated behavior changes, compiler-input closure or
 whole-candidate approval. Cargo.lock drift is not yet probed. This correctness
-prerequisite comes before broader dependency support in #196.
+prerequisite comes before broader dependency support in #196. The active next
+increment binds the supported Rust/Cargo discovery inventory across execution
+and later live/committed receipt admission. It does not promise total compiler
+input or runtime data closure; non-Rust data remains outside that scope.
 
 The first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on

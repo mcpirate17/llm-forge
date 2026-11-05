@@ -728,3 +728,54 @@ fn candidate_cargo_inventory_is_git_bound_and_held_until_verify() {
     fs::write(snapshot.path().join("src/new.rs"), "fn new() {}").unwrap();
     assert!(capture.verify().is_err());
 }
+
+#[test]
+fn ordinary_supporting_inventory_binds_git_and_materialization() {
+    let f = Fixture::new();
+    f.write("Cargo.toml", "[package]\nname='demo'\nversion='0.1.0'\n");
+    f.write("Cargo.lock", "version=4\n");
+    f.write("src/lib.rs", "pub mod a;\n");
+    f.write("src/a.rs", "pub fn a() {}\n");
+    let (source, snapshot, candidate, policy) = f.captured();
+    let mut capture = inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    let sha = crate::mutation_campaign::sha256_path(&snapshot.path().join("src/a.rs")).unwrap();
+    let required = BTreeMap::from([("src/a.rs".into(), sha)]);
+    let first = capture.supporting_inventory(&required).unwrap();
+    assert!(first.files >= 4);
+    capture.verify().unwrap();
+    fs::write(snapshot.path().join("src/new.rs"), "fn added() {}\n").unwrap();
+    assert!(capture.verify().is_err());
+}
+
+#[test]
+fn committed_candidate_and_live_supporting_inventories_use_their_own_tree() {
+    let f = Fixture::new();
+    f.write("Cargo.toml", "[package]\nname='demo'\nversion='0.1.0'\n");
+    f.write("Cargo.lock", "version=4\n");
+    f.write("src/lib.rs", "pub mod a;\n");
+    f.write("src/a.rs", "pub fn a() {}\n");
+    f.commit();
+    let source = Source::open(&f.root.join("repo")).unwrap();
+    let candidate = source.resolve(Kind::Commit, "HEAD", None).unwrap();
+    let snapshot = Snapshot::create(
+        &source,
+        &candidate.tree_oid,
+        &f.root.join("committed-snapshot"),
+        Limits::default(),
+    )
+    .unwrap();
+    let policy =
+        crate::candidate_policy::load(&snapshot.path(), Some("policy.toml"), TODAY).unwrap();
+    let mut captured =
+        inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    let sha = crate::mutation_campaign::sha256_path(&snapshot.path().join("src/a.rs")).unwrap();
+    let required = BTreeMap::from([("src/a.rs".into(), sha)]);
+    let git_identity = captured.supporting_inventory(&required).unwrap();
+    let root = f.root.join("repo");
+    fs::write(root.join("src/lib.rs"), "pub mod a;\nfn live_only() {}\n").unwrap();
+    let mut live = crate::mutation_live_inputs::LiveInputs::open(&root).unwrap();
+    let live_identity = live.supporting_inventory(&required).unwrap();
+    assert_ne!(git_identity, live_identity);
+    captured.verify().unwrap();
+    live.verify().unwrap();
+}

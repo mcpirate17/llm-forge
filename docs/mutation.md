@@ -302,13 +302,23 @@ ledger. Historical process-group-only receipts remain readable as records but
 do not establish current whole-tree cleanup admission. These ledger checks are
 structural consistency checks, not independent execution attestation.
 
-Ordinary supporting-input freshness is still limited: selected source/test pins
-are checked, but later receipt admission does not yet bind all unselected Rust
-inputs, Cargo manifests or relevant-file additions. Cargo inputs held during a
-run do not close that later-validation gap. This is tracked in
-[#197](https://github.com/mcpirate17/llm-forge/issues/197); do not treat an ordinary
-receipt as proof that every compiler input is unchanged. The opt-in Cargo-value
-workflow has separate inventory validation.
+Ordinary native root Cargo receipts carry a `supporting_inputs` identity with
+scope `cargo-root-rust-discovery-v1`. It binds the root `Cargo.toml` and
+`Cargo.lock` and the bounded inventory of Rust files in the admitted tree, excluding fixed
+output roots; additions, removals, type changes and byte changes to those inventoried
+inputs invalidate the identity. Selected mutation sources and tests retain their
+separate campaign pins. The runner holds and compares host and snapshot inputs,
+and native live corpus, committed corpus and candidate validation independently
+reconstruct the discovery inventory.
+
+Older ordinary native receipts without this binding remain readable, but cannot
+satisfy current native admission; regenerate them through the automatic runner.
+A compatibility caller that cannot independently capture the inventory fails
+closed. This identity covers bounded Rust/Cargo discovery bytes, not all compiler
+inputs: non-Rust files read by macros or at runtime, toolchain and environment
+closure, and producer authenticity are outside its scope. The existing opt-in
+Cargo per-test value contract has its own inventory and is not replaced by this
+binding.
 
 ## Receipt format
 

@@ -410,10 +410,25 @@ impl<'a> Build<'a> {
         } else {
             None
         };
-        let verified=conductor_native::mutation_evidence::verify_captured_native(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
+        let supporting_capture = crate::mutation_cargo_supporting::required_for(
+            &catalog.contracts,
+            &catalog.receipts,
+            || Ok(native_fingerprint.clone()),
+            self.native.as_ref().map(native::Identity::identity),
+        )
+        .and_then(|required| {
+            required
+                .map(|paths| self.capture.supporting_inventory(&paths))
+                .transpose()
+        });
+        let (supporting, supporting_error) = match supporting_capture {
+            Ok(value) => (value, None),
+            Err(error) => (None, Some(format!("{error:#}"))),
+        };
+        let verified=conductor_native::mutation_evidence::verify_captured_native_with_supporting(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
             "runtime":runtime,"broken_campaigns":catalog.broken,"malformed_receipts":catalog.malformed}),&catalog.receipts,
             |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}")),
-            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity)).map_err(anyhow::Error::msg)?;
+            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity), supporting.as_ref(), supporting_error.as_deref()).map_err(anyhow::Error::msg)?;
         self.payload = verified.result;
         let waived: Vec<_> = list(&states)?
             .iter()

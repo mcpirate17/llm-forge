@@ -37,7 +37,7 @@ pub(crate) fn generated_errors_with(
     hash: impl Fn(&str) -> Option<String>,
     lineage: impl Fn(Option<&Value>) -> bool,
 ) -> Vec<Rejection> {
-    generated_errors_with_installed(payload, campaign, runner, hash, lineage, None)
+    generated_errors_with_installed(payload, campaign, runner, hash, lineage, None, None, None)
 }
 
 pub(crate) fn generated_errors_with_installed(
@@ -47,6 +47,8 @@ pub(crate) fn generated_errors_with_installed(
     hash: impl Fn(&str) -> Option<String>,
     lineage: impl Fn(Option<&Value>) -> bool,
     installed: Option<&native_runner::InstalledIdentity>,
+    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
+    supporting_error: Option<&str>,
 ) -> Vec<Rejection> {
     let mut errors = Vec::new();
     if payload.get("schema_version").and_then(Value::as_str) != Some(RECEIPT_SCHEMA) {
@@ -83,6 +85,20 @@ pub(crate) fn generated_errors_with_installed(
         }
     }
     errors.extend(identity_errors(payload, campaign));
+    if native_runner::declared(payload)
+        && campaign.generated_value.is_none()
+        && campaign.mutation_engine == "cargo-mutants"
+    {
+        if let Err(reason) = crate::mutation_cargo_supporting_binding::compare(
+            payload.get("supporting_inputs"),
+            supporting,
+        ) {
+            let detail =
+                supporting_error.map_or(reason.clone(), |error| format!("{reason}: {error}"));
+            errors.push(reject(RejectionKind::NotPass, detail));
+        }
+    }
+
     if native_runner::declared(payload) {
         if let Some(detail) = native_runner::owned_cleanup_error(payload) {
             errors.push(reject(RejectionKind::SchemaError, detail));

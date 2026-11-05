@@ -145,3 +145,23 @@ fn live_cargo_inventory_retains_files_and_detects_new_source() {
     write("src/new.rs", "fn new() {}");
     assert!(capture.verify().is_err());
 }
+
+#[test]
+fn ordinary_supporting_inventory_holds_live_inputs_and_additions() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(
+        root.path().join("Cargo.toml"),
+        "[package]\nname='demo'\nversion='0.1.0'\n",
+    )
+    .unwrap();
+    fs::write(root.path().join("Cargo.lock"), "version=4\n").unwrap();
+    fs::create_dir(root.path().join("src")).unwrap();
+    fs::write(root.path().join("src/lib.rs"), "pub fn value() {}\n").unwrap();
+    let sha = crate::mutation_campaign::sha256_path(&root.path().join("src/lib.rs")).unwrap();
+    let required = BTreeMap::from([("src/lib.rs".into(), sha)]);
+    let mut live = LiveInputs::open(root.path()).unwrap();
+    live.supporting_inventory(&required).unwrap();
+    live.verify().unwrap();
+    fs::write(root.path().join("src/added.rs"), "fn added() {}\n").unwrap();
+    assert!(live.verify().is_err());
+}

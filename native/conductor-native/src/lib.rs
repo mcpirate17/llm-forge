@@ -83,6 +83,9 @@ pub mod memory_index_sidecar;
 pub mod mutation_cargo_inventory;
 #[cfg(feature = "source-analysis")]
 pub mod mutation_cargo_observations;
+#[cfg(feature = "source-analysis")]
+pub mod mutation_cargo_supporting;
+pub mod mutation_cargo_supporting_binding;
 pub mod mutation_corpus_delta;
 pub mod mutation_corpus_receipts;
 pub mod mutation_corpus_territory;
