@@ -10,6 +10,75 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Native outbound MCP observations — 2026-11-05
+
+The [five native observations](../research/performance/forge-program-20261105-outbound-mcp.json)
+bind release commit `5669fb33d3db9dac9b59fbec4680e8ac4df9efc8`, executable
+`00dc249c5ae27d8fb441da34ca4e56f05d22eec1a5daefbb1aac12e71b722ccb` and source
+inventory `53016f2e460a71facc56f77d74b6e7ee3824e922c990837231cf519deddc9be6`.
+Each fresh service exercised the actual inbound stdio adapter, persistent native
+outbound client and a separate Rust server reading an explicitly granted file.
+All 160 selected-tool calls and 195 recorded phases completed, with zero failed,
+censored or unstarted observations. This feature had no equivalent earlier
+outbound implementation; these are current costs, not measured speedups.
+
+| Observation | Range across five runs |
+| --- | --- |
+| Fixture preparation, service launch and readiness | 52.2–61.5 ms |
+| Adapter startup and initialization | 1.18–1.79 ms |
+| Inbound tool catalog discovery | 37.9–52.6 µs |
+| First selected-tool call, including endpoint launch and remote discovery | 11.8–22.7 ms |
+| Warm transport p50, 31 calls per run | 1.259–1.333 ms |
+| Warm transport p95, 31 calls per run | 1.322–1.400 ms |
+
+Transport timing includes framing and JSON conversion; the independent response
+oracle is timed separately. Pin validation before and after each result is included.
+Service CPU increased by 40–50 ms over the measured call sequence at 10 ms kernel
+tick resolution. Driver, adapter and endpoint CPU deltas rounded to zero ticks;
+this does not mean zero work. Final observed RSS was 25.4–25.6 MB for the service,
+16.3–16.6 MB for the adapter and 2.13–2.20 MB for the endpoint. These are process
+snapshots, not allocation counts or whole-tree peaks. The endpoint PID comes from
+the cooperative fixture, with stable process start ticks; it is not an independent
+producer attestation. No model usage, cache usage, task success or billed cost was
+observed. A first call is not an OS-cache-cold measurement.
+
+Every successful run checked unchanged observed inputs, adapter EOF/exit, explicit
+service stop, the durable cleanup disposition and positive absence of the exact
+owned scratch/cgroup paths. An independent review rechecked hashes, accounting and
+path absence. The test's 25-second deadline is cooperative; an external 60-second
+watchdog bounded these invocations. Failure or watchdog termination is not cleanup
+evidence. Earlier functional-test failures are retained separately in the artifact.
+
+The [matched ordinary CLI control](../research/performance/forge-program-20261105-outbound-cli-control.json)
+used 101 samples and five warmups per binary with the same prompt workload and
+environment. P50 changed from 1.602 to 1.595 ms, p95 from 1.909 to 1.825 ms, median
+CPU from 1.166 to 1.149 ms, and maximum RSS from 14.410 to 14.524 MB. The existing
+10% regression budget passed; these small differences do not establish an
+optimization. The baseline binary was the preserved `411d168` build of the
+pre-outbound production implementation. Subsequent documentation and Linux test
+guard changes are not assigned these measured executable identities.
+
+Reproduce on the documented Linux/systemd host using a private report destination:
+
+```sh
+cargo +1.98.0 build --release --locked --offline --jobs 2 \
+  --manifest-path native/forge/Cargo.toml --bin forge --example outbound_mcp_server
+sha256sum native/forge/target/release/examples/outbound_mcp_server
+FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
+FORGE_TEST_MCP_SERVER="$PWD/native/forge/target/release/examples/outbound_mcp_server" \
+FORGE_TEST_MCP_SERVER_SHA256="<digest from the independently captured build>" \
+FORGE_TEST_OUTBOUND_REPORT="/absolute/private/new-observation.json" \
+timeout --signal=TERM --kill-after=5s 60s \
+  cargo +1.98.0 test --release --locked --offline --jobs 2 \
+  --manifest-path native/forge/Cargo.toml --test native_outbound_mcp \
+  -- --exact outbound_current_roundtrip_observation --ignored --test-threads=1
+```
+
+Build the test driver with `--no-run` before timing when using Cargo; the recorded
+runs invoked the already-built test executable directly. Use a fresh report path
+for each repetition. The six functional scenarios use `--include-ignored --skip
+outbound_current_roundtrip_observation` and the same explicit binary handoffs.
+
 ### Automatic Cargo test value — 2026-11-05
 
 The [automatic fixture observations](../research/performance/forge-program-20261105-cargo-value.json)

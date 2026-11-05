@@ -83,6 +83,10 @@ forge harness start --policy /absolute/operator.json --state-parent /existing/pr
 forge harness catalog --socket /returned/state/socket
 ```
 
+The optional [outbound MCP capability](docs/native-harness.md#optional-outbound-mcp-tool)
+adds one operator-pinned local stdio tool to this same catalog, with bounded
+execution and schema validation.
+
 The returned socket belongs to that running service. An MCP client launches the
 absolute installed `forge` binary with these arguments:
 

@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! Admission exercises the shipped policy and held bindings without a child launch.
 use forge::harness::policy::Policy;
 use serde_json::{json, Value};

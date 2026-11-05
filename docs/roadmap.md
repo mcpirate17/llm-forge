@@ -111,16 +111,25 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
    paths. Retire proven duplicates and interpreted boundaries after caller/parity
    verification; add readiness/setup/status/undo without parallel machinery.
 
-**Active native MCP increment:** the local outbound endpoint passed six opted-in
+**Verified native MCP increment:** the local outbound endpoint passed six opted-in
 wire integration tests, seven protocol/controller tests (including delegated
 prelaunch cleanup), and three admission tests. The shared owner passed all 22
 opted-in process tests. Strict all-target Clippy passed after correcting an
 unnecessary borrow in the resource-validation extraction. Two early wire runs
 failed test-fixture permission and cgroup-layout assumptions; both were corrected
 without changing admission or weakening cleanup assertions. Independent review
-found no additional concrete blocker. Final committed-tree validation and latency
-observations remain pending; this checkpoint is not publication or client-adoption
-evidence. See [the operator contract](native-harness.md#optional-outbound-mcp-tool).
+found no additional concrete blocker. Full local-check and local-verify passed all
+18 steps at `5669fb33d3db9dac9b59fbec4680e8ac4df9efc8`: 4,653 successful test
+executions, zero failures and 188 ignored across 179 harnesses. Receipt SHA-256:
+`818e49f2ea3a3e39d7a585fc6c6a70549b6c7d6ca8be523e36ade6329aa6314e`.
+The final release repeated all 22 owner, seven controller/protocol and six wire
+tests with zero ignored cases. Five observations completed 160 selected-tool calls
+with verified cleanup: warm medians were 1.259–1.333 ms; the ordinary CLI control
+stayed within its existing budget. [The performance report](performance.md#native-outbound-mcp-observations--2026-11-05)
+records identities, controls, failures and limitations. Later documentation/test
+guard changes require their own publication receipt. Real coding-client use,
+task benefit and global installation remain separate unverified milestones.
+See [the operator contract](native-harness.md#optional-outbound-mcp-tool).
 
 **Rejected candidate:** optional next-inspection advice passed focused
 behavior tests and actual MCP inspections but added 22–27 µs and 943 frame bytes
@@ -225,7 +234,7 @@ all 18 steps, 4,532 successful executions, zero failures and 145 ignored across
 `.git/forge-checks/run-1793854577157961065-467531/receipt.json`.
 Compare recommendation workflows against both discovery-first
 and best existing direct-call controls; an extra recommendation call may be a net
-cost. Automatic strengthening, outbound MCP, agent task benefit and client adoption
+cost. Automatic strengthening, broader outbound MCP, agent task benefit and client adoption
 remain unverified mission gaps. The new installed identity path retains explicit
 operator pins; a candidate-controlled lock or receipt cannot authorize that identity.
 The installed global Forge remains a separate artifact.
