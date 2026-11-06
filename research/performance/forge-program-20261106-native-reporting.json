@@ -1,7 +1,7 @@
 {
   "schema": "forge.native-reporting.evidence.v1",
-  "status": "completed scoped measurements and positive control; final publication gate pending",
-  "scope": "Host-local bounded reporting comparisons; no mutation execution or agent productivity measurement.",
+  "status": "completed scoped measurements and positive control; final publication gate was pending at index assembly",
+  "scope": "Host-local bounded reporting comparisons and one scoped automatic mutation positive control; no agent productivity measurement.",
   "historical_two_arm": {
     "summary": ".git/forge-report-run-1793950295686621178/summary.json",
     "summary_sha256": "3273c2a61dd30e9f1c917e03c3143ed30d34d7bec2ef9431d3b88181e70b3555",
@@ -191,18 +191,18 @@
   ],
   "limitations": [
     "GNU time wall/CPU quantized to 10 ms; six/five fresh-process rounds with uncontrolled filesystem caches are not general performance claims.",
-    "Candidate remained slower than Python in four measured CLI workloads; differences versus native reference are small at measurement resolution.",
+    "In the rejected openat2 experiment, the candidate remained slower than Python in all four workloads and native-reference differences were small. In the final comparison, candidate and Python explicit medians were equal; candidate remained slower for changed, coverage and canary.",
     "Extension build-source provenance unavailable; identical output does not establish identical implementation.",
-    "Outer RSS is not aggregate simultaneous process-tree memory; descendant cleanup is not attested.",
+    "Outer RSS is not aggregate simultaneous process-tree memory; benchmark-owner descendant cleanup is not attested. The separate native positive control records verified cleanup.",
     "Raw artifacts and supplied tools are host-local; this index is not a portable replay bundle.",
     "No model tokens, cost, user benefit or agent productivity measured.",
     "Empirical p95 uses nearest rank from only five or six timed samples; in both sets it is the sample maximum, not a reliable tail estimate."
   ],
   "pending": {
-    "zero_eligible_contract_fix": "implemented at measured candidate; publication checks pending",
+    "zero_eligible_contract_fix": "implemented at measured candidate; publication checks were pending at index assembly",
     "final_comparison": "completed; see final_matched_three_arm",
     "positive_control": "completed: scoped automatic two-mutant PASS; see positive_control",
-    "publication_gate": "pending: make local-check and make local-verify on final committed tree and current origin/main"
+    "publication_gate": "At index assembly: pending make local-check and make local-verify on final committed tree and current origin/main"
   },
   "final_matched_three_arm": {
     "summary": ".git/forge-report-native-run-1793953091546186807/summary.json",
@@ -342,6 +342,6 @@
         "sha256": "038539bf81b671b8a02b29e2b185733881c318cc5075ef64102515d508560cc5"
       }
     ],
-    "result": "37 focused library tests passed (10 eligibility, 12 evidence, 6 restored pin and 9 restored live); 5 CLI tests passed separately; focused Clippy completed. Full publication checks remain pending."
+    "result": "37 focused library tests passed (10 eligibility, 12 evidence, 6 restored pin and 9 restored live); 5 CLI tests passed separately; focused Clippy completed. At index assembly, full publication checks remained pending."
   }
 }
