@@ -92,6 +92,27 @@ fn bound_mull_corpus_requires_independent_inputs_and_retained_replay() {
 }
 
 #[test]
+fn refreshed_manifest_or_input_pins_cannot_reuse_the_old_mull_receipt() {
+    let (receipt, contract, expected) = fixture();
+    assert!(check(&receipt, Some(&contract), Some(&expected)).is_none());
+    for field in ["manifest_sha256", "source_sha256", "test_sha256"] {
+        let mut refreshed = contract.clone();
+        if field == "manifest_sha256" {
+            refreshed[field] = json!("c".repeat(64));
+        } else {
+            for digest in refreshed[field].as_object_mut().unwrap().values_mut() {
+                *digest = json!("c".repeat(64));
+            }
+        }
+        assert_ne!(refreshed[field], contract[field], "{field} must change");
+        assert!(
+            check(&receipt, Some(&refreshed), Some(&expected)).is_some(),
+            "{field}"
+        );
+    }
+}
+
+#[test]
 fn consistent_survivor_report_cannot_claim_pass_or_an_unaccepted_ratchet() {
     let (mut receipt, mut contract, expected) = fixture();
     let observation = &mut receipt["mull_observation"];

@@ -189,3 +189,23 @@ No global installation, host adoption, performance improvement, or agent-task be
 is established. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
 for run identities, receipts, limits, and publication status.
+
+## Refresh measurements
+
+Clean release `9c10c9f` was measured on two authored source/driver pairs, with two
+warmups and 20 scored fresh-process previews per case. All 44 JSON outputs matched
+expected pins and every fixture file remained unchanged. Final recorder and build
+both identify Rust 1.98.0; earlier setup and ambient-toolchain attempts remain in
+the evidence. These are warm-cache observations including shell startup.
+
+| Source / driver bytes | Wall p50 / p95 | CPU p50 | Maximum child RSS |
+|---|---:|---:|---:|
+| 4,098 / 4,086 | 1.858 / 2.459 ms | 1.387 ms | 17.44 MiB |
+| 65,058 / 65,046 | 2.044 / 2.217 ms | 1.559 ms | 17.50 MiB |
+
+The [refresh index](../research/performance/forge-program-20261106-mull-refresh.json)
+contains the fixture recipe, exact command provenance and links to both sealed
+receipts. Independent audit recomputed the observations. No cold-cache,
+allocation, matched speedup, model-cost or agent-task result is established.
+The later stale-receipt test addition changes no measured production file.
+Full publication validation of the refresh increment remains pending.

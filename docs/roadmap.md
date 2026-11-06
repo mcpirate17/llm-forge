@@ -140,11 +140,16 @@ Actual-client adoption and matched agent-task benefit still require separate evi
 native refresh for one explicit `mull-confined-v1` manifest. It updates only the
 source/driver pins, preserves all other fields and refuses observed input drift
 before publication. It does not infer registration, run payloads or issue evidence.
-Focused validation passed six refresh, two core, seven publisher and 17 existing
+Focused validation passed six refresh, two core, seven publisher and 18
 receipt-validation tests, plus an actual CLI test with an empty `PATH`. Strict
 Clippy passed for Forge and core; independent review corrected a weak duplicate-key
-test oracle and found no production blocker. Clean release measurements and the
-refresh increment's own full publication checks remain pending.
+test oracle and found no production blocker. The stale-receipt regression now proves independent manifest/source/test pin changes
+reject old evidence. Clean release `9c10c9f` completed 44 preview calls on two
+authored byte-volume fixtures; median latency was 1.86/2.04 ms, including shell
+startup with warmed caches. Independent audit verified both receipts and unchanged
+inputs. The initial measurement setup failure, ambient-toolchain rerun and unit-test
+oracle repair remain recorded in the [refresh evidence index](../research/performance/forge-program-20261106-mull-refresh.json).
+The refresh increment's own full publication checks remain pending.
 
 ### Architecture, evidence and disposition
 
