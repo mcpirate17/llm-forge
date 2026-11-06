@@ -98,13 +98,36 @@ collection-error `ERROR` (zero attributed kills). Independent audit confirmed al
 Native export matched all 1,302 entries. A 31-command probe verified live/committed
 receipt acceptance, admitted supporting-input rejection and exact restoration.
 
-The full 18-step gate and exact-head/current-base verification passed at `c8722ce`:
+The final 18-step gate and exact-head/current-base verification passed at `f9e6375`:
 4,956 test executions passed, zero failed and 200 were ignored across 182 harnesses.
 The first gate's fixture/API and minimal-feature errors were repaired; all failed
 controls and probes remain recorded. Later publication heads require their own
-source-bound receipts. Unmarked Fest and Mull remain refused. Next implement the
-bounded Mull prerequisites; agent-task value and actual-client adoption still need
-separate evidence. See the [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
+source-bound receipts. [PR #214](https://github.com/mcpirate17/llm-forge/pull/214)
+merged as `edb9989` with the same checked tree. See the
+[evidence index](../research/performance/forge-program-20261106-confined-fest.json).
+
+The next [confined Mull increment](mutation-mull.md) is implemented at `f443a20`
+and awaits full publication checks. It reuses the native command owner for one
+C/C++ translation unit and a standalone driver, with exact toolchain pins, a fixed
+build definition, private child permissions and shared report replay. Real controls
+produced one killed mutant (`PASS`), one surviving mutant (`RATCHET_HELD`), a
+detached-child failing baseline and pre-payload wrong-plugin refusal. The initial
+GCC discovery and artifact-permission failures remain recorded.
+
+A fresh automatic run after operator-policy preparation passed; the original
+receipt remained preserved and was explicitly rejected for changed supporting
+inputs. All 15 freshness phases and 36 consumer commands passed live/committed
+acceptance, admitted-input rejection and exact restoration. Independent cleanup
+observations cover 21 command groups, four snapshots and four build definitions
+before the owned supervisor was retired. Independent freshness audit verified all
+45 preparation/probe commands, bindings and exact Git restoration. The complete
+publication gate remains pending. Focused tests passed 421 Forge and 90 minimal
+core cases, with strict Clippy and 41 planner contract tests passing. See the
+[Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
+for raw provenance and observational cost. Unmarked Mull and arbitrary project
+builds remain refused; C++ refresh is still absent. Next complete the source-bound
+publication gate, then reassess the native migration and agent-workflow backlog.
+Actual-client adoption and matched agent-task benefit still require separate evidence.
 
 ### Architecture, evidence and disposition
 
@@ -250,10 +273,10 @@ fixture uses explicitly pinned tools and grants, automatic generation and the
 existing process owner. [Measurements and limitations](performance.md#reproducible-native-timeout-fixture--2026-11-06)
 remain separate from full publication validation and actual-package campaign PASS.
 Next obtain useful bounded actual-package campaign evidence. Three other survivors
-do not yet establish that their guards are redundant; retain them pending proof. Restore
-Fest/Mull through the same command owner. A shared native coordinator for mutation
-evidence, coverage and canary remains queued; migration must preserve legacy
-identity and anchor semantics without weakening candidate approval requirements.
+do not yet establish that their guards are redundant; retain them pending proof.
+The confined Fest and standalone Mull profiles now reuse the same command owner.
+Native evidence, coverage and canary reports are delivered above; host caller
+migration must preserve identity and anchor semantics and candidate approval requirements.
 Read grants, test executables and environment are separate operator decisions;
 a seed grants none. Broader platform priorities below remain open.
 

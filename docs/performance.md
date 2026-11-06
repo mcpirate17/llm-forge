@@ -10,6 +10,8 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+Confined Mull: [validated controls and observational cost](../research/performance/forge-program-20261106-confined-mull.json), [scope and reproduction](mutation-mull.md); no matched speedup or agent-benefit result.
+
 ### Confined MCP test report — 2026-11-06
 
 The operator-enabled `python_test_report` uses the native classifier through an
