@@ -340,7 +340,7 @@
   "limitations": [
     "Raw logs and fixture roots are retained locally, not bundled into Git.",
     "Debug observer/runtime measurements are not release performance.",
-    "No accepted optimization, external-client result, host adoption or full release-gate result is established.",
+    "No accepted optimization, external-client result or host adoption is established.",
     "Debug strong/weak independent resource absence was observed while the parent cgroup existed; collection independent absence was observed only after parent expiry.",
     "Same-size automatic source replacement was witnessed at a deliberately equalized mtime, but default return values remained 7; the changed return-value mutant had a different source size.",
     "Collection marker PIDs are correlated by exact automatic mutant source bytes, not directly bound to command PIDs. Original JUnit files were disposed; the collection stdout tail contained the full engine JSON.",
@@ -391,7 +391,7 @@
       ]
     }
   },
-  "release_controls": {
+  "intermediate_release_controls": {
     "source_commit": "234b60f65b784ca0923f09c7cccc2a8be8f3792f",
     "compiled_source_sha256": "ebafc303ee5d848b7410e7fec36ae5511fb5bb5bbbff82dbbb4dbbfdcb0dd78e",
     "binary_sha256": "373f61f10921cd88d5aeae5d4c2d190eabcdd6ac6b91b7389bc3696c118068db",
@@ -449,7 +449,7 @@
     },
     "strict_clippy": "PASS"
   },
-  "freshness": {
+  "intermediate_freshness": {
     "first_probe": "FAILED expectation; untracked root .txt excluded from snapshot selection and correctly did not change captured inputs",
     "correction": "authored untracked .json admitted by existing filter; no product gate change",
     "final_decision": "FRESHNESS_EXPECTATIONS_MET",
