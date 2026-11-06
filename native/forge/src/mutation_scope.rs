@@ -81,6 +81,17 @@ pub fn changed_sources(
     repo_root: &Path,
     owner: &str,
 ) -> Result<BTreeSet<String>, String> {
+    changed_sources_narrow(base, repo_root, owner, None)
+}
+
+/// Restrict dirty ownership checks to the exact requested paths, while still
+/// requiring every selected dirty path to belong to the invoking lane.
+pub(crate) fn changed_sources_narrow(
+    base: &str,
+    repo_root: &Path,
+    owner: &str,
+    only: Option<&BTreeSet<String>>,
+) -> Result<BTreeSet<String>, String> {
     let diff_range = format!("{base}...HEAD");
     let mut paths: BTreeSet<String> = git_lines(repo_root, &["diff", "--name-only", &diff_range])?
         .into_iter()
@@ -92,8 +103,15 @@ pub fn changed_sources(
         repo_root,
         &["ls-files", "--others", "--exclude-standard"],
     )?);
+    if let Some(only) = only {
+        dirty.retain(|path| only.contains(path));
+    }
     if !dirty.is_empty() {
-        paths.extend(owned_dirty(repo_root, owner, dirty)?);
+        let owned = owned_dirty(repo_root, owner, dirty.clone())?;
+        if only.is_some() && owned != dirty {
+            return Err("selected dirty mutation paths are not owned by this lane".into());
+        }
+        paths.extend(owned);
     }
     paths.retain(|path| repo_root.join(path).exists());
     Ok(paths)

@@ -237,3 +237,58 @@ fn unselected_supporting_source_pins_are_refused() {
     subject.source_sha256 = pins(&["mine.py", "helper.py"]);
     refused(&subject, root, &[], "supporting pins are unsupported");
 }
+
+#[test]
+fn explicit_committed_source_ignores_unrelated_writer_dirt_but_not_selected_dirt() {
+    let repo = repository(&["selected.py", "unchanged.py"]);
+    let root = repo.path();
+    change(root, &["selected.py"]);
+    write(root, "campaigns/generated.json", "{}\n");
+    write(root, "campaigns/registry.d/generated.json", "{}\n");
+    let (_dir, mut subject) = scoped(&["selected.py"], "fest");
+    assert_eq!(
+        validate(&subject, root, &["selected.py"]),
+        Ok(vec!["selected.py".into()])
+    );
+    refused(&subject, root, &[], "no active ownership claim");
+    set_sources(&mut subject, &["unchanged.py"]);
+    subject.source_sha256 = pins(&["unchanged.py"]);
+    refused(
+        &subject,
+        root,
+        &["unchanged.py"],
+        "--only names files outside",
+    );
+    set_sources(&mut subject, &["selected.py"]);
+    subject.source_sha256 = pins(&["selected.py"]);
+    write(root, "selected.py", "dirty and not claimed\n");
+    refused(
+        &subject,
+        root,
+        &["selected.py"],
+        "no active ownership claim",
+    );
+}
+
+#[test]
+fn explicit_committed_source_with_foreign_dirty_edit_is_refused_even_with_other_claim() {
+    let repo = repository(&["selected.py", "other.py"]);
+    let root = repo.path();
+    change(root, &["selected.py"]);
+    for (owner, path) in [("lane", "other.py"), ("other-lane", "selected.py")] {
+        crate::ownership_lifecycle::create(
+            root,
+            crate::ownership_lifecycle::Create {
+                owner,
+                paths: &[path.to_owned()],
+                justification: "scope fixture",
+                expected_minutes: 1.0,
+                max_minutes: 2.0,
+            },
+        )
+        .unwrap();
+    }
+    write(root, "selected.py", "foreign dirty edit\n");
+    let (_dir, subject) = scoped(&["selected.py"], "fest");
+    refused(&subject, root, &["selected.py"], "not owned by this lane");
+}
