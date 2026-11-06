@@ -3,7 +3,7 @@
   "kind": "native_mull_refresh_evidence",
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/216",
-  "status": "focused_cli_and_release_measurements_verified_publication_pending",
+  "status": "implementation_release_and_full_gate_verified_at_7d80f88",
   "base_commit": "de687f577edeea5f557790b865a656cddb54835b",
   "scope": "Preview and optionally update only source/test pins of one explicit generated mull-confined-v1 manifest; preserve all other fields. No registration, payload execution or evidence production.",
   "verification": {
@@ -15,8 +15,22 @@
     "strict_clippy_forge": "PASS",
     "strict_clippy_core": "PASS",
     "independent_review": "No concrete production blocker. Corrected duplicate-key test to use an otherwise valid generated manifest.",
-    "full_local_check": null,
-    "local_verify": null,
+    "full_local_check": {
+      "receipt": ".git/forge-checks/run-1793986655974966960-2591944/receipt.json",
+      "sha256": "f2b4e806c2cd4ab7519edbfefd18e09d7af433635e0fdbed0ed5f27520eacd0f",
+      "head": "7d80f88fd5ea7ad1bb6f7f2606176f274f27e344",
+      "tree": "1aefc3bda9e2ad9081b39804bd2a0c5fd97f9447",
+      "base": "de687f577edeea5f557790b865a656cddb54835b",
+      "steps_passed": 18,
+      "test_executions": {
+        "passed": 5014,
+        "failed": 0,
+        "ignored": 203
+      },
+      "test_harnesses": 182,
+      "counts_scope": "summed test-result lines, includes feature-matrix/repeated executions; not unique test cases"
+    },
+    "local_verify": "PASS at 7d80f88 against freshly fetched origin/main de687f5; subsequent heads require their own matching receipts",
     "stale_receipt_regression": "Existing corpus fixture initially accepts; independently changed manifest/source/test pins each reject the old receipt. Unit contract test, not engine evidence.",
     "independent_measurement_audit": "PASS: both receipts, 40 scored observations, four warmups, all preview JSON outputs, unchanged fixture files and source/build/input/workload digests verified."
   },
@@ -149,6 +163,18 @@
     "corpus_regression_final": {
       "path": ".git/forge-mull-refresh-corpus3.log",
       "sha256": "d8490e9d7e7f08992839ea6c1a8129bad9a9afe3e729d15b0b0a8c7a1fbfa7d3"
+    },
+    "full_gate1": {
+      "path": ".git/forge-checks/run-1793986655974966960-2591944/receipt.json",
+      "sha256": "f2b4e806c2cd4ab7519edbfefd18e09d7af433635e0fdbed0ed5f27520eacd0f"
+    },
+    "full_gate1_counts": {
+      "path": ".git/forge-mull-refresh-gate1-summary.json",
+      "sha256": "9a6090d5301909228c7ea4748a650f2c38300ed34907994881cbf31f47997cfd"
+    },
+    "local_verify1": {
+      "path": ".git/forge-mull-refresh-local-verify1.log",
+      "sha256": "7f5f3c06f8e4a7aedf5c745eee693833fc5d27bdbb5ce7c401c58c0af92b1fca"
     }
   },
   "implementation_commit": "9c10c9fac1ae909a58fadeb31674ffe14b60e4ca",

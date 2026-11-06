@@ -149,7 +149,10 @@ authored byte-volume fixtures; median latency was 1.86/2.04 ms, including shell
 startup with warmed caches. Independent audit verified both receipts and unchanged
 inputs. The initial measurement setup failure, ambient-toolchain rerun and unit-test
 oracle repair remain recorded in the [refresh evidence index](../research/performance/forge-program-20261106-mull-refresh.json).
-The refresh increment's own full publication checks remain pending.
+All 18 full local checks and fresh-base verification passed at `7d80f88`: 5,014
+passing test executions, zero failures and 203 ignored across 182 harnesses.
+Later publication heads require their own matching receipts; integration is
+tracked by issue #216 and its linked PR.
 
 ### Architecture, evidence and disposition
 

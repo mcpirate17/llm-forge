@@ -208,4 +208,6 @@ contains the fixture recipe, exact command provenance and links to both sealed
 receipts. Independent audit recomputed the observations. No cold-cache,
 allocation, matched speedup, model-cost or agent-task result is established.
 The later stale-receipt test addition changes no measured production file.
-Full publication validation of the refresh increment remains pending.
+The full 18-step check and fresh-base verification passed at `7d80f88`: 5,014
+passing test executions, zero failures and 203 ignored across 182 harnesses.
+Later publication heads require their own matching receipts.
