@@ -42,7 +42,7 @@ The unused probe keys are still type-checked, so configuration mistakes fail lou
 
 The native boundary requires existing, safely owned output parents and normalized
 paths. It refuses symlinks, hard-linked inputs/outputs, traversal, world-writable
-inputs, output/input aliases, duplicate JSON keys and output names that could be
+inputs, output/input aliases, duplicate summary JSON keys and output names that could be
 rediscovered as `gate-*.json`. Named-user `~user` expansion is unsupported; supply
 an absolute path. Missing or whitespace-only ledgers remain empty ledgers.
 Read-only observation permits group-writable repository data. Publication and
@@ -51,7 +51,7 @@ affected files owned by the operator without group/world write permissions.
 These checks run before staging and again before replacement or removal.
 Limits are 256 summaries, 16 MiB per summary/output/previous ledger or report,
 64 MiB total summary bytes, 4,096 artifact-directory entries, and 64 ancestor
-configuration files of at most 1 MiB each. JSON nesting is bounded to 32 levels.
+configuration files of at most 1 MiB each. Summary JSON nesting is bounded to 32 levels.
 
 Both outputs are staged before either is replaced. Cooperating publishers lock
 both parent directories in a consistent order and recheck captured inputs before

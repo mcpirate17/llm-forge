@@ -158,7 +158,11 @@ with exactly the verified tree and closed issue #216.
 native backlog migration. The new CLI reuses Slop Core's fold, captures bounded
 inputs, stages both outputs and consumes only explicitly authorized discovered
 artifacts after publication. Focused native tests and eleven comparisons against
-a private current-source Python/PyO3 comparator pass; release measurement and
+a private current-source Python/PyO3 comparator pass, repeated with clean release
+`018b148`. Its 96 matched preview calls preserve complete report output and input
+hashes after timestamp checks: Python/native p50 latency was 30.25/2.02 ms for ten findings and
+32.06/5.30 ms for 1,000. These warmed-cache command measurements establish no
+agent-task or model-cost result. Independent audit verified all eight receipts;
 full publication gates remain pending. Independent review found and fixed a
 future discovery-namespace alias and tightened destructive-path permissions.
 The hardened path passes 17 backlog tests and both CLI/Make tests; strict Clippy
