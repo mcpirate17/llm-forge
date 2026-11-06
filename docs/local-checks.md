@@ -123,6 +123,25 @@ tests and installed-runtime checks. The default full invocation and
 `local-verify` are the publication checks. If committed inputs or `origin/main`
 change, rerun and verify the new receipt.
 
+After a normal PR merge, avoid checking out an outdated local `main` and then
+fast-forwarding it: that can rewrite identical final source bytes twice and
+invalidate Cargo's timestamp-based cache. From a clean feature branch whose
+verified tree exactly matches the merged tree, fast-forward the inactive local
+ref first. The non-forced fetch refuses divergence; the tree check stops on any
+additional content change:
+
+```sh
+test -z "$(git status --porcelain)" &&
+  git fetch origin main:main &&
+  git diff --quiet HEAD main -- &&
+  git switch main
+```
+
+This preserves ordinary PR integration and never adjusts source timestamps or
+Cargo fingerprints. A different merged tree needs investigation and its required
+verification; cache reuse is not evidence of correctness.
+
+
 For uncommitted edits, `make local-preview` or `forge preview --path
 native/forge/src/example.rs` prints an advisory plan. Add `--execute` to copy
 versioned and nonignored source inputs into a disposable file snapshot under

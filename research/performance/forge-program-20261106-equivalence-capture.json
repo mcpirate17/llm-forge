@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "kind": "equivalence_no_record_capture",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/222",
+  "base_commit": "b34f6b37c552f386ee4cc33641e93d5cc482121d",
+  "status": "original_behavior_regression_confirmed_release_comparator_pending",
+  "scope": "Remove the unused temporary full execution workspace from no-record native target capture. Production code is still original in this baseline commit. Actual guest Stage, record-present private-copy path and later confinement remain outside the proposed change.",
+  "baseline_verification": {
+    "original_capture_tests": {
+      "passed": 3,
+      "expected_red": 1,
+      "ignored_benchmark": 1,
+      "log": {
+        "path": ".git/forge-capture-original-tests3.log",
+        "sha256": "c90042309c6e4a791f89ffe027ea12484a55b6ec60ddf3b7b77a83cd16f41fab"
+      },
+      "red_case": "no_record_capture_does_not_create_temporary_workspace observes real scratch creation/deletion; this is not a publication PASS"
+    },
+    "format": "PASS",
+    "strict_clippy": "PASS all targets",
+    "clippy_log": {
+      "path": ".git/forge-capture-fixture-clippy1.log",
+      "sha256": "2e77d3054211f2f939804a3299227069b36f8fa9c1186c6dc28fdc0d75ac8461"
+    },
+    "independent_review": "Fixture review found no blocker: actual Git Selection/Snapshot, exact changed-unit targets, held Python/test/config/waiver drift, inotify observation and malformed pinned-record error cleanup. No valid recorded-driver success or confinement-execution claim."
+  },
+  "benchmark_plan": {
+    "test": "candidate_equivalence_inputs::capture_tests::benchmark_no_record_capture_small_and_large",
+    "fixture": {
+      "path": "native/forge/src/candidate_equivalence_capture_tests.rs",
+      "sha256": "18f287850040ef8830b28387cf8da3523b941098561bfa2803315d2f41ac52c3"
+    },
+    "auxiliary_files": [
+      0,
+      1000
+    ],
+    "auxiliary_bytes_each": 1024,
+    "warmups_per_case": 2,
+    "measured_captures_per_case": 10,
+    "timed_scope": "Actual capture() call, including its verification; fixture/Selection/review-snapshot preparation, event reads, exact-output assertions and disposal outside interval. In-process warm fixture; no guest or model.",
+    "reproduction": "Run the preserved clean release unit-test executable with --exact candidate_equivalence_inputs::capture_tests::benchmark_no_record_capture_small_and_large --ignored --nocapture --test-threads=1. Compare identical fixture code and input/tree identities; retain source, build and binary pins."
+  },
+  "retained_attempts": [
+    {
+      "log": {
+        "path": ".git/forge-capture-original-tests1.log",
+        "sha256": "3145cdfe1cfb299c35d7140c3bca6f58ecd23fb150ec563e1393f055bc12543c"
+      },
+      "result": "Compile failed: json! macro did not accept an inline array.map expression; precomputed the exact same hash array."
+    },
+    {
+      "log": {
+        "path": ".git/forge-capture-original-tests2.log",
+        "sha256": "0ddbb5a4da77a49bcf92d11591c3e10131aae2fa05521d8a20e72c5fe6210bbf"
+      },
+      "result": "Two passed, two failed, one ignored: intended no-workspace RED plus malformed-record fixture refused its implicit shared parent before SQLite. Made only the authored temporary root explicitly 0700; no production admission change."
+    }
+  ],
+  "release_comparators": "PENDING",
+  "measurements": "PENDING",
+  "full_local_check": "PENDING after production improvement; this baseline contains the deliberate regression failure",
+  "limitations": [
+    "In-process capture cost is not total candidate review or guest latency.",
+    "No new model-token, task-success, CPU/RSS/allocation or host-adoption evidence.",
+    "Malformed SQLite case establishes error cleanup, not valid recorded-driver selection.",
+    "No manual or automatic mutation campaign executed in this increment."
+  ],
+  "validation_process_observation": {
+    "inventory": {
+      "path": ".git/forge-build-cache-inventory.md",
+      "sha256": "ffa919cab7ff8d6d5c67dc2806fce88efbafcd8d7568a8b2a4dbdf91828dcb05"
+    },
+    "integration_preservation": {
+      "path": ".git/forge-publisher-integration-source-preservation.json",
+      "sha256": "a5f19be6095154ca44b1c8bf5f8e1aa26162f2c61e62ffecaecfa6976b6c44ef"
+    },
+    "result": "Prior identical conductor source blobs acquired newer timestamps after its gate; timestamp-based fingerprints provide a sufficient invalidator, not proof of every dirty reason or actor. Registry feature targets already isolated. The next PR transition preserved all 1480 native entries exactly by non-forced local-main fast-forward before identical-tree checkout. No build-speed gain inferred and no fingerprints/profiles/test coverage changed."
+  }
+}

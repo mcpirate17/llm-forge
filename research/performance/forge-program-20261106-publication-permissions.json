@@ -4,7 +4,7 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/219",
   "base_commit": "4a55be6e540402f6284ebdc039192dc4cda908c0",
-  "status": "clean_release_controls_passed_full_gate_pending",
+  "status": "merged_with_exact_verified_tree",
   "scope": "Shared atomic report publisher and changed Mull refresh apply refuse foreign-owned or group/world-writable final parents and existing leaves. Read-only preview and unchanged apply retain their previous admission. No engine payload or external model execution.",
   "changes": [
     "Recheck parent/leaf and staged identity after caller guard before replacement; preserve ordered locks and explicit pair partial-disposition diagnostics.",
@@ -67,8 +67,22 @@
     },
     "format": "PASS",
     "independent_review": "Shared publisher implementation and cleanup independently reviewed by runtime_inventory. Cleanup permission gap fixed; final review found no concrete production blocker. Trusted stable ancestors and same-UID race exclusion remain explicit.",
-    "full_local_check": "PENDING",
-    "local_verify": "PENDING",
+    "full_local_check": {
+      "receipt": ".git/forge-checks/run-1793992036998595477-2760436/receipt.json",
+      "receipt_sha256": "eddd13d5b5cea2ba06d5fb1e458a2d9ad5e458d91d4c426cbb4759d19a6fe03b",
+      "head": "0689c39dbd51c450a253c3caf6b68b823d265c5c",
+      "tree": "3718cf000f086ecc8eb9e0d49a0b3b4c45f046e2",
+      "base": "4a55be6e540402f6284ebdc039192dc4cda908c0",
+      "test_executions": {
+        "passed": 5047,
+        "failed": 0,
+        "ignored": 203
+      },
+      "harnesses": 183,
+      "scope": "Summed test-result lines, includes repeated feature-matrix executions, not unique tests.",
+      "steps_passed": 18
+    },
+    "local_verify": "PASS after fresh fetch before publication and merge; .git/forge-publisher-local-verify2.log",
     "independent_controls": {
       "path": ".git/forge-publisher-controls-independent.json",
       "sha256": "c168e3443fdc4ff80d920719a47964a106c9abe8e3bfcc50db2c1d160be3e27b",
@@ -156,5 +170,11 @@
     "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --lib candidate_report_store",
     "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --lib mutation_mull_refresh_cli",
     "FORGE_TEST_BIN=/absolute/release/forge cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml --test mutation_plan_cli"
-  ]
+  ],
+  "integration": {
+    "pr": "https://github.com/mcpirate17/llm-forge/pull/221",
+    "merge_commit": "b34f6b37c552f386ee4cc33641e93d5cc482121d",
+    "exact_verified_tree": "3718cf000f086ecc8eb9e0d49a0b3b4c45f046e2",
+    "proof": ".git/forge-publisher-merge-proof.json"
+  }
 }

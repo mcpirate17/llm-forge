@@ -173,7 +173,7 @@ passes.
 and migrates only the second fold invocation. See [usage](equivalence-backlog.md)
 and the [evidence index](../research/performance/forge-program-20261106-backlog.json).
 
-[Issue #219](https://github.com/mcpirate17/llm-forge/issues/219) is active:
+[PR #221](https://github.com/mcpirate17/llm-forge/pull/221) delivered issue #219:
 shared report publication now checks owned, non-group/world-writable parents and
 existing leaves before staging and replacement. Mull refresh upgrades its captured
 manifest to mutation permissions only for changed apply; preview and no-op remain
@@ -181,8 +181,17 @@ read-only. Cleanup retains and identifies stages if permissions become unsafe.
 Focused tests cover shared modes, permission drift, pair failures and the existing
 report callers. Clean release `9484974` refuses the two previously admitted shared
 write cases while preserving private apply and shared no-op. The four controls use
-empty-PATH refresh calls with no engine execution; full publication validation is pending.
+empty-PATH refresh calls with no engine execution. All 18 full checks and fresh-base
+verification passed at `0689c39`: 5,047 passing executions, zero failures and 203
+ignored across 183 harnesses. Merge `b34f6b3` exactly matches the verified tree.
 See the [evidence index](../research/performance/forge-program-20261106-publication-permissions.json).
+
+[Issue #222](https://github.com/mcpirate17/llm-forge/issues/222) is active: measure
+and remove the unused temporary workspace in equivalence target capture when no
+recorded-test database is configured. Target discovery already reads the captured
+review snapshot; actual guest execution retains its separate confined Stage.
+Baseline fixtures and regression controls are being prepared before the production
+change. Standalone explicit-commit gate design remains subsequent work.
 
 ### Architecture, evidence and disposition
 

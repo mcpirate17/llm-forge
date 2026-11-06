@@ -452,3 +452,7 @@ mod artifact_tests {
         assert_eq!(std::fs::read_dir(&tree.output).unwrap().count(), 0);
     }
 }
+
+#[cfg(test)]
+#[path = "candidate_equivalence_capture_tests.rs"]
+mod capture_tests;
