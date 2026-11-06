@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "kind": "native_mull_refresh_evidence",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/216",
+  "status": "focused_verified_release_measurement_and_publication_pending",
+  "base_commit": "de687f577edeea5f557790b865a656cddb54835b",
+  "scope": "Preview and optionally update only source/test pins of one explicit generated mull-confined-v1 manifest; preserve all other fields. No registration, payload execution or evidence production.",
+  "verification": {
+    "refresh_tests_passed": 6,
+    "core_tests_passed": 2,
+    "publisher_tests_passed": 7,
+    "existing_corpus_tests_passed": 17,
+    "actual_cli_tests_passed": 1,
+    "strict_clippy_forge": "PASS",
+    "strict_clippy_core": "PASS",
+    "independent_review": "No concrete production blocker. Corrected duplicate-key test to use an otherwise valid generated manifest.",
+    "full_local_check": null,
+    "local_verify": null
+  },
+  "measurements": null,
+  "limitations": [
+    "Only the exact confined Mull profile is supported; no native Python/Rust refresh parity.",
+    "Explicit file selection neither checks nor changes registry membership.",
+    "Cooperating writers use a parent lock; revalidation is not kernel compare-and-swap against hostile same-UID changes.",
+    "Refresh does not authenticate a producer, execute tests or validate existing receipts.",
+    "No matched speedup, model token reduction, task-success benefit or host adoption is claimed."
+  ],
+  "artifacts": {
+    "refresh_unit": {
+      "path": ".git/forge-mull-refresh-focused2.log",
+      "sha256": "5b1c060bab0113d7d5256f31ad083c54e6d2ecd4041550f9ff4917445808d19d"
+    },
+    "core_unit": {
+      "path": ".git/forge-mull-refresh-core1.log",
+      "sha256": "4a20dd1c9507be2c3cdab9b86412d4b42e5ce480a1236848210babc5bbea56bd"
+    },
+    "publisher_unit": {
+      "path": ".git/forge-mull-refresh-publisher1.log",
+      "sha256": "985e6a4b81a462fd86d6e9396b03ee843a81b73592dda5deaa35d629009d183b"
+    },
+    "corpus_regression": {
+      "path": ".git/forge-mull-refresh-corpus1.log",
+      "sha256": "46014d0e081a79ba2bf948a61dd552c8b2cd50d9d23ba3dc53a9cf2fb2d725a1"
+    },
+    "cli": {
+      "path": ".git/forge-mull-refresh-cli1.log",
+      "sha256": "526e6c01e2a5cc16168c52a7ee411c7de14983f0b848a169e8917e98cdbdb2cc"
+    },
+    "forge_clippy": {
+      "path": ".git/forge-mull-refresh-clippy1.log",
+      "sha256": "d20224ee1b83dfd0129bf18e1fb794e744538d410ab322f5294bb69598e165ff"
+    },
+    "core_clippy": {
+      "path": ".git/forge-mull-refresh-core-clippy1.log",
+      "sha256": "f81bbafae69bc0a2c62d738b6b207f87c3c162c4bd6e7ebf7b63b7fbeeaa1a1b"
+    }
+  }
+}

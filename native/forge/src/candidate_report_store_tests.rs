@@ -98,15 +98,20 @@ fn parent_lease_serializes_publishers_and_releases_after_success_or_failure() {
     let root = Fixture::new();
     let output = root.0.join("report");
     for fail in [false, true] {
-        let result = publish_locked(&output, b"complete", |parent| {
-            assert!(crate::file_lock::Exclusive::try_new(
-                parent.open(".")?.into_std(),
-                "contending report publisher",
-            )
-            .is_err());
-            ensure!(!fail, "injected pre-publication failure");
-            Ok(())
-        });
+        let result = publish_locked(
+            &output,
+            b"complete",
+            |parent| {
+                assert!(crate::file_lock::Exclusive::try_new(
+                    parent.open(".")?.into_std(),
+                    "contending report publisher",
+                )
+                .is_err());
+                ensure!(!fail, "injected pre-publication failure");
+                Ok(())
+            },
+            || Ok(()),
+        );
         assert_eq!(result.is_err(), fail);
         let lease = crate::file_lock::Exclusive::try_new(
             fs::File::open(&root.0).unwrap(),
@@ -132,4 +137,36 @@ fn pre_rename_rejection_removes_only_owned_staging_file() {
     cleanup(&parent, &pending, &held).unwrap();
     assert_eq!(fs::read(&sentinel).unwrap(), b"original");
     assert!(!root.0.join(pending).exists());
+}
+
+#[test]
+fn guard_runs_once_after_staging_under_lock_and_failure_preserves_destination() {
+    let root = Fixture::new();
+    let output = root.0.join("report");
+    fs::write(&output, b"original").unwrap();
+    for fail in [true, false] {
+        let mut calls = 0;
+        let result = publish_checked(&output, b"replacement", || {
+            calls += 1;
+            assert_eq!(fs::read(&output)?, b"original");
+            assert_eq!(fs::read_dir(&root.0)?.count(), 2);
+            assert!(
+                crate::file_lock::Exclusive::try_new(fs::File::open(&root.0)?, "contender")
+                    .is_err()
+            );
+            ensure!(!fail, "held input drift");
+            Ok(())
+        });
+        assert_eq!(calls, 1);
+        assert_eq!(result.is_err(), fail);
+        assert_eq!(fs::read_dir(&root.0).unwrap().count(), 1);
+        assert_eq!(
+            fs::read(&output).unwrap(),
+            if fail {
+                b"original".as_slice()
+            } else {
+                b"replacement"
+            }
+        );
+    }
 }

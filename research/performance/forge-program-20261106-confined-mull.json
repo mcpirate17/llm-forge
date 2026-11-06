@@ -3,7 +3,7 @@
   "kind": "forge-engineering-evidence-index",
   "date": "2026-11-06",
   "issue": 196,
-  "status": "runtime_freshness_verified_historical_gate_pass_final_head_revalidation_required",
+  "status": "merged_pr_215_exact_checked_tree",
   "implementation_commit": "f443a20f3211f3b6d05eac41765f22558c0a9290",
   "base_commit": "edb99898aec9d884389895867957dc1cdfd47e4a",
   "compiled_source_sha256": "1be8bcc84722f8991e205708ac209385684dc85fd4e8fed3d16ad8a16aeaf780",
@@ -160,8 +160,23 @@
       "counts_scope": "summed test-result lines, includes feature-matrix/repeated executions; not unique test cases"
     },
     "local_verify": "PASS at b09b5d8 against origin/main edb9989; subsequent heads require matching receipts",
-    "pr": null,
-    "installed_native_source_matches_real_control_source": true
+    "pr": "https://github.com/mcpirate17/llm-forge/pull/215",
+    "final_publication": {
+      "head": "a154c279dd42d24884bbc1ced31788f7719d4aff",
+      "base": "edb99898aec9d884389895867957dc1cdfd47e4a",
+      "tree": "4008a9a054e4f47617c137af89d77571d20c5560",
+      "merge_commit": "de687f577edeea5f557790b865a656cddb54835b",
+      "merged_at": "2026-11-06T17:10:27Z",
+      "steps_passed": 18,
+      "test_executions": {
+        "passed": 5000,
+        "failed": 0,
+        "ignored": 203
+      },
+      "test_harnesses": 182,
+      "local_verify": "PASS"
+    },
+    "first_gate_installed_source_matches_real_control_source": true
   },
   "cleanup": {
     "command_groups_absent": 21,
@@ -382,6 +397,22 @@
     "embedding_fixture_focused": {
       "path": ".git/forge-embedding-fixture-focused.log",
       "sha256": "67e552668829e9f1fe17391b9502e17d3c7d40370f314c7904e0e87d1f9050f5"
+    },
+    "final_full_gate": {
+      "path": ".git/forge-checks/run-1793984783287426079-2563920/receipt.json",
+      "sha256": "dab747875deabb199bff58443b0bf4cf226468fb5b6daa1e6de4386332c17b9f"
+    },
+    "final_local_verify": {
+      "path": ".git/forge-mull-local-verify3.log",
+      "sha256": "aa53eade52b589f3d33c8f64ae7e1e7b3976f8dfd325026e139d5adb1b83da9f"
+    },
+    "final_gate_counts": {
+      "path": ".git/forge-mull-gate3-summary.json",
+      "sha256": "e508b74502dfe7b55606d21213a8cc7a1f23e8cd5cb62d118e1878812f667653"
+    },
+    "merged_tree_proof": {
+      "path": ".git/forge-mull-merge-proof.json",
+      "sha256": "cd853ea467618fd17c2b217d63406172de93ecf3e52601bd06c75fd727e74da3"
     }
   }
 }

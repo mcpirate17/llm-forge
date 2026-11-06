@@ -106,8 +106,8 @@ source-bound receipts. [PR #214](https://github.com/mcpirate17/llm-forge/pull/21
 merged as `edb9989` with the same checked tree. See the
 [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
-The next [confined Mull increment](mutation-mull.md) was exercised at `f443a20`
-and passed full publication checks at `b09b5d8`. It reuses the native command owner for one
+The [confined Mull increment](mutation-mull.md) was exercised at `f443a20`
+and passed full publication checks at `a154c27`. It reuses the native command owner for one
 C/C++ translation unit and a standalone driver, with exact toolchain pins, a fixed
 build definition, private child permissions and shared report replay. Real controls
 produced one killed mutant (`PASS`), one surviving mutant (`RATCHET_HELD`), a
@@ -127,12 +127,24 @@ source-bound receipts. Focused tests passed 421 Forge and 90 minimal
 core cases, with strict Clippy and 41 planner contract tests passing. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
 for raw provenance and observational cost. Unmarked Mull and arbitrary project
-builds remain refused; C++ refresh is still absent. The subsequent gate at `68caf0a`
+builds remain refused. The intermediate gate at `68caf0a`
 found an unrelated HTTP test-fixture race; the bounded request-reader correction
 passed 12 focused tests and 200 repetitions without changing production behavior.
-That failed gate remains in the evidence; rerun all publication checks on the
-corrected head, publish through the normal PR path, then reassess the backlog.
+That failed gate remains in the evidence. All 18 checks passed again on corrected
+head `a154c27` with the same counts; fresh-base verification passed before
+[PR #215](https://github.com/mcpirate17/llm-forge/pull/215) merged as `de687f5`,
+with exactly the checked tree.
 Actual-client adoption and matched agent-task benefit still require separate evidence.
+
+[Issue #216](https://github.com/mcpirate17/llm-forge/issues/216) adds a preview-first
+native refresh for one explicit `mull-confined-v1` manifest. It updates only the
+source/driver pins, preserves all other fields and refuses observed input drift
+before publication. It does not infer registration, run payloads or issue evidence.
+Focused validation passed six refresh, two core, seven publisher and 17 existing
+receipt-validation tests, plus an actual CLI test with an empty `PATH`. Strict
+Clippy passed for Forge and core; independent review corrected a weak duplicate-key
+test oracle and found no production blocker. Clean release measurements and the
+refresh increment's own full publication checks remain pending.
 
 ### Architecture, evidence and disposition
 

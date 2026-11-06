@@ -119,13 +119,24 @@ fn cleanup(parent: &Dir, name: &OsStr, file: &File) -> Result<()> {
 
 /// Atomically replace an owned report with at most 16 MiB of complete bytes.
 pub fn publish(path: &Path, bytes: &[u8]) -> Result<()> {
-    publish_locked(path, bytes, |_| Ok(()))
+    publish_checked(path, bytes, || Ok(()))
+}
+
+/// Revalidate caller-held inputs after staging and immediately before replacement.
+/// The parent lock serializes cooperating publishers, not arbitrary same-UID writes.
+pub(crate) fn publish_checked(
+    path: &Path,
+    bytes: &[u8],
+    before_rename: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    publish_locked(path, bytes, |_| Ok(()), before_rename)
 }
 
 fn publish_locked(
     path: &Path,
     bytes: &[u8],
     after_lock: impl FnOnce(&Dir) -> Result<()>,
+    before_rename: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
     ensure!(bytes.len() <= MAX_BYTES, "report exceeds 16 MiB");
     let (parent, name) = open_parent(path)?;
@@ -141,6 +152,7 @@ fn publish_locked(
     let result = (|| -> Result<()> {
         same_stage(&parent, &stage_name, &held)?;
         check_destination(&parent, &name)?;
+        before_rename()?;
         parent
             .rename(&stage_name, &parent, &name)
             .context("rename report staging file")?;
