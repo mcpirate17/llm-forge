@@ -401,7 +401,7 @@ impl Running {
             json!({"recorded_paths":status["python_test_report"],"fresh_positive_enoent":true}),
         );
     }
-    pub fn direct(&self) -> Value {
+    pub fn direct_command(&self) -> std::process::Command {
         let mut command = std::process::Command::new(&self.binary);
         command
             .env_clear()
@@ -413,8 +413,13 @@ impl Running {
             .args(["analyze", "--root"])
             .arg(&self.source)
             .args(["--max-bytes", "262144", "tests"]);
-        let output =
-            forge::process_probe::run(&mut command, Duration::from_secs(20), 262145).unwrap();
+        command
+    }
+    pub fn direct_output(&self, timeout: Duration) -> anyhow::Result<std::process::Output> {
+        forge::process_probe::run(&mut self.direct_command(), timeout, 262145)
+    }
+    pub fn direct(&self) -> Value {
+        let output = self.direct_output(Duration::from_secs(20)).unwrap();
         write(&self.state.join("direct.stdout"), &output.stdout);
         write(&self.state.join("direct.stderr"), &output.stderr);
         assert!(

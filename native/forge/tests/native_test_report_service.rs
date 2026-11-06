@@ -341,3 +341,6 @@ async fn synthetic_active_report_halfclose_and_pipeline_clean_tree_before_reuse(
         }
     }).await.expect("owned service control exceeded cooperative test bound");
 }
+
+#[path = "support/test_report_observation.rs"]
+mod observation;
