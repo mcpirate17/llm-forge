@@ -295,9 +295,17 @@ pub mod mutation_fest_guest_cli;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_fest_inputs;
 #[cfg(target_os = "linux")]
+pub mod mutation_mull_inventory_cli;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_mull_runtime;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_mull_toolchain;
+#[cfg(target_os = "linux")]
 pub mod mutation_plan;
 #[cfg(target_os = "linux")]
 pub mod mutation_process;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_profile_inputs;
 #[cfg(target_os = "linux")]
 pub mod mutation_receipt_verify;
 #[cfg(target_os = "linux")]

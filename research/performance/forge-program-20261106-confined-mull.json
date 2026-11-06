@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "kind": "forge-engineering-evidence-index",
+  "date": "2026-11-06",
+  "issue": 196,
+  "status": "runtime_freshness_verified_historical_gate_pass_final_head_revalidation_required",
+  "implementation_commit": "f443a20f3211f3b6d05eac41765f22558c0a9290",
+  "base_commit": "edb99898aec9d884389895867957dc1cdfd47e4a",
+  "compiled_source_sha256": "1be8bcc84722f8991e205708ac209385684dc85fd4e8fed3d16ad8a16aeaf780",
+  "release_executable_sha256": "f891ae4679ea344bd039568a9cfd9897082b70b613d5d461dd44964d069a0d0e",
+  "scope": "opt-in mull-confined-v1: one C/C++ translation unit, one same-language standalone driver, LLVM18 fixed build; no arbitrary project build admission",
+  "controls": [
+    {
+      "case": "strong",
+      "native_status": "PASS",
+      "complete_campaign": true,
+      "accounting": {
+        "censored": 0,
+        "completed": 1,
+        "failed": 0,
+        "planned": 1,
+        "unstarted": 0
+      },
+      "score": 1.0,
+      "command_count": 6,
+      "command_duration_ms": [
+        143,
+        137,
+        9,
+        8,
+        18,
+        16
+      ],
+      "receipt": {
+        "path": "/tmp/.tmpOYPccF/repo/campaigns/receipts/run.json",
+        "sha256": "07ad1332faf830b02b7702133758ebcbabb0f8aab58f0c40d1ac7ba8c0f00a72",
+        "bytes": 24623
+      }
+    },
+    {
+      "case": "weak",
+      "native_status": "RATCHET_HELD",
+      "complete_campaign": true,
+      "accounting": {
+        "censored": 0,
+        "completed": 1,
+        "failed": 0,
+        "planned": 1,
+        "unstarted": 0
+      },
+      "score": 0.0,
+      "command_count": 6,
+      "command_duration_ms": [
+        136,
+        96,
+        8,
+        9,
+        14,
+        16
+      ],
+      "receipt": {
+        "path": "/tmp/.tmpNqDKm0/repo/campaigns/receipts/run.json",
+        "sha256": "7998fbe0e0f354cd4c1398aeda7ce4c28a2dbad0f385d089b121151dc19217e9",
+        "bytes": 24671
+      }
+    },
+    {
+      "case": "detached_failed_baseline",
+      "native_status": "BASELINE_FAILED",
+      "complete_campaign": false,
+      "accounting": {
+        "censored": 0,
+        "completed": 0,
+        "failed": 0,
+        "planned": null,
+        "unstarted": null
+      },
+      "score": null,
+      "command_count": 3,
+      "command_duration_ms": [
+        136,
+        151,
+        20
+      ],
+      "receipt": {
+        "path": "/tmp/.tmpGTvsuJ/repo/campaigns/receipts/run.json",
+        "sha256": "3f7da16c7745f97a16900d6a613a2bd600601557aa41a1a22bbdb3054c477010",
+        "bytes": 17772
+      }
+    },
+    {
+      "case": "strong_after_policy",
+      "native_status": "PASS",
+      "complete_campaign": true,
+      "accounting": {
+        "censored": 0,
+        "completed": 1,
+        "failed": 0,
+        "planned": 1,
+        "unstarted": 0
+      },
+      "score": 1.0,
+      "command_count": 6,
+      "command_duration_ms": [
+        136,
+        126,
+        12,
+        7,
+        14,
+        11
+      ],
+      "receipt": {
+        "path": "/tmp/.tmpOYPccF/repo/campaigns/receipts/freshness-policy-run.json",
+        "sha256": "a4ee68eec7fb1d2af8a98221cee8f8a9a81eed7ac21a496a286639958cec1bff",
+        "bytes": 24591
+      }
+    },
+    {
+      "case": "wrong_plugin",
+      "native_status": "REFUSED",
+      "command_count": 0,
+      "receipt_created": false,
+      "native_output": {
+        "path": "/tmp/.tmpTSwlRf/logs/run.stdout",
+        "sha256": "26cb65d7789b8de76e5b73d0bb4d4a77cc8b1429b330ac8c8fd1cdef9d875f32",
+        "bytes": 114
+      }
+    }
+  ],
+  "freshness": {
+    "phases_completed": 15,
+    "consumer_probe_commands": 36,
+    "preparation_commands": 9,
+    "old_receipt_preserved": true,
+    "old_only_evidence_exit": 5,
+    "old_only_rejection": "supporting inputs changed",
+    "live_and_committed": "CLEAN -> REGRESSED -> CLEAN",
+    "evidence": "PASS -> FAIL -> PASS",
+    "exact_tree_restoration": true,
+    "independent_audit": "NO_DISCREPANCY_FOUND: 45 raw commands, exact pins and Git restoration"
+  },
+  "verification": {
+    "focused_forge_passed": 421,
+    "focused_forge_ignored": 29,
+    "core_minimal_passed": 90,
+    "planner_passed": 41,
+    "planner_ignored": 1,
+    "strict_clippy": "PASS",
+    "full_local_check": {
+      "head": "b09b5d8df0572d734d039bdc6bdca0bd8d4dedcd",
+      "base": "edb99898aec9d884389895867957dc1cdfd47e4a",
+      "receipt_sha256": "6153b9d567408f939dadd2d13c06564b53f23982975ac7291c2f86281123a95e",
+      "steps_passed": 18,
+      "test_executions": {
+        "passed": 5000,
+        "failed": 0,
+        "ignored": 203
+      },
+      "test_harnesses": 182,
+      "counts_scope": "summed test-result lines, includes feature-matrix/repeated executions; not unique test cases"
+    },
+    "local_verify": "PASS at b09b5d8 against origin/main edb9989; subsequent heads require matching receipts",
+    "pr": null,
+    "installed_native_source_matches_real_control_source": true
+  },
+  "cleanup": {
+    "command_groups_absent": 21,
+    "snapshot_roots_absent": 4,
+    "definition_roots_absent": 4,
+    "verified_before_supervisor_retirement": true,
+    "supervisor_retired": true
+  },
+  "observational_cost": {
+    "outer_controls": [
+      {
+        "case": "wrong-plugin",
+        "observations": 1,
+        "wall_seconds": 9.25,
+        "user_cpu_seconds": 8.91,
+        "system_cpu_seconds": 0.2,
+        "maximum_rss_kib": 141332,
+        "raw": {
+          "path": ".git/forge-mull-control-v3-wrong-plugin-time.txt",
+          "sha256": "514046f9371d40beae68c6948f49d9f455f449d7068c0e9df5cc4410598e7e3e",
+          "bytes": 916
+        }
+      },
+      {
+        "case": "strong-weak",
+        "observations": 1,
+        "wall_seconds": 28.83,
+        "user_cpu_seconds": 26.33,
+        "system_cpu_seconds": 1.98,
+        "maximum_rss_kib": 141764,
+        "raw": {
+          "path": ".git/forge-mull-control-v3-strong-weak-time.txt",
+          "sha256": "388060ca8d2f028c496c9c2de69e33ae02c879c43fc990b51c151d8c7b4de961",
+          "bytes": 915
+        }
+      },
+      {
+        "case": "baseline-failure",
+        "observations": 1,
+        "wall_seconds": 12.79,
+        "user_cpu_seconds": 11.77,
+        "system_cpu_seconds": 0.77,
+        "maximum_rss_kib": 141560,
+        "raw": {
+          "path": ".git/forge-mull-control-v3-baseline-failure-time.txt",
+          "sha256": "da55fce811c34c8d5e674f485ffeb45d932f546eba7e510401d80abe70a1d3b7",
+          "bytes": 914
+        }
+      }
+    ],
+    "scope": "single debug-observer executions using a separately selected release Forge; includes setup, independent hashing, assertions and cleanup; supervisor is separate",
+    "command_duration_scope": "per-command native owner observations omit grant hashing and other coordinator work; not whole-run latency",
+    "maximum_rss_scope": "largest observed process RSS, not simultaneous aggregate or service RSS",
+    "p50_p95": null,
+    "matched_baseline": null,
+    "agent_task_success": null,
+    "model_tokens_or_cache_usage": null,
+    "speedup_or_agent_benefit_claim": false
+  },
+  "retained_failures": [
+    {
+      "source": "3402fe7",
+      "result": "strong BASELINE_FAILED at configure/link; no engine",
+      "fix": "explicit operator GCC installation selection without broader reads"
+    },
+    {
+      "source": "c1e9e3f",
+      "result": "configure/build success, private executable admission ERROR; no engine",
+      "fix": "Mull-only child umask0077; admission unchanged"
+    },
+    {
+      "kind": "unit fixtures",
+      "result": "first run 6 unsafe fixture permission failures and 1 missing JSON map key panic",
+      "fix": "private test files/directories and explicit map insertion; production gate unchanged"
+    },
+    {
+      "source": "68caf0aaaabf57a935734086b233d963c7bd0f42",
+      "kind": "full publication gate",
+      "result": "17 steps passed; Forge unit tests failed in duplicate_response_keys_are_rejected_without_echoing_payload with response-read error instead of invalid JSON",
+      "reproduction": "same focused case failed on attempt 61 before fix; no pre-fix executable digest was captured",
+      "fix": "test-only reuse of bounded complete HTTP request reader; exact duplicate-key assertion retained; 8192-byte request body verified",
+      "focused_validation": "12 embedding backend tests passed; repaired exact case passed 200 consecutive runs",
+      "independent_review": "native_review found no concrete blocker; production behavior unchanged"
+    }
+  ],
+  "limitations": [
+    "One automatic add-to-sub mutant per scored fixture is a narrow execution control, not comprehensive mutation efficacy.",
+    "Operator inventories detect persistent changes at checks; no hostile same-UID transient or producer attestation.",
+    "Program aliases constrain top-level Forge launches, not a kernel descendant executable allowlist.",
+    "Detached readiness and live-child handshake plus cgroup cleanup are not independent child PID attestation.",
+    "Raw report canonical bytes are retained; disposed executable/profdata/raw report file digests cannot be independently reopened.",
+    "Unmarked Mull and arbitrary project builds remain refused; native C++ refresh is not implemented.",
+    "No shared installation, host adoption, real external agent result or performance improvement is established."
+  ],
+  "artifacts": {
+    "release_ledger": {
+      "path": ".git/forge-mull-v3-release-binary.json",
+      "sha256": "2a00ab23df68be821c0aaf372a4ffae21e7282e4fddd352ebe55b1b901718280",
+      "bytes": 1103
+    },
+    "observer_ledger": {
+      "path": ".git/forge-mull-v3-test-binary.json",
+      "sha256": "5bffa2d7d941a0d4c951107d6f0498d445cba9ad2bcb6d9c8158a6898c4a77da",
+      "bytes": 990
+    },
+    "toolchain_static_candidates": {
+      "path": ".git/forge-mull-static-toolchain-inventory.json",
+      "sha256": "e2368081ffb3defc6151787cfef4a29d0f47347d5dbf0b2e27097fff1a43d5f9",
+      "bytes": 122644
+    },
+    "operator_location": {
+      "path": ".git/forge-mull-control-location-v3.json",
+      "sha256": "57441d3d91e98c705798ac0c6e23586072f7f5362e31a75c759a0a4050fd18ef",
+      "bytes": 851
+    },
+    "controls": {
+      "path": ".git/forge-mull-controls-v3.json",
+      "sha256": "5b4cda38a3aca7edd1a7a778179bad32d6b5a7ddbf37f606cc0d6e11671e437e",
+      "bytes": 2752
+    },
+    "controls_independent": {
+      "path": ".git/forge-mull-v3-controls-independent.json",
+      "sha256": "fa60da6ed71315a6b6d960513e4026fdbf190367dea50b775fb462a20f2be6c9",
+      "bytes": 137748
+    },
+    "first_failed_controls": {
+      "path": ".git/forge-mull-first-controls-independent.json",
+      "sha256": "821b319061888fcaaaa6166699d3db36ec4c07882fab3fac22a47248237b6eec",
+      "bytes": 46808
+    },
+    "second_failed_controls": {
+      "path": ".git/forge-mull-v2-controls-independent.json",
+      "sha256": "76f2aab1f1a620e478415640a37fb12c78a70bae2d3d436957c3628acdb42d90",
+      "bytes": 47756
+    },
+    "freshness_preparation": {
+      "path": "/tmp/.tmpOYPccF/freshness-preparation/summary.json",
+      "sha256": "b7705b1eb738d5daeec2a7a7af55afd92236eb0f791751687c1ab0b24720f0a9",
+      "bytes": 11330
+    },
+    "freshness_location": {
+      "path": ".git/forge-mull-freshness-location.json",
+      "sha256": "a6976f8a9daa377040f83102df79d7edd425201dc7a2161a60c32cdd44525f11",
+      "bytes": 1453
+    },
+    "freshness_summary": {
+      "path": "/tmp/forge-mull-freshness-76fa369329d0/summary.json",
+      "sha256": "a0a584d66fcdea7ccec60fcdf81fdfbd292038d27f66de16354f2982b4d7fc66",
+      "bytes": 147495
+    },
+    "supervisor_retirement": {
+      "path": ".git/forge-mull-v3-unit-stop.json",
+      "sha256": "4783949fe1d8521f5edbfbdfb58e9487c096477e23dc592804164b1928e7e781",
+      "bytes": 4563
+    },
+    "focused_tests": {
+      "path": ".git/forge-mull-private-tests.log",
+      "sha256": "8637f6fe534697e93df3a1b46ce6008a233f6573c9d323ad549142d28e6a6f7d",
+      "bytes": 47512
+    },
+    "strict_clippy": {
+      "path": ".git/forge-mull-private-clippy.log",
+      "sha256": "89be14c723d50129bb852f9fd6754f4d6c8fa181667cef339fd2312c8bb03548",
+      "bytes": 223
+    },
+    "core_minimal": {
+      "path": ".git/forge-mull-core-minimal3.log",
+      "sha256": "50759cab6b1bd52cf006c05fd711c8dd3a87050b32be3d0db262e7c82ca720a7",
+      "bytes": 9584
+    },
+    "planner_contract": {
+      "path": ".git/forge-mull-plan-contract1.log",
+      "sha256": "f6d03569661cc627411a9eed21779ec597f1f01388736792224f9264b94ba51f",
+      "bytes": 3940
+    },
+    "first_forge_test_failures": {
+      "path": ".git/forge-mull-forge-tests1.log",
+      "sha256": "f19495248b33a978bc21141c6247516a17c821082e0c1fd45c60703570064ce6",
+      "bytes": 50172
+    },
+    "first_core_test_failure": {
+      "path": ".git/forge-mull-core-minimal1.log",
+      "sha256": "ff69ff035df629616db823a6e065af91065f2b844806560f173da1eace131bbc",
+      "bytes": 9834
+    },
+    "freshness_independent": {
+      "path": ".git/forge-mull-freshness-independent.json",
+      "sha256": "f9444cd409172e901d6326e47a4b588a02cd3be781f3610bfe1a5351b699f02a",
+      "bytes": 80172
+    },
+    "full_gate1_receipt": {
+      "path": ".git/forge-checks/run-1793983571383453218-2495981/receipt.json",
+      "sha256": "6153b9d567408f939dadd2d13c06564b53f23982975ac7291c2f86281123a95e",
+      "bytes": 13828
+    },
+    "full_gate1_counts": {
+      "path": ".git/forge-mull-gate1-summary.json",
+      "sha256": "1ab5db9029f679475b1ac7a0d666a6622a25719dfbec11d16357144f0496db67",
+      "bytes": 385
+    },
+    "full_gate1_verify": {
+      "path": ".git/forge-mull-local-verify1.log",
+      "sha256": "19e38fdb3b6e08ac413e8ceaa72fa47255e8d69c1e266ae6e5bee56641599faa",
+      "bytes": 377
+    },
+    "full_gate2_failed_receipt": {
+      "path": ".git/forge-checks/run-1793984317482342374-2554710/receipt.json",
+      "sha256": "ad43db98963c6f68be7908d5cf101941ad26ac29e0e7fa97ba2f68fbbf811e04"
+    },
+    "embedding_fixture_before": {
+      "path": ".git/forge-embedding-fixture-before.json",
+      "sha256": "217d13a8110d8b268a22d7e50627906cb602a6ff7f85ad47f36476560d7f72a6"
+    },
+    "embedding_fixture_after": {
+      "path": ".git/forge-embedding-fixture-after.json",
+      "sha256": "d3ca2044b76af8fa0bdf9d693a9751c3851ccc6c6f538599ed4a005dcebd8c88"
+    },
+    "embedding_fixture_focused": {
+      "path": ".git/forge-embedding-fixture-focused.log",
+      "sha256": "67e552668829e9f1fe17391b9502e17d3c7d40370f314c7904e0e87d1f9050f5"
+    }
+  }
+}

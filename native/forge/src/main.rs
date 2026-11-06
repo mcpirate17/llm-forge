@@ -315,6 +315,9 @@ enum MutationCommand {
     /// Export an inventory of a private Fest guest without executing it.
     #[cfg(target_os = "linux")]
     FestGuest(forge::mutation_fest_guest_cli::FestGuestArgs),
+    /// Observe a bounded Mull runtime directory digest without granting execution.
+    #[cfg(target_os = "linux")]
+    MullInventory(forge::mutation_mull_inventory_cli::MullInventoryArgs),
     /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
     /// Write one manifest and registry fragment per planned subject.
@@ -568,6 +571,12 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
         MutationCommand::FestGuest(args) => command_exit(
             "mutation fest-guest",
             forge::mutation_fest_guest_cli::run(args),
+            1,
+        ),
+        #[cfg(target_os = "linux")]
+        MutationCommand::MullInventory(args) => command_exit(
+            "mutation mull-inventory",
+            forge::mutation_mull_inventory_cli::run(args),
             1,
         ),
         MutationCommand::Results(args) => {

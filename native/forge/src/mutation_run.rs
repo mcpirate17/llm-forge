@@ -477,13 +477,20 @@ fn finish_legacy_snapshot(
     };
     if let Err(error) = &cache {
         verified = false;
-        receipt["fest_cache"]["removal_error"] = json!(format!("{error:#}"));
-    } else if verified && ledger_verified(receipt) && receipt.contains_key("fest_cache") {
-        receipt["fest_cache"]["removed"] = json!(true);
+        receipt.insert(
+            "auxiliary_cleanup_error".into(),
+            json!(format!("{error:#}")),
+        );
+    } else if verified && ledger_verified(receipt) {
+        for key in ["fest_cache", "mull_definition"] {
+            if receipt.contains_key(key) {
+                receipt[key]["removed"] = json!(true);
+            }
+        }
     }
     let removal = dispose_legacy_snapshot(snapshot, receipt, verified);
     checked.map_err(|error| Stop::Refused(format!("execution input verification: {error:#}")))?;
-    cache.map_err(|error| Stop::Refused(format!("Fest cache cleanup: {error:#}")))?;
+    cache.map_err(|error| Stop::Refused(format!("mutation auxiliary cleanup: {error:#}")))?;
     removal
 }
 
@@ -578,7 +585,13 @@ fn prepare_legacy(
     let fest = campaign.language == "python"
         && campaign.mutation_engine == "fest"
         && campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1");
-    if !fest && (campaign.language != "rust" || campaign.mutation_engine != "cargo-mutants") {
+    let mull = campaign.language == "cpp"
+        && campaign.mutation_engine == "mull"
+        && campaign.option_text("execution_profile").as_deref() == Some("mull-confined-v1");
+    if !fest
+        && !mull
+        && (campaign.language != "rust" || campaign.mutation_engine != "cargo-mutants")
+    {
         return Err("ordinary mutation profile is not yet supported; explicit confined Cargo or generated Fest grants are required".into());
     }
     let path = request.execution_grants.as_deref().ok_or(
@@ -629,6 +642,8 @@ fn selected_tools(
     };
     if campaign.mutation_engine == "fest" {
         Ok((Some(tool("python")?), tool("fest")?))
+    } else if campaign.mutation_engine == "mull" {
+        Ok((None, tool("mull-runner")?))
     } else {
         Ok((None, tool("cargo-mutants")?))
     }
@@ -707,6 +722,16 @@ fn close_scored(
     planned: Option<u64>,
     relative: &str,
 ) -> Result<(), String> {
+    if campaign.option_text("execution_profile").as_deref() == Some("mull-confined-v1") {
+        if let Some(error) = conductor_native::mutation_mull_receipt::evidence_error(
+            receipt,
+            &campaign.campaign_id,
+            &json!(campaign.source_sha256),
+            &json!(campaign.test_sha256),
+        ) {
+            return Err(error);
+        }
+    }
     if campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1") {
         if let Some(error) = conductor_native::mutation_fest_receipt::cleanup_error(receipt) {
             return Err(error);

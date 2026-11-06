@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "mutation_corpus_mull_tests.rs"]
+mod mull;
+
 #[test]
 fn corpus_passing_statuses_reject_partial_diagnostics_for_all_runner_kinds() {
     let symbols = BTreeSet::new();
@@ -128,7 +131,7 @@ mod native_receipts {
     use super::*;
     use crate::mutation_native_runner::{RUNNER_KIND, RUNNER_SCHEMA};
 
-    fn native_receipt() -> Value {
+    pub(super) fn native_receipt() -> Value {
         json!({
             "status": "RATCHET_HELD",
             "execution_grants_sha256": "a".repeat(64),

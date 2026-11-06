@@ -702,6 +702,9 @@ fn environment(run: &EngineRun, worktree: &Path) -> Result<BTreeMap<String, Stri
 
 /// Build the instrumented corpus, cover it, mutate it, fill the receipt.
 pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
+    if run.campaign.option_text("execution_profile").as_deref() == Some("mull-confined-v1") {
+        return confined(run, binary);
+    }
     require_no_drift(run.campaign, run.worktree)?;
     let (version, profdata_tool) = pinned_tools(run.campaign, binary)?;
     let worktree = run.worktree.to_path_buf();
@@ -736,6 +739,191 @@ pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
     run.receipt
         .insert("engine_summary".into(), summary(&every, &scoped));
     run.receipt.insert("mutants".into(), Value::Array(scoped));
+    run.require_scored_rows()
+}
+
+fn confined_build(run: &mut EngineRun) -> Step<String> {
+    let runtime = run.runtime.ok_or("Mull requires confined command owner")?;
+    let state = runtime.mull().map_err(|e| format!("Mull state: {e:#}"))?;
+    let cmake = runtime
+        .program("cmake")
+        .map_err(|e| e.to_string())?
+        .to_string_lossy()
+        .into_owned();
+    let definition = state.read_only().map_err(|e| e.to_string())?;
+    let build = state.build();
+    let worktree = run.worktree.to_owned();
+    let steps = [
+        vec![
+            cmake.clone(),
+            "-S".into(),
+            definition.to_string_lossy().into_owned(),
+            "-B".into(),
+            build.to_string_lossy().into_owned(),
+            "-G".into(),
+            "Ninja".into(),
+        ],
+        vec![
+            cmake,
+            "--build".into(),
+            build.to_string_lossy().into_owned(),
+            "--parallel".into(),
+            "1".into(),
+        ],
+    ];
+    for argv in &steps {
+        let (result, _) = run.run(
+            argv,
+            &worktree,
+            run.campaign.run_timeout_seconds,
+            &BTreeMap::new(),
+            &[],
+        )?;
+        receipt_list(run, "build", result.as_value());
+        if !result.succeeded() {
+            run.receipt.insert("status".into(), json!(BASELINE_FAILED));
+            run.write_receipt()?;
+            return Err(format!("confined Mull build failed: {}", result.stderr_tail).into());
+        }
+    }
+    state
+        .admit_executable()
+        .map_err(|e| format!("Mull artifact admission: {e:#}").into())
+}
+
+fn confined_baselines(run: &mut EngineRun) -> Step<(Vec<Value>, PathBuf)> {
+    let runtime = run.runtime.ok_or("Mull owner missing")?;
+    let state = runtime.mull().map_err(|e| e.to_string())?;
+    let build = state.build();
+    let raw = state.output().join("baseline.profraw");
+    let mut baselines = Vec::new();
+    for _ in 0..2 {
+        match fs::symlink_metadata(&raw) {
+            Ok(meta) if meta.is_file() => fs::remove_file(&raw).map_err(|e| e.to_string())?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            _ => return Err("Mull raw profile path is not a regular file".into()),
+        }
+        let argv = run.campaign.test_argv.clone();
+        let (result, _) = run.run(
+            &argv,
+            &build,
+            run.campaign.run_timeout_seconds,
+            &BTreeMap::new(),
+            &[],
+        )?;
+        run.note_baseline(&result, &argv)?;
+        baselines.push(result.as_value());
+    }
+    let (held, bytes) = crate::candidate_inputs::repository_live(&raw, 32 * 1024 * 1024)
+        .map_err(|e| format!("Mull coverage: {e:#}"))?;
+    if bytes.is_empty() {
+        return Err("Mull baseline emitted no coverage".into());
+    }
+    let profdata = state.output().join("baseline.profdata");
+    let tool = runtime
+        .program("llvm-profdata")
+        .map_err(|e| e.to_string())?;
+    let argv = vec![
+        tool.to_string_lossy().into_owned(),
+        "merge".into(),
+        "-sparse".into(),
+        raw.to_string_lossy().into_owned(),
+        "-o".into(),
+        profdata.to_string_lossy().into_owned(),
+    ];
+    let (merged, _) = run.run(
+        &argv,
+        &build,
+        run.campaign.run_timeout_seconds,
+        &BTreeMap::new(),
+        &[],
+    )?;
+    held.verify().map_err(|e| e.to_string())?;
+    if !merged.succeeded() {
+        return Err(format!("Mull coverage merge failed: {}", merged.stderr_tail).into());
+    }
+    let (_, bytes) = crate::candidate_inputs::repository_live(&profdata, 32 * 1024 * 1024)
+        .map_err(|e| e.to_string())?;
+    if bytes.is_empty() {
+        return Err("Mull merged coverage is empty".into());
+    }
+    run.receipt.insert(
+        "mull_profile_sha256".into(),
+        json!(crate::mutation_campaign::sha256_hex(&bytes)),
+    );
+    Ok((baselines, profdata))
+}
+
+fn confined(run: &mut EngineRun, binary: &str) -> Step<()> {
+    require_no_drift(run.campaign, run.worktree)?;
+    let executable_sha256 = confined_build(run)?;
+    let (baselines, profdata) = confined_baselines(run)?;
+    let runtime = run.runtime.ok_or("Mull owner missing")?;
+    let state = runtime.mull().map_err(|e| e.to_string())?;
+    let report_dir = state.output().join("reports");
+    let executable = state.executable();
+    let call = RunnerCall {
+        binary,
+        executable: &executable,
+        profdata: &profdata,
+        report_dir: &report_dir,
+        report_name: "standalone",
+    };
+    let argv = engine_argv(run.campaign, &call)?;
+    let (profile_held, profile_bytes) =
+        crate::candidate_inputs::repository_live(&profdata, 32 * 1024 * 1024)
+            .map_err(|e| e.to_string())?;
+    if run.receipt.get("mull_profile_sha256")
+        != Some(&json!(crate::mutation_campaign::sha256_hex(&profile_bytes)))
+    {
+        return Err("Mull coverage input changed before engine launch".into());
+    }
+    let (result, _) = run.run(
+        &argv,
+        &state.build(),
+        run.campaign.run_timeout_seconds,
+        &BTreeMap::new(),
+        &[],
+    )?;
+    run.receipt.insert(
+        "engine_result".into(),
+        engine_result(std::slice::from_ref(&result)),
+    );
+    require_runner_success(&result, "standalone")?;
+    profile_held.verify().map_err(|e| e.to_string())?;
+    let (report_held, bytes) = crate::candidate_inputs::repository_live(
+        &report_dir.join("standalone.json"),
+        4 * 1024 * 1024,
+    )
+    .map_err(|e| format!("Mull report: {e:#}"))?;
+    let text = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+    let report = crate::tool_schema::parse_document_with_limit(text, 4 * 1024 * 1024)
+        .map_err(|e| e.to_string())?;
+    let source = &run.campaign.source[0];
+    let (source_held, source_bytes) =
+        crate::candidate_inputs::repository_live(&run.worktree.join(source), 32 * 1024 * 1024)
+            .map_err(|e| e.to_string())?;
+    let source_text = std::str::from_utf8(&source_bytes).map_err(|e| e.to_string())?;
+    let every = conductor_native::mutation_mull_report::rows(
+        &report,
+        run.worktree,
+        &run.worktree.join(source),
+        source_text,
+    )?;
+    report_held.verify().map_err(|e| e.to_string())?;
+    source_held.verify().map_err(|e| e.to_string())?;
+    let canonical_hash = conductor_native::mutation_mull_receipt::report_sha256(&report)?;
+    run.receipt.insert("mull_observation".into(), json!({
+        "schema_version":1, "campaign_id":run.campaign.campaign_id, "source_path":source,
+        "worktree":run.worktree, "source_sha256":run.campaign.source_sha256, "test_sha256":run.campaign.test_sha256,
+        "report":report, "report_sha256":canonical_hash,
+        "raw_report_sha256":crate::mutation_campaign::sha256_hex(&bytes), "executable_sha256":executable_sha256,
+        "scope":"single-standalone-executable", "baselines":baselines
+    }));
+    run.planned = Some(every.len() as u64);
+    run.receipt
+        .insert("engine_summary".into(), summary(&every, &every));
+    run.receipt.insert("mutants".into(), Value::Array(every));
     run.require_scored_rows()
 }
 

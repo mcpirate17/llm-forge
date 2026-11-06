@@ -22,7 +22,8 @@ pub fn execution_profile(
         && language == "rust"
         && engine == "cargo-mutants";
     let fest = profile == "fest-confined-v1" && language == "python" && engine == "fest";
-    if !cargo && !fest {
+    let mull = profile == "mull-confined-v1" && language == "cpp" && engine == "mull";
+    if !cargo && !fest && !mull {
         return Err("unsupported generator execution profile for campaign".into());
     }
     Ok(Some(profile.to_owned()))
@@ -47,6 +48,9 @@ pub(super) fn validate_fest_if_selected(
     generator: &Map<String, Value>,
     payload: &Map<String, Value>,
 ) -> Result<(), String> {
+    if profile == Some("mull-confined-v1") {
+        return validate_mull(generator, payload);
+    }
     if profile == Some("fest-confined-v1") {
         let sources = super::digest_map(payload, "source_sha256")?;
         let tests = super::digest_map(payload, "test_sha256")?;
@@ -105,6 +109,43 @@ pub(super) fn validate_fest(
         argv[prefix.len()..].iter().map(String::as_str).collect();
     if paths.len() != tests.len() || !tests.keys().all(|path| paths.contains(path.as_str())) {
         return Err("confined Fest tests differ from pinned scope".into());
+    }
+    Ok(())
+}
+
+fn validate_mull(
+    generator: &Map<String, Value>,
+    payload: &Map<String, Value>,
+) -> Result<(), String> {
+    let sources = super::digest_map(payload, "source_sha256")?;
+    let tests = super::digest_map(payload, "test_sha256")?;
+    let options = generator
+        .get("options")
+        .and_then(Value::as_object)
+        .ok_or("Mull profile options missing")?;
+    let source = sources.keys().next().ok_or("Mull source missing")?;
+    let test = tests.keys().next().ok_or("Mull driver missing")?;
+    crate::mutation_plan::validate_mull_path(source)?;
+    crate::mutation_plan::validate_mull_path(test)?;
+    let c_source = source.ends_with(".c");
+    if payload.get("mutation_engine").and_then(Value::as_str) != Some("mull")
+        || sources.len() != 1
+        || tests.len() != 1
+        || source == test
+        || c_source != test.ends_with(".c")
+        || options.len() != 1
+        || generator.get("jobs").and_then(Value::as_u64) != Some(1)
+        || generator.get("seed").and_then(Value::as_u64) != Some(0)
+        || generator.get("operators") != Some(&serde_json::json!([]))
+        || generator.get("exclude") != Some(&serde_json::json!([]))
+        || generator.get("source") != Some(&serde_json::json!([source]))
+        || payload.get("test_argv") != Some(&serde_json::json!(["forge-mull-test"]))
+        || !payload
+            .get("environment")
+            .and_then(Value::as_object)
+            .is_some_and(Map::is_empty)
+    {
+        return Err("invalid confined Mull campaign scope or options".into());
     }
     Ok(())
 }
@@ -209,3 +250,7 @@ mod tests {
 #[cfg(test)]
 #[path = "mutation_manifest_fest_tests.rs"]
 mod fest_tests;
+
+#[cfg(test)]
+#[path = "mutation_manifest_mull_tests.rs"]
+mod mull_tests;

@@ -113,12 +113,48 @@ pub(crate) fn generated_errors_with_installed(
     errors.extend(cargo_value_errors(payload, campaign));
     errors
 }
+fn mull_profile_errors(
+    payload: &Map<String, Value>,
+    campaign: &CampaignContract,
+    supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
+) -> Vec<Rejection> {
+    let mut errors = Vec::new();
+    if let Some(detail) = crate::mutation_mull_receipt::evidence_error(
+        payload,
+        &campaign.campaign_id,
+        &campaign.source_sha256,
+        &campaign.test_sha256,
+    ) {
+        errors.push(reject(RejectionKind::NotPass, detail));
+    }
+    if !native_runner::declared(payload) {
+        errors.push(reject(
+            RejectionKind::NotPass,
+            "confined Mull requires a native runner receipt",
+        ));
+    }
+    let checked = supporting.map_err(str::to_owned).and_then(|expected| {
+        crate::mutation_cargo_supporting_binding::compare_profile(
+            payload.get("supporting_inputs"),
+            expected,
+            Some("mull-confined-v1"),
+        )
+    });
+    if let Err(detail) = checked {
+        errors.push(reject(RejectionKind::NotPass, detail));
+    }
+    errors
+}
+
 fn profile_errors(
     payload: &Map<String, Value>,
     campaign: &CampaignContract,
     supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
 ) -> Vec<Rejection> {
     let mut errors = Vec::new();
+    if campaign.execution_profile.as_deref() == Some("mull-confined-v1") {
+        errors.extend(mull_profile_errors(payload, campaign, supporting));
+    }
     if campaign.execution_profile.as_deref() == Some("fest-confined-v1") {
         if let Some(detail) = crate::mutation_fest_receipt::cleanup_error(payload) {
             errors.push(reject(RejectionKind::NotPass, detail));

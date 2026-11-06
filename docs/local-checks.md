@@ -228,3 +228,23 @@ external guest and explicit grants. Its real CLI controls additionally require
 `FORGE_TEST_FEST_CONFIG` and `FORGE_TEST_FEST_CONFIG_SHA256`; skip
 `confined_cli::real::fest::` when running only the Cargo fixtures above. Fixture
 paths are retained when process disposition or cleanup cannot be verified.
+
+The confined Mull automatic controls are also opt-in and require a pinned operator
+fixture configuration, a verified Forge binary, a prepared Clang/LLVM 18 and Mull
+toolchain, and an existing delegated cgroup v2 parent. They are not part of the
+default local-check. See the [Mull profile guide](mutation-mull.md) for the exact
+configuration shape and the current evidence limits. To run only those controls:
+
+```sh
+FORGE_TEST_BIN=/absolute/path/to/verified/forge \
+FORGE_TEST_MULL_CONFIG=/operator/private/mull-fixture.json \
+FORGE_TEST_MULL_CONFIG_SHA256=SHA256_OF_EXACT_CONFIG_BYTES \
+  cargo +1.98.0 test --release --offline --locked \
+  --manifest-path native/forge/Cargo.toml --test mutation_run_cli \
+  confined_cli::real::mull:: -- --ignored --nocapture --test-threads=1
+```
+
+The suite includes scoring controls and refusal checks, but a wrong-plugin refusal
+alone is not mutation evidence. Preserve the command ledger, receipts, pins, and
+cleanup observations for review. Full publication gates and the freshness audit
+remain separate from these opt-in fixture runs.

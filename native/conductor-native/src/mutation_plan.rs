@@ -19,6 +19,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
+#[path = "mutation_plan_mull.rs"]
+mod mull;
+pub use mull::validate_mull_path;
+
 #[path = "mutation_plan_priority.rs"]
 mod priority;
 pub use priority::PriorityOptions;
@@ -811,6 +815,8 @@ pub struct PlanRequest {
     pub python_jobs: Option<i64>,
     #[serde(default)]
     pub fest_confined: bool,
+    #[serde(default)]
+    pub mull_confined: bool,
     #[serde(default = "default_timeout")]
     pub run_timeout_seconds: i64,
     pub campaigns_root: String,
@@ -831,11 +837,22 @@ fn default_timeout() -> i64 {
 }
 
 fn validate_plan_request(request: &PlanRequest) -> Result<(), String> {
-    if request.language != "python" && request.language != "rust" {
+    if request.language != "python" && request.language != "rust" && request.language != "cpp" {
         return Err(format!(
-            "unknown language '{}'; known: python, rust",
+            "unknown language '{}'; known: python, rust, cpp",
             request.language
         ));
+    }
+    if request.mull_confined != (request.language == "cpp") {
+        return Err("--mull-confined is required for cpp and is cpp-only".into());
+    }
+    if request.mull_confined
+        && (request.jobs != 1 || request.priority.is_some() || request.run_timeout_seconds <= 0)
+    {
+        return Err(
+            "confined Mull requires one worker, a positive timeout and no priority projection"
+                .into(),
+        );
     }
     if request.fest_confined && request.language != "python" {
         return Err("--fest-confined is Python-only".into());
@@ -843,7 +860,7 @@ fn validate_plan_request(request: &PlanRequest) -> Result<(), String> {
     if request.fest_confined && request.python_jobs.is_some_and(|jobs| jobs != 1) {
         return Err("--fest-confined requires one Python worker".into());
     }
-    if !request.extra_tests.is_empty() && request.language != "python" {
+    if !request.extra_tests.is_empty() && request.language != "python" && !request.mull_confined {
         return Err("--extra-test pairs python subjects only".to_string());
     }
     if request.python_jobs.is_some() && request.language != "python" {
@@ -895,6 +912,9 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
             .map(|u| json!({"source": u.source, "lines": u.lines}))
             .collect();
         (manifests, unpaired_json, Vec::new(), already)
+    } else if request.mull_confined {
+        let (manifests, already) = mull::plan(request, &covered)?;
+        (manifests, Vec::new(), Vec::new(), already)
     } else {
         let (manifests, already, untested) = plan_rust(
             repo_root,
@@ -1108,6 +1128,7 @@ mod fixture_parity_tests {
             jobs: 4,
             python_jobs: None,
             fest_confined: false,
+            mull_confined: false,
             run_timeout_seconds: 1800,
             campaigns_root: "conductor/mutation_campaigns".to_string(),
             only_sources: None,

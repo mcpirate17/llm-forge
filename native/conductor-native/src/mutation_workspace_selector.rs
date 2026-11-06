@@ -113,7 +113,7 @@ pub fn parse(options: &Map<String, Value>) -> Result<Option<Selector>, String> {
             selector.validate()?;
             Ok(Some(selector))
         }
-        None | Some("cargo-workspace-v2" | "fest-confined-v1") => {
+        None | Some("cargo-workspace-v2" | "fest-confined-v1" | "mull-confined-v1") => {
             if options.contains_key("workspace_selector") {
                 return Err("workspace selector requires v3 profile".into());
             }

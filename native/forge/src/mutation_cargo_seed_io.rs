@@ -83,6 +83,23 @@ impl Budget {
             ..Self::new()
         }
     }
+    pub(crate) fn mull() -> Self {
+        Self {
+            max_entries: 20_000,
+            max_total: 1024 * 1024 * 1024,
+            max_file: 256 * 1024 * 1024,
+            ..Self::new()
+        }
+    }
+    pub(crate) fn mull_with_bytes(bytes: u64) -> Result<Self> {
+        let mut budget = Self::mull();
+        ensure!(
+            bytes <= budget.max_total,
+            "Mull explicit file byte budget exceeded"
+        );
+        budget.bytes = bytes;
+        Ok(budget)
+    }
     pub(super) fn deadline(&self) -> Instant {
         self.start + Duration::from_secs(120)
     }

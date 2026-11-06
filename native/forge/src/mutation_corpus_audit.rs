@@ -289,8 +289,9 @@ fn campaign_receipts(
     let ordinary_cargo = campaign["generated"] == true
         && campaign["mutation_engine"] == "cargo-mutants"
         && campaign["generated_value"].is_null();
-    let ordinary_native =
-        ordinary_cargo || crate::mutation_cargo_supporting::confined_fest(campaign);
+    let ordinary_native = ordinary_cargo
+        || crate::mutation_cargo_supporting::confined_fest(campaign)
+        || crate::mutation_cargo_supporting::confined_mull(campaign);
     let id = string(campaign, "campaign_id")?;
     let workspace = conductor_native::mutation_cargo_supporting_binding::uses_snapshot_inputs(
         campaign["execution_profile"].as_str(),

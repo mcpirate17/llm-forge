@@ -103,6 +103,11 @@ fn extra_tests_require_a_real_test_target() {
 
     let parsed = extra_tests(&["kept.py=test_kept.py".into()], root).expect("pairs");
     assert_eq!(parsed["kept.py"], ["test_kept.py"]);
+    fs::create_dir(root.join("tests")).expect("tests");
+    fs::write(root.join("tests/driver.cpp"), "int main() { return 0; }").expect("driver");
+    let parsed =
+        extra_tests(&["kept.py=tests/driver.cpp".into()], root).expect("root test directory");
+    assert_eq!(parsed["kept.py"], ["tests/driver.cpp"]);
 
     let error = extra_tests(&["kept.py=changed.py".into()], root).expect_err("not a test");
     assert_eq!(error, "--extra-test target is not a test file: changed.py");

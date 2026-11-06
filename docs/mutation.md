@@ -255,8 +255,11 @@ below also supports captured local paths and verified registry seeds. Both requi
 one worker, no campaign environment overrides,
 no configured Python guest and operator-pinned execution grants. The separate
 [confined Fest profile](mutation-fest.md) uses its own explicit Python guest grant.
-Ordinary Mull execution remains unsupported under these grants (#196). The opt-in
-Cargo per-test value workflow above retains its separate execution interface.
+Mull is available only through the explicitly granted
+[confined standalone profile](mutation-mull.md); unmarked Mull campaigns remain
+unsupported. Native `mutation refresh` does not yet support C++ manifests, so use
+`mutation write` to regenerate those campaigns. The opt-in Cargo per-test value
+workflow above retains its separate execution interface.
 
 Ordinary execution requires an operator-owned, pinned grant document:
 

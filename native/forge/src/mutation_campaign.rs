@@ -379,26 +379,7 @@ fn python_truth(value: &Value) -> bool {
     }
 }
 
-/// A generated mutant's name, from what it does rather than where it sits.
-fn mutant_base(path: &str, operator: &str, original: &str, mutated: &str) -> String {
-    let joined = [path, operator, original, mutated].join("\0");
-    format!("{operator}-{}", &sha256_hex(joined.as_bytes())[..12])
-}
-
-/// Name a run's mutants in the order given, disambiguating identical rewrites.
-pub fn identify(entries: &[[&str; 4]]) -> Vec<String> {
-    let mut seen: BTreeMap<String, usize> = BTreeMap::new();
-    entries
-        .iter()
-        .map(|[path, operator, original, mutated]| {
-            let base = mutant_base(path, operator, original, mutated);
-            let occurrence = seen.entry(base.clone()).or_insert(0);
-            let name = format!("{base}-{occurrence}");
-            *occurrence += 1;
-            name
-        })
-        .collect()
-}
+pub use conductor_native::mutation_generated_identity::identify;
 
 fn drift_into(
     pins: &BTreeMap<String, String>,

@@ -25,6 +25,36 @@ fn accept_bounded(listener: &TcpListener) -> TcpStream {
     stream
 }
 
+fn read_request(stream: &mut TcpStream) -> Value {
+    let mut request = Vec::new();
+    let mut chunk = [0; 4096];
+    let header_end = loop {
+        let n = stream.read(&mut chunk).unwrap();
+        assert!(n > 0);
+        request.extend_from_slice(&chunk[..n]);
+        assert!(request.len() <= 16 * 1024, "fixture header exceeds 16 KiB");
+        if let Some(pos) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+            break pos + 4;
+        }
+    };
+    let headers = String::from_utf8_lossy(&request[..header_end]);
+    let length: usize = headers
+        .lines()
+        .find_map(|line| {
+            line.to_ascii_lowercase()
+                .strip_prefix("content-length:")
+                .map(|v| v.trim().parse().unwrap())
+        })
+        .unwrap();
+    assert!(length <= 1024 * 1024, "fixture body exceeds 1 MiB");
+    while request.len() < header_end + length {
+        let n = stream.read(&mut chunk).unwrap();
+        assert!(n > 0);
+        request.extend_from_slice(&chunk[..n]);
+    }
+    serde_json::from_slice(&request[header_end..header_end + length]).unwrap()
+}
+
 #[test]
 fn rejects_invalid_vector_shapes_and_numbers() {
     for value in [json!([]), json!(["x", 1]), json!([true]), json!({})] {
@@ -55,8 +85,7 @@ fn transport_never_reports_secrets_or_server_body_and_disables_redirect() {
     let endpoint = format!("http://{}/api/embed", listener.local_addr().unwrap());
     let worker = thread::spawn(move || {
         let mut stream = accept_bounded(&listener);
-        let mut request = [0; 4096];
-        let _ = stream.read(&mut request).unwrap();
+        read_request(&mut stream);
         stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/leak\r\nContent-Length: 6\r\nConnection: close\r\n\r\nsecret").unwrap();
     });
     let error = transport::post_json(
@@ -105,33 +134,7 @@ fn fixture(body: Value) -> (String, thread::JoinHandle<Value>) {
     let url = format!("http://{}/embed", listener.local_addr().unwrap());
     let worker = thread::spawn(move || {
         let mut stream = accept_bounded(&listener);
-        let mut request = Vec::new();
-        let mut chunk = [0; 4096];
-        let header_end = loop {
-            let n = stream.read(&mut chunk).unwrap();
-            assert!(n > 0);
-            request.extend_from_slice(&chunk[..n]);
-            assert!(request.len() <= 16 * 1024, "fixture header exceeds 16 KiB");
-            if let Some(pos) = request.windows(4).position(|w| w == b"\r\n\r\n") {
-                break pos + 4;
-            }
-        };
-        let headers = String::from_utf8_lossy(&request[..header_end]);
-        let length: usize = headers
-            .lines()
-            .find_map(|line| {
-                line.to_ascii_lowercase()
-                    .strip_prefix("content-length:")
-                    .map(|v| v.trim().parse().unwrap())
-            })
-            .unwrap();
-        assert!(length <= 1024 * 1024, "fixture body exceeds 1 MiB");
-        while request.len() < header_end + length {
-            let n = stream.read(&mut chunk).unwrap();
-            assert!(n > 0);
-            request.extend_from_slice(&chunk[..n]);
-        }
-        let data = serde_json::from_slice(&request[header_end..header_end + length]).unwrap();
+        let data = read_request(&mut stream);
         let response = body.to_string();
         write!(
             stream,
@@ -325,8 +328,7 @@ fn duplicate_response_keys_are_rejected_without_echoing_payload() {
     let endpoint = format!("http://{}/embed", listener.local_addr().unwrap());
     let worker = thread::spawn(move || {
         let mut stream = accept_bounded(&listener);
-        let mut request = [0; 4096];
-        let _ = stream.read(&mut request).unwrap();
+        let request = read_request(&mut stream);
         let body = r#"{"data":[{"index":0,"index":1,"embedding":[1,0]}]}"#;
         write!(
             stream,
@@ -335,16 +337,18 @@ fn duplicate_response_keys_are_rejected_without_echoing_payload() {
             body
         )
         .unwrap();
+        request
     });
+    let request = json!({"input": "x".repeat(8192)});
     let error = transport::post_json(
         &endpoint,
-        &json!({}),
+        &request,
         None,
         Instant::now() + Duration::from_secs(2),
     )
     .unwrap_err()
     .to_string();
-    worker.join().unwrap();
+    assert_eq!(worker.join().unwrap(), request);
     assert_eq!(error, "embedding backend returned invalid JSON");
 }
 

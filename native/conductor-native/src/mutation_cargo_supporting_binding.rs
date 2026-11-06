@@ -83,7 +83,8 @@ mod tests {
 
 /// Whether an independently verified profile uses the full snapshot domain.
 pub fn uses_snapshot_inputs(profile: Option<&str>) -> bool {
-    crate::mutation_workspace_selector::is_workspace(profile) || profile == Some("fest-confined-v1")
+    crate::mutation_workspace_selector::is_workspace(profile)
+        || matches!(profile, Some("fest-confined-v1" | "mull-confined-v1"))
 }
 
 pub fn compare_profile(

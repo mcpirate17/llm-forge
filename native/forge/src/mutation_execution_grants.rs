@@ -60,6 +60,8 @@ struct Document {
     cargo_workspace: Option<CargoWorkspaceGrant>,
     #[serde(default)]
     python_guest: Option<crate::mutation_fest_guest::GuestConfig>,
+    #[serde(default)]
+    mull_toolchain: Option<crate::mutation_mull_toolchain::Config>,
 }
 
 /// The operator selects the lockfile independently of the seed's own metadata.
@@ -98,6 +100,7 @@ pub(crate) struct Grants {
     pub(crate) max_wall_seconds: u64,
     pub(crate) cargo_workspace: Option<CargoWorkspaceGrant>,
     guest: Option<crate::mutation_fest_guest::HeldGuest>,
+    mull: Option<crate::mutation_mull_toolchain::Held>,
     common_git: PathBuf,
     git_dir: PathBuf,
     environment: EnvironmentSelection,
@@ -311,6 +314,35 @@ fn protected_roots() -> Result<(PathBuf, Vec<PathBuf>)> {
     }
     Ok((home, roots))
 }
+fn validate_document(document: &Document, source_root: &Path) -> Result<()> {
+    ensure!(
+        document.version == 1,
+        "unsupported execution grants version"
+    );
+    ensure!(
+        document.source_root == source_root,
+        "execution grants source_root mismatch"
+    );
+    ensure!(
+        (1..=120).contains(&document.read_only.len())
+            && (1..=128).contains(&document.programs.len()),
+        "execution grants collection limit exceeded"
+    );
+    ensure!(
+        (1..=86400).contains(&document.max_wall_seconds),
+        "invalid execution wall ceiling"
+    );
+    let limits = &document.resources;
+    // Same ranges as Cgroup::create; validation must not create a cgroup.
+    ensure!(
+        (10..=1_024_000).contains(&limits.cpu_millis)
+            && (16..=1_048_576).contains(&limits.memory_mib)
+            && (1..=4096).contains(&limits.processes),
+        "invalid execution cgroup ceilings"
+    );
+    Ok(())
+}
+
 impl Grants {
     pub(crate) fn load(
         path: &Path,
@@ -354,31 +386,8 @@ impl Grants {
         git_dir: &Path,
         control: BoundFile,
     ) -> Result<Self> {
-        ensure!(
-            document.version == 1,
-            "unsupported execution grants version"
-        );
-        ensure!(
-            document.source_root == source_root,
-            "execution grants source_root mismatch"
-        );
-        ensure!(
-            (1..=120).contains(&document.read_only.len())
-                && (1..=128).contains(&document.programs.len()),
-            "execution grants collection limit exceeded"
-        );
-        ensure!(
-            (1..=86400).contains(&document.max_wall_seconds),
-            "invalid execution wall ceiling"
-        );
+        validate_document(&document, source_root)?;
         let limits = document.resources;
-        // Same ranges as Cgroup::create; validation must not create a cgroup.
-        ensure!(
-            (10..=1_024_000).contains(&limits.cpu_millis)
-                && (16..=1_048_576).contains(&limits.memory_mib)
-                && (1..=4096).contains(&limits.processes),
-            "invalid execution cgroup ceilings"
-        );
         let directories = vec![
             directory(&document.scratch_parent)?,
             directory(&document.cgroup_parent)?,
@@ -394,6 +403,27 @@ impl Grants {
         disjoint(path, &document.scratch_parent)?;
         let (home, protected) = protected_roots()?;
         let guest_config = document.python_guest;
+        let mull_config = document.mull_toolchain;
+        ensure!(
+            mull_config.is_none() || (guest_config.is_none() && document.cargo_workspace.is_none()),
+            "Mull toolchain grants cannot be combined with Python or Cargo grants"
+        );
+        let mull_files: BTreeSet<PathBuf> = mull_config
+            .as_ref()
+            .map(|config| {
+                config
+                    .files
+                    .keys()
+                    .cloned()
+                    .chain(
+                        document
+                            .programs
+                            .values()
+                            .map(|program| program.path.clone()),
+                    )
+                    .collect()
+            })
+            .unwrap_or_default();
         let mut grants = Self {
             git_dir: git_dir.into(),
             environment: environment_selection(),
@@ -408,6 +438,7 @@ impl Grants {
             max_wall_seconds: document.max_wall_seconds,
             cargo_workspace: document.cargo_workspace,
             guest: None,
+            mull: None,
             control_path: path.into(),
             digest: pin.into(),
             control,
@@ -416,8 +447,13 @@ impl Grants {
             read_directories: BTreeSet::new(),
             read_files: Vec::new(),
         };
-        grants.bind_reads()?;
+        grants.bind_reads(&mull_files)?;
         grants.bind_programs(document.programs)?;
+        if let Some(config) = &mull_config {
+            grants.mull = Some(crate::mutation_mull_toolchain::Held::capture(
+                config, &grants,
+            )?);
+        }
         if let Some(config) = &guest_config {
             ensure!(
                 grants.cargo_workspace.is_none(),
@@ -458,7 +494,7 @@ impl Grants {
         }
         Ok(())
     }
-    fn bind_reads(&mut self) -> Result<()> {
+    fn bind_reads(&mut self, mull_files: &BTreeSet<PathBuf>) -> Result<()> {
         let mut total = 0usize;
         for (index, read) in self.read_only.iter().enumerate() {
             ensure!(
@@ -483,7 +519,7 @@ impl Grants {
             if fs::symlink_metadata(read)?.is_dir() {
                 self.directories.push(directory(read)?);
                 self.read_directories.insert(read.clone());
-            } else {
+            } else if !mull_files.contains(read) {
                 let (held, length) = read_file(read, &self.source_root)?;
                 total = total
                     .checked_add(length)
@@ -509,6 +545,14 @@ impl Grants {
     }
     pub(crate) fn has_fest_guest(&self) -> bool {
         self.guest.is_some()
+    }
+    pub(crate) fn mull_toolchain(&self) -> Result<&crate::mutation_mull_toolchain::Held> {
+        self.mull
+            .as_ref()
+            .context("confined Mull requires a pinned toolchain")
+    }
+    pub(crate) fn has_mull_toolchain(&self) -> bool {
+        self.mull.is_some()
     }
     pub(crate) fn digest(&self) -> &str {
         &self.digest
@@ -545,6 +589,9 @@ impl Grants {
         self.control.verify()?;
         if let Some(guest) = &self.guest {
             guest.verify()?;
+        }
+        if let Some(mull) = &self.mull {
+            mull.verify()?;
         }
         for path in self
             .read_only

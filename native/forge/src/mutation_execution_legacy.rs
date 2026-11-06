@@ -15,7 +15,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
     fs,
-    os::unix::fs::{symlink, PermissionsExt},
+    os::unix::fs::{symlink, DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
 };
 fn error(value: impl std::fmt::Display) -> String {
@@ -274,9 +274,15 @@ pub(crate) enum Inputs {
     Root(Box<RootInputs>),
     Workspace(Box<crate::mutation_workspace_inputs::Inputs>),
     Fest(Box<crate::mutation_fest_inputs::Inputs>),
+    Mull(Box<crate::mutation_mull_runtime::Inputs>),
 }
 impl Inputs {
     pub fn capture(campaign: &Campaign, root: &Path, grants: &Grants) -> Result<Self> {
+        ensure!(
+            !grants.has_mull_toolchain()
+                || campaign.option_text("execution_profile").as_deref() == Some("mull-confined-v1"),
+            "Mull toolchain requires Mull profile"
+        );
         match campaign
             .options
             .get("execution_profile")
@@ -300,6 +306,11 @@ impl Inputs {
                 crate::mutation_fest_inputs::Inputs::capture(campaign, root)
                     .map(|inputs| Self::Fest(Box::new(inputs)))
             }
+            Some("mull-confined-v1") => {
+                grants.mull_toolchain()?;
+                crate::mutation_mull_runtime::Inputs::capture(campaign, root)
+                    .map(|inputs| Self::Mull(Box::new(inputs)))
+            }
             Some(_) => anyhow::bail!("unsupported execution profile"),
         }
     }
@@ -308,6 +319,7 @@ impl Inputs {
             Self::Root(_) => snapshot.populate(root).map_err(anyhow::Error::msg),
             Self::Workspace(inputs) => inputs.populate(snapshot),
             Self::Fest(inputs) => inputs.populate(snapshot),
+            Self::Mull(inputs) => inputs.shared.populate(snapshot),
         }
     }
     pub fn verify(&self, snapshot: Option<&Path>) -> Result<()> {
@@ -315,6 +327,7 @@ impl Inputs {
             Self::Root(inputs) => inputs.verify(snapshot),
             Self::Workspace(inputs) => inputs.verify(snapshot),
             Self::Fest(inputs) => inputs.verify(snapshot),
+            Self::Mull(inputs) => inputs.shared.verify(snapshot, None),
         }
     }
     pub fn verify_snapshot(&self, root: &Path) -> Result<()> {
@@ -322,6 +335,7 @@ impl Inputs {
             Self::Root(inputs) => inputs.verify_snapshot(root),
             Self::Workspace(inputs) => inputs.verify(Some(root)),
             Self::Fest(inputs) => inputs.verify(Some(root)),
+            Self::Mull(inputs) => inputs.shared.verify(Some(root), None),
         }
     }
     pub fn supporting_identity(
@@ -331,6 +345,7 @@ impl Inputs {
             Self::Root(inputs) => inputs.supporting_identity(),
             Self::Workspace(inputs) => inputs.identity(),
             Self::Fest(inputs) => inputs.identity(),
+            Self::Mull(inputs) => inputs.shared.identity(),
         }
     }
     pub fn receipt(&self, relative: &str) -> Result<()> {
@@ -338,13 +353,47 @@ impl Inputs {
             Self::Root(_) => Ok(()),
             Self::Workspace(inputs) => inputs.receipt(relative),
             Self::Fest(inputs) => inputs.receipt(relative),
+            Self::Mull(inputs) => inputs.shared.receipt(relative),
+        }
+    }
+    fn prepare_scratch(
+        &self,
+        root: &Path,
+        environment: &BTreeMap<String, String>,
+    ) -> Result<Option<crate::mutation_cargo_seed::StagedSeed>> {
+        match self {
+            Self::Fest(_) => {
+                prepare_fest_output(root)?;
+                Ok(None)
+            }
+            Self::Mull(_) => {
+                fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(root.join("mull-output"))?;
+                Ok(None)
+            }
+            Self::Root(_) | Self::Workspace(_) => {
+                let seed = self.stage(&root.join("cargo-home"))?;
+                if seed.is_none() {
+                    fs::create_dir(root.join("cargo-home"))?;
+                    fs::set_permissions(
+                        root.join("cargo-home"),
+                        fs::Permissions::from_mode(0o700),
+                    )?;
+                }
+                fs::create_dir(root.join("target"))?;
+                let isolated =
+                    isolated_python_env(environment, root, &[]).map_err(anyhow::Error::msg)?;
+                ensure!(&isolated == environment, "unexpected bytecode environment");
+                Ok(seed)
+            }
         }
     }
     fn stage(&self, path: &Path) -> Result<Option<crate::mutation_cargo_seed::StagedSeed>> {
         match self {
             Self::Root(_) => Ok(None),
             Self::Workspace(inputs) => inputs.stage(path),
-            Self::Fest(_) => Ok(None),
+            Self::Fest(_) | Self::Mull(_) => Ok(None),
         }
     }
 }
@@ -473,10 +522,13 @@ fn prepare_fest_output(root: &Path) -> Result<()> {
 
 fn validate_runtime_programs(
     fest: bool,
+    mull: bool,
     programs: &BTreeMap<String, PathBuf>,
     grants: &Grants,
 ) -> Result<()> {
-    if fest {
+    if mull {
+        grants.mull_toolchain()?;
+    } else if fest {
         ensure!(
             programs.len() == 2 && programs.contains_key("python") && programs.contains_key("fest"),
             "confined Fest requires exactly the pinned python and fest aliases"
@@ -505,6 +557,7 @@ pub(crate) struct Runtime<'a> {
     cleanup_complete: Cell<bool>,
     signal: Cell<Option<i32>>,
     fest_cache: RefCell<Option<crate::mutation_fest_guest::ReadOnlyCache>>,
+    mull: Option<crate::mutation_mull_runtime::State>,
 }
 impl<'a> Runtime<'a> {
     pub fn prepare(snapshot: &Snapshot, grants: &'a Grants, inputs: &'a Inputs) -> Result<Self> {
@@ -516,8 +569,19 @@ impl<'a> Runtime<'a> {
         grants.validate_private_root(&snapshot.root)?;
         let programs = grants.programs();
         let fest = matches!(inputs, Inputs::Fest(_));
-        validate_runtime_programs(fest, &programs, grants)?;
+        let is_mull = matches!(inputs, Inputs::Mull(_));
+        validate_runtime_programs(fest, is_mull, &programs, grants)?;
         let root = snapshot.root.canonicalize()?;
+        let mull = if let Inputs::Mull(inputs) = inputs {
+            Some(crate::mutation_mull_runtime::State::create(
+                inputs,
+                &snapshot.worktree,
+                &root,
+                grants,
+            )?)
+        } else {
+            None
+        };
         let mut cache = if fest {
             Some(crate::mutation_fest_guest::ReadOnlyCache::create(grants)?)
         } else {
@@ -531,12 +595,17 @@ impl<'a> Runtime<'a> {
                     grants.fest_guest()?.root(),
                     cache.path(),
                 )?
+            } else if let Some(mull) = &mull {
+                mull.environment()?
             } else {
                 cargo_environment(&root, grants)?
             };
             let mut read_only = grants.read_only.clone();
             if let Some(cache) = cache.as_ref() {
                 read_only.push(cache.path().to_owned());
+            }
+            if let Some(mull) = &mull {
+                read_only.push(mull.read_only()?);
             }
             let sandbox = Sandbox::prepare(Policy {
                 read_only,
@@ -545,24 +614,7 @@ impl<'a> Runtime<'a> {
                 environment: environment.clone(),
             })?;
             fs::create_dir(root.join("bin"))?;
-            let seed = if fest {
-                prepare_fest_output(&root)?;
-                None
-            } else {
-                let seed = inputs.stage(&root.join("cargo-home"))?;
-                if seed.is_none() {
-                    fs::create_dir(root.join("cargo-home"))?;
-                    fs::set_permissions(
-                        root.join("cargo-home"),
-                        fs::Permissions::from_mode(0o700),
-                    )?;
-                }
-                fs::create_dir(root.join("target"))?;
-                let isolated =
-                    isolated_python_env(&environment, &root, &[]).map_err(anyhow::Error::msg)?;
-                ensure!(isolated == environment, "unexpected bytecode environment");
-                seed
-            };
+            let seed = inputs.prepare_scratch(&root, &environment)?;
             for (alias, path) in &programs {
                 symlink(path, root.join("bin").join(alias))?;
             }
@@ -578,6 +630,9 @@ impl<'a> Runtime<'a> {
                 if let Some(cache) = cache.take() {
                     return Err(cache.prelaunch_error(error));
                 }
+                if let Some(mull) = &mull {
+                    return Err(mull.prelaunch_error(error));
+                }
                 return Err(error);
             }
         };
@@ -592,10 +647,14 @@ impl<'a> Runtime<'a> {
             cleanup_complete: Cell::new(true),
             signal: Cell::new(None),
             fest_cache: RefCell::new(cache),
+            mull,
         })
     }
     pub fn verify(&self, snapshot: Option<&Path>) -> Result<()> {
         self.grants.verify()?;
+        if let Some(mull) = &self.mull {
+            mull.verify()?;
+        }
         if let Some(cache) = self.fest_cache.borrow().as_ref() {
             cache.verify()?;
             let (_, bytes) =
@@ -653,7 +712,9 @@ impl<'a> Runtime<'a> {
                 let tests = inputs.tests()?;
                 Ok((tests.baseline_args.clone(), tests.engine_args.clone()))
             }
-            Inputs::Fest(_) => anyhow::bail!("Fest has no Cargo test arguments"),
+            Inputs::Fest(_) | Inputs::Mull(_) => {
+                anyhow::bail!("external engine has no Cargo selection")
+            }
         }
     }
     pub fn admit(&self, run: &mut EngineRun<'_>) -> Step<()> {
@@ -798,14 +859,18 @@ impl<'a> Runtime<'a> {
         match self.inputs {
             Inputs::Root(_) => Ok(campaign.option_text("package_root").unwrap_or_default()),
             Inputs::Workspace(inputs) => Ok(inputs.tests()?.report_root.clone()),
-            Inputs::Fest(_) => anyhow::bail!("Fest has no Cargo report root"),
+            Inputs::Fest(_) | Inputs::Mull(_) => {
+                anyhow::bail!("external engine has no Cargo selection")
+            }
         }
     }
     pub fn report_package(&self) -> Result<Option<&str>> {
         match self.inputs {
             Inputs::Root(_) => Ok(None),
             Inputs::Workspace(inputs) => Ok(Some(&inputs.tests()?.package_name)),
-            Inputs::Fest(_) => anyhow::bail!("Fest has no Cargo report package"),
+            Inputs::Fest(_) | Inputs::Mull(_) => {
+                anyhow::bail!("external engine has no Cargo selection")
+            }
         }
     }
     /// Persist the sibling cache path before any guest child is launched.
@@ -813,6 +878,15 @@ impl<'a> Runtime<'a> {
         &self,
         receipt: &mut crate::mutation_score::Receipt,
     ) -> Result<()> {
+        if let Some(mull) = &self.mull {
+            mull.record(receipt)?;
+            let mut identity = self.grants.mull_toolchain()?.identity()?;
+            let programs = self.programs.iter().map(|(alias,path)| Ok((alias.clone(),
+                serde_json::json!({"path":path,"sha256":self.grants.program_sha256(alias)?}))))
+                .collect::<Result<serde_json::Map<String,serde_json::Value>>>()?;
+            identity["programs"] = serde_json::Value::Object(programs);
+            receipt.insert("mull_toolchain".into(), identity);
+        }
         if let Some(cache) = self.fest_cache.borrow().as_ref() {
             cache.verify_admission()?;
             receipt.insert(
@@ -829,8 +903,14 @@ impl<'a> Runtime<'a> {
 
     /// Call only after the coordinator verifies the complete owned process ledger.
     pub(crate) fn finish_cache(&self, worktree: &Path) -> Result<()> {
-        ensure!(self.cleanup_complete.get(), "Fest cleanup is not complete");
+        ensure!(
+            self.cleanup_complete.get(),
+            "mutation cleanup is not complete"
+        );
         self.verify(Some(worktree))?;
+        if let Some(mull) = &self.mull {
+            mull.finish()?;
+        }
         if let Some(cache) = self.fest_cache.borrow_mut().take() {
             cache.remove_verified()?;
         }
@@ -861,6 +941,15 @@ impl<'a> Runtime<'a> {
         }
     }
 
+    pub(crate) fn mull(&self) -> Result<&crate::mutation_mull_runtime::State> {
+        self.mull
+            .as_ref()
+            .context("confined Mull state unavailable")
+    }
+    pub(crate) fn program(&self, alias: &str) -> Result<&Path> {
+        self.grants.program(alias)
+    }
+
     pub fn command(
         &self,
         run: &mut EngineRun<'_>,
@@ -887,6 +976,12 @@ impl<'a> Runtime<'a> {
             return Err("mutation command must use the verified snapshot cwd".into());
         }
         self.verify(Some(run.worktree)).map_err(error)?;
+        let derived_programs = self
+            .mull
+            .as_ref()
+            .map(|mull| mull.programs(&self.programs))
+            .transpose()
+            .map_err(error)?;
         let session = CommandSession {
             sandbox: &self.sandbox,
             reactor: &self.reactor,
@@ -894,10 +989,11 @@ impl<'a> Runtime<'a> {
             limits: self.grants.resources,
             cleanup_complete: &self.cleanup_complete,
             signal: &self.signal,
-            programs: Some(&self.programs),
+            programs: Some(derived_programs.as_ref().unwrap_or(&self.programs)),
             scratch: &self.root,
             max_wall_seconds: self.grants.max_wall_seconds,
             cargo_value: false,
+            private_files: self.mull.is_some(),
         };
         let result = session.command(run, argv, cwd, timeout, capture);
         if let Err(failure) = self.verify(Some(run.worktree)) {

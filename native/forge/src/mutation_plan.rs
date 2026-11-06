@@ -42,7 +42,7 @@ pub struct PriorityArgs {
 pub struct ScopeArgs {
     #[command(flatten)]
     pub priority: Box<PriorityArgs>,
-    /// "python" or "rust"
+    /// "python", "rust", or standalone "cpp" with --mull-confined.
     pub language: String,
 
     /// Repository root; defaults to the nearest ancestor of the current
@@ -70,6 +70,10 @@ pub struct ScopeArgs {
     /// Generate the confined Fest profile for one Python source per campaign.
     #[arg(long, conflicts_with = "cargo_workspace")]
     pub fest_confined: bool,
+
+    /// Generate one standalone C/C++ source and explicit test-driver campaign.
+    #[arg(long, conflicts_with_all = ["cargo_workspace", "fest_confined", "rust_value_contract"])]
+    pub mull_confined: bool,
 
     #[arg(long = "run-timeout", default_value_t = 1800)]
     pub run_timeout: i64,
@@ -99,7 +103,7 @@ pub struct ScopeArgs {
     pub include_covered: bool,
 
     /// `SOURCE=TEST`; also score SOURCE with TEST when no test is named
-    /// after SOURCE. Repeatable. Python subjects only.
+    /// after SOURCE. Repeatable. Required for standalone C/C++ subjects.
     #[arg(long = "extra-test", value_name = "SOURCE=TEST")]
     pub extra_test: Vec<String>,
 
@@ -315,6 +319,7 @@ fn plan(args: ScopeArgs) -> Result<Planned, String> {
         jobs: args.jobs,
         python_jobs: args.python_jobs,
         fest_confined: args.fest_confined,
+        mull_confined: args.mull_confined,
         run_timeout_seconds: args.run_timeout,
         campaigns_root: campaigns.clone(),
         only_sources,

@@ -93,8 +93,12 @@ pub mod mutation_coverage;
 #[cfg(feature = "source-analysis")]
 pub mod mutation_evidence;
 pub mod mutation_fest_receipt;
+pub mod mutation_generated_identity;
 #[cfg(feature = "source-analysis")]
 mod mutation_manifest;
+pub mod mutation_mull_outcome;
+pub mod mutation_mull_receipt;
+pub mod mutation_mull_report;
 pub mod mutation_native_runner;
 pub mod mutation_patch_anchor;
 pub mod mutation_plan;

@@ -3,6 +3,8 @@ use super::*;
 
 #[path = "mutation_cli_fest.rs"]
 mod fest;
+#[path = "mutation_cli_mull.rs"]
+mod mull;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
