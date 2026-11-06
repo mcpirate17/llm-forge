@@ -1236,7 +1236,10 @@ ordered operator inventory, then a reserved sandbox environment override.
 A debug attempt executed one pytest baseline command successfully (561 ms in
 its command ledger), then refused when coverage cleanup removed its own config.
 The snapshot and empty cache were retained, and the owned command cgroup was
-confirmed absent. This is partial correctness evidence, not benchmark evidence.
+confirmed absent. A subsequent debug attempt passed its baseline (580 ms), then
+failed engine startup at the process limit (12 ms); all owned resources were
+removed. The timestamp stress fixture now records an explicit owner metadata
+intervention with unchanged source bytes. These are not benchmark comparisons.
 
 The [evidence index](../research/performance/forge-program-20261106-confined-fest.json)
 retains these failed attempts, build identities and unresolved validation work.

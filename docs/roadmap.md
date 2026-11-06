@@ -94,7 +94,9 @@ read-only empty bytecode caches, guest-first imports and complete kill attributi
 Focused native checks passed; live validation is still incomplete. Two attempts
 refused before payload launch. A debug attempt completed one pytest command, then
 correctly refused after coverage cleanup removed its configuration. These failures
-remain recorded; no Fest mutation PASS or performance benefit is established.
+remain recorded. A fourth attempt reached the engine and failed on thread-pool
+admission; its cgroups, snapshot and cache were removed. No Fest mutation PASS
+or performance benefit is established.
 Next validate automatic kills, survivors, collection-error rejection and receipt
 freshness, then run the full publication gates. Unmarked Fest and Mull execution
 remain refused. See the [active evidence index](../research/performance/forge-program-20261106-confined-fest.json).

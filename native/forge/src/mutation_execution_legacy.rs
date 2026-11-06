@@ -432,6 +432,10 @@ fn fest_environment(
         ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
         ("PYTHONNOUSERSITE".into(), "1".into()),
         ("PYTHONSAFEPATH".into(), "1".into()),
+        // Fest creates a Tokio runtime and Rayon pools independently of the
+        // selected mutation worker count. Bound those ambient defaults too.
+        ("RAYON_NUM_THREADS".into(), "1".into()),
+        ("TOKIO_WORKER_THREADS".into(), "1".into()),
         ("PYTEST_DISABLE_PLUGIN_AUTOLOAD".into(), "1".into()),
         (
             "PYTEST_ADDOPTS".into(),
@@ -928,6 +932,8 @@ mod fest_environment_tests {
         .unwrap();
         assert_eq!(env["PYTHONPATH"], "/guest/lib/python3.12:/guest/lib/python3.12/lib-dynload:/guest/lib/python3.12/dist-packages:/scratch/worktree:/scratch/worktree/src");
         assert_eq!(env["PYTHONSAFEPATH"], "1");
+        assert_eq!(env["RAYON_NUM_THREADS"], "1");
+        assert_eq!(env["TOKIO_WORKER_THREADS"], "1");
         assert!(env["PYTEST_ADDOPTS"].contains("--import-mode=importlib"));
         let data_prefix = format!("{}.", env["COVERAGE_FILE"]);
         for protected in [

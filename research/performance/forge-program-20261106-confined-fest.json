@@ -4,12 +4,13 @@
   "scope": "confined Fest profile validation; no full mutation PASS or performance claim",
   "attempts": {
     "observer_tests_passed": 0,
-    "observer_tests_failed": 3,
+    "observer_tests_failed": 4,
     "pre_payload_refusals": 2,
     "partial_baseline_only_runs": 1,
     "engine_runs_completed": 0,
-    "weak_controls_unstarted": 3,
-    "collection_error_control": "UNSTARTED"
+    "weak_controls_unstarted": 4,
+    "collection_error_control": "UNSTARTED",
+    "engine_startup_failures": 1
   },
   "evidence": [
     {
@@ -152,6 +153,32 @@
         "source_clean": true,
         "bytes": 531886408,
         "build_log_sha256": "e7d42dfeda9ab22bb758c6cd84675e5e86da4f15071534efa9a47d7b6e74460f"
+      }
+    },
+    {
+      "path": ".git/forge-fest-fourth-debug-engine-failure.json",
+      "sha256": "7592a21d8258eedd3d73ac09b141841760b98b3afdc789092977ad3f8d038f22",
+      "record": {
+        "scope": "DEBUG engine startup failure; no completed mutation campaign",
+        "fixture": "/tmp/.tmpb1c75C",
+        "receipt_sha256": "318b6b3f3d2960e47e01a51e7df4dd159f1970fc67a23e30fc7a6c22dfa5fe0c",
+        "native_status": "ERROR",
+        "error": "fest produced no JSON report (rc=101): \nthread 'main' (2289911) panicked at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rayon-core-1.13.0/src/registry.rs:171:10:\nThe global thread pool has not been initialized.: ThreadPoolBuildError { kind: IOError(Os { code: 11, kind: WouldBlock, message: \"Resource temporarily unavailable\" }) }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+        "commands_observed": 2,
+        "command_exit_codes": [
+          0,
+          101
+        ],
+        "mutant_accounting": "unavailable; engine emitted no JSON report",
+        "snapshot_cache_and_command_cgroups_absent": [
+          "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/forge-fest-control-b93wne10.service/forge-native-2289854-f89b59423fd8b83c7190dda35c23b342",
+          "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/forge-fest-control-b93wne10.service/forge-native-2289854-da8dfe16716a283f83b204f2a0408a84",
+          "/tmp/.tmpb1c75C/scratch/llm-orchestrator-snapshot-F37tgH",
+          "/tmp/.tmpb1c75C/scratch/fest-pycache-2289854-6f7c92940f1b53e893874abdabb0a60a"
+        ],
+        "metadata_intervention_records": 1,
+        "source_observations": 1,
+        "intervention": "fixture owner sets source mtime only; actual bytes/hashes retained in separate records"
       }
     }
   ],
