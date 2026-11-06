@@ -179,7 +179,9 @@ existing leaves before staging and replacement. Mull refresh upgrades its captur
 manifest to mutation permissions only for changed apply; preview and no-op remain
 read-only. Cleanup retains and identifies stages if permissions become unsafe.
 Focused tests cover shared modes, permission drift, pair failures and the existing
-report callers. Clean release controls and full publication validation are pending.
+report callers. Clean release `9484974` refuses the two previously admitted shared
+write cases while preserving private apply and shared no-op. The four controls use
+empty-PATH refresh calls with no engine execution; full publication validation is pending.
 See the [evidence index](../research/performance/forge-program-20261106-publication-permissions.json).
 
 ### Architecture, evidence and disposition
