@@ -15,19 +15,26 @@ PR head `966ae9a128458a6cbc488bfcd51bc574c4b623eb`. The canonical measurement an
 Open defects live in the [issue tracker](https://github.com/mcpirate17/llm-forge/issues),
 not a parallel local defect ledger.
 
-### Native reporting increment — in verification, 2026-11-06
+### Native reporting increment — publication validation, 2026-11-06
 
 Issue [#208](https://github.com/mcpirate17/llm-forge/issues/208) moves explicit,
 changed, coverage and canary reports to shared Rust validation and routes their
-Make targets through the native CLI. Commit `88a63ef` passed focused tests and
-strict Clippy; its full JSON/exit parity controls passed. It is not yet published.
-The first timing comparison found a native regression, recorded in the canonical
+Make targets through the native CLI. The measured source is `d1fc4dd`; focused
+validation passed 37 tests plus strict Clippy. Independent review cleared the
+eligibility fast path and preserved input checks. The original slower baseline,
+rejected path-lookup experiment, and final matched comparisons are recorded in the
 [performance report](performance.md#native-report-migration-baseline--2026-11-06).
-The path-lookup experiment was rejected after a matched comparison showed little
-benefit. The next candidate targets measured repeated receipt decoding.
-Remeasurement, a real installed-receipt control, and full publication validation
-remain before acceptance. Existing Python host APIs are retained compatibility
-surfaces; this increment does not establish host adoption or complete Rust migration.
+The final run completed all 90 observations with exact JSON/exit parity; explicit
+reports matched Python's median, while coverage and canary remained slower.
+
+A real two-mutant automatic control verified installed native receipt acceptance,
+missing-identity debt and invalid-pin refusal. Make routes were traced with `UV=false`.
+The final committed tree must pass the full local check and current-base verification
+before publication. Existing Python host APIs remain compatibility surfaces; this
+increment establishes neither host adoption nor complete Rust migration.
+Remaining priorities include issue #196's ordinary mutation profiles and native
+prompt/tool assistance. Report overhead remains a documented limitation, not a
+general speedup claim; select the next increment from current user-value evidence.
 
 ### Architecture, evidence and disposition
 
