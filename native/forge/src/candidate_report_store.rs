@@ -132,6 +132,160 @@ pub(crate) fn publish_checked(
     publish_locked(path, bytes, |_| Ok(()), before_rename)
 }
 
+struct PairOutput<'a> {
+    path: &'a Path,
+    parent: Dir,
+    name: OsString,
+    staged: Option<(OsString, File)>,
+    renamed: bool,
+    durable: bool,
+}
+
+impl<'a> PairOutput<'a> {
+    fn new(path: &'a Path) -> Result<Self> {
+        let (parent, name) = open_parent(path)?;
+        Ok(Self {
+            path,
+            parent,
+            name,
+            staged: None,
+            renamed: false,
+            durable: false,
+        })
+    }
+
+    fn parent_identity(&self) -> Result<(u64, u64)> {
+        let meta = self.parent.dir_metadata()?;
+        Ok((meta.dev(), meta.ino()))
+    }
+
+    fn verify_staged(&self) -> Result<()> {
+        let (name, held) = self
+            .staged
+            .as_ref()
+            .context("paired staging file missing")?;
+        same_stage(&self.parent, name, held)?;
+        check_destination(&self.parent, &self.name)
+    }
+
+    fn replace(
+        &mut self,
+        rename: &mut impl FnMut(&Dir, &OsStr, &OsStr) -> Result<()>,
+    ) -> Result<()> {
+        let (name, _) = self
+            .staged
+            .as_ref()
+            .context("paired staging file missing")?;
+        rename(&self.parent, name, &self.name)?;
+        self.renamed = true;
+        self.staged = None;
+        self.parent
+            .open(".")?
+            .sync_all()
+            .context("paired output replaced but directory sync failed")?;
+        self.durable = true;
+        Ok(())
+    }
+
+    fn cleanup_staged(&mut self) -> Result<()> {
+        if let Some((name, held)) = self.staged.take() {
+            cleanup(&self.parent, &name, &held).with_context(|| {
+                format!("remove paired staging file {name:?} for {:?}", self.path)
+            })?;
+        }
+        Ok(())
+    }
+
+    fn disposition(&self) -> String {
+        format!(
+            "path={:?} renamed={} durable={}",
+            self.path, self.renamed, self.durable
+        )
+    }
+}
+
+fn pair_leases(
+    first: &PairOutput<'_>,
+    second: &PairOutput<'_>,
+) -> Result<Vec<crate::file_lock::Exclusive>> {
+    let first_id = first.parent_identity()?;
+    let second_id = second.parent_identity()?;
+    ensure!(
+        first_id != second_id || first.name != second.name,
+        "paired outputs must name distinct files"
+    );
+    let mut parents = vec![(first_id, &first.parent), (second_id, &second.parent)];
+    parents.sort_by_key(|(identity, _)| *identity);
+    parents.dedup_by_key(|(identity, _)| *identity);
+    parents
+        .into_iter()
+        .map(|(_, parent)| {
+            crate::file_lock::Exclusive::blocking(
+                parent.open(".")?.into_std(),
+                "paired report parent directory",
+            )
+        })
+        .collect()
+}
+
+/// Stage both outputs, then replace first followed by second under ordered parent locks.
+/// Two renames are not transactional. Errors identify each output's replacement and
+/// durability state; callers must not consume inputs unless this returns success.
+pub(crate) fn publish_pair_checked(
+    first: (&Path, &[u8]),
+    second: (&Path, &[u8]),
+    before_rename: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    publish_pair_using(first, second, before_rename, stage, |parent, from, to| {
+        parent
+            .rename(from, parent, to)
+            .context("rename paired report staging file")
+    })
+}
+
+fn publish_pair_using(
+    first: (&Path, &[u8]),
+    second: (&Path, &[u8]),
+    before_rename: impl FnOnce() -> Result<()>,
+    mut stage_file: impl FnMut(&Dir, &[u8]) -> Result<(OsString, File)>,
+    mut rename: impl FnMut(&Dir, &OsStr, &OsStr) -> Result<()>,
+) -> Result<()> {
+    ensure!(
+        first.1.len() <= MAX_BYTES && second.1.len() <= MAX_BYTES,
+        "paired report exceeds 16 MiB per output; neither output replaced"
+    );
+    let mut first_output = PairOutput::new(first.0)?;
+    let mut second_output = PairOutput::new(second.0)?;
+    let _leases = pair_leases(&first_output, &second_output)?;
+    let result = (|| -> Result<()> {
+        check_destination(&first_output.parent, &first_output.name)?;
+        check_destination(&second_output.parent, &second_output.name)?;
+        first_output.staged = Some(stage_file(&first_output.parent, first.1)?);
+        second_output.staged = Some(stage_file(&second_output.parent, second.1)?);
+        first_output.verify_staged()?;
+        second_output.verify_staged()?;
+        before_rename()?;
+        first_output.replace(&mut rename)?;
+        second_output.verify_staged()?;
+        second_output.replace(&mut rename)
+    })();
+    if let Err(error) = result {
+        let cleanup = [
+            first_output.cleanup_staged(),
+            second_output.cleanup_staged(),
+        ]
+        .into_iter()
+        .filter_map(|result| result.err().map(|error| format!("{error:#}")))
+        .collect::<Vec<_>>();
+        bail!(
+            "paired publication failed: {error:#}; first {}; second {}; staging cleanup errors={cleanup:?}",
+            first_output.disposition(),
+            second_output.disposition()
+        );
+    }
+    Ok(())
+}
+
 fn publish_locked(
     path: &Path,
     bytes: &[u8],

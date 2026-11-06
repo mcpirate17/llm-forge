@@ -148,14 +148,14 @@ SLOP_TESTS ?=
 slop-gate:  ## Equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail)
 	$(PYTHON) -m conductor.equivalence_gate gate --base "$(SLOP_BASE)" --root "$(CONDUCTOR_HOST_ROOT)" $(SLOP_ENFORCE)
 
-slop-backlog:  ## Probe SLOP_MODULES (default: changed), then fold it and every land's run into the ledger
+slop-backlog:  ## Probe with the Python gate, then fold summaries using native Forge (SLOP_MODULES defaults to changed)
 	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)"
 	$(PYTHON) -m conductor.equivalence_gate gate \
 		--base "$(SLOP_BASE)" --root "$(CONDUCTOR_HOST_ROOT)" \
 		$(if $(SLOP_MODULES),$(foreach m,$(SLOP_MODULES),--module $(m))) \
 		$(if $(SLOP_JOBS),--jobs $(SLOP_JOBS)) \
 		--json "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)/slop_sweep.json"
-	$(PYTHON) -m conductor.equivalence_gate backlog --root "$(CONDUCTOR_HOST_ROOT)" \
+	$(FORGE) equivalence backlog --root "$(CONDUCTOR_HOST_ROOT)" --apply --consume-recorded \
 		"$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)/slop_sweep.json"
 
 slop-imports:  ## Ablate the silenced (noqa F401) imports of SLOP_MODULE against its drivers

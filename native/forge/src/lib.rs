@@ -259,6 +259,10 @@ pub mod tool_schema;
 pub mod write_targets;
 
 #[cfg(target_os = "linux")]
+pub mod equivalence_backlog;
+#[cfg(target_os = "linux")]
+mod equivalence_backlog_inputs;
+#[cfg(target_os = "linux")]
 pub mod mutation_attribution;
 #[cfg(target_os = "linux")]
 pub mod mutation_bytecode;

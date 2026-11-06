@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "kind": "native_equivalence_backlog",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/218",
+  "status": "focused_validation_passed_release_measurement_and_full_gate_pending",
+  "base_commit": "ac7e415108312df989ac12d5bad4797b91d7308e",
+  "scope": "Native configuration/discovery/folding/publication/explicit consumption. The existing Python gate remains the first Make step. No probe engine or model launched.",
+  "verification": {
+    "shared_fold_tests_passed": 9,
+    "backlog_tests_passed": 13,
+    "publisher_tests_passed": 13,
+    "host_config_tests_passed": 1,
+    "actual_cli_and_make_tests_passed": 2,
+    "strict_forge_clippy": "PASS",
+    "independent_review": "Pure fold and paired publisher independently reviewed. Future output/discovery namespace alias fixed with regression; aggregate bound enforced before reading.",
+    "parity_scenarios_passed": 11,
+    "parity": {
+      "root": "/home/tim/Projects/llm-forge/.git/backlog-parity-cnwi2b4r",
+      "summary": "/home/tim/Projects/llm-forge/.git/backlog-parity-cnwi2b4r/summary.json",
+      "sha256": "35ee59e07df1faefa78394b9726f1561ca1b1736accea609b3e26b59d86980db"
+    },
+    "full_local_check": "PENDING",
+    "local_verify": "PENDING"
+  },
+  "original_comparator": {
+    "root": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601",
+    "source_commit": "ac7e415108312df989ac12d5bad4797b91d7308e",
+    "source_tree": "525a7191daa26370996f205afb52449402790c46",
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "python": "Python 3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "python_executable": "/home/tim/Projects/LLM/.venv/bin/python",
+    "started_at": 1793987906.6779728,
+    "builds": {
+      "slop-core": {
+        "command": [
+          "cargo",
+          "+1.98.0",
+          "build",
+          "--release",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "2",
+          "--manifest-path",
+          "native/slop-core/Cargo.toml",
+          "--lib",
+          "--features",
+          "extension-module",
+          "--target-dir",
+          "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/slop-core-target"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 39.68006538899499,
+        "log": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/slop-core.log",
+        "binary": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/slop_core.so",
+        "sha256": "366d2d3c9aa997190c8405edd7620572b83466febdd064d9bf17e9e2e4cdce76"
+      },
+      "conductor-native": {
+        "command": [
+          "cargo",
+          "+1.98.0",
+          "build",
+          "--release",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "2",
+          "--manifest-path",
+          "native/conductor-native/Cargo.toml",
+          "--lib",
+          "--features",
+          "extension-module,bundled-sqlite",
+          "--target-dir",
+          "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/conductor-native-target"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 153.4319116199913,
+        "log": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/conductor-native.log",
+        "binary": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor_native.so",
+        "sha256": "950127c2e8e3981b8f77f3f2167799c906879f910eae36bf43e1d31bdae5d557"
+      }
+    },
+    "import_probe": {
+      "conductor_native": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor_native.so",
+      "slop_core": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/slop_core.so",
+      "wrapper": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor/equivalence_gate.py",
+      "torch_imported": false,
+      "backlog_callable": true,
+      "config_callable": true
+    },
+    "finished_at": 1793988060.1660187,
+    "wrapper_sha256": {
+      "equivalence_gate.py": "f8bc186fcdf2cb68519c408b06fdab6b0dced06a80bd1176f7d9799e77670585",
+      "_native.py": "cb53ff8d66fb94053f0527525818643da06477f71c8917976e0dd268aa185e76"
+    }
+  },
+  "measurements": {
+    "status": "PENDING",
+    "scope": "No speed, model-token, cost or agent-task benefit claim from functional comparisons."
+  },
+  "retained_attempts": [
+    {
+      "log": ".git/forge-backlog-focused1.log",
+      "passed": 4,
+      "failed": 9,
+      "cause": "Authored test summaries omitted required schema fields. Fixtures repaired using complete Summary serialization; production parser unchanged."
+    }
+  ],
+  "limitations": [
+    "Two output replacements are not transactional; partial states are explicit and artifacts retained on publication failure.",
+    "Same-UID hostile writes are outside cooperative-parent guarantee.",
+    "Intentional differences: preview default, explicit apply/consume, owned normalized paths/output parents, external-output explicit flags, bounded strict JSON, one coherent clock instant.",
+    "Dirty debug binary used only for initial functional parity; clean release and performance evidence pending.",
+    "Owned authored fixture/Make stub evidence is not real guest or agent-task evidence."
+  ]
+}

@@ -149,10 +149,20 @@ authored byte-volume fixtures; median latency was 1.86/2.04 ms, including shell
 startup with warmed caches. Independent audit verified both receipts and unchanged
 inputs. The initial measurement setup failure, ambient-toolchain rerun and unit-test
 oracle repair remain recorded in the [refresh evidence index](../research/performance/forge-program-20261106-mull-refresh.json).
-All 18 full local checks and fresh-base verification passed at `7d80f88`: 5,014
-passing test executions, zero failures and 203 ignored across 182 harnesses.
-Later publication heads require their own matching receipts; integration is
-tracked by issue #216 and its linked PR.
+All 18 full local checks and fresh-base verification passed again at `53ad8f5`:
+5,014 passing test executions, zero failures and 203 ignored across 182 harnesses.
+[PR #217](https://github.com/mcpirate17/llm-forge/pull/217) merged as `ac7e415`
+with exactly the verified tree and closed issue #216.
+
+[Issue #218](https://github.com/mcpirate17/llm-forge/issues/218) is the active
+native backlog migration. The new CLI reuses Slop Core's fold, captures bounded
+inputs, stages both outputs and consumes only explicitly authorized discovered
+artifacts after publication. Focused native tests and eleven comparisons against
+a private current-source Python/PyO3 comparator pass; release measurement and
+full publication gates remain pending. Independent review found and fixed a
+future discovery-namespace alias. `make slop-backlog` keeps its Python gate first
+and migrates only the second fold invocation. See [usage](equivalence-backlog.md)
+and the [evidence index](../research/performance/forge-program-20261106-backlog.json).
 
 ### Architecture, evidence and disposition
 

@@ -247,6 +247,24 @@ fn capture(
 }
 
 impl BoundFile {
+    /// Consume this exact captured leaf through its held parent after revalidation.
+    /// Cooperative parent ownership is required, as for report publication.
+    pub(crate) fn consume(&self) -> Result<()> {
+        self.verify()?;
+        self.parent
+            .dir
+            .remove_file(&self.name)
+            .context("remove captured input")
+    }
+
+    pub(crate) fn sync_parent(&self) -> Result<()> {
+        self.parent
+            .dir
+            .open(".")?
+            .sync_all()
+            .context("sync captured input directory")
+    }
+
     pub(crate) fn verify_external_pin(&self, path: &Path, sha256: &str) -> Result<()> {
         canonical(path)?;
         ensure!(

@@ -199,6 +199,9 @@ enum Command {
         #[arg(long, alias = "project-dir")]
         host: Option<std::path::PathBuf>,
     },
+    /// Fold equivalence evidence without launching an interpreter or probe.
+    #[cfg(target_os = "linux")]
+    Equivalence(forge::equivalence_backlog::EquivalenceArgs),
     /// Mutation-campaign commands that run natively, no Python interpreter.
     Mutation {
         #[command(subcommand)]
@@ -505,6 +508,10 @@ fn main() -> ExitCode {
                 ExitCode::from(1)
             }
         },
+        #[cfg(target_os = "linux")]
+        Command::Equivalence(args) => {
+            command_exit("equivalence", forge::equivalence_backlog::run(args), 4)
+        }
         Command::Mutation { action } => run_mutation(action),
         Command::Receipt { action } => match action {
             ReceiptCommand::Verify(args) => ExitCode::from(mutation_receipt_verify::run(args)),
