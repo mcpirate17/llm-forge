@@ -144,14 +144,8 @@ fn validate_entries(entries: &[InventoryEntry]) -> Result<()> {
             !name.ends_with(".pth")
                 && !name.ends_with(".pyc")
                 && !name.ends_with(".pyo")
-                && !matches!(
-                    name,
-                    "sitecustomize.py"
-                        | "usercustomize.py"
-                        | "pyvenv.cfg"
-                        | "__pycache__"
-                        | "seed-manifest.json"
-                ),
+                && !startup_name(name)
+                && !matches!(name, "pyvenv.cfg" | "__pycache__" | "seed-manifest.json"),
             "Fest guest contains a startup hook or bytecode cache: {}",
             entry.path
         );
@@ -165,6 +159,60 @@ fn validate_entries(entries: &[InventoryEntry]) -> Result<()> {
         ensure!(
             total <= 256 * 1024 * 1024,
             "Fest guest exceeds total byte bound"
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn startup_name(name: &str) -> bool {
+    ["sitecustomize", "usercustomize"].iter().any(|base| {
+        name == *base
+            || name
+                .strip_prefix(*base)
+                .is_some_and(|suffix| suffix.starts_with('.'))
+    })
+}
+
+fn validate_layout(entries: &[InventoryEntry]) -> Result<()> {
+    const LIB: &str = "lib/python3.12";
+    let versions = entries
+        .iter()
+        .filter(|entry| {
+            entry.directory
+                && entry.path.starts_with("lib/python3.")
+                && !entry.path[4..].contains('/')
+        })
+        .count();
+    ensure!(
+        versions == 1,
+        "Fest guest requires exactly one supported Python library layout"
+    );
+    for path in [
+        LIB,
+        "lib/python3.12/lib-dynload",
+        "lib/python3.12/dist-packages",
+    ] {
+        ensure!(
+            entries
+                .iter()
+                .any(|entry| entry.path == path && entry.directory),
+            "Fest guest required library directory missing: {path}"
+        );
+    }
+    for path in [
+        "pytest/__init__.py",
+        "pytest/__main__.py",
+        "_pytest/__init__.py",
+        "pytest_cov/__init__.py",
+        "pytest_cov/plugin.py",
+        "coverage/__init__.py",
+    ] {
+        let required = format!("{LIB}/dist-packages/{path}");
+        ensure!(
+            entries
+                .iter()
+                .any(|entry| entry.path == required && !entry.directory),
+            "Fest guest required package module missing: {required}"
         );
     }
     Ok(())
@@ -251,6 +299,7 @@ impl HeldGuest {
             "unsupported Fest guest manifest"
         );
         validate_entries(&document.entries)?;
+        validate_layout(&document.entries)?;
         let directory = inventory_root(&config.root)?;
         let result = Self {
             root: config.root.clone(),

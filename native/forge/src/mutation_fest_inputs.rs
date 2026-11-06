@@ -122,15 +122,24 @@ fn absent(path: &Path) -> Result<()> {
 }
 
 fn pytest_controls(root: &Path, tests: &[String]) -> Result<()> {
-    for name in [
-        "fest.toml",
-        ".venv",
-        "sitecustomize.py",
-        "usercustomize.py",
-        "src/sitecustomize.py",
-        "src/usercustomize.py",
-    ] {
+    for name in ["fest.toml", ".venv"] {
         absent(&root.join(name))?;
+    }
+    for directory in [root.to_owned(), root.join("src")] {
+        let entries = match fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        };
+        for entry in entries {
+            let name = entry?.file_name();
+            let name = name.to_str().context("non-UTF8 Fest import root entry")?;
+            ensure!(
+                !crate::mutation_fest_guest::startup_name(name),
+                "unsupported Fest startup hook: {}",
+                directory.join(name).display()
+            );
+        }
     }
     let mut directories = BTreeSet::new();
     directories.insert(root.to_owned());
@@ -374,5 +383,22 @@ mod tests {
         let mut bad = good;
         bad.environment.insert("PYTHONPATH".into(), "/tmp".into());
         assert!(validate_campaign(&bad).is_err());
+    }
+
+    #[test]
+    fn import_roots_reject_all_startup_module_forms() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir(root.path().join("src")).unwrap();
+        for name in [
+            "sitecustomize",
+            "sitecustomize.py",
+            "usercustomize.cpython-312-x86_64-linux-gnu.so",
+        ] {
+            let path = root.path().join("src").join(name);
+            fs::write(&path, b"fixture").unwrap();
+            assert!(pytest_controls(root.path(), &[]).is_err());
+            fs::remove_file(path).unwrap();
+        }
+        assert!(pytest_controls(root.path(), &[]).is_ok());
     }
 }

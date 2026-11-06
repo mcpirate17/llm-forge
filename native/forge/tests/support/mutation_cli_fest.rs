@@ -14,8 +14,18 @@ use std::{
 
 const SOURCE: &str = "def answer(value=7):\n    assert value > 0\n    return value\n";
 const COLLECTION_SOURCE: &str = "def answer(value=7):\n    return value + 1\n";
+const SHADOW_FILES: [&str; 8] = [
+    "pytest.py",
+    "coverage.py",
+    "json.py",
+    "pytest_cov/__init__.py",
+    "src/pytest.py",
+    "src/coverage.py",
+    "src/json.py",
+    "src/pytest_cov/__init__.py",
+];
 const TEST_HEAD: &str = r#"import errno, hashlib, importlib, json, os, sys, time
-import pytest
+import pytest, pytest_cov, coverage
 
 def test_answer():
     import subject
@@ -37,7 +47,9 @@ def test_answer():
     row = {'pid':os.getpid(),'source':data.decode('utf-8'),'sha256':hashlib.sha256(data).hexdigest(),
            'size':st.st_size,'mtime_sec':int(st.st_mtime),'normal':normal,'rewritten':rewritten_value,
            'normal_loader':normal_loader,'rewritten_loader':type(rewritten.__loader__).__name__,
-           'dont_write':sys.dont_write_bytecode,'prefix':sys.pycache_prefix,'write_denied':denied}
+           'dont_write':sys.dont_write_bytecode,'prefix':sys.pycache_prefix,'write_denied':denied,
+           'guest_prefix':sys.prefix, 'origins':{name:os.path.realpath(module.__file__) for name, module in
+               [('pytest',pytest),('pytest_cov',pytest_cov),('coverage',coverage),('json',json)]}}
     directory = os.environ['TMPDIR']
     final = os.path.join(directory, 'forge-observation-' + str(os.getpid()) + '.json')
     temporary = final + '.tmp'
@@ -190,6 +202,13 @@ fn fixture(cfg: &Config, config_bytes: &[u8], strong: bool, collection: bool) ->
         SOURCE
     };
     put(&repo, "subject.py", source);
+    for name in SHADOW_FILES {
+        put(
+            &repo,
+            name,
+            "raise RuntimeError('repository import-shadow decoy executed')\n",
+        );
+    }
     let assertion = if strong {
         "    assert normal == 7 and rewritten_value == 7\n    assert rewritten.answer(1) == 1\n    with pytest.raises(AssertionError): rewritten.answer(0)\n    with pytest.raises(AssertionError): rewritten.answer(-1)\n"
     } else {
@@ -239,14 +258,18 @@ def test_answer():
         pin,
         uncertain: std::rc::Rc::new(std::cell::Cell::new(true)),
     };
+    initialize_fixture(&host, cfg, source);
+    host
+}
+fn initialize_fixture(host: &CargoFixture, cfg: &Config, source: &str) {
     let template = format!(
         "--template={}",
         host.root.as_ref().unwrap().path().join("hooks").display()
     );
-    git(&host, cfg, &["init", "-q", "-b", "main", &template], "init");
+    git(host, cfg, &["init", "-q", "-b", "main", &template], "init");
     fs::set_permissions(host.repo.join(".git"), fs::Permissions::from_mode(0o700)).unwrap();
     git(
-        &host,
+        host,
         cfg,
         &[
             "add",
@@ -254,26 +277,34 @@ def test_answer():
             ".gitignore",
             "subject.py",
             "test_subject.py",
+            "pytest.py",
+            "coverage.py",
+            "json.py",
+            "pytest_cov/__init__.py",
+            "src/pytest.py",
+            "src/coverage.py",
+            "src/json.py",
+            "src/pytest_cov/__init__.py",
         ],
         "add",
     );
     git(
-        &host,
+        host,
         cfg,
         &["add", "-f", "campaigns/registry.json"],
         "registry",
     );
-    git(&host, cfg, &["commit", "-qm", "base"], "base");
-    git(&host, cfg, &["checkout", "-qb", "fest-control"], "branch");
+    git(host, cfg, &["commit", "-qm", "base"], "base");
+    git(host, cfg, &["checkout", "-qb", "fest-control"], "branch");
     put(
         &host.repo,
         "subject.py",
         &format!("{source}# scoped change\n"),
     );
-    git(&host, cfg, &["add", "subject.py"], "changed-add");
-    git(&host, cfg, &["commit", "-qm", "selected source"], "changed");
-    host
+    git(host, cfg, &["add", "subject.py"], "changed-add");
+    git(host, cfg, &["commit", "-qm", "selected source"], "changed");
 }
+
 fn forge(
     host: &CargoFixture,
     cfg: &Config,
@@ -547,7 +578,13 @@ fn altered(original: &str, mutant: &Value) -> Option<String> {
         original.get(end..)?
     ))
 }
-fn verify_observations(host: &CargoFixture, receipt: &Value, rows: &[Value], strong: bool) {
+fn verify_observations(
+    host: &CargoFixture,
+    cfg: &Config,
+    receipt: &Value,
+    rows: &[Value],
+    strong: bool,
+) {
     let original = fs::read_to_string(host.repo.join("subject.py")).unwrap();
     let baseline: Vec<_> = rows
         .iter()
@@ -570,6 +607,16 @@ fn verify_observations(host: &CargoFixture, receipt: &Value, rows: &[Value], str
         assert_eq!(row["normal_loader"], "SourceFileLoader");
         assert_eq!(row["rewritten_loader"], "AssertionRewritingHook");
         assert_eq!(row["prefix"], receipt["fest_cache"]["path"]);
+        let guest = Path::new(cfg.python_guest["root"].as_str().unwrap());
+        assert_eq!(row["guest_prefix"].as_str(), guest.to_str());
+        for name in ["pytest", "pytest_cov", "coverage", "json"] {
+            let origin = Path::new(row["origins"][name].as_str().expect("module origin"));
+            assert!(
+                origin.starts_with(guest) && origin != guest,
+                "{name} not loaded from pinned guest: {}",
+                origin.display()
+            );
+        }
     }
     let mutants = receipt["mutants"].as_array().unwrap();
     for outcome in if strong {
@@ -808,6 +855,7 @@ fn exercise(cfg: &Config, config_bytes: &[u8], strong: bool, collection: bool) {
         verify_outcome(&receipt, &shown, status, &forge_hash, strong);
         verify_observations(
             &host,
+            cfg,
             &receipt,
             &observed(host.root.as_ref().unwrap().path()),
             strong,

@@ -21,6 +21,7 @@ use std::{
 fn error(value: impl std::fmt::Display) -> String {
     value.to_string()
 }
+
 fn table<'a>(
     value: &'a toml::Value,
     label: &str,
@@ -419,7 +420,10 @@ fn fest_environment(
         ("VIRTUAL_ENV".into(), guest.to_string_lossy().into_owned()),
         (
             "PYTHONPATH".into(),
-            format!("{}:{}", worktree.display(), worktree.join("src").display()),
+            format!("{}:{}:{}:{}:{}", guest.join("lib/python3.12").display(),
+                guest.join("lib/python3.12/lib-dynload").display(),
+                guest.join("lib/python3.12/dist-packages").display(),
+                worktree.display(), worktree.join("src").display()),
         ),
         (
             "PYTHONPYCACHEPREFIX".into(),
@@ -427,10 +431,11 @@ fn fest_environment(
         ),
         ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
         ("PYTHONNOUSERSITE".into(), "1".into()),
+        ("PYTHONSAFEPATH".into(), "1".into()),
         ("PYTEST_DISABLE_PLUGIN_AUTOLOAD".into(), "1".into()),
         (
             "PYTEST_ADDOPTS".into(),
-            format!("-c {}/pytest.ini --rootdir={} --confcutdir={} --noconftest -p pytest_cov.plugin -p no:cacheprovider",
+            format!("-c {}/pytest.ini --rootdir={} --confcutdir={} --noconftest --import-mode=importlib -p pytest_cov.plugin -p no:cacheprovider",
                 output.display(), worktree.display(), worktree.display()),
         ),
         (
@@ -911,5 +916,31 @@ impl<'a> Runtime<'a> {
             return Err(error(failure).into());
         }
         result.map(|(report, stdout, _)| (report, stdout))
+    }
+}
+
+#[cfg(test)]
+mod fest_environment_tests {
+    use super::*;
+
+    #[test]
+    fn trusted_guest_imports_precede_snapshot_and_pytest_uses_importlib() {
+        let env = fest_environment(
+            Path::new("/scratch"),
+            Path::new("/scratch/worktree"),
+            Path::new("/guest"),
+            Path::new("/cache"),
+        )
+        .unwrap();
+        assert_eq!(env["PYTHONPATH"], "/guest/lib/python3.12:/guest/lib/python3.12/lib-dynload:/guest/lib/python3.12/dist-packages:/scratch/worktree:/scratch/worktree/src");
+        assert_eq!(env["PYTHONSAFEPATH"], "1");
+        assert!(env["PYTEST_ADDOPTS"].contains("--import-mode=importlib"));
+        assert!(fest_environment(
+            Path::new("/scratch"),
+            Path::new("/scratch/colon:bad"),
+            Path::new("/guest"),
+            Path::new("/cache")
+        )
+        .is_err());
     }
 }

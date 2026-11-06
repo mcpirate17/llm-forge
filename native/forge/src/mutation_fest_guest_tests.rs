@@ -39,6 +39,14 @@ impl Fixture {
             "cgroup",
             "guest",
             "guest/bin",
+            "guest/lib",
+            "guest/lib/python3.12",
+            "guest/lib/python3.12/lib-dynload",
+            "guest/lib/python3.12/dist-packages",
+            "guest/lib/python3.12/dist-packages/pytest",
+            "guest/lib/python3.12/dist-packages/_pytest",
+            "guest/lib/python3.12/dist-packages/pytest_cov",
+            "guest/lib/python3.12/dist-packages/coverage",
         ] {
             directory(&root.path().join(path));
         }
@@ -57,11 +65,35 @@ impl Fixture {
             b"external loader fixture",
             0o600,
         );
-        let entries = vec![
+        let mut entries = vec![
             entry("bin", None, false),
             entry("bin/fest", Some(b"fest fixture; never run"), true),
             entry("bin/python", Some(b"python fixture; never run"), true),
         ];
+        for path in [
+            "lib",
+            "lib/python3.12",
+            "lib/python3.12/lib-dynload",
+            "lib/python3.12/dist-packages",
+            "lib/python3.12/dist-packages/pytest",
+            "lib/python3.12/dist-packages/_pytest",
+            "lib/python3.12/dist-packages/pytest_cov",
+            "lib/python3.12/dist-packages/coverage",
+        ] {
+            entries.push(entry(path, None, false));
+        }
+        for path in [
+            "lib/python3.12/dist-packages/pytest/__init__.py",
+            "lib/python3.12/dist-packages/pytest/__main__.py",
+            "lib/python3.12/dist-packages/_pytest/__init__.py",
+            "lib/python3.12/dist-packages/pytest_cov/__init__.py",
+            "lib/python3.12/dist-packages/pytest_cov/plugin.py",
+            "lib/python3.12/dist-packages/coverage/__init__.py",
+        ] {
+            write(&root.path().join("guest").join(path), b"fixture", 0o600);
+            entries.push(entry(path, Some(b"fixture"), false));
+        }
+        entries.sort_by(|a, b| a.path.cmp(&b.path));
         let guest = root.path().join("guest");
         let loader = root.path().join("loader");
         let document = json!({"version":1,"source_root":root.path().join("repo"),
@@ -230,4 +262,22 @@ fn guest_manifest_refuses_unsorted_duplicate_and_oversize_declarations() {
         .unwrap_err()
         .to_string()
         .contains("entry count"));
+}
+
+#[test]
+fn guest_requires_single_complete_supported_python_layout() {
+    let f = Fixture::new();
+    assert!(validate_layout(&f.entries).is_ok());
+    for path in [
+        "pytest_cov/plugin.py",
+        "pytest/__init__.py",
+        "pytest_cov/__init__.py",
+    ] {
+        let mut missing = f.entries.clone();
+        missing.retain(|e| e.path != format!("lib/python3.12/dist-packages/{path}"));
+        assert!(validate_layout(&missing).is_err());
+    }
+    let mut ambiguous = f.entries.clone();
+    ambiguous.push(entry("lib/python3.13", None, false));
+    assert!(validate_layout(&ambiguous).is_err());
 }
