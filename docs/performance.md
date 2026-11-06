@@ -10,6 +10,50 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Selected workspace test controls — 2026-11-06
+
+The clean release at `4cba4eb` exercised four automatic cargo-mutants controls
+using the same authored workspace and two boolean mutation subjects. The
+[evidence index](../research/performance/forge-program-20261106-selected-workspace.json)
+includes fixture source, binary/source identities, observed outcomes and retained
+command-stream hashes. Each successful control completed 31 checks; no checks
+failed, timed out or remained unstarted. An earlier launch refused a mistyped
+toolchain hash before any commands ran (one check completed, one failed, 29
+unstarted); that attempt is retained too.
+
+| Selected target and filter | Baseline passed / filtered | Automatic mutants | Native baseline / engine wall time |
+| --- | ---: | --- | ---: |
+| Integration `contract`, `chosen::strong` | 1 / 1 | 2 killed, PASS | 125 / 369 ms |
+| Integration `contract`, `chosen::weak` | 1 / 1 | 2 survived, RATCHET_HELD | 117 / 321 ms |
+| Integration `contract`, no filter | 2 / 0 | 2 killed, PASS | 144 / 325 ms |
+| Library, `chosen::weak` | 1 / 0 | 2 survived, RATCHET_HELD | 94 / 318 ms |
+
+An unselected target contains `compile_error!`, so successful engine execution
+exercises target selection during compilation as well as testing. Another
+unselected integration target has the same weak-test name but assertions that
+kill the mutants. The surviving controls therefore check that unselected tests
+cannot make a weak selected scope appear to pass. Direct and engine baseline
+counts and test-name/status digests matched. Survivor baselines were recorded
+only by the native runner; `RATCHET_HELD` is not mutation PASS.
+
+All four original and exactly restored fixtures were accepted by live and
+committed corpus checks; supporting-source and test-data drift were refused.
+Corpus acceptance means reproducibility of the scoped receipt, including
+RATCHET_HELD, not candidate approval. Independent audit checked all 584 retained
+stdout/stderr streams, current input/evidence hashes and positive absence of the
+12 owned cgroups and four snapshots.
+
+The timings are single command observations that exclude admission, snapshot,
+hashing and driver overhead. Coverage differs deliberately between cases, so
+they establish no matched speedup, latency distribution or agent benefit. CPU,
+RSS, allocation and model-token measurements are unavailable for these controls.
+The original internal engine logs and direct-baseline output were removed with
+the snapshots; their recorded parser observations cannot be independently
+re-read. Other raw evidence and the private driver remain host-local: this index
+is neither a portable replay bundle nor execution attestation. The selected
+profile's zero-test/ignored-only refusals are covered by unit tests; no new
+selected-profile timeout workload was run.
+
 ### Cargo workspace mutation evidence — 2026-11-06
 
 The first bounded Cargo seed preparation attempt refused the local cache's

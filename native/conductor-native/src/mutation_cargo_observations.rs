@@ -325,6 +325,15 @@ fn summary(line: &str, passed: usize, failed: usize) -> Result<(), String> {
     summary_counts(line, passed, failed, 0)
 }
 fn summary_counts(line: &str, passed: usize, failed: usize, ignored: usize) -> Result<(), String> {
+    summary_counts_filtered(line, passed, failed, ignored, 0)
+}
+fn summary_counts_filtered(
+    line: &str,
+    passed: usize,
+    failed: usize,
+    ignored: usize,
+    filtered: usize,
+) -> Result<(), String> {
     let prefix = if failed == 0 {
         "test result: ok. "
     } else {
@@ -340,7 +349,7 @@ fn summary_counts(line: &str, passed: usize, failed: usize, ignored: usize) -> R
         format!("{failed} failed"),
         format!("{ignored} ignored"),
         "0 measured".into(),
-        "0 filtered out".into(),
+        format!("{filtered} filtered out"),
     ]) {
         require(
             *piece == expected,
@@ -456,7 +465,10 @@ fn libtest(body: &str, names: &BTreeMap<String, String>, killed: bool) -> Result
 
 #[path = "mutation_cargo_package_observations.rs"]
 mod package_observations;
-pub use package_observations::{parse_package_baseline, parse_package_engine_baseline};
+pub use package_observations::{
+    parse_package_baseline, parse_package_engine_baseline, parse_selected_baseline,
+    parse_selected_engine_baseline,
+};
 
 /// Strict direct-baseline stdout only. Caller checks command, ordinary exit,
 /// independently executed repetitions and source binding before invoking collect.

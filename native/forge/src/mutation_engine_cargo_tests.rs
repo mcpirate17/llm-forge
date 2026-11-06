@@ -424,3 +424,24 @@ fn report_capture_rejects_symlink_and_overlimit_and_detects_drift() {
     std::fs::write(&report, b"{\"changed\":true}").unwrap();
     assert!(held.verify().is_err());
 }
+
+#[test]
+fn selected_workspace_invocation_retains_one_in_place_engine_owner() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut subject = bounded(
+        dir.path(),
+        json!({"language":"rust","mutation_engine":"cargo-mutants",
+        "generator":cargo_generator(json!({"execution_profile":"cargo-workspace-v3",
+            "workspace_selector":{"schema_version":1,"target":{"kind":"lib"}}}))}),
+    );
+    subject.jobs = 1;
+    let argv = engine_argv(&subject, "/bin/cargo-mutants", Path::new("/out")).unwrap();
+    assert!(argv.contains(&"--in-place".into()));
+    assert!(!argv.contains(&"--jobs".into()));
+    subject.jobs = 2;
+    assert!(
+        engine_argv(&subject, "/bin/cargo-mutants", Path::new("/out"))
+            .unwrap_err()
+            .contains("exactly one worker")
+    );
+}

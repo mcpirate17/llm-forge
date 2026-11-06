@@ -72,6 +72,8 @@ pub(crate) struct CampaignContract {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) execution_profile: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) workspace_selector: Option<crate::mutation_workspace_selector::Selector>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) generated_value: Option<Value>,
     pub(crate) value_analysis_payload: Option<Value>,
     pub(crate) value_analysis: Option<ValueContract>,
@@ -916,6 +918,14 @@ pub(crate) fn generated_campaign_contract_with(
     let generator = object(payload.get("generator"), "generator")?;
     let language = required_string(payload, "language", "language")?;
     let profile = profile::execution_profile(generator, &language, mutation_engine)?;
+    let workspace_selector = match generator.get("options") {
+        Some(value) => crate::mutation_workspace_selector::parse(
+            value
+                .as_object()
+                .ok_or("generator.options must be an object")?,
+        )?,
+        None => None,
+    };
     let source_sha256 = digest_map(payload, "source_sha256")?;
     let test_sha256 = digest_map(payload, "test_sha256")?;
 
@@ -955,15 +965,7 @@ pub(crate) fn generated_campaign_contract_with(
         .cloned()
         .unwrap_or_default();
 
-    // The scope is complete by construction: a generated campaign runs the whole test command,
-    // never a hand-picked subset of node ids, so there is no partial mode for it to be in.
-    let mut test_scopes = Map::new();
-    for path in test_sha256.keys() {
-        test_scopes.insert(
-            path.clone(),
-            json!({"mode": "complete", "selection": "test_argv"}),
-        );
-    }
+    let test_scopes = profile::generated_test_scopes(&test_sha256, workspace_selector.is_some());
 
     let source_drifted = source_sha256
         .iter()
@@ -992,6 +994,7 @@ pub(crate) fn generated_campaign_contract_with(
         environment,
         host_read_dependencies: Vec::new(),
         execution_profile: profile,
+        workspace_selector,
         generated_value: None,
         value_analysis_payload: None,
         value_analysis: None,

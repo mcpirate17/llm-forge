@@ -1,6 +1,7 @@
 //! Pure full receipt selection over held caller facts; anchor proof is native Rust I/O injection.
 use super::*;
 use crate::mutation_receipt::{self as rules, Rejection};
+use crate::mutation_workspace_selector::is_workspace;
 use sha2::{Digest, Sha256};
 #[derive(Clone)]
 pub struct CapturedReceipt {
@@ -257,10 +258,11 @@ fn validate(
         .ok_or("expanded captured receipt is not an object")?;
     if campaign.generated {
         let is_native = crate::mutation_native_runner::declared(payload);
+        let workspace = is_workspace(campaign.execution_profile.as_deref());
         if runtime.is_none() && !is_native {
             return Ok(vec![missing_runner()]);
         }
-        if is_native && campaign.execution_profile.as_deref() == Some("cargo-workspace-v2") {
+        if is_native && workspace {
             let authorized = native.workspace.is_some_and(|bindings| {
                 bindings.receipt_root.is_some_and(|root| {
                     crate::mutation_snapshot_inputs::within_namespace(&receipt.relative, root)
@@ -299,7 +301,7 @@ fn validate(
                     .is_some_and(|lineage| rules::lineage_payload_accepts(recorded, lineage))
             },
             native.installed,
-            if campaign.execution_profile.as_deref() == Some("cargo-workspace-v2") {
+            if workspace {
                 match native
                     .workspace
                     .and_then(|items| items.identities.get(&campaign.campaign_id))

@@ -268,6 +268,119 @@ mod native_receipts {
         assert!(check(&forged_scope, Some(&root)).is_some());
     }
 
+    #[test]
+    fn v3_corpus_refuses_missing_selection_even_with_valid_supporting_inputs() {
+        use crate::mutation_cargo_supporting_binding::SupportingInputs;
+        let symbols = BTreeSet::new();
+        let contract = json!({"campaign_id":"c","manifest":"campaigns/a.json","manifest_sha256":"f".repeat(64),
+            "source_sha256":{"src/a.rs":"e".repeat(64)},"test_sha256":{"tests/a.rs":"b".repeat(64)},
+            "execution_profile":"cargo-workspace-v3","workspace_selector":{"schema_version":1,"target":{"kind":"lib"},"filter":null},
+            "test_argv":["cargo","test","--manifest-path","Cargo.toml","--package","demo","--lib"]});
+        let campaign = Campaign {
+            campaign_id: "c",
+            generated: true,
+            ordinary_cargo: true,
+            ordinary_contract: Some(&contract),
+            declares_value_analysis: false,
+            source_symbols: &symbols,
+        };
+        let expected = SupportingInputs {
+            schema_version: 2,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "complete-snapshot-inputs-v2".into(),
+            digest: "a".repeat(64),
+            files: 4,
+        };
+        let mut receipt = native_receipt();
+        for field in ["campaign_id", "manifest", "manifest_sha256", "test_sha256"] {
+            receipt[field] = contract[field].clone();
+        }
+        receipt["supporting_inputs"] = serde_json::to_value(&expected).unwrap();
+        let error = rejection_with_supporting(
+            &campaign,
+            &receipt,
+            &json!({}),
+            |_| Ok(Some("e".repeat(64))),
+            |_| Ok(false),
+            None,
+            Some(&expected),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(error.contains("selection"), "{error}");
+    }
+
+    #[test]
+    fn v3_corpus_accepts_bound_selection_and_refuses_tampering_for_pass_or_ratchet() {
+        use crate::mutation_cargo_supporting_binding::SupportingInputs;
+        let symbols = BTreeSet::new();
+        let (selector, argv, fields) = crate::mutation_workspace_receipt::tests::fixture();
+        let contract = json!({"campaign_id":"c","manifest":"campaigns/a.json","manifest_sha256":"f".repeat(64),
+            "source_sha256":{"src/a.rs":"e".repeat(64)},"test_sha256":{"tests/a.rs":"b".repeat(64)},
+            "execution_profile":"cargo-workspace-v3","workspace_selector":selector,"test_argv":argv});
+        let campaign = Campaign {
+            campaign_id: "c",
+            generated: true,
+            ordinary_cargo: true,
+            ordinary_contract: Some(&contract),
+            declares_value_analysis: false,
+            source_symbols: &symbols,
+        };
+        let expected = SupportingInputs {
+            schema_version: 2,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "complete-snapshot-inputs-v2".into(),
+            digest: "a".repeat(64),
+            files: 4,
+        };
+        let mut receipt = native_receipt();
+        for field in ["campaign_id", "manifest", "manifest_sha256", "test_sha256"] {
+            receipt[field] = contract[field].clone();
+        }
+        for (key, value) in fields {
+            receipt[key] = value;
+        }
+        receipt["supporting_inputs"] = serde_json::to_value(&expected).unwrap();
+        receipt["process_cleanup"]["commands_observed"] = json!(3);
+        for row in receipt["process_commands"].as_array_mut().unwrap() {
+            row["state"] = json!("observed");
+            row["confinement"] = json!({"cleanup_complete":true,"outcome":"exited","exit_code":0,"signal":null,"resources":{"verified":true},"errors":[]});
+        }
+        let check = |row: &Value| {
+            rejection_with_supporting(
+                &campaign,
+                row,
+                &json!({}),
+                |_| Ok(Some("e".repeat(64))),
+                |_| Ok(false),
+                None,
+                Some(&expected),
+            )
+            .unwrap()
+        };
+        for status in ["PASS", "RATCHET_HELD"] {
+            receipt["status"] = json!(status);
+            assert!(check(&receipt).is_none());
+            let mut forged = receipt.clone();
+            forged["workspace_baseline"]["engine"]["inventory_sha256"] = json!("c".repeat(64));
+            assert!(check(&forged).is_some());
+        }
+        receipt["runner_kind"] = json!("python");
+        receipt["runner_components_sha256"] = json!({"legacy":"a"});
+        let error = rejection_with_supporting(
+            &campaign,
+            &receipt,
+            &json!({"legacy":"a"}),
+            |_| Ok(Some("e".repeat(64))),
+            |_| Ok(false),
+            None,
+            Some(&expected),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(error.contains("requires a native runner"), "{error}");
+    }
+
     fn judged(receipt: &Value, hash: &str, lineage: bool) -> Option<String> {
         let symbols = std::collections::BTreeSet::new();
         let campaign = Campaign {

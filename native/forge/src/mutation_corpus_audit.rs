@@ -290,7 +290,10 @@ fn campaign_receipts(
         && campaign["mutation_engine"] == "cargo-mutants"
         && campaign["generated_value"].is_null();
     let id = string(campaign, "campaign_id")?;
-    let (identity, supporting_error) = if campaign["execution_profile"] == "cargo-workspace-v2" {
+    let workspace = conductor_native::mutation_workspace_selector::is_workspace(
+        campaign["execution_profile"].as_str(),
+    );
+    let (identity, supporting_error) = if workspace {
         match supporting.workspace.get(id) {
             Some(Ok(identity)) => (Some(identity), None),
             Some(Err(error)) => (None, Some(error.as_str())),
@@ -354,13 +357,8 @@ fn campaign_receipts(
             identity,
         )
     };
-    let (accepted, reasons) = accepted_rows(
-        rows,
-        campaign["execution_profile"] == "cargo-workspace-v2",
-        supporting.receipt_root,
-        capture,
-        reject,
-    )?;
+    let (accepted, reasons) =
+        accepted_rows(rows, workspace, supporting.receipt_root, capture, reject)?;
     let evidence = if rows.is_empty() {
         Some(
             json!({"campaign_id":id,"reason":"NO_RECEIPT","receipts":0,"detail":"no receipt declares this campaign_id"}),

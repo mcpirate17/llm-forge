@@ -111,6 +111,8 @@ pub mod mutation_value_admission;
 pub mod mutation_value_inputs;
 #[cfg(feature = "python")]
 mod mutation_value_py;
+pub mod mutation_workspace_receipt;
+pub mod mutation_workspace_selector;
 #[cfg(target_os = "linux")]
 pub mod native_id;
 #[cfg(feature = "python")]

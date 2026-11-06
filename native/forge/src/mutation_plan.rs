@@ -8,6 +8,7 @@
 use anyhow::{Context, Result};
 use clap::Args;
 use conductor_native::mutation_plan::{compute_plan, PlanRequest, PriorityOptions};
+use conductor_native::mutation_workspace_selector::{Selector, Target};
 use conductor_native::project_paths;
 use serde_json::{json, Map, Value};
 use std::env;
@@ -102,6 +103,14 @@ pub struct ScopeArgs {
     #[arg(long)]
     pub cargo_workspace: bool,
 
+    /// Select one standard library or integration-test target in the workspace profile.
+    #[arg(long, requires = "cargo_workspace")]
+    pub cargo_test_target: Option<String>,
+
+    /// Literal bounded libtest name substring; requires an explicitly selected target.
+    #[arg(long, requires = "cargo_test_target")]
+    pub cargo_test_filter: Option<String>,
+
     /// Explicit source/test-value declaration for one supported Rust package.
     #[arg(long, requires = "rust_value_contract_sha256")]
     pub rust_value_contract: Option<String>,
@@ -188,7 +197,7 @@ fn priority_options(args: &ScopeArgs) -> Option<PriorityOptions> {
         })
 }
 
-fn attach_workspace_profile(result: &mut Value) -> Result<(), String> {
+fn attach_workspace_profile(result: &mut Value, selector: Option<&Selector>) -> Result<(), String> {
     let manifests = result
         .get_mut("manifests")
         .and_then(Value::as_array_mut)
@@ -206,9 +215,65 @@ fn attach_workspace_profile(result: &mut Value) -> Result<(), String> {
         if options.contains_key("execution_profile") {
             return Err("generated Cargo execution profile already exists".into());
         }
-        options.insert("execution_profile".into(), json!("cargo-workspace-v2"));
+        let profile = if selector.is_some() {
+            "cargo-workspace-v3"
+        } else {
+            "cargo-workspace-v2"
+        };
+        options.insert("execution_profile".into(), json!(profile));
+        if let Some(selector) = selector {
+            options.insert(
+                "workspace_selector".into(),
+                serde_json::to_value(selector).map_err(|e| e.to_string())?,
+            );
+        }
+        if let Some(selector) = selector {
+            let argv = manifest
+                .get_mut("test_argv")
+                .and_then(Value::as_array_mut)
+                .ok_or("generated Cargo test command is missing")?;
+            argv.extend(
+                selector
+                    .cargo_args()
+                    .into_iter()
+                    .chain(selector.libtest_args())
+                    .map(Value::String),
+            );
+        }
     }
     Ok(())
+}
+
+fn requested_selector(
+    target: Option<&str>,
+    filter: Option<&str>,
+    workspace: bool,
+) -> Result<Option<Selector>, String> {
+    let Some(target) = target else {
+        if filter.is_some() {
+            return Err("--cargo-test-filter requires --cargo-test-target".into());
+        }
+        return Ok(None);
+    };
+    if !workspace {
+        return Err("--cargo-test-target requires --cargo-workspace".into());
+    }
+    let target = if target == "lib" {
+        Target::Lib {}
+    } else if let Some(name) = target.strip_prefix("test:") {
+        Target::Test {
+            name: name.to_owned(),
+        }
+    } else {
+        return Err("--cargo-test-target must be lib or test:NAME".into());
+    };
+    let selector = Selector {
+        schema_version: 1,
+        target,
+        filter: filter.map(str::to_owned),
+    };
+    selector.validate()?;
+    Ok(Some(selector))
 }
 
 fn plan(args: ScopeArgs) -> Result<Planned, String> {
@@ -220,6 +285,11 @@ fn plan(args: ScopeArgs) -> Result<Planned, String> {
     {
         return Err("--cargo-workspace cannot be combined with a Rust value contract".into());
     }
+    let selector = requested_selector(
+        args.cargo_test_target.as_deref(),
+        args.cargo_test_filter.as_deref(),
+        args.cargo_workspace,
+    )?;
     let repo_root = resolve_repo_root(args.repo_root.clone()).map_err(|error| error.to_string())?;
     let owner = resolve_lane(args.owner.clone(), &repo_root)?;
     let (only_sources, scope) = select_scope(&args, &repo_root, &owner)?;
@@ -245,7 +315,7 @@ fn plan(args: ScopeArgs) -> Result<Planned, String> {
     };
     let mut result = compute_plan(&request)?;
     if args.cargo_workspace {
-        attach_workspace_profile(&mut result)?;
+        attach_workspace_profile(&mut result, selector.as_ref())?;
     }
     let cargo_value = match (args.rust_value_contract, args.rust_value_contract_sha256) {
         (Some(path), Some(hash)) => Some(
@@ -425,5 +495,51 @@ mod tests {
         let value = today_utc();
         assert_eq!(value.len(), 8);
         assert!(value.chars().all(|c| c.is_ascii_digit()));
+    }
+    #[test]
+    fn workspace_target_intent_is_typed_and_v2_default_is_unchanged() {
+        assert!(requested_selector(None, None, false).unwrap().is_none());
+        assert!(requested_selector(None, Some("tests::"), true).is_err());
+        assert!(requested_selector(Some("lib"), None, false).is_err());
+        assert!(requested_selector(Some("bin:demo"), None, true).is_err());
+        let baseline = json!({"manifests":[{"language":"rust","mutation_engine":"cargo-mutants",
+            "generator":{"options":{}},"test_argv":["cargo","test","--manifest-path","Cargo.toml","--package","demo"]}]});
+        let mut v2 = baseline.clone();
+        attach_workspace_profile(&mut v2, None).unwrap();
+        assert_eq!(
+            v2["manifests"][0]["generator"]["options"],
+            json!({"execution_profile":"cargo-workspace-v2"})
+        );
+        assert_eq!(
+            v2["manifests"][0]["test_argv"],
+            baseline["manifests"][0]["test_argv"]
+        );
+        let selector = requested_selector(Some("test:contract"), Some("checks::"), true)
+            .unwrap()
+            .unwrap();
+        let mut v3 = baseline;
+        attach_workspace_profile(&mut v3, Some(&selector)).unwrap();
+        assert_eq!(
+            v3["manifests"][0]["generator"]["options"]["execution_profile"],
+            "cargo-workspace-v3"
+        );
+        assert_eq!(
+            v3["manifests"][0]["generator"]["options"]["workspace_selector"],
+            serde_json::to_value(&selector).unwrap()
+        );
+        assert_eq!(
+            v3["manifests"][0]["test_argv"],
+            json!([
+                "cargo",
+                "test",
+                "--manifest-path",
+                "Cargo.toml",
+                "--package",
+                "demo",
+                "--test=contract",
+                "--",
+                "checks::"
+            ])
+        );
     }
 }

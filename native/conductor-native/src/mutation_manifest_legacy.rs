@@ -451,7 +451,10 @@ impl<R: CampaignReader> Builder<'_, R> {
             .and_then(Value::as_object)
             .and_then(|generator| generator.get("options"))
             .and_then(Value::as_object)
-            .is_some_and(|options| options.contains_key("execution_profile"))
+            .is_some_and(|options| {
+                options.contains_key("execution_profile")
+                    || options.contains_key("workspace_selector")
+            })
         {
             return Err("execution profile requires a generated Cargo campaign".into());
         }
@@ -482,6 +485,7 @@ impl<R: CampaignReader> Builder<'_, R> {
             environment: self.environment,
             host_read_dependencies: self.host_read_dependencies,
             execution_profile: None,
+            workspace_selector: None,
             generated_value: None,
             value_analysis_payload: self.payload.get("value_analysis").cloned(),
             value_analysis,

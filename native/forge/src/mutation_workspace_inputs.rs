@@ -64,12 +64,13 @@ fn campaign(campaign: &Campaign) -> Result<(String, String)> {
             && campaign.mutation_engine == "cargo-mutants",
         "unsupported workspace engine"
     );
+    let selector = conductor_native::mutation_workspace_selector::parse(&campaign.options)
+        .map_err(anyhow::Error::msg)?;
     ensure!(
-        campaign
-            .options
-            .get("execution_profile")
-            .and_then(serde_json::Value::as_str)
-            == Some("cargo-workspace-v2"),
+        matches!(
+            campaign.option_text("execution_profile").as_deref(),
+            Some("cargo-workspace-v2" | "cargo-workspace-v3")
+        ),
         "workspace profile marker required"
     );
     ensure!(
@@ -84,7 +85,8 @@ fn campaign(campaign: &Campaign) -> Result<(String, String)> {
             "manifest_path",
             "package",
             "package_root",
-            "execution_profile"
+            "execution_profile",
+            "workspace_selector"
         ]
         .contains(&key.as_str())),
         "unsupported workspace generator option"
@@ -116,7 +118,7 @@ fn campaign(campaign: &Campaign) -> Result<(String, String)> {
             == parent,
         "workspace package root differs from manifest"
     );
-    let expected = vec![
+    let mut expected = vec![
         "cargo".into(),
         "test".into(),
         "--manifest-path".into(),
@@ -124,10 +126,19 @@ fn campaign(campaign: &Campaign) -> Result<(String, String)> {
         "--package".into(),
         package.clone(),
     ];
+    if let Some(selector) = &selector {
+        expected.extend(selector.cargo_args());
+        expected.extend(selector.libtest_args());
+    }
     ensure!(
         campaign.test_argv == expected,
         "unsupported workspace test command"
     );
+    verify_source_scope(campaign, parent)?;
+    Ok((manifest, package))
+}
+
+fn verify_source_scope(campaign: &Campaign, parent: &str) -> Result<()> {
     let selected: BTreeSet<String> = campaign
         .source
         .iter()
@@ -153,7 +164,7 @@ fn campaign(campaign: &Campaign) -> Result<(String, String)> {
             "workspace source must be a literal path without glob metacharacters"
         );
     }
-    Ok((manifest, package))
+    Ok(())
 }
 
 fn no_cargo_redirection(root: &Path, manifest: &str) -> Result<()> {
@@ -416,6 +427,8 @@ impl Inputs {
         home: &Path,
         c: &Campaign,
     ) -> Result<()> {
+        let selector = conductor_native::mutation_workspace_selector::parse(&c.options)
+            .map_err(anyhow::Error::msg)?;
         let selection = mutation_workspace_metadata::validate(
             bytes,
             root,
@@ -425,6 +438,7 @@ impl Inputs {
             &self.package,
             &c.source_sha256,
             &c.test_sha256,
+            selector.as_ref(),
         )?;
         self.tests
             .set(selection)

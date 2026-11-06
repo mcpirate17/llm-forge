@@ -89,7 +89,9 @@ pub fn compare_profile(
 ) -> Result<(), String> {
     let scope = match profile {
         None => "cargo-root-rust-discovery-v1",
-        Some("cargo-workspace-v2") => "complete-snapshot-inputs-v2",
+        Some(profile) if crate::mutation_workspace_selector::is_workspace(Some(profile)) => {
+            "complete-snapshot-inputs-v2"
+        }
         Some(_) => return Err("unsupported verified Cargo execution profile".into()),
     };
     if expected.is_some_and(|identity| identity.scope != scope) {
@@ -121,8 +123,10 @@ mod workspace_tests {
         let v2 = serde_json::to_value(&workspace).unwrap();
         assert!(compare_profile(Some(&v1), Some(&root), None).is_ok());
         assert!(compare_profile(Some(&v2), Some(&workspace), Some("cargo-workspace-v2")).is_ok());
+        assert!(compare_profile(Some(&v2), Some(&workspace), Some("cargo-workspace-v3")).is_ok());
         assert!(compare_profile(Some(&v2), Some(&workspace), None).is_err());
         assert!(compare_profile(Some(&v1), Some(&root), Some("cargo-workspace-v2")).is_err());
+        assert!(compare_profile(Some(&v1), Some(&root), Some("cargo-workspace-v3")).is_err());
         assert!(compare_profile(Some(&v2), None, Some("cargo-workspace-v2")).is_err());
         assert!(compare_profile(Some(&v2), Some(&workspace), Some("unknown")).is_err());
     }

@@ -340,6 +340,43 @@ selectors and repository-relative pins to workspace-relative engine file filters
 using validated Cargo metadata. Test pins are anchors for the selected package's
 whole standard test suite, not a claim of per-test attribution.
 
+Select one standard library or integration-test target when the intended
+validation scope is narrower. The native writer emits `cargo-workspace-v3`:
+
+```sh
+forge mutation write rust --owner my-lane --base origin/main \
+  --only path/to/package/src/changed.rs --cargo-workspace --jobs 1 \
+  --cargo-test-target lib --cargo-test-filter module::tests::
+```
+
+Use `--cargo-test-target test:contract` for a named integration target. Omit
+`--cargo-test-filter` to run the whole selected target. Filters are literal
+libtest name substrings, limited to 256 bytes of ASCII identifiers separated by
+`::` (a trailing `::` is allowed). They are not regular expressions or exact-case
+selectors. Target names and filters
+cannot supply arbitrary Cargo arguments. Planning records the requested scope;
+execution independently resolves the target and its source from the captured
+manifest and Cargo metadata. Disabled, ambiguous, feature-requiring and custom
+harness targets are refused. Required features are never enabled implicitly.
+
+Both the direct baseline and cargo-mutants select the same build/test target.
+The filter applies only to test execution. Each baseline must observe one
+complete libtest frame with a passing test, and their test-name/status inventory
+digests and counts must match. Candidate and corpus admission bind the recorded
+selection and command arguments to the verified campaign. These remain
+cooperative observations, not execution attestation or per-test attribution.
+Full snapshot freshness and execution grants still apply to the narrower scope;
+a selected target does not grant compiler headers, test executables or environment
+variables. Existing unselected `cargo-workspace-v2` selection is preserved.
+Both workspace profiles now refuse mutation subjects at the Cargo workspace
+root: cargo-mutants treats slashless file patterns as recursive basename globs,
+which could include unselected files. Subjects such as `src/changed.rs` remain
+supported. This refusal occurs after metadata validation and before testing or
+mutation; Forge does not silently broaden the requested source scope.
+The [selected workspace controls](performance.md#selected-workspace-test-controls--2026-11-06)
+exercise real automatic mutants with both killed and surviving outcomes,
+including an unselected target that cannot compile.
+
 Add an operator-selected repository-relative lockfile to the grant:
 
 ```json

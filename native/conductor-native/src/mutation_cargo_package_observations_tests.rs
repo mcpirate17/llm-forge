@@ -90,3 +90,183 @@ fn engine_baseline_refuses_zero_incomplete_or_mismatched_protocol() {
     let (outcome, log) = engine("test unmatched ... ok\n");
     assert!(parse_package_engine_baseline(&outcome, &log, "/bin/cargo", "demo", "0.1.0").is_err());
 }
+
+fn selected() -> Selector {
+    Selector {
+        schema_version: 1,
+        target: crate::mutation_workspace_selector::Target::Lib {},
+        filter: Some("module::tests::".into()),
+    }
+}
+const SELECTED: &str = "running 2 tests\ntest module::tests::a ... ok\ntest module::tests::b ... ignored\n\ntest result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 17 filtered out; finished in 0.01s\n";
+#[test]
+fn selected_baseline_binds_sorted_case_names_status_and_filtered_count() {
+    let first = parse_selected_baseline(SELECTED, &selected()).unwrap();
+    assert_eq!(first["passed"], 1);
+    assert_eq!(first["filtered"], 17);
+    let swapped = SELECTED.replace(
+        "test module::tests::a ... ok\ntest module::tests::b ... ignored",
+        "test module::tests::b ... ignored\ntest module::tests::a ... ok",
+    );
+    assert_eq!(
+        first,
+        parse_selected_baseline(&swapped, &selected()).unwrap()
+    );
+    let renamed = SELECTED.replace("tests::a", "tests::c");
+    assert_ne!(
+        first["inventory_sha256"],
+        parse_selected_baseline(&renamed, &selected()).unwrap()["inventory_sha256"]
+    );
+    for invalid in [
+        SELECTED.replace("tests::a", "other::a"),
+        SELECTED.replace("17 filtered out", "017 filtered out"),
+        SELECTED.replace("tests::b ... ignored", "tests::a ... ignored"),
+        format!("{SELECTED}{ZERO}"),
+        ZERO.to_owned(),
+    ] {
+        assert!(
+            parse_selected_baseline(&invalid, &selected()).is_err(),
+            "{invalid}"
+        );
+    }
+}
+#[test]
+fn selected_engine_requires_same_target_in_both_phases_and_filter_only_in_test() {
+    let (mut outcome, _) = engine(SELECTED);
+    let build = vec![
+        "/bin/cargo",
+        "test",
+        "--no-run",
+        "--verbose",
+        "--package=demo@0.1.0",
+        "--locked",
+        "--offline",
+        "--lib",
+    ];
+    let test = vec![
+        "/bin/cargo",
+        "test",
+        "--verbose",
+        "--package=demo@0.1.0",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "module::tests::",
+    ];
+    outcome["phase_results"][0]["argv"] = json!(build);
+    outcome["phase_results"][1]["argv"] = json!(test);
+    let log = format!(
+        "*** {}\n*** result: Success\n*** {}\nRunning unittests\n{SELECTED}*** result: Success\n",
+        build.join(" "),
+        test.join(" ")
+    );
+    let direct = parse_selected_baseline(SELECTED, &selected()).unwrap();
+    assert_eq!(
+        direct,
+        parse_selected_engine_baseline(&outcome, &log, "/bin/cargo", "demo", "0.1.0", &selected())
+            .unwrap()
+    );
+    outcome["phase_results"][0]["argv"]
+        .as_array_mut()
+        .unwrap()
+        .pop();
+    assert!(parse_selected_engine_baseline(
+        &outcome,
+        &log,
+        "/bin/cargo",
+        "demo",
+        "0.1.0",
+        &selected()
+    )
+    .is_err());
+}
+
+#[test]
+fn selected_baseline_rejects_ignored_only_partial_and_unknown_cases() {
+    let ignored = "running 1 test\ntest module::tests::a ... ignored\ntest result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 3 filtered out; finished in 0.00s\n";
+    assert!(parse_selected_baseline(ignored, &selected()).is_err());
+    assert!(parse_selected_baseline(
+        "running 1 test\ntest module::tests::a ... ok\n",
+        &selected()
+    )
+    .is_err());
+    assert!(
+        parse_selected_baseline(&SELECTED.replace("... ok", "... FAILED"), &selected()).is_err()
+    );
+    assert!(parse_selected_baseline(
+        &SELECTED.replace("17 filtered out", "100001 filtered out"),
+        &selected()
+    )
+    .is_err());
+}
+#[test]
+fn selected_engine_rejects_filter_or_target_mismatch_in_test_phase() {
+    let (mut outcome, _) = engine(SELECTED);
+    let build = vec![
+        "/bin/cargo",
+        "test",
+        "--no-run",
+        "--verbose",
+        "--package=demo@0.1.0",
+        "--locked",
+        "--offline",
+        "--lib",
+    ];
+    let test = vec![
+        "/bin/cargo",
+        "test",
+        "--verbose",
+        "--package=demo@0.1.0",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "module::tests::",
+    ];
+    outcome["phase_results"][0]["argv"] = json!(build);
+    outcome["phase_results"][1]["argv"] = json!(test);
+    let log = format!(
+        "*** {}\n*** result: Success\n*** {}\n{SELECTED}*** result: Success\n",
+        build.join(" "),
+        test.join(" ")
+    );
+    let mut wrong = outcome.clone();
+    wrong["phase_results"][1]["argv"][8] = json!("other::tests::");
+    assert!(parse_selected_engine_baseline(
+        &wrong,
+        &log,
+        "/bin/cargo",
+        "demo",
+        "0.1.0",
+        &selected()
+    )
+    .is_err());
+    wrong = outcome;
+    wrong["phase_results"][1]["argv"][6] = json!("--test=other");
+    assert!(parse_selected_engine_baseline(
+        &wrong,
+        &log,
+        "/bin/cargo",
+        "demo",
+        "0.1.0",
+        &selected()
+    )
+    .is_err());
+}
+
+#[test]
+fn selected_without_filter_requires_zero_filtered_and_zero_measured() {
+    let selector = Selector {
+        schema_version: 1,
+        target: crate::mutation_workspace_selector::Target::Lib {},
+        filter: None,
+    };
+    assert!(parse_selected_baseline(SELECTED, &selector).is_err());
+    let unfiltered = SELECTED.replace("17 filtered out", "0 filtered out");
+    assert!(parse_selected_baseline(&unfiltered, &selector).is_ok());
+    assert!(
+        parse_selected_baseline(&unfiltered.replace("0 measured", "1 measured"), &selector)
+            .is_err()
+    );
+}
