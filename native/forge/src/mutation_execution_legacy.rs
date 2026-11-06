@@ -446,10 +446,6 @@ fn fest_environment(
             "COVERAGE_RCFILE".into(),
             output.join("coverage.rc").to_string_lossy().into_owned(),
         ),
-        (
-            "TMPDIR".into(),
-            output.join("tmp").to_string_lossy().into_owned(),
-        ),
         ("LANG".into(), "C".into()),
         ("TZ".into(), "UTC".into()),
     ]))
@@ -457,7 +453,6 @@ fn fest_environment(
 
 fn prepare_fest_output(root: &Path) -> Result<()> {
     fs::create_dir(root.join("fest-output"))?;
-    fs::create_dir(root.join("fest-output/tmp"))?;
     use std::io::Write as _;
     let mut config = fs::OpenOptions::new()
         .write(true)
@@ -935,6 +930,8 @@ mod fest_environment_tests {
         assert_eq!(env["PYTHONPATH"], "/guest/lib/python3.12:/guest/lib/python3.12/lib-dynload:/guest/lib/python3.12/dist-packages:/scratch/worktree:/scratch/worktree/src");
         assert_eq!(env["PYTHONSAFEPATH"], "1");
         assert!(env["PYTEST_ADDOPTS"].contains("--import-mode=importlib"));
+        crate::sandbox::validate_environment(&env).unwrap();
+        assert!(!env.contains_key("TMPDIR"));
         assert!(fest_environment(
             Path::new("/scratch"),
             Path::new("/scratch/colon:bad"),
@@ -942,5 +939,26 @@ mod fest_environment_tests {
             Path::new("/cache")
         )
         .is_err());
+    }
+
+    #[test]
+    #[ignore = "requires Landlock ABI 6 and seccomp notification support"]
+    fn fixed_fest_environment_is_admitted_by_the_real_sandbox() {
+        let root = tempfile::tempdir().unwrap();
+        let scratch = root.path().join("scratch");
+        let guest = root.path().join("guest");
+        let cache = root.path().join("cache");
+        for path in [&scratch, &guest, &cache] {
+            fs::create_dir(path).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let env = fest_environment(&scratch, &scratch.join("worktree"), &guest, &cache).unwrap();
+        Sandbox::prepare(Policy {
+            read_only: vec![guest, cache],
+            scratch: scratch.clone(),
+            working_directory: scratch,
+            environment: env,
+        })
+        .unwrap();
     }
 }

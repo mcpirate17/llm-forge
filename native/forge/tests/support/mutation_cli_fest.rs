@@ -433,14 +433,14 @@ fn collect(root: &Path, done: &AtomicBool) -> Result<usize, String> {
             if !entry.file_type().map_err(|e| e.to_string())?.is_dir() {
                 continue;
             }
-            let output = entry.path().join("fest-output");
-            let tmp = output.join("tmp");
-            if [&output, &tmp].iter().any(|p| {
-                !fs::symlink_metadata(p).is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
-            }) {
+            let snapshot = entry.path();
+            let output = snapshot.join("fest-output");
+            if !fs::symlink_metadata(&output)
+                .is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
+            {
                 continue;
             }
-            let Ok(files) = fs::read_dir(tmp) else {
+            let Ok(files) = fs::read_dir(snapshot) else {
                 continue;
             };
             for file in files {
