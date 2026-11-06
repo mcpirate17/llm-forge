@@ -3,7 +3,7 @@
   "kind": "native_equivalence_backlog",
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/218",
-  "status": "clean_release_parity_and_matched_preview_measurements_passed_full_gate_pending",
+  "status": "merged_with_exact_verified_tree",
   "base_commit": "ac7e415108312df989ac12d5bad4797b91d7308e",
   "scope": "Native configuration/discovery/folding/publication/explicit consumption. The existing Python gate remains the first Make step. No probe engine or model launched.",
   "verification": {
@@ -20,8 +20,22 @@
       "summary": "/home/tim/Projects/llm-forge/.git/backlog-parity-64bn_w38/summary.json",
       "sha256": "efcc203dd014fe50f54530cda918df70214160168ed75679f0846cceaec04502"
     },
-    "full_local_check": "PENDING",
-    "local_verify": "PENDING",
+    "full_local_check": {
+      "receipt": ".git/forge-checks/run-1793989860930960943-2690829/receipt.json",
+      "receipt_sha256": "da657c433147f9436928ca1f543954addd8f6c89d4fa4fced90cef58a92a1318",
+      "head": "3fe8c5dfeafcec6705260fb0df6d974b9ed02fce",
+      "tree": "dde24983e0d8189ca307d90df482b5616c049763",
+      "base": "ac7e415108312df989ac12d5bad4797b91d7308e",
+      "test_executions": {
+        "passed": 5041,
+        "failed": 0,
+        "ignored": 203
+      },
+      "steps_passed": 18,
+      "test_harnesses": 183,
+      "counts_scope": "Summed test-result lines; feature-matrix repeats are not unique tests."
+    },
+    "local_verify": "PASS after fresh fetch before publication and merge; .git/forge-backlog-local-verify2.log",
     "initial_parity_independent_audit": {
       "path": ".git/forge-backlog-parity-independent.json",
       "sha256": "412d413c643197a9461343a6841ea1fe208276939597beb8c171978bce756858"
@@ -380,5 +394,13 @@
       "recorder": "<pinned-forge> performance benchmark --command <arm-command> --samples 10 --warmups 2 --timeout-seconds 10 --output <receipt> with exact --source and --input pins listed in receipts; RUSTUP_TOOLCHAIN=1.98.0"
     },
     "order": "small Python/native/native/Python; larger native/Python/Python/native. Complete normalized report equality checks only interval-bounded generated minute. Every fixture input hash unchanged."
+  },
+  "integration": {
+    "pr": "https://github.com/mcpirate17/llm-forge/pull/220",
+    "merge_commit": "4a55be6e540402f6284ebdc039192dc4cda908c0",
+    "shared_install_or_adoption": false,
+    "proof": ".git/forge-backlog-merge-proof.json",
+    "checked_head": "3fe8c5dfeafcec6705260fb0df6d974b9ed02fce",
+    "exact_tree": "dde24983e0d8189ca307d90df482b5616c049763"
   }
 }

@@ -185,7 +185,7 @@ fn directory(selection: &Selection) -> Result<PathBuf> {
         }
         let meta = fs::symlink_metadata(&dir)?;
         ensure!(
-            meta.is_dir() && meta.uid() == unsafe { libc::geteuid() } && meta.mode() & 0o002 == 0,
+            meta.is_dir() && meta.uid() == unsafe { libc::geteuid() } && meta.mode() & 0o022 == 0,
             "unsafe canonical receipt directory"
         );
     }

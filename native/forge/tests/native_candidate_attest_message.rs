@@ -6,7 +6,7 @@ mod candidate_execution_fixture;
 mod support;
 use candidate_execution_fixture::{value, Case};
 use serde_json::json;
-use std::{path::Path, time::Duration};
+use std::{os::unix::fs::PermissionsExt, path::Path, time::Duration};
 fn fixture() -> Case {
     let mut case = Case::new(Path::new("/bin/true"));
     case.grants["resources"] = json!({"cpu_millis":1000,"memory_mib":128,"processes":16});
@@ -45,6 +45,7 @@ fn attest_requires_execution_before_any_message_change() {
     let case = fixture();
     let message = case.fixture.root.join("message");
     std::fs::write(&message, b"subject\n").unwrap();
+    std::fs::set_permissions(&message, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut cmd = case.command_for("attest-message", "index", &[]);
     cmd.arg(&message).args(["--surface", "pre-commit"]);
     let output = forge::process_probe::run(&mut cmd, Duration::from_secs(10), 1024 * 1024).unwrap();
@@ -64,6 +65,7 @@ fn token_only_and_closed_descriptor_fail_before_review() {
         let case = fixture();
         let message = case.fixture.root.join("message");
         std::fs::write(&message, b"subject\n").unwrap();
+        std::fs::set_permissions(&message, std::fs::Permissions::from_mode(0o600)).unwrap();
         let mut cmd = case.command_for("attest-message", "index", &[]);
         cmd.arg(&message)
             .args(["--surface", "pre-commit", "--execute"]);
@@ -91,6 +93,7 @@ fn inherited_lock(case: &Case) -> std::fs::File {
     use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
     let dir = case.fixture.root.join("repo/.git/governance");
     std::fs::create_dir_all(&dir).unwrap();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -129,6 +132,7 @@ fn fresh_review_publishes_canonical_receipt_then_attests_message() {
     let before = case.source_state();
     let message = case.fixture.root.join("message");
     std::fs::write(&message, b"subject\n").unwrap();
+    std::fs::set_permissions(&message, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut cmd = case.command_for("attest-message", "index", &[]);
     cmd.arg(&message)
         .args(["--surface", "pre-commit", "--execute"]);
@@ -174,6 +178,7 @@ fn fresh_review_publishes_canonical_receipt_then_attests_message() {
     assert_eq!(std::fs::read(&receipt).unwrap(), receipt_bytes);
     assert_eq!(std::fs::read_to_string(&message).unwrap(), text);
     std::fs::write(&message, b"subject\nGovernance-Tree: conflicting\n").unwrap();
+    std::fs::set_permissions(&message, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut cmd = case.command_for("attest-message", "index", &[]);
     cmd.arg(&message)
         .args(["--surface", "pre-commit", "--execute"]);
@@ -197,6 +202,7 @@ fn inherited_exclusive_descriptor_survives_fresh_review() {
     let lock = inherited_lock(&case);
     let message = case.fixture.root.join("message");
     std::fs::write(&message, b"subject\n").unwrap();
+    std::fs::set_permissions(&message, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut cmd = case.command_for("attest-message", "index", &[]);
     cmd.arg(&message)
         .args(["--surface", "pre-commit", "--execute"]);
@@ -257,6 +263,7 @@ fn index_drift_during_real_stage_refuses_before_canonical_publication() {
     capture_engine(&case);
     let message = case.fixture.root.join("message");
     std::fs::write(&message, b"subject\n").unwrap();
+    std::fs::set_permissions(&message, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut cmd = case.command_for("attest-message", "index", &[]);
     cmd.arg(&message)
         .args(["--surface", "pre-commit", "--execute"]);

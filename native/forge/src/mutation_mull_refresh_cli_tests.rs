@@ -14,6 +14,7 @@ struct Fixture {
 impl Fixture {
     fn new(ext: &str) -> Self {
         let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
         fs::create_dir(root.path().join("src")).unwrap();
         fs::create_dir(root.path().join("tests")).unwrap();
         let source = PathBuf::from(format!("src/subject.{ext}"));
@@ -38,6 +39,11 @@ impl Fixture {
             "campaigns/registry.json",
             "campaigns",
             false,
+        )
+        .unwrap();
+        fs::set_permissions(
+            root.path().join("campaigns"),
+            fs::Permissions::from_mode(0o700),
         )
         .unwrap();
         Self {
@@ -226,4 +232,71 @@ fn manifest_aliases_and_parent_symlinks_are_refused() {
     .unwrap();
     let path = Path::new("campaign-link").join(f.campaign.file_name().unwrap());
     assert!(prepare(f.root.path(), &path).is_err());
+}
+
+#[test]
+fn shared_manifest_or_parent_remains_previewable_but_changed_apply_refuses() {
+    for parent in [false, true] {
+        let fixture = Fixture::new("cpp");
+        fixture.change();
+        let manifest = fixture.path(&fixture.campaign);
+        let path = if parent {
+            manifest.parent().unwrap()
+        } else {
+            &manifest
+        };
+        fs::set_permissions(
+            path,
+            fs::Permissions::from_mode(if parent { 0o775 } else { 0o664 }),
+        )
+        .unwrap();
+        let old = fs::read(&manifest).unwrap();
+        let fragment = fs::read(fixture.path(&fixture.fragment)).unwrap();
+        assert_eq!(
+            fixture.prepare().finish(false, false).unwrap()["status"],
+            "PREVIEW"
+        );
+        let error = format!("{:#}", fixture.prepare().finish(true, false).unwrap_err());
+        assert!(error.contains("mutation"), "{error}");
+        assert_eq!(fs::read(&manifest).unwrap(), old);
+        assert_eq!(fs::read(fixture.path(&fixture.fragment)).unwrap(), fragment);
+        assert!(!fs::read_dir(manifest.parent().unwrap()).unwrap().any(|e| e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".report-pending")));
+    }
+}
+
+#[test]
+fn unchanged_apply_is_read_only_even_for_shared_manifest_metadata() {
+    let fixture = Fixture::new("cpp");
+    let manifest = fixture.path(&fixture.campaign);
+    fs::set_permissions(&manifest, fs::Permissions::from_mode(0o664)).unwrap();
+    fs::set_permissions(
+        manifest.parent().unwrap(),
+        fs::Permissions::from_mode(0o775),
+    )
+    .unwrap();
+    let old = fs::read(&manifest).unwrap();
+    let inode = fs::metadata(&manifest).unwrap().ino();
+    assert_eq!(
+        fixture.prepare().finish(true, false).unwrap()["status"],
+        "UNCHANGED"
+    );
+    assert_eq!(fs::read(&manifest).unwrap(), old);
+    assert_eq!(fs::metadata(&manifest).unwrap().ino(), inode);
+    assert_eq!(fs::metadata(&manifest).unwrap().mode() & 0o777, 0o664);
+}
+
+#[test]
+fn mutation_permission_drift_after_capture_refuses_refresh() {
+    let fixture = Fixture::new("cpp");
+    fixture.change();
+    let prepared = fixture.prepare();
+    let manifest = fixture.path(&fixture.campaign);
+    let old = fs::read(&manifest).unwrap();
+    fs::set_permissions(&manifest, fs::Permissions::from_mode(0o664)).unwrap();
+    assert!(prepared.finish(true, false).is_err());
+    assert_eq!(fs::read(&manifest).unwrap(), old);
 }

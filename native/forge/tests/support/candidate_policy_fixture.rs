@@ -2,6 +2,7 @@
 use crate::support::forge_binary;
 use git2::{Repository, RepositoryInitOptions};
 use std::{
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -14,10 +15,18 @@ impl Fixture {
     pub fn new() -> Self {
         let root = std::env::temp_dir().join(forge::resource_id("forge-policy-cli").unwrap());
         std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
         std::fs::create_dir(root.join("scratch")).unwrap();
         let mut options = RepositoryInitOptions::new();
         options.initial_head("main");
         let repository = Repository::init_opts(root.join("repo"), &options).unwrap();
+        for path in [
+            root.join("scratch"),
+            root.join("repo"),
+            root.join("repo/.git"),
+        ] {
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
         Self { root, repository }
     }
     pub fn stage(&self, path: &str, content: &str) {

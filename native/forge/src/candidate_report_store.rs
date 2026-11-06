@@ -1,7 +1,8 @@
 //! Atomic report exports under an operator-controlled directory tree.
 //! Cooperating publishers serialize with a parent-directory flock. This may
 //! wait for another publisher; callers must not already hold that directory lock.
-//! Parent components are pinned without following symlinks. Moving or replacing
+//! Parent components are opened without following symlinks. Ancestors must be
+//! trusted and stable; this is not a general filesystem sandbox. Moving or replacing
 //! a pinned parent, or swapping final entries between checks, by the same UID is
 //! outside the trusted-parent contract; rename never opens or truncates the leaf.
 use anyhow::{bail, ensure, Context, Result};
@@ -59,13 +60,26 @@ fn open_parent(path: &Path) -> Result<(Dir, OsString)> {
     Ok((directory, name))
 }
 
+fn check_parent(parent: &Dir) -> Result<()> {
+    let directory = parent.dir_metadata()?;
+    ensure!(
+        directory.is_dir()
+            && directory.uid() == unsafe { libc::geteuid() }
+            && directory.mode() & 0o022 == 0,
+        "report parent must be owned and not group or world writable"
+    );
+    Ok(())
+}
+
 fn check_destination(parent: &Dir, name: &OsStr) -> Result<()> {
+    check_parent(parent)?;
     match parent.symlink_metadata(name) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
         Ok(meta) => {
             ensure!(
-                meta.is_file() && meta.uid() == unsafe { libc::geteuid() } && meta.nlink() == 1,
+                meta.is_file() && meta.uid() == unsafe { libc::geteuid() }
+                    && meta.nlink() == 1 && meta.mode() & 0o022 == 0,
                 "existing report must be an owned singly linked regular file (mode={:o}, uid={}, links={})",
                 meta.mode(), meta.uid(), meta.nlink()
             );
@@ -111,10 +125,14 @@ fn stage(parent: &Dir, bytes: &[u8]) -> Result<(OsString, File)> {
 }
 
 fn cleanup(parent: &Dir, name: &OsStr, file: &File) -> Result<()> {
-    same_stage(parent, name, file)?;
-    parent
-        .remove_file(name)
-        .context("remove owned report staging file")
+    (|| {
+        check_parent(parent)?;
+        same_stage(parent, name, file)?;
+        parent
+            .remove_file(name)
+            .context("remove owned report staging file")
+    })()
+    .with_context(|| format!("staging file {name:?} retained or cleanup unverified"))
 }
 
 /// Atomically replace an owned report with at most 16 MiB of complete bytes.
@@ -265,6 +283,8 @@ fn publish_pair_using(
         first_output.verify_staged()?;
         second_output.verify_staged()?;
         before_rename()?;
+        first_output.verify_staged()?;
+        second_output.verify_staged()?;
         first_output.replace(&mut rename)?;
         second_output.verify_staged()?;
         second_output.replace(&mut rename)
@@ -307,6 +327,8 @@ fn publish_locked(
         same_stage(&parent, &stage_name, &held)?;
         check_destination(&parent, &name)?;
         before_rename()?;
+        same_stage(&parent, &stage_name, &held)?;
+        check_destination(&parent, &name)?;
         parent
             .rename(&stage_name, &parent, &name)
             .context("rename report staging file")?;

@@ -63,6 +63,8 @@ str()/int() coercion of malformed rows is deliberately refused. Root-list and
 scalar baselines remain unsupported. Refresh reuses owned, singly linked,
 regular-file atomic publication under an existing parent, rather than partial
 truncation or writing through special files; new files are private mode 0600.
+The parent and any existing baseline must belong to the current user and deny
+group/world writes, under the [shared publisher contract](native-candidate-review.md).
 
 `complexity-report`, `complexity-check`, and `complexity-refresh-baseline` in
 conductor.mk call this route; `COMPLEXITY_ARGS` supplies host-specific options.

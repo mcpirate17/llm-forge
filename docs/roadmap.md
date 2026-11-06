@@ -154,8 +154,8 @@ All 18 full local checks and fresh-base verification passed again at `53ad8f5`:
 [PR #217](https://github.com/mcpirate17/llm-forge/pull/217) merged as `ac7e415`
 with exactly the verified tree and closed issue #216.
 
-[Issue #218](https://github.com/mcpirate17/llm-forge/issues/218) is the active
-native backlog migration. The new CLI reuses Slop Core's fold, captures bounded
+[PR #220](https://github.com/mcpirate17/llm-forge/pull/220) delivered the native
+backlog migration and closed issue #218. The CLI reuses Slop Core's fold, captures bounded
 inputs, stages both outputs and consumes only explicitly authorized discovered
 artifacts after publication. Focused native tests and eleven comparisons against
 a private current-source Python/PyO3 comparator pass, repeated with clean release
@@ -163,14 +163,24 @@ a private current-source Python/PyO3 comparator pass, repeated with clean releas
 hashes after timestamp checks: Python/native p50 latency was 30.25/2.02 ms for ten findings and
 32.06/5.30 ms for 1,000. These warmed-cache command measurements establish no
 agent-task or model-cost result. Independent audit verified all eight receipts;
-full publication gates remain pending. Independent review found and fixed a
+all 18 publication checks and fresh-base verification passed at `3fe8c5d`:
+5,041 passing executions, zero failures and 203 ignored across 183 harnesses.
+Merge `4a55be6` has exactly that verified tree. Independent review found and fixed a
 future discovery-namespace alias and tightened destructive-path permissions.
 The hardened path passes 17 backlog tests and both CLI/Make tests; strict Clippy
-passes. [Issue #219](https://github.com/mcpirate17/llm-forge/issues/219) is the next
-priority: apply the permission boundary to older shared report writers.
+passes.
 `make slop-backlog` keeps its Python gate first
 and migrates only the second fold invocation. See [usage](equivalence-backlog.md)
 and the [evidence index](../research/performance/forge-program-20261106-backlog.json).
+
+[Issue #219](https://github.com/mcpirate17/llm-forge/issues/219) is active:
+shared report publication now checks owned, non-group/world-writable parents and
+existing leaves before staging and replacement. Mull refresh upgrades its captured
+manifest to mutation permissions only for changed apply; preview and no-op remain
+read-only. Cleanup retains and identifies stages if permissions become unsafe.
+Focused tests cover shared modes, permission drift, pair failures and the existing
+report callers. Clean release controls and full publication validation are pending.
+See the [evidence index](../research/performance/forge-program-20261106-publication-permissions.json).
 
 ### Architecture, evidence and disposition
 

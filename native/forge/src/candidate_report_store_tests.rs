@@ -1,7 +1,7 @@
 use super::*;
 use std::ffi::CString;
 use std::fs;
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{symlink, MetadataExt, PermissionsExt};
 use std::sync::{Arc, Barrier};
 
 struct Fixture(std::path::PathBuf);
@@ -9,7 +9,34 @@ impl Fixture {
     fn new() -> Self {
         let path = std::env::temp_dir().join(crate::resource_id("report-test").unwrap());
         fs::create_dir(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
         Self(path)
+    }
+}
+
+fn private_file(path: &Path, bytes: &[u8]) {
+    fs::write(path, bytes).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+fn remove_retained_stages(root: &Path, error: &str, expected: usize) {
+    let stages: Vec<_> = fs::read_dir(root)
+        .unwrap()
+        .map(|entry| entry.unwrap())
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".report-pending")
+        })
+        .collect();
+    assert_eq!(stages.len(), expected, "{error}");
+    for entry in stages {
+        let name = entry.file_name();
+        assert!(error.contains(name.to_str().unwrap()), "{error}");
+        let meta = fs::symlink_metadata(entry.path()).unwrap();
+        assert!(meta.is_file() && meta.uid() == unsafe { libc::geteuid() } && meta.nlink() == 1);
+        fs::remove_file(entry.path()).unwrap();
     }
 }
 impl Drop for Fixture {
@@ -37,7 +64,7 @@ fn unsafe_targets_never_touch_sentinel() {
     let root = Fixture::new();
     let sentinel = root.0.join("sentinel");
     let output = root.0.join("output");
-    fs::write(&sentinel, b"keep").unwrap();
+    private_file(&sentinel, b"keep");
     symlink(&sentinel, &output).unwrap();
     assert!(publish(&output, b"changed").is_err());
     fs::remove_file(&output).unwrap();
@@ -56,9 +83,10 @@ fn symlink_parent_traversal_and_oversize_fail_without_clobber() {
     let real = root.0.join("real");
     let link = root.0.join("link");
     fs::create_dir(&real).unwrap();
+    fs::set_permissions(&real, fs::Permissions::from_mode(0o700)).unwrap();
     symlink(&real, &link).unwrap();
     let output = real.join("report");
-    fs::write(&output, b"original").unwrap();
+    private_file(&output, b"original");
     assert!(publish(&link.join("report"), b"changed").is_err());
     assert!(publish(&real.join("../report"), b"changed").is_err());
     assert!(publish(&output, &vec![0; MAX_BYTES + 1]).is_err());
@@ -129,7 +157,7 @@ fn pre_rename_rejection_removes_only_owned_staging_file() {
     let root = Fixture::new();
     let output = root.0.join("report");
     let sentinel = root.0.join("sentinel");
-    fs::write(&sentinel, b"original").unwrap();
+    private_file(&sentinel, b"original");
     let (parent, name) = open_parent(&output).unwrap();
     let (pending, held) = stage(&parent, b"complete").unwrap();
     symlink(&sentinel, &output).unwrap();
@@ -143,7 +171,7 @@ fn pre_rename_rejection_removes_only_owned_staging_file() {
 fn guard_runs_once_after_staging_under_lock_and_failure_preserves_destination() {
     let root = Fixture::new();
     let output = root.0.join("report");
-    fs::write(&output, b"original").unwrap();
+    private_file(&output, b"original");
     for fail in [true, false] {
         let mut calls = 0;
         let result = publish_checked(&output, b"replacement", || {
@@ -174,9 +202,64 @@ fn guard_runs_once_after_staging_under_lock_and_failure_preserves_destination() 
 fn paired_fixture(root: &Fixture) -> (std::path::PathBuf, std::path::PathBuf) {
     let first = root.0.join("report");
     let second = root.0.join("ledger");
-    fs::write(&first, b"old report").unwrap();
-    fs::write(&second, b"old ledger").unwrap();
+    private_file(&first, b"old report");
+    private_file(&second, b"old ledger");
     (first, second)
+}
+
+#[test]
+fn publication_refuses_shared_parent_and_shared_destination() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    fs::set_permissions(&root.0, fs::Permissions::from_mode(0o775)).unwrap();
+    assert!(publish(&first, b"new").is_err());
+    assert!(publish_pair_checked((&first, b"new"), (&second, b"new"), || Ok(())).is_err());
+    fs::set_permissions(&root.0, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(&second, fs::Permissions::from_mode(0o664)).unwrap();
+    assert!(publish(&second, b"new").is_err());
+    assert!(publish_pair_checked((&first, b"new"), (&second, b"new"), || Ok(())).is_err());
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+    assert_eq!(fs::read(&second).unwrap(), b"old ledger");
+}
+
+#[test]
+fn publication_rechecks_permissions_after_guard() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    let result = publish_checked(&first, b"new", || {
+        fs::set_permissions(&first, fs::Permissions::from_mode(0o664))?;
+        Ok(())
+    });
+    assert!(result.is_err());
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+    fs::set_permissions(&first, fs::Permissions::from_mode(0o600)).unwrap();
+    let result = publish_pair_checked((&first, b"new"), (&second, b"new"), || {
+        fs::set_permissions(&root.0, fs::Permissions::from_mode(0o775))?;
+        Ok(())
+    });
+    let error = format!("{:#}", result.unwrap_err());
+    fs::set_permissions(&root.0, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+    assert_eq!(fs::read(&second).unwrap(), b"old ledger");
+    remove_retained_stages(&root.0, &error, 2);
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 2);
+}
+
+#[test]
+fn single_publish_retains_stage_when_parent_becomes_shared() {
+    let root = Fixture::new();
+    let output = root.0.join("report");
+    private_file(&output, b"old");
+    let error = publish_checked(&output, b"new", || {
+        fs::set_permissions(&root.0, fs::Permissions::from_mode(0o775))?;
+        Ok(())
+    })
+    .unwrap_err();
+    let diagnostic = format!("{error:#}");
+    assert!(diagnostic.contains("group or world writable"));
+    fs::set_permissions(&root.0, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(fs::read(&output).unwrap(), b"old");
+    remove_retained_stages(&root.0, &diagnostic, 1);
 }
 
 #[test]
@@ -301,7 +384,7 @@ fn paired_stale_input_guard_refuses_after_staging_without_replacing_outputs() {
     let root = Fixture::new();
     let (first, second) = paired_fixture(&root);
     let input = root.0.join("input");
-    fs::write(&input, b"captured input").unwrap();
+    private_file(&input, b"captured input");
     let (held, _) = crate::candidate_inputs::repository_live(&input, 1024).unwrap();
     assert!(
         publish_pair_checked((&first, b"new report"), (&second, b"new ledger"), || {
@@ -323,6 +406,8 @@ fn paired_cross_parent_locks_serialize_opposite_publication_orders() {
     let right = root.0.join("right");
     fs::create_dir(&left).unwrap();
     fs::create_dir(&right).unwrap();
+    fs::set_permissions(&left, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(&right, fs::Permissions::from_mode(0o700)).unwrap();
     let first = left.join("report");
     let second = right.join("ledger");
     let barrier = Arc::new(Barrier::new(2));
