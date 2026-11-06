@@ -217,14 +217,17 @@ verification passed; merge `2d0564e` has the identical checked tree. Initial com
 and fixture failures are retained in the
 [evidence index](../research/performance/forge-program-20261106-committed-equivalence.json).
 The Make gate's live-worktree/default-changed/all contract remains unmigrated.
-[Issue #226](https://github.com/mcpirate17/llm-forge/issues/226) is active for explicit
-live-input selection: mutation snapshots exclude files the legacy named gate can
-read, so they cannot silently supply that contract. The implementation reuses the
-scanner with explicit roots, held host inputs and a self-contained Stage object
-store. Validation is in progress, including existing mutation behavior, real guest
-cleanup and paired preparation cost. Original operator read grants remain in
-effect; captured inputs are not a complete execution dependency set. No Make
-migration or unrestricted legacy live-tree parity is claimed. See the
+[Issue #226](https://github.com/mcpirate17/llm-forge/issues/226) adds explicit
+live-input selection using the shared scanner, held host inputs and a private Stage
+object store. Release `62858f7` passed ten standalone and four candidate Stage guest
+controls; three authored live-input cases matched the actual Python wrapper's full
+summaries, reports and exits. Independent audits verified 240 paired preparation
+observations and 480 shared-capture observations. Live preparation costs more;
+the captured inputs do not bind every authorized host read. A real guest control
+demonstrates that boundary. The failed observer attempt remains accounted for.
+Full publication checks are next, followed by profiling repeated materialization
+before selecting an optimization. Make/default-changed/all migration remains open;
+no unrestricted legacy live-tree parity is claimed. See the
 [live-input evidence index](../research/performance/forge-program-20261106-live-equivalence.json).
 
 ### Architecture, evidence and disposition

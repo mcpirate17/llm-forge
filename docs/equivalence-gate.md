@@ -153,3 +153,19 @@ these controls intentionally retain evidence directories for review.
 Run `cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --test equivalence_gate_live -- --ignored --nocapture --test-threads=1`.
 The evidence index records exact builds, comparator provenance and separate capture
 measurements. Similar capture cost does not establish full-workload acceleration.
+
+The preparation-only fixture can run without a guest or delegated cgroup. It
+compares the two source modes on identical file bytes, with two warmups and ten
+scored observations per mode and fixture size:
+
+```sh
+FORGE_TEST_GATE_BENCH_OUTPUT=/absolute/new-observations.json \
+  cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml \
+  --lib equivalence_gate::tests::bench::compare_committed_and_live_preparation \
+  -- --exact --ignored --test-threads=1
+```
+
+The output path must be new. Release measurements use five fresh processes and
+the existing performance recorder; phase timings exclude fixture setup and
+observer-binary hashing. Live preparation includes three materializations and a
+private Stage object store. This fixture does not launch or time a guest.

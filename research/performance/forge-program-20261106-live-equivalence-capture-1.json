@@ -1,0 +1,58 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1794002743,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "62858f7e0c51af80f7f4a4323d1eb5cd03482a1c",
+    "source_files": {
+      "native/conductor-native/src/equivalence_targets.rs": "f93e669c945e99a7bcb40ad9502d78271c580b4df535d737ee9a04c483b68dd6",
+      "native/forge/Cargo.lock": "a40a856c4603e78fa2dcce537202bbcf17a87bc02978450a1e41df1cb91e1a4d",
+      "native/forge/src/candidate_equivalence_capture_tests.rs": "dbfd8cdcab8a607982b1dcae2de7a5ad49f7ea6acaca836fa6123aa2d01b9d74",
+      "native/forge/src/candidate_equivalence_inputs.rs": "37d026f5fa69b3fa04d6a90be7d97549c307362205a882cba75c684a869a157a",
+      "native/forge/src/candidate_snapshot/paths.rs": "ab8568bd9afe8bfdb4473c2207ae1d3625a90f49998080716cc3f5bb70ba85ef",
+      "native/forge/src/candidate_test_inputs.rs": "8a946560271d78c3e7bed888d64bc04afedb02237249155ad0567ab88cea6ea3",
+      "native/forge/src/snapshot_inputs.rs": "17cbe5b825085e052c15263dcc32cbe4c688815ed20c4ea4fc9accd60d2da9ac"
+    },
+    "command": "PATH= exec /home/tim/Projects/llm-forge/.git/live-gate-observers-62858f7-i5wqklio/forge --exact candidate_equivalence_inputs::capture_tests::benchmark_no_record_capture_small_and_large --ignored --nocapture --test-threads=1",
+    "workload_sha256": "7c6d1d1679a7d5ff4444b02a7131e8774e242ed215f8c305c264d28222cd74d6",
+    "environment_sha256": "6d8b5cb18288a24b4a90046e88894c5974fcbd687422da8aff6f615bcf63eca7",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "warmups": 0,
+    "timeout_seconds": 30
+  },
+  "samples": [
+    {
+      "wall_ms": 1192.813278,
+      "cpu_ms": 300.748,
+      "max_rss_bytes": 53964800
+    },
+    {
+      "wall_ms": 1192.916796,
+      "cpu_ms": 306.161,
+      "max_rss_bytes": 53293056
+    },
+    {
+      "wall_ms": 1214.165484,
+      "cpu_ms": 303.127,
+      "max_rss_bytes": 53379072
+    },
+    {
+      "wall_ms": 1188.9987310000001,
+      "cpu_ms": 303.139,
+      "max_rss_bytes": 53739520
+    },
+    {
+      "wall_ms": 1210.088647,
+      "cpu_ms": 301.777,
+      "max_rss_bytes": 53878784
+    }
+  ],
+  "summary": {
+    "p50_ms": 1192.916796,
+    "p95_ms": 1214.165484,
+    "cpu_p50_ms": 303.127,
+    "max_rss_bytes": 53964800
+  },
+  "receipt_sha256": "1fdd0c4e41e408f860b98cbe67ffa1bbd19e785d785aa26387a9bae1afadb8a1"
+}
