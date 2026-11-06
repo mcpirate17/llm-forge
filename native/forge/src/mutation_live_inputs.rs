@@ -95,11 +95,9 @@ impl LiveInputs {
             }
         }
         ensure!(
-            parent.starts_with(&self.canonical),
-            "corpus parent escapes root"
+            parent.starts_with(&self.canonical) && parent.canonicalize()? == parent,
+            "corpus parent has a symlink or escapes root"
         );
-        crate::nofollow_path::check(parent)
-            .context("corpus parent has a symlink or escapes root")?;
         Ok(path)
     }
     fn missing(&self, relative: &str) -> Result<bool> {

@@ -94,7 +94,9 @@ fn github_output(report: &Value) -> Result<()> {
     {
         println!("{}", annotation.as_str().context("invalid annotation")?);
     }
-    let summary = output["summary"].as_str().context("native summary missing")?;
+    let summary = output["summary"]
+        .as_str()
+        .context("native summary missing")?;
     if let Some(path) = std::env::var_os("GITHUB_STEP_SUMMARY").filter(|p| !p.is_empty()) {
         if !summary.is_empty() {
             OpenOptions::new()

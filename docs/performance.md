@@ -34,10 +34,21 @@ extension, version 0.1.94. That extension's build-source provenance is unavailab
 This is an artifact comparison, not evidence that the same Rust source was built
 into both runtimes. Model costs and agent effectiveness were not measured.
 
-Instrumented profiling found 61,706 syscalls for explicit evidence and 254,019 for
-coverage, dominated by repeated path canonicalization. A subsequent candidate
-replaces those walks with a Linux no-symlink lookup while preserving held-input
-checks. Its performance remains pending measurement; this slower baseline is retained.
+A matched three-arm rerun compared Python, `88a63ef` and the `b499dbe` path-lookup
+experiment on one unchanged checkout. All 90 observations completed with full JSON
+and exit-code parity. Six timed repetitions used all six arm orders. Median wall
+times were 40/130/120 ms (explicit), 40/130/130 ms (changed), and 100/270/260 ms
+(coverage and canary). The experiment reduced explicit-report syscalls from 61,706
+to 41,655 but left most user CPU cost unchanged. Its small timing difference does
+not justify an additional unsafe syscall helper and kernel requirement; that code
+is rejected. Existing path checks remain, with the additional regression tests.
+
+Debugger phase timing on the experimental binary attributed 87 of 155 instrumented
+wall milliseconds to two supporting-input eligibility scans, versus 6 ms in final
+verification. Each scan decodes every receipt. This includes debugger overhead,
+not uninstrumented CPU attribution. Perf sampling was denied by host policy;
+gprofng timer warnings made its samples unreliable. Receipt decoding is the next
+measured target; neither failed profiler establishes a passing measurement.
 
 ### Reproducible native timeout fixture — 2026-11-06
 
