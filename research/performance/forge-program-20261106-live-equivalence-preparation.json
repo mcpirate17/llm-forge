@@ -1,0 +1,63 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1794002731,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "62858f7e0c51af80f7f4a4323d1eb5cd03482a1c",
+    "source_files": {
+      "native/forge/Cargo.lock": "a40a856c4603e78fa2dcce537202bbcf17a87bc02978450a1e41df1cb91e1a4d",
+      "native/forge/src/candidate_equivalence_inputs.rs": "37d026f5fa69b3fa04d6a90be7d97549c307362205a882cba75c684a869a157a",
+      "native/forge/src/candidate_execution_private_git.rs": "6bf13ce06101b80eb456536f571adf2eca7e63413c49bd9a2d6bee3a9e27489a",
+      "native/forge/src/candidate_execution_workspace.rs": "a3e002ef28a602ad3897b91c31bc649f002b015714204d0ce99e2cf9c5d59bf8",
+      "native/forge/src/equivalence_gate.rs": "4fe72af998a63ba29494a110a0f2d6a5527417b3a610e228f0697d5fc4af7828",
+      "native/forge/src/equivalence_gate_bench.rs": "89e6c37e89410d814973dfb3d667e0cccb7e45e70b397cf894b2e0d2bcf069f1",
+      "native/forge/src/equivalence_gate_source.rs": "8c14d1a657b33037629ad85c1dbca0a1863f0f8dd192133bc52843a4d3548ef9",
+      "native/forge/src/equivalence_gate_tests.rs": "098eaedf4d7ee63004aa08c73e1bc7828c6b4236dde2ff325b4d74f142a5a200",
+      "native/forge/src/mutation_snapshot.rs": "093cebf8f1f4b4813c7bbc22c52c0954954b19bfdbc3b1adb5fcb3df2b617b48",
+      "native/forge/src/mutation_snapshot_ignore.rs": "e85a8f4388cb45d7568581af13a895fcf9e5094875b64b64176c2098e1934529",
+      "native/forge/src/mutation_snapshot_live.rs": "e7f6d5a06a4ca6845e75ceec819ca20ffe8fb0d7575d042d040718039e4e76c6",
+      "native/forge/src/mutation_snapshot_native.rs": "ca14e6167472fa3c3e0a3e4c0a981da3b54db5a1327fedf050040cc56bbc3583"
+    },
+    "command": "FORGE_TEST_GATE_BENCH_OUTPUT=/home/tim/Projects/llm-forge/.git/live-gate-preparation-measure-hi5khkfe/observations/process-$$.json PATH= exec /home/tim/Projects/llm-forge/.git/live-gate-observers-62858f7-i5wqklio/forge --exact equivalence_gate::tests::bench::compare_committed_and_live_preparation --ignored --nocapture --test-threads=1",
+    "workload_sha256": "7c0c8ac5e09a5e644d9a84d523cb205a44a88254c8166aef150e134327993f2c",
+    "environment_sha256": "a60bf8f97d3a9325e838e2a0388c2c496c4632c3f149706fd7b67390409a8698",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "warmups": 0,
+    "timeout_seconds": 90
+  },
+  "samples": [
+    {
+      "wall_ms": 27319.623065,
+      "cpu_ms": 3229.398,
+      "max_rss_bytes": 16343040
+    },
+    {
+      "wall_ms": 26961.582055000003,
+      "cpu_ms": 3204.725,
+      "max_rss_bytes": 18804736
+    },
+    {
+      "wall_ms": 26901.258478,
+      "cpu_ms": 3196.462,
+      "max_rss_bytes": 18288640
+    },
+    {
+      "wall_ms": 26985.595676,
+      "cpu_ms": 3215.907,
+      "max_rss_bytes": 17846272
+    },
+    {
+      "wall_ms": 29887.207617,
+      "cpu_ms": 3184.998,
+      "max_rss_bytes": 19169280
+    }
+  ],
+  "summary": {
+    "p50_ms": 26985.595676,
+    "p95_ms": 29887.207617,
+    "cpu_p50_ms": 3204.725,
+    "max_rss_bytes": 19169280
+  },
+  "receipt_sha256": "2d429e02468cfe3bc92c6ab30f7ddcee8243c3c108acc5e2cd51f199ee1d5168"
+}

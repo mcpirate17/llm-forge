@@ -32,9 +32,42 @@ struct ProbeConfig {
     jobs: Option<usize>,
 }
 pub(crate) struct CaptureContext<'c, 's> {
-    pub source: &'c Source,
+    pub origin: &'c Source,
+    pub tree_source: &'c Source,
     pub snapshot: &'s Snapshot,
     pub grants: &'c Grants,
+}
+impl CaptureContext<'_, '_> {
+    fn validate(&self) -> Result<()> {
+        ensure!(
+            self.grants.source_root == self.origin.root(),
+            "equivalence grants source root differs from origin"
+        );
+        ensure!(
+            self.grants
+                .read_only
+                .iter()
+                .any(|root| self.origin.root().starts_with(root))
+                && self
+                    .grants
+                    .read_only
+                    .iter()
+                    .any(|root| self.origin.common_dir().starts_with(root)),
+            "equivalence origin lacks explicit source/Git read grants"
+        );
+        Ok(())
+    }
+    fn exclude_private(&self, path: &Path) -> Result<()> {
+        candidate_inputs::exclude(path, Some(&self.snapshot.path()))?;
+        if self.tree_source.root() != self.origin.root() {
+            candidate_inputs::exclude(path, Some(&self.grants.scratch_parent))?;
+            candidate_inputs::exclude(path, Some(self.tree_source.root()))?;
+            if self.tree_source.common_dir() != self.origin.common_dir() {
+                candidate_inputs::exclude(path, Some(self.tree_source.common_dir()))?;
+            }
+        }
+        Ok(())
+    }
 }
 enum HeldInputs<'a> {
     Candidate(Inputs<'a>),
@@ -245,7 +278,11 @@ fn store_copy(
             timeout,
         );
     }
-    let workspace = Workspace::new(context.source, &snapshot.report().tree_oid, context.grants)?;
+    let workspace = Workspace::new(
+        context.tree_source,
+        &snapshot.report().tree_oid,
+        context.grants,
+    )?;
     let path = workspace.runtime().join("equivalence-record.sqlite");
     if let Some(record) = record {
         let dir = workspace.artifact_root()?;
@@ -274,24 +311,28 @@ type RecordCapture = (Option<BoundFile>, Option<Vec<u8>>, Option<PathBuf>);
 fn capture_record(
     config: Option<RecordConfig>,
     supplied_store: Option<(&Path, &str)>,
-    root: &Path,
-    snapshot: &Snapshot,
+    context: &CaptureContext<'_, '_>,
 ) -> Result<RecordCapture> {
     let mut record = None;
     let mut record_bytes = None;
     let mut path = None;
     if let Some(config) = config.filter(|config| config.lines) {
         let _environment = &config.environment;
-        let expected = record_path(&config, root)?;
+        let expected = record_path(&config, context.origin.root())?;
         let (supplied, sha256) = supplied_store
             .context("configured recorded store needs an operator path and SHA-256 grant")?;
         ensure!(
             supplied == expected,
             "granted record store must be the exact canonical configured path"
         );
+        context.exclude_private(&expected)?;
         no_wal(&expected)?;
-        let (held, bytes) =
-            candidate_inputs::external(&expected, sha256, 32 * 1024 * 1024, &snapshot.path())?;
+        let (held, bytes) = candidate_inputs::external(
+            &expected,
+            sha256,
+            32 * 1024 * 1024,
+            &context.snapshot.path(),
+        )?;
         no_wal(&expected)?;
         held.verify()?;
         record = Some(held);
@@ -339,7 +380,8 @@ pub(crate) fn capture<'a>(
     capture_common(
         inputs,
         CaptureContext {
-            source: &source,
+            origin: &source,
+            tree_source: &source,
             snapshot,
             grants: &execution.grants,
         },
@@ -359,13 +401,14 @@ pub(crate) fn capture_committed<'s>(
     supplied_artifacts: Option<&Path>,
     granted_jobs: usize,
 ) -> Result<Captured<'s>> {
+    context.validate()?;
     crate::candidate_source::safe_path(module.as_bytes())?;
     ensure!(
         module.ends_with(".py") && !module.chars().any(char::is_control),
         "selected module must be a literal Python path"
     );
     let mut tree = SnapshotInputs::new(
-        context.source,
+        context.tree_source,
         context.snapshot,
         &context.snapshot.report().tree_oid,
     )?;
@@ -398,15 +441,13 @@ fn capture_common<'s>(
     supplied_artifacts: Option<&Path>,
     granted_jobs: usize,
 ) -> Result<Captured<'s>> {
+    context.validate()?;
     let CaptureContext {
-        source,
+        origin,
         snapshot,
         grants,
+        ..
     } = &context;
-    ensure!(
-        grants.source_root == source.root(),
-        "equivalence grants source root differs"
-    );
     let tree = inputs.tree_mut();
     let (probe, record_config) = config(tree)?;
     let timeout = probe.per_module_timeout.unwrap_or(180.0);
@@ -425,13 +466,15 @@ fn capture_common<'s>(
     let artifacts = admit_artifacts(
         probe.run_artifacts.as_deref(),
         supplied_artifacts,
-        source.root(),
+        origin.root(),
         &snapshot.path(),
         &grants.scratch_parent,
     )?;
+    if let Some(artifacts) = &artifacts {
+        context.exclude_private(&artifacts.directory)?;
+    }
     let _other_config = (&probe.ledger, &probe.report);
-    let (record, record_bytes, path) =
-        capture_record(record_config, supplied_store, source.root(), snapshot)?;
+    let (record, record_bytes, path) = capture_record(record_config, supplied_store, &context)?;
     bind_python_tree(tree)?;
     let targets = store_copy(&context, record_bytes.as_deref(), changed, timeout)?;
     let evidence = serde_json::json!({"candidate_tree":snapshot.report().tree_oid,

@@ -1,8 +1,10 @@
-//! Explicit committed-module probing through the existing confined Stage owner.
+//! Explicit committed or selected live-module probing through the confined Stage owner.
+#[path = "equivalence_gate_source.rs"]
+mod source;
 use crate::{
     candidate_equivalence_inputs::{self, Artifacts, CaptureContext},
     candidate_equivalence_stage::{self, Probe, StageContext},
-    candidate_execution_workspace::{Grants, Workspace},
+    candidate_execution_workspace::Grants,
     candidate_snapshot::{Limits as SnapshotLimits, Snapshot},
     candidate_source::Source,
     confined_execution::Limits,
@@ -12,17 +14,24 @@ use anyhow::{ensure, Context, Result};
 use clap::Args;
 use serde_json::{json, Value};
 use slop_core::gate_types::Summary;
+use source::SelectedSource;
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 #[derive(Args)]
 pub struct GateArgs {
-    /// Repository containing the requested commit; live changes are not evaluated.
+    /// Repository containing the selected source and original operator authority.
     #[arg(long, default_value = ".")]
     root: PathBuf,
     /// Full lowercase 40-character commit OID, never a branch or abbreviated name.
-    #[arg(long)]
-    commit: String,
-    /// One literal relative .py path, evaluated as a whole module from the commit.
+    #[arg(long, required_unless_present = "live", conflicts_with = "live")]
+    commit: Option<String>,
+    /// Capture live tracked inputs and explicitly selected untracked/ignored inputs.
+    #[arg(long, requires = "inputs", conflicts_with = "commit")]
+    live: bool,
+    /// Additional live input file or directory; repeat for each bounded scope.
+    #[arg(long = "input", requires = "live", conflicts_with = "commit")]
+    inputs: Vec<String>,
+    /// One literal relative .py path, evaluated as a whole module from captured inputs.
     #[arg(long)]
     module: String,
     /// Absolute operator-owned grants file outside the repository.
@@ -33,12 +42,12 @@ pub struct GateArgs {
     guest_path: PathBuf,
     #[arg(long)]
     guest_sha256: String,
-    /// Separately supplied current record data; must match committed configuration.
+    /// Separately supplied current record data; must match captured configuration.
     #[arg(long, requires = "store_sha256")]
     store: Option<PathBuf>,
     #[arg(long, requires = "store")]
     store_sha256: Option<String>,
-    /// Explicit existing output directory matching committed run_artifacts.
+    /// Explicit existing output directory matching captured run_artifacts.
     #[arg(long)]
     artifacts: Option<PathBuf>,
     /// Maximum guest workers inside the single resource-limited Stage (1..32).
@@ -63,13 +72,24 @@ pub struct GateArgs {
 
 fn validate_selection(args: &GateArgs) -> Result<()> {
     ensure!(
-        args.commit.len() == 40
-            && args
-                .commit
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
-        "commit must be a full lowercase 40-character commit OID"
+        args.live != args.commit.is_some(),
+        "select exactly one of an explicit commit or live inputs"
     );
+    if let Some(commit) = &args.commit {
+        ensure!(
+            commit.len() == 40
+                && commit
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+            "commit must be a full lowercase 40-character commit OID"
+        );
+        ensure!(args.inputs.is_empty(), "input paths require live mode");
+    } else {
+        ensure!(
+            !args.inputs.is_empty(),
+            "live mode requires explicit input paths"
+        );
+    }
     crate::candidate_source::safe_path(args.module.as_bytes())?;
     ensure!(
         args.module.ends_with(".py") && !args.module.chars().any(char::is_control),
@@ -126,16 +146,18 @@ struct Completed {
 
 fn evaluate(
     args: &GateArgs,
-    source: &Source,
+    selected: &SelectedSource,
     snapshot: &Snapshot,
     grants: Arc<Grants>,
     limits: Limits,
     interrupts: &Interrupts,
 ) -> Result<Completed> {
-    snapshot.verify_materialized(source)?;
+    selected.verify()?;
+    snapshot.verify_materialized(selected.tree_source())?;
     let mut captured = candidate_equivalence_inputs::capture_committed(
         CaptureContext {
-            source,
+            origin: selected.origin(),
+            tree_source: selected.tree_source(),
             snapshot,
             grants: &grants,
         },
@@ -144,6 +166,9 @@ fn evaluate(
         args.artifacts.as_deref(),
         args.jobs,
     )?;
+    if args.live {
+        captured.evidence["source_kind"] = json!("live_snapshot_tree");
+    }
     ensure!(
         captured.targets.len() == 1,
         "named gate requires exactly one target module"
@@ -160,19 +185,20 @@ fn evaluate(
             jobs: captured.jobs,
         },
         StageContext {
-            source_root: source.root(),
+            source_root: selected.origin().root(),
             capture_snapshot: &capture_path,
-            data: json!({"scope":"committed-whole-module", "commit_oid":args.commit,
+            data: json!({"scope":selected.scope(), "commit_oid":args.commit,
                 "tree_oid":snapshot.report().tree_oid, "module":args.module,
                 "grants_sha256":grants.digest(), "execution_verified":false}),
         },
     )?;
-    let workspace = Workspace::new(source, &snapshot.report().tree_oid, &grants)?;
-    workspace.verify_materialized(source)?;
+    let workspace = selected.workspace(&grants)?;
+    workspace.verify_materialized(selected.tree_source())?;
     let prepared =
         candidate_equivalence_stage::prepare_workspace(workspace, &grants, limits, admitted)?;
     captured.verify()?;
-    snapshot.verify_materialized(source)?;
+    snapshot.verify_materialized(selected.tree_source())?;
+    selected.verify()?;
     ensure!(
         !interrupts.interrupted()?,
         "equivalence interrupted before execution"
@@ -185,15 +211,16 @@ fn evaluate(
         candidate_equivalence_stage::execute(prepared, grants, interrupts),
     )?;
     captured.verify()?;
-    snapshot.verify_materialized(source)?;
+    snapshot.verify_materialized(selected.tree_source())?;
+    selected.verify()?;
     let summary: Summary = serde_json::from_slice(&bytes).context("invalid equivalence summary")?;
     Ok(Completed {
         summary,
         bytes,
         evidence: json!({"schema_version":1, "action":"equivalence_gate",
-            "scope":"committed-whole-module", "commit_oid":args.commit,
+            "scope":selected.scope(), "commit_oid":args.commit,
             "tree_oid":snapshot.report().tree_oid, "module":args.module,
-            "working_tree_evaluated":false, "original_git_history":false,
+            "working_tree_evaluated":args.live, "original_git_history":false,
             "guest_output_authenticated":false, "approval":false,
             "inputs":captured.evidence, "stage":stage, "execution":report,
             "summary_sha256":summary_sha256}),
@@ -201,7 +228,7 @@ fn evaluate(
     })
 }
 
-fn finish_capture(result: Result<Completed>, cleanup: Result<()>) -> Result<Completed> {
+fn finish_capture<T>(result: Result<T>, cleanup: Result<()>) -> Result<T> {
     match (result, cleanup) {
         (Ok(completed), Ok(())) => Ok(completed),
         (Err(error), Ok(())) => Err(error),
@@ -215,22 +242,23 @@ fn finish_capture(result: Result<Completed>, cleanup: Result<()>) -> Result<Comp
 pub fn run(args: GateArgs) -> Result<u8> {
     validate_selection(&args)?;
     let interrupts = Interrupts::install()?;
-    let source = Source::open(&args.root)?;
-    let tree = source
-        .commit_tree(&args.commit)
-        .context("resolve explicit commit")?;
-    let grants = Arc::new(Grants::load(&args.grants, &source)?);
+    let origin = Source::open(&args.root)?;
+    let grants = Arc::new(Grants::load(&args.grants, &origin)?);
     let limits = execution_limits(&args, &grants)?;
-    let snapshot = Snapshot::create(
-        &source,
-        &tree,
-        &grants
-            .scratch_parent
-            .join(crate::resource_id("equivalence-capture")?),
-        SnapshotLimits::default(),
-    )?;
-    let result = evaluate(&args, &source, &snapshot, grants, limits, &interrupts);
-    let mut completed = finish_capture(result, snapshot.discard())?;
+    let selected = SelectedSource::capture(&args, origin, &grants)?;
+    let tree = selected.tree().to_owned();
+    let live_evidence = selected.live_evidence();
+    let result = evaluate_capture(&args, &selected, grants, limits, &interrupts);
+    let mut completed = finish_capture(result, selected.discard())?;
+    if let Some(evidence) = live_evidence {
+        completed.evidence["live_inputs"] = evidence;
+        completed.evidence["live_capture_cleanup_complete"] = json!(true);
+        completed.evidence["execution_read_scope"] = json!({
+            "policy":"operator_grants",
+            "original_source_readable":true,
+            "captured_inputs_are_dependency_closure":false
+        });
+    }
     ensure!(
         !interrupts.interrupted()?,
         "equivalence interrupted before publication"
@@ -246,15 +274,41 @@ pub fn run(args: GateArgs) -> Result<u8> {
     if args.json {
         println!("{}", serde_json::to_string(&completed.evidence)?);
     } else {
-        println!(
-            "Commit {} · tree {} · whole module {}",
-            args.commit, tree, args.module
-        );
+        if let Some(commit) = &args.commit {
+            println!(
+                "Commit {commit} · tree {tree} · whole module {}",
+                args.module
+            );
+        } else {
+            println!(
+                "Live selected inputs · tree {tree} · whole module {}",
+                args.module
+            );
+        }
         print!("{}", slop_core::gate_report::render(&completed.summary)?);
     }
     Ok(u8::from(
         args.enforce && !completed.summary.blocking.is_empty(),
     ))
+}
+
+fn evaluate_capture(
+    args: &GateArgs,
+    selected: &SelectedSource,
+    grants: Arc<Grants>,
+    limits: Limits,
+    interrupts: &Interrupts,
+) -> Result<Completed> {
+    let snapshot = Snapshot::create(
+        selected.tree_source(),
+        selected.tree(),
+        &grants
+            .scratch_parent
+            .join(crate::resource_id("equivalence-capture")?),
+        SnapshotLimits::default(),
+    )?;
+    let result = evaluate(args, selected, &snapshot, grants, limits, interrupts);
+    finish_capture(result, snapshot.discard())
 }
 
 #[cfg(test)]

@@ -780,3 +780,33 @@ fn explicit_materialized_verification_checks_workspace_before_payload() {
     // Verification is opt-in; the owned workspace can still dispose mutated payloads.
     workspace.discard().unwrap();
 }
+
+#[test]
+fn live_workspace_owns_tree_and_blobs_without_source_alternates() {
+    let f = Fixture::new();
+    let source = f.source();
+    let repo = source.repository();
+    let blob = repo.blob(b"captured live bytes\n").unwrap();
+    let mut nested = repo.treebuilder(None).unwrap();
+    nested.insert("subject.py", blob, 0o100644).unwrap();
+    let nested = nested.write().unwrap();
+    let mut root = repo.treebuilder(None).unwrap();
+    root.insert("src", nested, 0o040000).unwrap();
+    let tree = root.write().unwrap().to_string();
+    let workspace = Workspace::new_live(&source, &tree, &f.grants()).unwrap();
+    workspace.verify_materialized(&source).unwrap();
+    assert!(!workspace.git_dir.join("objects/info/alternates").exists());
+    let objects = f.host.join(".git/objects");
+    let held = f.host.join(".git/objects-held");
+    fs::rename(&objects, &held).unwrap();
+    let private = git2::Repository::open_bare(&workspace.git_dir).unwrap();
+    assert_eq!(
+        private.find_blob(blob).unwrap().content(),
+        b"captured live bytes\n"
+    );
+    assert!(private
+        .find_tree(git2::Oid::from_str(&tree).unwrap())
+        .is_ok());
+    fs::rename(&held, &objects).unwrap();
+    workspace.discard().unwrap();
+}

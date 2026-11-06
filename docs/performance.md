@@ -14,39 +14,39 @@ Counterbalanced warmed-cache runs scored 20 samples per arm/workload; shell star
 
 ### No-record equivalence capture — 2026-11-06
 
-Release unit binaries `fdd816e` and `8dbdc85` use the identical benchmark fixture.
-The latter skips an unused full workspace copy during target capture; actual
-execution retains its separate confined Stage and recorded-store copying is unchanged.
+Release `fdd816e` → `8dbdc85` skips an unused workspace copy in target capture.
+Actual execution keeps its separate Stage; recorded-store copying is unchanged.
 
-| Auxiliary 1 KiB files | Original p50 / p95 ms | Current p50 / p95 ms |
+| Auxiliary 1 KiB files | Original p50 / p95 ms | Optimized p50 / p95 ms |
 | --- | ---: | ---: |
 | 0 | 4.585538 / 5.013369 | 0.239860 / 0.257800 |
 | 1,000 | 421.223473 / 429.975807 | 2.139969 / 2.230079 |
 
-Four ABBA blocks ran five fresh test processes each. Each process timed two
-warmups and ten captures per case: 100 scored observations and 20 warmups per
-arm/case, 480 total. Complete target/evidence and input identities matched.
-Inotify observed a scratch creation/deletion pair for every original capture and
-none for the optimized captures. Quantiles use nearest rank; observations within
-a process share a warmed fixture and are not independent cold starts.
-The [evidence index](../research/performance/forge-program-20261106-equivalence-capture.json)
-retains binary/build pins, raw observations and four independently verified receipts.
-The two command identities differ; this is a matched fixture comparison. Those outer
-receipts include executable hashing, fixture setup, assertions, disposal and shell
-startup; their CPU/RSS do not measure capture alone. No guest, complete-review,
-model or agent-task gain is established. All 18 publication checks and fresh-base
-verification passed before PR #223 merged with the exact checked tree.
+Four ABBA blocks/five fresh processes each yielded 480 observations: 100 scored
+and 20 warm per arm/case. Targets, evidence and input identities matched; inotify
+scratch events fell from one create/delete pair to zero. Quantiles use nearest rank.
+[Original receipts and audits](../research/performance/forge-program-20261106-equivalence-capture.json) retain identical fixture/build pins and all 18 publication checks.
+Inner timings are warmed capture calls. Outer CPU/RSS includes setup, hashing,
+assertions, disposal and shell startup; neither establishes guest or agent benefit.
 
-### Committed-module gate — 2026-11-06
+### Named-module gate — 2026-11-06
 
-Release `16b5445` passed five standalone lifecycle and four candidate Stage controls.
-Three fixtures matched Python's complete summaries, reports and enforcement exits;
-these are functional comparisons, not speedups. All 480 shared-capture observations
-(400 scored/80 warm) retained exact inputs, targets and zero scratch activity.
-Reference/current p50/p95 ms: **0.245051/0.268611 → 0.240391/0.258652** (0 extra files),
-**2.127811/2.169730 → 2.140081/2.212542** (1,000 files): similar observed cost.
-Four ABBA blocks preserve the benchmark body. [Receipts and audits](../research/performance/forge-program-20261106-committed-equivalence.json) bind compiled identities.
-Outer CPU/RSS includes setup/hashing; full-workload usage, cold-cache latency and agent benefit are unmeasured.
+Release `62858f7` passed ten standalone and four candidate Stage guest controls.
+Three live-input fixtures matched Python's complete summaries, reports and exits.
+[Earlier committed-gate evidence](../research/performance/forge-program-20261106-committed-equivalence.json) remains retained; these are functional comparisons.
+
+| Extra 1 KiB files | Committed preparation p50 / p95 ms | Live preparation p50 / p95 ms |
+| --- | ---: | ---: |
+| 0 | 6.422997 / 7.581573 | 13.175985 / 13.923039 |
+| 1,000 | 858.945750 / 995.692634 | 1371.677875 / 1640.766942 |
+
+Five fresh processes produced 240 paired observations (200 scored/40 warm), with
+identical trees/targets and empty scratch. Timings cover capture, preparation,
+verification and disposal; live adds a captured tree and private Stage Git objects.
+Shared capture's separate 480-row ABBA check versus `8dbdc85` observed p50 changes
+of +0.008310 ms (3.49%) small and +0.015760 ms (0.74%) large, with exact inputs/targets.
+[Receipts, phase timings, p95 and audits](../research/performance/forge-program-20261106-live-equivalence.json) retain failures and measurement limits. This is added-profile cost, not a speedup.
+Cold-cache, full-guest, model-cost and agent-task effects remain unmeasured; outer wait4 CPU/RSS is not per-arm usage or aggregate simultaneous tree memory.
 
 ### Confined MCP test report — 2026-11-06
 

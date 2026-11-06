@@ -200,7 +200,7 @@ measures capture, not guest or full-review speed. All 18 full checks passed at
 `3d8ae38`: 5,051 passing executions, zero failures and 204 ignored across 183
 harnesses. Fresh-base verification passed; merge `551a506` has the identical tree. See the
 [evidence index](../research/performance/forge-program-20261106-equivalence-capture.json).
-[Issue #224](https://github.com/mcpirate17/llm-forge/issues/224) is active: a
+[PR #225](https://github.com/mcpirate17/llm-forge/pull/225) delivered issue #224: a
 [standalone explicit-commit gate](equivalence-gate.md) sharing the candidate
 input capture and Stage owner. It selects one whole committed Python module,
 verifies both materialized preimages and keeps external authority explicit.
@@ -211,12 +211,24 @@ matched the preserved Python wrapper's complete summaries, reports and enforceme
 exits without normalization; actual confined child imports used the pinned guest.
 Independent audits verified retained evidence and cleanup. All 480 shared-capture
 observations preserved inputs/targets and zero scratch activity, with similar cost
-before/after the refactor. Full publication checks remain pending; initial compile
+before/after the refactor. All 18 publication checks passed at `24a1079`: 5,073
+passing executions, zero failures, 209 ignored across 185 harnesses. Fresh-base
+verification passed; merge `2d0564e` has the identical checked tree. Initial compile
 and fixture failures are retained in the
 [evidence index](../research/performance/forge-program-20261106-committed-equivalence.json).
 The Make gate's live-worktree/default-changed/all contract remains unmigrated.
-Its next prerequisite is explicit live-input selection: mutation snapshots exclude
-files the legacy named gate can read, so they cannot silently supply that contract.
+[Issue #226](https://github.com/mcpirate17/llm-forge/issues/226) adds explicit
+live-input selection using the shared scanner, held host inputs and a private Stage
+object store. Release `62858f7` passed ten standalone and four candidate Stage guest
+controls; three authored live-input cases matched the actual Python wrapper's full
+summaries, reports and exits. Independent audits verified 240 paired preparation
+observations and 480 shared-capture observations. Live preparation costs more;
+the captured inputs do not bind every authorized host read. A real guest control
+demonstrates that boundary. The failed observer attempt remains accounted for.
+Full publication checks are next, followed by profiling repeated materialization
+before selecting an optimization. Make/default-changed/all migration remains open;
+no unrestricted legacy live-tree parity is claimed. See the
+[live-input evidence index](../research/performance/forge-program-20261106-live-equivalence.json).
 
 ### Architecture, evidence and disposition
 

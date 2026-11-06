@@ -3,6 +3,7 @@ use crate::candidate_inputs::{self, BoundFile};
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::{Dir, OpenOptions, OpenOptionsExt};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
     env,
@@ -174,6 +175,61 @@ impl Inputs {
         ensure!(path.is_absolute(), "HOME must be absolute");
         Ok(path.join(".config/git"))
     }
+    /// Observed provenance only: ambient host paths are framed, never authorization.
+    pub fn identity(&self) -> Result<serde_json::Value> {
+        fn frame(hash: &mut Sha256, bytes: &[u8]) {
+            hash.update((bytes.len() as u64).to_le_bytes());
+            hash.update(bytes);
+        }
+        let mut hash = Sha256::new();
+        frame(&mut hash, b"forge.live.git-controls.v1");
+        let mut files = self
+            .files
+            .iter()
+            .map(BoundFile::sha256_identity)
+            .collect::<Result<Vec<_>>>()?;
+        files.sort_unstable();
+        files.dedup();
+        frame(&mut hash, b"present");
+        hash.update((files.len() as u64).to_le_bytes());
+        for (parent, name, digest) in &files {
+            hash.update([1]);
+            frame(&mut hash, parent.as_os_str().as_encoded_bytes());
+            frame(&mut hash, name.as_bytes());
+            frame(&mut hash, *digest);
+        }
+        frame(&mut hash, b"absent");
+        hash.update((self.absent.len() as u64).to_le_bytes());
+        for path in &self.absent {
+            hash.update([0]);
+            frame(&mut hash, path.as_os_str().as_encoded_bytes());
+        }
+        for (name, value) in [
+            (b"HOME".as_slice(), &self.home),
+            (b"XDG_CONFIG_HOME".as_slice(), &self.xdg),
+        ] {
+            frame(&mut hash, name);
+            match value {
+                Some(value) => {
+                    hash.update([1]);
+                    frame(&mut hash, value.as_encoded_bytes());
+                }
+                None => hash.update([0]),
+            }
+        }
+        frame(&mut hash, b"git-environment");
+        hash.update((self.git_env.len() as u64).to_le_bytes());
+        for (key, value) in &self.git_env {
+            frame(&mut hash, key.as_encoded_bytes());
+            frame(&mut hash, value.as_encoded_bytes());
+        }
+        Ok(serde_json::json!({"schema_version":1,"algorithm":"sha256",
+            "digest":format!("{:x}",hash.finalize()),
+            "present":files.len(),
+            "absent":self.absent.len(),
+            "scope":"held Git config/ignore/attributes path+presence+content and HOME/XDG/Git environment; includes ambient host paths; provenance, not authority"}))
+    }
+
     pub fn verify(&self) -> Result<()> {
         ensure!(
             Self::git_environment() == self.git_env,

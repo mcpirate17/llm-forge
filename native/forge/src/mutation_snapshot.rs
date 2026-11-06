@@ -20,6 +20,7 @@ pub(crate) use inputs::Selection as SnapshotSelection;
 mod ignore_rules;
 #[path = "mutation_snapshot_native.rs"]
 mod native;
+pub(crate) use native::live::LiveBinding;
 
 const SOURCE_SUFFIXES: [&str; 20] = [
     ".c", ".cc", ".cpp", ".cu", ".h", ".hpp", ".js", ".json", ".jsx", ".md", ".py", ".pyx", ".pxd",
@@ -211,6 +212,7 @@ pub struct Snapshot {
     pub included_untracked: Vec<String>,
     removed: bool,
     preserved: bool,
+    allocation: native::live::Allocation,
 }
 
 impl Snapshot {
@@ -223,7 +225,11 @@ impl Snapshot {
 
     /// Allocate only the empty private root for sandbox admission.
     pub(crate) fn allocate(parent: &Path) -> Result<Self, String> {
-        let root = private_root(parent)?;
+        let root = private_root(parent)?
+            .canonicalize()
+            .map_err(|e| format!("snapshot allocation path: {e}"))?;
+        let allocation = native::live::Allocation::capture(&root)
+            .map_err(|e| format!("snapshot allocation identity: {e:#}"))?;
         let worktree = root.join("worktree");
         Ok(Self {
             root,
@@ -232,7 +238,33 @@ impl Snapshot {
             included_untracked: Vec::new(),
             removed: false,
             preserved: false,
+            allocation,
         })
+    }
+
+    /// Explicit live selection; no mutation ignore/suffix/output policy is reused.
+    pub(crate) fn populate_live(
+        &mut self,
+        repo: &Path,
+        roots: &[String],
+    ) -> Result<LiveBinding, String> {
+        self.allocation
+            .verify(&self.root)
+            .map_err(|e| format!("snapshot root: {e:#}"))?;
+        let binding = native::live::populate_selected(repo, &self.root, &self.worktree, roots)
+            .map_err(|e| format!("live snapshot: {e:#}"))?;
+        self.commit = binding.commit().to_owned();
+        Ok(binding)
+    }
+
+    pub(crate) fn verify_live(&self, repo: &Path, binding: &LiveBinding) -> Result<(), String> {
+        self.allocation
+            .verify(&self.root)
+            .map_err(|e| format!("snapshot root: {e:#}"))?;
+        binding
+            .verify_host(repo)
+            .and_then(|()| binding.verify_snapshot(&self.worktree))
+            .map_err(|e| format!("live snapshot verification: {e:#}"))
     }
 
     pub(crate) fn populate(&mut self, repo: &Path) -> Result<(), String> {
@@ -300,16 +332,9 @@ impl Snapshot {
     /// Delete the snapshot and prove it is gone.
     pub fn remove(mut self) -> Result<(), String> {
         self.removed = true;
-        let result = fs::remove_dir_all(&self.root);
-        if self.root.exists() {
-            let detail = result.err().map(|error| error.to_string());
-            return Err(format!(
-                "snapshot {} survived removal: {}",
-                self.root.display(),
-                detail.unwrap_or_else(|| "it still exists".to_string())
-            ));
-        }
-        Ok(())
+        self.allocation
+            .remove(&self.root)
+            .map_err(|e| format!("snapshot {} cleanup unverified: {e:#}", self.root.display()))
     }
 }
 
@@ -322,13 +347,11 @@ impl Drop for Snapshot {
             eprintln!("forge: retained mutation snapshot: {}", self.root.display());
             return;
         }
-        if let Err(error) = fs::remove_dir_all(&self.root) {
-            if self.root.exists() {
-                eprintln!(
-                    "forge: snapshot {} survived cleanup: {error}",
-                    self.root.display()
-                );
-            }
+        if let Err(error) = self.allocation.remove(&self.root) {
+            eprintln!(
+                "forge: snapshot {} cleanup unverified: {error:#}",
+                self.root.display()
+            );
         }
     }
 }

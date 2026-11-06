@@ -385,12 +385,15 @@ impl CommittedFixture {
         Self::authored(false, CANDIDATE)
     }
     fn authored(alias: bool, module: &str) -> Self {
+        Self::configured(alias, module, CONFIG)
+    }
+    fn configured(alias: bool, module: &str, config: &str) -> Self {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
         let repo_path = root.path().join("repo");
         let repository = git2::Repository::init(&repo_path).unwrap();
         for (name, data) in [
-            ("pyproject.toml", CONFIG),
+            ("pyproject.toml", config),
             ("waivers.json", "[]\n"),
             ("pkg/target.py", module),
             ("tests/test_target.py", TEST),
@@ -449,7 +452,8 @@ impl CommittedFixture {
     fn capture(&self, module: &str) -> Result<Captured<'_>> {
         capture_committed(
             CaptureContext {
-                source: &self.source,
+                origin: &self.source,
+                tree_source: &self.source,
                 snapshot: &self.snapshot,
                 grants: &self.grants,
             },
@@ -594,7 +598,8 @@ fn committed_capture_refuses_unsolicited_external_record_grant() {
     let hash = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
     let result = capture_committed(
         CaptureContext {
-            source: &fixture.source,
+            origin: &fixture.source,
+            tree_source: &fixture.source,
             snapshot: &fixture.snapshot,
             grants: &fixture.grants,
         },
@@ -607,4 +612,325 @@ fn committed_capture_refuses_unsolicited_external_record_grant() {
     assert!(format!("{error:#}").contains("without enabled captured configuration"));
     assert_eq!(fs::read(&path).unwrap(), b"unconfigured record");
     fixture.assert_clean();
+}
+
+/// Different original/private Git roots, with grants loaded only for the origin.
+struct OriginFixture {
+    origin: Source,
+    grants: crate::candidate_execution_workspace::Grants,
+    private: CommittedFixture,
+}
+impl OriginFixture {
+    fn new(config: &str) -> Self {
+        let private = CommittedFixture::configured(false, CANDIDATE, config);
+        let repository = git2::Repository::init(private.root.path().join("origin")).unwrap();
+        stage(
+            &repository,
+            "pyproject.toml",
+            b"origin config is deliberately invalid [\n",
+        );
+        stage(
+            &repository,
+            "pkg/target.py",
+            b"def origin_only():\n    return 0\n",
+        );
+        let tree = repository
+            .find_tree(repository.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        let signature = git2::Signature::now("fixture", "fixture@example.invalid").unwrap();
+        repository
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                "real origin",
+                &tree,
+                &[],
+            )
+            .unwrap();
+        let origin = Source::open(repository.workdir().unwrap()).unwrap();
+        let mut document: Value =
+            serde_json::from_slice(&fs::read(private.root.path().join("grants.json")).unwrap())
+                .unwrap();
+        document["source_root"] = json!(origin.root());
+        document["read_only"] = json!([origin.root()]);
+        let path = private.root.path().join("origin-grants.json");
+        fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let grants = crate::candidate_execution_workspace::Grants::load(&path, &origin).unwrap();
+        for root in [origin.root(), private.source.root()] {
+            for name in ["out", "records"] {
+                let directory = root.join(name);
+                fs::create_dir(&directory).unwrap();
+                fs::set_permissions(directory, fs::Permissions::from_mode(0o700)).unwrap();
+            }
+        }
+        Self {
+            origin,
+            grants,
+            private,
+        }
+    }
+    fn context(&self) -> CaptureContext<'_, '_> {
+        CaptureContext {
+            origin: &self.origin,
+            tree_source: &self.private.source,
+            snapshot: &self.private.snapshot,
+            grants: &self.grants,
+        }
+    }
+    fn configure_private(&mut self, config: &str) {
+        let repository = git2::Repository::open(self.private.source.root()).unwrap();
+        stage(&repository, "pyproject.toml", config.as_bytes());
+        let parent = repository.head().unwrap().peel_to_commit().unwrap();
+        let tree = repository
+            .find_tree(repository.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        let signature = git2::Signature::now("fixture", "fixture@example.invalid").unwrap();
+        let commit = repository
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                "captured external configuration",
+                &tree,
+                &[&parent],
+            )
+            .unwrap();
+        let tree = self
+            .private
+            .source
+            .commit_tree(&commit.to_string())
+            .unwrap();
+        let snapshot = Snapshot::create(
+            &self.private.source,
+            &tree,
+            &self.private.root.path().join("replacement-snapshot"),
+            Limits::default(),
+        )
+        .unwrap();
+        std::mem::replace(&mut self.private.snapshot, snapshot)
+            .discard()
+            .unwrap();
+    }
+    fn record(&self, root: &Path, bytes: &[u8]) -> (PathBuf, String) {
+        let path = root.join("records/current.sqlite");
+        fs::write(&path, bytes).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        (path, format!("{:x}", Sha256::digest(bytes)))
+    }
+}
+
+#[test]
+fn split_origin_publishes_relative_artifacts_at_origin_using_private_captured_config() {
+    let fixture = OriginFixture::new(&format!("{CONFIG}run_artifacts='out'\n"));
+    let output = fixture.origin.root().join("out");
+    let private_output = fixture.private.source.root().join("out");
+    let mut watch = ScratchWatch::new(&fixture.grants.scratch_parent);
+    let captured =
+        capture_committed(fixture.context(), "pkg/target.py", None, Some(&output), 1).unwrap();
+    assert_eq!(
+        captured.targets[0]
+            .2
+            .iter()
+            .map(|unit| unit.0.as_str())
+            .collect::<Vec<_>>(),
+        ["changed", "untouched"]
+    );
+    assert_eq!(captured.timeout_seconds, 12.5);
+    assert_eq!(captured.waivers.as_deref(), Some(b"[]\n".as_slice()));
+    captured.verify().unwrap();
+    let published = captured
+        .artifacts
+        .as_ref()
+        .unwrap()
+        .publish(b"{}", true)
+        .unwrap();
+    assert_eq!(published.parent(), Some(output.as_path()));
+    assert_eq!(fs::read(published).unwrap(), b"{}");
+    assert_eq!(fs::read_dir(private_output).unwrap().count(), 0);
+    assert!(
+        watch.drain().is_empty(),
+        "split no-record capture created a Workspace"
+    );
+    assert!(capture_committed(
+        fixture.context(),
+        "pkg/target.py",
+        None,
+        Some(&fixture.private.source.root().join("out")),
+        1
+    )
+    .is_err());
+    fixture.private.assert_clean();
+}
+
+#[test]
+fn split_origin_relative_record_admission_pins_origin_bytes_and_rejects_private_substitute() {
+    // Tests record admission only, without claiming these bytes form a valid SQLite driver DB.
+    let fixture = OriginFixture::new(&format!(
+        "{CONFIG}\n[tool.forge.test_record]\nstore='records/current.sqlite'\n"
+    ));
+    let (original, hash) = fixture.record(fixture.origin.root(), b"origin current data");
+    let (substitute, substitute_hash) =
+        fixture.record(fixture.private.source.root(), b"private substitute");
+    let document: toml::Value = toml::from_str(
+        &fs::read_to_string(fixture.private.snapshot.path().join("pyproject.toml")).unwrap(),
+    )
+    .unwrap();
+    let configured = || record_config(&document).unwrap();
+    let context = fixture.context();
+    context.validate().unwrap();
+    let (held, bytes, path) =
+        capture_record(configured(), Some((&original, &hash)), &context).unwrap();
+    assert_eq!(bytes.as_deref(), Some(b"origin current data".as_slice()));
+    assert_eq!(path, Some(original.clone()));
+    held.unwrap().verify().unwrap();
+    assert!(capture_record(
+        configured(),
+        Some((&substitute, &substitute_hash)),
+        &context
+    )
+    .is_err());
+    assert_eq!(fs::read(original).unwrap(), b"origin current data");
+    assert_eq!(fs::read(substitute).unwrap(), b"private substitute");
+    fixture.private.assert_clean();
+}
+
+#[test]
+fn split_origin_rejects_private_grant_and_scratch_record_or_output_substitution() {
+    let fixture = OriginFixture::new(&format!("{CONFIG}run_artifacts='out'\n"));
+    let incorrect = CaptureContext {
+        origin: &fixture.origin,
+        tree_source: &fixture.private.source,
+        snapshot: &fixture.private.snapshot,
+        grants: &fixture.private.grants,
+    };
+    assert!(capture_committed(incorrect, "pkg/target.py", None, None, 1).is_err());
+    let scratch = &fixture.grants.scratch_parent;
+    let scratch_output = scratch.join("out");
+    fs::create_dir(&scratch_output).unwrap();
+    fs::set_permissions(&scratch_output, fs::Permissions::from_mode(0o700)).unwrap();
+    let origin_output = fixture.origin.root().join("out");
+    fs::remove_dir(&origin_output).unwrap();
+    std::os::unix::fs::symlink(&scratch_output, &origin_output).unwrap();
+    assert!(capture_committed(
+        fixture.context(),
+        "pkg/target.py",
+        None,
+        Some(&scratch_output),
+        1
+    )
+    .is_err());
+    let record = scratch.join("record.sqlite");
+    fs::write(&record, b"scratch substitute").unwrap();
+    fs::set_permissions(&record, fs::Permissions::from_mode(0o600)).unwrap();
+    std::os::unix::fs::symlink(
+        &record,
+        fixture.origin.root().join("records/current.sqlite"),
+    )
+    .unwrap();
+    let document: toml::Value =
+        toml::from_str("[tool.forge.test_record]\nstore='records/current.sqlite'\n").unwrap();
+    let hash = format!("{:x}", Sha256::digest(fs::read(&record).unwrap()));
+    assert!(capture_record(
+        record_config(&document).unwrap(),
+        Some((&record, &hash)),
+        &fixture.context()
+    )
+    .is_err());
+    assert_eq!(fs::read(&record).unwrap(), b"scratch substitute");
+    // These are authored test inputs, removed explicitly before asserting no Workspace leak.
+    fs::remove_file(record).unwrap();
+    fs::remove_dir(scratch_output).unwrap();
+    fixture.private.assert_clean();
+}
+
+#[test]
+fn split_origin_captured_absolute_paths_cannot_authorize_private_source_outputs_or_records() {
+    let mut fixture = OriginFixture::new(CONFIG);
+    let output = fixture.private.source.root().join("out");
+    fixture.configure_private(&format!("{CONFIG}run_artifacts='{}'\n", output.display()));
+    let error = capture_committed(fixture.context(), "pkg/target.py", None, Some(&output), 1)
+        .err()
+        .expect("private source output admitted");
+    assert!(
+        format!("{error:#}").contains("excluded snapshot or scratch"),
+        "{error:#}"
+    );
+    assert_eq!(fs::read_dir(&output).unwrap().count(), 0);
+    let (record, hash) = fixture.record(fixture.private.source.root(), b"private record");
+    fixture.configure_private(&format!(
+        "{CONFIG}\n[tool.forge.test_record]\nstore='{}'\n",
+        record.display()
+    ));
+    let error = capture_committed(
+        fixture.context(),
+        "pkg/target.py",
+        Some((&record, &hash)),
+        None,
+        1,
+    )
+    .err()
+    .expect("private source record admitted");
+    assert!(
+        format!("{error:#}").contains("excluded snapshot or scratch"),
+        "{error:#}"
+    );
+    assert_eq!(fs::read(record).unwrap(), b"private record");
+    fixture.private.assert_clean();
+}
+
+#[test]
+fn same_root_record_admission_preserves_owned_scratch_compatibility_but_split_origin_refuses() {
+    // Admission-only control: these bytes are not evidence of a valid SQLite driver DB.
+    let original = CommittedFixture::new();
+    let private = CommittedFixture::new();
+    let path = original
+        .grants
+        .scratch_parent
+        .join("operator-record.sqlite");
+    fs::write(&path, b"operator pinned current data").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let hash = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
+    let document: toml::Value = toml::from_str(&format!(
+        "[tool.forge.test_record]\nstore='{}'\n",
+        path.display()
+    ))
+    .unwrap();
+    let legacy = CaptureContext {
+        origin: &original.source,
+        tree_source: &original.source,
+        snapshot: &original.snapshot,
+        grants: &original.grants,
+    };
+    legacy.validate().unwrap();
+    let (held, bytes, captured_path) = capture_record(
+        record_config(&document).unwrap(),
+        Some((&path, &hash)),
+        &legacy,
+    )
+    .unwrap();
+    assert_eq!(
+        bytes.as_deref(),
+        Some(b"operator pinned current data".as_slice())
+    );
+    assert_eq!(captured_path.as_deref(), Some(path.as_path()));
+    held.unwrap().verify().unwrap();
+    let split = CaptureContext {
+        origin: &original.source,
+        tree_source: &private.source,
+        snapshot: &private.snapshot,
+        grants: &original.grants,
+    };
+    split.validate().unwrap();
+    assert!(capture_record(
+        record_config(&document).unwrap(),
+        Some((&path, &hash)),
+        &split
+    )
+    .is_err());
+    assert_eq!(fs::read(&path).unwrap(), b"operator pinned current data");
+    fs::remove_file(path).unwrap();
+    original.assert_clean();
+    private.assert_clean();
 }
