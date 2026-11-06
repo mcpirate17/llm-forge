@@ -465,13 +465,35 @@ corpus admission, source/data drift refusal, exact restoration and owned cleanup
 A timed-out real mutant produced an incomplete ERROR receipt and retained the
 unrestored snapshot after process cleanup.
 
-The actual Forge workload admitted all 338 registry packages but its baseline
+The earlier package-wide Forge workload admitted all 338 registry packages but its baseline
 failed while compiling `ring`: the explicit read grants excluded the required
 `/usr/include/stdc-predef.h` header. A seed does not grant compiler headers.
-Forge package tests also require fixtures such as `FORGE_TEST_BIN` and Git that
-this interface does not grant. The full package suite and engine remain unproven;
-the successful authored fixtures do not establish that broader support. See the
-current [engineering status](roadmap.md) and [observations](performance.md).
+An explicit header read grant subsequently passed an authored C compilation
+control and the five-test `mutation_cargo_supporting::tests::` library baseline.
+That actual campaign's engine timed out; this does not establish a completed
+campaign. Other Forge tests require fixtures such as `FORGE_TEST_BIN` and Git
+that this interface does not grant. The full package suite remains unproven;
+see the current [engineering status](roadmap.md) and [observations](performance.md).
+
+### Interrupted ordinary Cargo progress
+
+After an engine timeout or abnormal stop, Forge can record
+`engine_partial_progress` once owned process cleanup is confirmed. This versioned,
+explicitly incomplete diagnostic binds the discovery and outcome files, reconciles
+unique mutant identities against the selected source/package, and reports observed
+counts and identity digests. It supports the cargo-mutants 27.1 report shape.
+Each input is bounded to 16 MiB, with row and identity limits; serialized progress
+is bounded to 64 KiB. Missing, malformed, inconsistent or changed reports instead
+produce a bounded `engine_partial_progress_error`. Neither case replaces the
+original failure or permits reading output from an unresolved process owner.
+
+Stopped-run accounting, scored mutant rows, source coverage and survivor baselines
+remain unchanged. The difference between discovered and observed mutants may
+include interrupted work: `remaining_or_interrupted` stays null, not an inferred
+unstarted count. Both diagnostic fields survive receipt slimming. Either field's
+presence makes a PASS claim inadmissible and prevents PASS/RATCHET_HELD corpus
+acceptance, including null or malformed values. These are cooperative observations,
+not execution attestation; ordinary snapshot verification and retention still apply.
 
 ## Receipt format
 

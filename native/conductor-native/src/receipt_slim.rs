@@ -401,6 +401,32 @@ mod tests {
     }
 
     #[test]
+    fn partial_engine_diagnostics_remain_separate_from_scored_detail() {
+        for (count, encoding) in [(5, "json"), (200, "zstd+base64")] {
+            let mut receipt = full_receipt(count);
+            receipt["status"] = json!("ERROR");
+            receipt["engine_partial_progress"] = json!({"schema_version":1,"complete":false,
+                "outcomes":{"observed":44,"counts":{"KILLED":40,"SURVIVED":4}}});
+            receipt["engine_partial_progress_error"] = Value::Null;
+            let slim = slim_receipt(&receipt);
+            assert_eq!(slim[DETAIL_KEY]["encoding"], encoding);
+            assert_eq!(
+                slim["engine_partial_progress"],
+                receipt["engine_partial_progress"]
+            );
+            assert!(slim
+                .as_object()
+                .unwrap()
+                .contains_key("engine_partial_progress_error"));
+            let detail = expand_detail(&slim[DETAIL_KEY]).unwrap();
+            assert!(!detail.contains_key("engine_partial_progress"));
+            assert!(!detail.contains_key("engine_partial_progress_error"));
+            assert_eq!(detail["mutants"], receipt["mutants"]);
+            assert_eq!(expand_receipt(&slim).unwrap(), receipt);
+        }
+    }
+
+    #[test]
     fn big_campaigns_become_one_zstd_blob() {
         let receipt = full_receipt(200);
         let slim = slim_receipt(&receipt);

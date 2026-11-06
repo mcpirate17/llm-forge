@@ -93,7 +93,7 @@ outputs blocked exact source scope; Cargo's confined `../` shared-source paths
 were rejected; and omitted dependency examples were treated as required inputs.
 Selected dirty sources still require ownership. Symlinks and escaping paths
 remain refused; only unselected dependency example/test/bench targets may be absent.
-The last actual trial admitted all 338 registry packages and started the package
+The fourth package-wide trial admitted all 338 registry packages and started the package
 baseline, which failed because the C compiler could not read an ungranted system
 header. It produced BASELINE_FAILED, with both owned scopes and snapshot removed.
 Forge's complete package suite and engine remain unproven under these grants.
@@ -104,7 +104,7 @@ checks and exact-head/current-base verification passed, with 4,755 passing
 executions, zero failures and 188 ignored across 179 harnesses. The earlier
 `0522270` gate and intermediate focused results remain historical observations.
 
-The next #196 slice at `4cba4eb` adds explicit library/integration-target selection,
+The #196 slice at `4cba4eb` adds explicit library/integration-target selection,
 a bounded libtest substring filter, matched direct/engine test inventories and
 campaign-bound native admission. Selected test pins are partial anchors, not
 complete test-file coverage. Both workspace profiles now refuse slashless
@@ -119,10 +119,27 @@ clean-release automatic controls each completed 31 checks: strong or whole-targe
 selection killed both mutants, while weak integration/library selection preserved
 both survivors as RATCHET_HELD. Independent raw audits verified scope, corpus
 drift/restoration and cleanup. [Results and limitations](performance.md#selected-workspace-test-controls--2026-11-06)
-remain distinct from the required full publication checks.
+remain distinct from the full publication checks. [PR #204](https://github.com/mcpirate17/llm-forge/pull/204)
+landed as `83990e2`, with a tree identical to checked head `c1c3a7e`. All 18 local
+checks and exact-head/current-base verification passed: 4,804 passing executions,
+zero failures and 188 ignored across 179 harnesses.
 
-Next for #196: validate explicit compiler-header and test-fixture grants for an
-actual Forge test scope, then restore Fest/Mull through the same command owner.
+An explicit `/usr/include` read grant subsequently passed a small C-header
+control. The actual Forge library filter `mutation_cargo_supporting::tests::`
+then passed all five selected tests after a fresh 157-second build. Its automatic
+engine timed out at 300 seconds; retained files list 55 mutants and 44 completed
+outcomes (34 caught, seven missed, three unviable). The remaining states are
+unknown. The snapshot is retained and all three owned process scopes are absent.
+This is selected-baseline evidence, not a completed campaign or full package suite.
+See the [measurement scope and evidence](performance.md#compiler-header-control-and-actual-forge-timeout--2026-11-06).
+
+Active work: [#205](https://github.com/mcpirate17/llm-forge/issues/205) preserves
+bounded, explicitly incomplete engine progress after timeout. Such observations
+must remain separate from scoring and cannot support passing receipt admission.
+Next for #196: finish useful bounded actual-package campaign evidence and restore
+Fest/Mull through the same command owner. A shared native coordinator for mutation
+evidence, coverage and canary remains queued; migration must preserve legacy
+identity and anchor semantics without weakening candidate approval requirements.
 Read grants, test executables and environment are separate operator decisions;
 a seed grants none. Broader platform priorities below remain open.
 

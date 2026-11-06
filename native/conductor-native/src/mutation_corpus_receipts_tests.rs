@@ -1,4 +1,41 @@
 use super::*;
+
+#[test]
+fn corpus_passing_statuses_reject_partial_diagnostics_for_all_runner_kinds() {
+    let symbols = BTreeSet::new();
+    let c = campaign(&symbols);
+    for status in ["PASS", "RATCHET_HELD"] {
+        for key in ["engine_partial_progress", "engine_partial_progress_error"] {
+            for value in [Value::Null, json!("malformed"), json!({"complete":false})] {
+                for native in [false, true] {
+                    let mut receipt = json!({"status":status});
+                    receipt[key] = value.clone();
+                    if native {
+                        receipt["runner_kind"] = json!("forge-native");
+                    }
+                    let reason = rejection(&c, &receipt, &json!({}), |_| Ok(None), |_| Ok(false))
+                        .unwrap()
+                        .unwrap();
+                    assert!(reason.contains("partial engine diagnostics"), "{reason}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn corpus_stopped_statuses_keep_their_original_rejection() {
+    let symbols = BTreeSet::new();
+    let c = campaign(&symbols);
+    for status in ["ERROR", "CANCELLED"] {
+        let receipt = json!({"status":status,"engine_partial_progress":null,
+            "engine_partial_progress_error":"partial report unavailable"});
+        assert_eq!(
+            rejection(&c, &receipt, &json!({}), |_| Ok(None), |_| Ok(false)).unwrap(),
+            Some(format!("status={status}"))
+        );
+    }
+}
 fn campaign<'a>(symbols: &'a BTreeSet<String>) -> Campaign<'a> {
     Campaign {
         campaign_id: "c",
