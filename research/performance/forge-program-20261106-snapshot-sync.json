@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "kind": "snapshot_directory_sync_batching",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/228",
+  "base_commit": "981163d8fa81ef84e6d953e2a7d027dc6c6f93ac",
+  "status": "candidate_focused_verified_measurement_pending",
+  "scope": "Shared native snapshot materialization; preserve every file sync and final publish-parent sync, batch distinct directory syncs after complete population. No guest authority change.",
+  "profile": {
+    "path": ".git/forge-snapshot-sync-profile-audit.json",
+    "sha256": "d8ac55f5d0789d7fc0ec548e91297e7cda3cc18e6a0cea1359bdb38881753be9"
+  },
+  "profile_limits": "One traced fixture execution, 48 completed rows. 121297 fsync calls,25.016018 seconds,91.39% of selected-syscall wall latency; not total workload share, not isolated directory cost, not speedup. Includes setup and cleanup, traced execution perturbs latency.",
+  "validation": [
+    {
+      "attempt": 1,
+      "steps": [
+        {
+          "step": "snapshot",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "candidate_snapshot::"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 22.039250373840332,
+          "log": {
+            "path": ".git/forge-snapshot-sync-snapshot1.log",
+            "sha256": "84f5e66a0b15da3e832ddd62d497e5dd6317aba0c5d57b244f63a4e1a1028f52"
+          },
+          "results": [
+            "test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 1325 filtered out; finished in 0.15s"
+          ]
+        },
+        {
+          "step": "workspace",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "candidate_execution_workspace"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.14043664932250977,
+          "log": {
+            "path": ".git/forge-snapshot-sync-workspace1.log",
+            "sha256": "bfeca91dbac6880c24ddee537f9654260280725b06ca898411e987cbc2feb4d4"
+          },
+          "results": [
+            "test result: ok. 18 passed; 0 failed; 8 ignored; 0 measured; 1325 filtered out; finished in 0.05s"
+          ]
+        },
+        {
+          "step": "equivalence",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "equivalence_gate::"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.10475492477416992,
+          "log": {
+            "path": ".git/forge-snapshot-sync-equivalence1.log",
+            "sha256": "42ab026a5231b65419f88e50aa59cfca7885a391a908598f3e79bb3ec3502f21"
+          },
+          "results": [
+            "test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 1344 filtered out; finished in 0.01s"
+          ]
+        },
+        {
+          "step": "clippy",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 10.818237543106079,
+          "log": {
+            "path": ".git/forge-snapshot-sync-clippy1.log",
+            "sha256": "f789215df2f773aa95b81e7c2acdd31ff7a6492dee4f401bbc977a8a4b4bf9ba"
+          },
+          "results": []
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "steps": [
+        {
+          "step": "clippy",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 17.764249086380005,
+          "log": {
+            "path": ".git/forge-snapshot-sync-clippy2.log",
+            "sha256": "f72b1c43dbc50741aa56ec0e8b3a142bb32fb1859eb7e2964e54d1dd848b6d07"
+          },
+          "results": []
+        },
+        {
+          "step": "fmt",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "fmt",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 2.436093330383301,
+          "log": {
+            "path": ".git/forge-snapshot-sync-fmt2.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "results": []
+        },
+        {
+          "step": "snapshot",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "candidate_snapshot::"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 6.908831834793091,
+          "log": {
+            "path": ".git/forge-snapshot-sync-snapshot2.log",
+            "sha256": "929387dd94565db5fd14c76bb418c23be40f986419708c2d15f45cb614178639"
+          },
+          "results": [
+            "test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 1325 filtered out; finished in 0.19s"
+          ]
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "steps": [
+        {
+          "step": "snapshot",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "snapshot"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 1.1573424339294434,
+          "log": {
+            "path": ".git/forge-snapshot-sync-snapshot3.log",
+            "sha256": "41af9cdd6ef455495c83807894d6c9b964304990114bff84e57e5c28b2ee9cc8"
+          },
+          "results": [
+            "test result: ok. 112 passed; 0 failed; 3 ignored; 0 measured; 1236 filtered out; finished in 1.06s"
+          ]
+        },
+        {
+          "step": "equivalence",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "equivalence"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.2335045337677002,
+          "log": {
+            "path": ".git/forge-snapshot-sync-equivalence3.log",
+            "sha256": "3461a07b0cbbef1a47dfa1345c3b2de1e62a0b432d94cd92325503671dede98b"
+          },
+          "results": [
+            "test result: ok. 40 passed; 0 failed; 2 ignored; 0 measured; 1309 filtered out; finished in 0.14s"
+          ]
+        }
+      ]
+    }
+  ],
+  "retained_failure": "Attempt1 strict Clippy rejected complex test-hook type. Fixed with cfg(test) type alias; no suppressed lint. Tests had passed; subsequent strict Clippy/fmt and affected tests passed.",
+  "independent_review": {
+    "reviewer": "native_review",
+    "result": "No concrete blocker after reading implementation and tests",
+    "limitations": "Hook errors occur immediately before sync; not actual kernel fsync failure or power-loss proof. Earlier aggregate path-budget concern withdrawn after source metadata budget inspection."
+  },
+  "test_scope": [
+    "Unique directory flushes after all file bytes/modes/source links exist; child before parent",
+    "Child, parent and root injected failures clean owned staging",
+    "Symlink, equivalent inode, intermediate ancestor and root mode replacements refuse",
+    "Hook reset after panic; dedicated child with RLIMIT_NOFILE=64 materializes192 sibling directories"
+  ],
+  "remaining": [
+    "Clean release build and matched old/current preparation measurements using unchanged fixture",
+    "Real candidate execution regression controls",
+    "Independent performance/evidence review",
+    "Full local-check and fresh-base local-verify before PR publication"
+  ],
+  "limitations": [
+    "No power-loss survival claim for unpublished staging names or later guest modifications",
+    "No speedup, end-to-end agent benefit or cost savings established yet"
+  ]
+}

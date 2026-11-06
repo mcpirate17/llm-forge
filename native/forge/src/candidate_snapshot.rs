@@ -1,4 +1,6 @@
 //! Private standalone Git-object snapshots. No Git child, checkout or worktree.
+#[path = "candidate_snapshot_directory_sync.rs"]
+mod directory_sync;
 mod paths;
 #[cfg(test)]
 mod tests;
@@ -248,11 +250,12 @@ impl Snapshot {
     }
 
     fn populate(&mut self, source: &Source, plan: &Plan) -> Result<()> {
+        let mut directories = directory_sync::Directories::new(&self.directory)?;
         for entry in &plan.entries {
             if entry.mode == "160000" {
                 continue;
             }
-            let parent = self.parent_for(&entry.path)?;
+            let parent = self.parent_for(&entry.path, &mut directories)?;
             let name = Path::new(&entry.path)
                 .file_name()
                 .context("candidate filename missing")?;
@@ -281,34 +284,33 @@ impl Snapshot {
                 0o644
             }))?;
             file.sync_all()?;
-            parent.open(".")?.sync_all()?;
         }
         // All ordinary paths exist before any source-controlled symlink does.
         for (path, target) in &plan.links {
-            let parent = self.parent_for(path)?;
+            let parent = self.parent_for(path, &mut directories)?;
             parent.symlink_contents(
                 target,
                 Path::new(path)
                     .file_name()
                     .context("symlink name missing")?,
             )?;
-            parent.open(".")?.sync_all()?;
         }
-        self.directory.open(".")?.sync_all()?;
+        directories.sync(&self.directory)?;
         Ok(())
     }
 
-    fn parent_for(&self, path: &str) -> Result<Dir> {
+    fn parent_for(&self, path: &str, directories: &mut directory_sync::Directories) -> Result<Dir> {
         let mut directory = self.directory.try_clone()?;
         let parent = Path::new(path)
             .parent()
             .context("candidate file has no parent")?;
+        let mut current = PathBuf::new();
         for component in parent.components() {
             let Component::Normal(name) = component else {
                 anyhow::bail!("unsafe candidate parent");
             };
             match directory.create_dir_with(name, DirBuilder::new().mode(0o755)) {
-                Ok(()) => directory.open(".")?.sync_all()?,
+                Ok(()) => (),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
                 Err(error) => return Err(error.into()),
             }
@@ -319,6 +321,8 @@ impl Snapshot {
                     .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW),
             )?;
             directory = Dir::from_std_file(opened.into_std());
+            current.push(name);
+            directories.record(&current, &directory)?;
         }
         Ok(directory)
     }

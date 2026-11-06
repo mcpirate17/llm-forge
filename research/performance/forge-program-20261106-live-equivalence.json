@@ -4,7 +4,7 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/226",
   "base_commit": "2d0564ea15abc7d78affa1dfa6e2d8f52ec1b673",
-  "status": "focused_release_controls_and_measurements_complete_publication_pending",
+  "status": "merged_verified_bounded_profile",
   "scope": "Explicit named whole Python module; live HEAD/index working bytes plus declared roots and root pyproject. Shared mutation scanner and candidate Stage owner; original operator authority remains distinct from captured content.",
   "implemented": [
     "Explicit mutually exclusive commit/live CLI; live requires bounded input roots",
@@ -370,8 +370,36 @@
       },
       "environment_limit": "Recorder environment digest is sealed before/after evidence, but raw environment was not saved and cannot be independently reconstructed. Hash/seal integrity does not authenticate a producer."
     },
-    "full_local_check": "pending",
-    "fresh_base_verification": "pending",
+    "full_local_check": {
+      "result": "PASS",
+      "steps": 18,
+      "checked_head": "9e63d03a704ea5a198ac02b0cb091a27cd2b488b",
+      "tree": "25d0e873f9143970af10e3eaa010c1f06a59331c",
+      "base": "2d0564ea15abc7d78affa1dfa6e2d8f52ec1b673",
+      "test_executions": {
+        "passed": 5092,
+        "failed": 0,
+        "ignored": 215
+      },
+      "harnesses": 185,
+      "scope": "Summed test-result lines, includes repeated feature-matrix executions, not unique tests.",
+      "receipt": {
+        "path": ".git/forge-checks/run-1794003145696194969-2967327/receipt.json",
+        "sha256": "09f863d43b71ba293de35cfbffe3f3c1b17a27c19582fa710869feed82f76141"
+      },
+      "independent_audit": {
+        "path": ".git/forge-live-gate-publication-audit.json",
+        "sha256": "0ab69a25cf4a5833f8026213ce731492a19ac81844db5ecc71f58404ea643c0a"
+      },
+      "dependency_audit": "PASS with the existing allowed paste1.0.15 unmaintained advisory RUSTSEC-2024-0436; not warning-free and no policy change."
+    },
+    "fresh_base_verification": {
+      "result": "PASS twice after fresh fetch",
+      "log": {
+        "path": ".git/forge-live-gate-local-verify2.log",
+        "sha256": "20a32f2bf3587618f0157fabc54e656fb6aadb025f11dcc0dd957c4693f278e2"
+      }
+    },
     "format": {
       "result": "PASS",
       "log": {
@@ -544,5 +572,21 @@
     },
     "unit_observer_sha256": "e8b69483d462cdff2defc2b79838e048567097295d30c77756f68066700da711",
     "shared_installation": false
+  },
+  "publication": {
+    "pr": "https://github.com/mcpirate17/llm-forge/pull/227",
+    "issue_state": "CLOSED",
+    "merge": "981163d8fa81ef84e6d953e2a7d027dc6c6f93ac",
+    "merged_tree": "25d0e873f9143970af10e3eaa010c1f06a59331c",
+    "proof": {
+      "path": ".git/forge-live-gate-merge-proof.json",
+      "sha256": "37bf46face4f10d6d6c033c6150937d62018c0c80637de2791342e06c86d4892"
+    },
+    "native_input_entries_preserved": 1494,
+    "source_preservation": {
+      "path": ".git/forge-live-gate-integration-source-preservation.json",
+      "sha256": "37bf46face4f10d6d6c033c6150937d62018c0c80637de2791342e06c86d4892"
+    },
+    "local_and_remote_branches_retired": true
   }
 }

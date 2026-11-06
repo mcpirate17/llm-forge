@@ -31,8 +31,8 @@ assertions, disposal and shell startup; neither establishes guest or agent benef
 
 ### Named-module gate — 2026-11-06
 
-Release `62858f7` passed ten standalone and four candidate Stage guest controls.
-Three live-input fixtures matched Python's complete summaries, reports and exits.
+Release `62858f7` passed ten standalone/four candidate guest controls and three exact Python comparisons.
+[PR #227](https://github.com/mcpirate17/llm-forge/pull/227) passed all 18 publication checks: 5,092 passed/0 failed/215 ignored executions; fresh-base verification passed.
 [Earlier committed-gate evidence](../research/performance/forge-program-20261106-committed-equivalence.json) remains retained; these are functional comparisons.
 
 | Extra 1 KiB files | Committed preparation p50 / p95 ms | Live preparation p50 / p95 ms |
