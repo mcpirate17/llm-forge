@@ -14,48 +14,48 @@ Counterbalanced warmed-cache runs scored 20 samples per arm/workload; shell star
 
 ### No-record equivalence capture — 2026-11-06
 
-Release `fdd816e` → `8dbdc85` skips an unused workspace copy in target capture.
-Actual execution keeps its separate Stage; recorded-store copying is unchanged.
+Release `fdd816e` → `8dbdc85` skips an unused workspace copy in target capture. Actual execution keeps its separate Stage; recorded-store copying is unchanged.
 
 | Auxiliary 1 KiB files | Original p50 / p95 ms | Optimized p50 / p95 ms |
 | --- | ---: | ---: |
 | 0 | 4.585538 / 5.013369 | 0.239860 / 0.257800 |
 | 1,000 | 421.223473 / 429.975807 | 2.139969 / 2.230079 |
 
-Four ABBA blocks/five fresh processes each yielded 480 observations: 100 scored
-and 20 warm per arm/case. Targets, evidence and input identities matched; inotify
-scratch events fell from one create/delete pair to zero. Quantiles use nearest rank.
+Four ABBA blocks/five fresh processes each yielded 480 observations: 100 scored and 20 warm per arm/case. Targets, evidence and input identities matched; inotify scratch events fell from one create/delete pair to zero. Quantiles use nearest rank.
 [Original receipts and audits](../research/performance/forge-program-20261106-equivalence-capture.json) retain identical fixture/build pins and all 18 publication checks.
-Inner timings are warmed capture calls. Outer CPU/RSS includes setup, hashing,
-assertions, disposal and shell startup; neither establishes guest or agent benefit.
+Inner timings are warmed capture calls. Outer CPU/RSS includes setup, hashing, assertions, disposal and shell startup; neither establishes guest or agent benefit.
 
 ### Named-module gate — 2026-11-06
 
-Release `62858f7` passed ten standalone/four candidate guest controls and three exact Python comparisons.
-[PR #227](https://github.com/mcpirate17/llm-forge/pull/227) passed all 18 publication checks: 5,092 passed/0 failed/215 ignored executions; fresh-base verification passed.
-[Earlier committed-gate evidence](../research/performance/forge-program-20261106-committed-equivalence.json) remains retained; these are functional comparisons.
+Release `62858f7` passed ten standalone/four candidate guest controls and three exact Python comparisons. [PR #227](https://github.com/mcpirate17/llm-forge/pull/227) passed all 18 publication checks: 5,092 passed/0 failed/215 ignored executions; fresh-base verification passed.
+[Committed-gate evidence](../research/performance/forge-program-20261106-committed-equivalence.json) and [live-input receipts, timings and audits](../research/performance/forge-program-20261106-live-equivalence.json) retain the functional comparisons and added-profile cost; neither establishes a speedup or agent benefit.
 
 | Extra 1 KiB files | Committed preparation p50 / p95 ms | Live preparation p50 / p95 ms |
 | --- | ---: | ---: |
 | 0 | 6.422997 / 7.581573 | 13.175985 / 13.923039 |
 | 1,000 | 858.945750 / 995.692634 | 1371.677875 / 1640.766942 |
 
-Five fresh processes produced 240 paired observations (200 scored/40 warm), with
-identical trees/targets and empty scratch. Timings cover capture, preparation,
-verification and disposal; live adds a captured tree and private Stage Git objects.
-Shared capture's separate 480-row ABBA check versus `8dbdc85` observed p50 changes
-of +0.008310 ms (3.49%) small and +0.015760 ms (0.74%) large, with exact inputs/targets.
-[Receipts, phase timings, p95 and audits](../research/performance/forge-program-20261106-live-equivalence.json) retain failures and measurement limits. This is added-profile cost, not a speedup.
-Cold-cache, full-guest, model-cost and agent-task effects remain unmeasured; outer wait4 CPU/RSS is not per-arm usage or aggregate simultaneous tree memory.
+Five processes produced 240 observations (200 scored/40 warm), with identical trees/targets and empty scratch. Timings include capture, preparation, verification and disposal; live adds a tree and private Stage Git objects.
+Shared capture's separate 480-row ABBA check versus `8dbdc85` observed p50 changes of +0.008310 ms (3.49%) small and +0.015760 ms (0.74%) large, with exact inputs/targets. Outer wait4 CPU/RSS is not per-arm usage or aggregate simultaneous tree memory; cold-cache, guest, model-cost and task effects remain unmeasured.
+
+### Snapshot directory batching — rejected experiment
+
+Candidate `a4a8431` retained file/publication syncs and batched directory syncs. All 960 observations passed input/cleanup checks; four CLI and seven guest controls also passed. Reference `62858f7` and candidate used unchanged fixtures in four ABBA blocks, 20 fresh processes, 800 scored/160 warm observations.
+
+| Extra files / mode | Reference p50 / p95 ms | Candidate p50 / p95 ms |
+| --- | ---: | ---: |
+| 0 / committed | 6.603783 / 9.266066 | 4.325672 / 7.271916 |
+| 0 / live | 13.648619 / 15.053076 | 10.190971 / 13.242976 |
+| 1,000 / committed | 882.178863 / 1054.391956 | 941.959952 / 1058.013161 |
+| 1,000 / live | 1447.162316 / 1690.246537 | 1496.148250 / 1837.419160 |
+
+Small cases improved, but the primary 1,000-file target did not demonstrate a gain. Reference block medians drifted from 861/1,370 to 950/1,504 ms; pooled differences are not causal regression proof. Independent review agreed to reject the added bookkeeping and restore all native source to `981163d`.
+[Public receipts, phase summaries and reproduction](../research/performance/forge-program-20261106-snapshot-sync.json) retain the experiment; detailed rows, logs and audits linked under `.git` remain host-local. Inner rows are nested within processes; no cold-cache, guest, token, cost or agent-task benefit is established. The aggregate syscall profile did not isolate directory sync cost.
 
 ### Confined MCP test report — 2026-11-06
 
-The operator-enabled `python_test_report` uses the native classifier through an
-owned confined worker. Release source `2d23d1c` and observer source `a3ac295` were
-measured on the same authored repository: one Python test and two modules.
-The [evidence index](../research/performance/forge-program-20261106-mcp-test-report.json)
-retains the initial pre-launch admission failure, correction, live controls,
-native performance receipt, raw observations and independent audits.
+The operator-enabled `python_test_report` uses the native classifier through an owned confined worker. Release `2d23d1c` and observer `a3ac295` were measured on the same authored repository: one Python test and two modules.
+The [evidence index](../research/performance/forge-program-20261106-mcp-test-report.json) retains the initial pre-launch admission failure, correction, live controls, native performance receipt, raw observations and independent audits.
 
 | Five scored observations, 31 calls per arm each | Inner median range | Inner p95 range |
 | --- | ---: | ---: |

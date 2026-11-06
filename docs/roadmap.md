@@ -231,12 +231,17 @@ has the identical checked tree, and all 1,494 native entries retained their byte
 and filesystem identities during integration. Make/default-changed/all migration remains open;
 no unrestricted legacy live-tree parity is claimed. See the
 [live-input evidence index](../research/performance/forge-program-20261106-live-equivalence.json).
-[Issue #228](https://github.com/mcpirate17/llm-forge/issues/228) investigates batching
-redundant directory syncs while retaining file and publication syncs. One bounded
-profile of the unchanged fixture observed 121,297 fsync calls and 25.016 seconds
-of accumulated selected-syscall latency. It does not isolate directory costs or
-establish a speedup. The candidate is under durability and failure-path review;
-matched measurements and full publication checks remain required before acceptance.
+[Issue #228](https://github.com/mcpirate17/llm-forge/issues/228) investigated batching
+directory syncs while retaining file and publication syncs. Candidate `a4a8431`
+passed focused, CLI and real-guest controls, but its 960-observation comparison
+did not demonstrate improvement on the primary 1,000-file workload. Small cases
+improved; substantial reference-block drift prevents treating the larger pooled
+difference as a proven causal regression. Independent review agreed to reject
+the added bookkeeping. All native source is restored to `981163d`; no speedup is
+promoted. The [experiment and receipts](../research/performance/forge-program-20261106-snapshot-sync.json)
+retain the profile, failures, successful controls, comparison and cleanup proof.
+Publication checks for this investigation record are next, followed by native
+default-changed/tracked-all multi-module selection for the remaining Make gate.
 
 ### Architecture, evidence and disposition
 

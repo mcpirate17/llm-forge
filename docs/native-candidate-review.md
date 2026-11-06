@@ -559,14 +559,6 @@ automatically; an explicitly published CLI snapshot persists at `--output`.
 The existing output parent is selected by the operator and must be trusted.
 Publication rechecks its identity and uses atomic no-replace renaming on Linux.
 
-Materialization syncs each regular file after writing bytes and mode, then syncs
-each distinct directory once, descendants before ancestors, after all files and
-source links exist. Directory reopening starts from the held root, refuses
-symlinks and checks recorded device, inode, mode and owner identities. A sync
-error refuses success and triggers owned staging cleanup. Publication retains
-its separate destination-parent sync. These checks do not promise power-loss
-survival of an unpublished staging name or of later guest modifications.
-
 ### Verify a candidate receipt
 
 `verify-receipt` accepts at most 16 MiB of UTF-8 JSON and checks that a candidate

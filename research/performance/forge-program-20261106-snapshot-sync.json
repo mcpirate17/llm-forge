@@ -4,8 +4,8 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/228",
   "base_commit": "981163d8fa81ef84e6d953e2a7d027dc6c6f93ac",
-  "status": "candidate_focused_verified_measurement_pending",
-  "scope": "Shared native snapshot materialization; preserve every file sync and final publish-parent sync, batch distinct directory syncs after complete population. No guest authority change.",
+  "status": "experiment_rejected_native_source_restored_publication_pending",
+  "scope": "Investigated shared native snapshot directory synchronization. Candidate correctness passed, but the primary1000-file preparation target did not demonstrate improvement. Existing native implementation restored byte-for-byte; no product optimization accepted.",
   "profile": {
     "path": ".git/forge-snapshot-sync-profile-audit.json",
     "sha256": "d8ac55f5d0789d7fc0ec548e91297e7cda3cc18e6a0cea1359bdb38881753be9"
@@ -273,13 +273,580 @@
     "Hook reset after panic; dedicated child with RLIMIT_NOFILE=64 materializes192 sibling directories"
   ],
   "remaining": [
-    "Clean release build and matched old/current preparation measurements using unchanged fixture",
-    "Real candidate execution regression controls",
-    "Independent performance/evidence review",
-    "Full local-check and fresh-base local-verify before PR publication"
+    "Full local-check and fresh-base local-verify before publishing investigation record",
+    "Record issue228 disposition without claiming a shipped speedup",
+    "Advance to remaining native multi-module gate caller; exact input and authority contract must remain explicit"
   ],
   "limitations": [
-    "No power-loss survival claim for unpublished staging names or later guest modifications",
-    "No speedup, end-to-end agent benefit or cost savings established yet"
-  ]
+    "No accepted implementation change or platform speedup from this experiment",
+    "Nested observations are not800 independent process replicates; only20 fresh processes in four blocks",
+    "Warm filesystem/cache observations, with visible block/order variation; no cold-cache or allocation measurements",
+    "Outer wait4 CPU and largest individual waited-process RSS are whole-process observations, not per-phase or simultaneous process-tree memory",
+    "Same recorded compiler/profile/features, not complete ambient build-environment equivalence or producer authentication",
+    "No guest elapsed-time, model-cost, token savings or agent-task benefit attribution"
+  ],
+  "candidate": {
+    "commit": "a4a8431ae9785fdc90cf192c1557f4618ab394b4",
+    "tree": "703516fa11d63570d3f690f37f437b15eca6aca5",
+    "release": {
+      "path": ".git/forge-snapshot-sync-release-binary.json",
+      "sha256": "575d0dcf7ef1384f4022e556994c4aa46bb7cdf6a4e89ab81c5bb6f6c572a10c"
+    },
+    "observers": {
+      "path": ".git/forge-snapshot-sync-observer-binaries.json",
+      "sha256": "b960c2406b9a37b203296ebbc5b12ccf1fc249451a26a3fc9d18cecb39c6ad31"
+    },
+    "original_reference_commit": "62858f7e0c51af80f7f4a4323d1eb5cd03482a1c",
+    "source_restore_base": "981163d8fa81ef84e6d953e2a7d027dc6c6f93ac",
+    "native_diff_against_base_after_restore": "empty"
+  },
+  "additional_validation": {
+    "release_cli": {
+      "path": ".git/forge-snapshot-sync-release-cli1.json",
+      "sha256": "e921b0e78210d2fd02b8a1145a06594dd17d071489c15f0b91f207314f86eda6"
+    },
+    "real_guest_controls": {
+      "path": ".git/forge-snapshot-sync-controls2.json",
+      "sha256": "0bc29e776b1b0ae61d688c0b76e345a038781852730d1b1c29eafec816ee00b1"
+    },
+    "independent_controls_audit": {
+      "path": ".git/forge-snapshot-sync-controls-independent.json",
+      "sha256": "164146047fed56f21ccc6e2fccbc0f0572c8ada408151b11306c71b6c63591c6"
+    },
+    "exact_owned_unit_retirement": {
+      "path": ".git/forge-snapshot-sync-control-retirement1.json",
+      "sha256": "95ff76d2dfb82f5e04d48b6c6fd605d74b0bffbd3d8cc632a69de5945e5f5212"
+    },
+    "retained_runner_preflight_failure": {
+      "path": ".git/forge-snapshot-sync-control-failure1.json",
+      "sha256": "604434c778e1e1be2ae544eca1bdb67324443b8ce074c5224903df1b66ca1396"
+    },
+    "counts": "4 release CLI checks and7 real guest checks PASS. First private runner failed user-bus preflight before any test observer; corrected only bus environment and reran successfully. No shared install/adoption."
+  },
+  "measurement": {
+    "driver": {
+      "path": ".git/forge-snapshot-sync-measure.py",
+      "sha256": "adccc4acdf4f7ac0745c922702f6ed483aaab9ff009218b3509dd8c5196a8ebd"
+    },
+    "summary": {
+      "path": ".git/snapshot-sync-measure-1ql5oi04/summary.json",
+      "sha256": "9541bdd7c88f8d9808ef156ca49732ebc03cc3c36b1dfbe4f4c53735faaf61c5"
+    },
+    "independent_audit": {
+      "path": ".git/forge-snapshot-sync-measure-independent.json",
+      "sha256": "0ab714291c1c0662665ade3b925d6ce8f48299b762c41b967e6a0e99dcca1cec"
+    },
+    "planned": {
+      "blocks": 4,
+      "sequence": [
+        "reference",
+        "candidate",
+        "candidate",
+        "reference"
+      ],
+      "processes_per_block": 5,
+      "fresh_processes": 20,
+      "rows": 960,
+      "scored": 800,
+      "warm": 160
+    },
+    "accounting": {
+      "completed_blocks": 4,
+      "noncompleted_launched_blocks": 0,
+      "unstarted_blocks": 0,
+      "confirmed_completed_processes": 20,
+      "censored_or_unknown_process_slots": 0,
+      "known_unstarted_process_slots": 0
+    },
+    "aggregate": [
+      {
+        "extra_files": 0,
+        "preparation_mode": "commit",
+        "arms": {
+          "reference": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 2.521522,
+                "p95_ms": 4.773004,
+                "min_ms": 2.365032,
+                "max_ms": 5.79697
+              },
+              "prepare_ns": {
+                "p50_ms": 3.703378,
+                "p95_ms": 4.212291,
+                "min_ms": 3.441287,
+                "max_ms": 6.992135
+              },
+              "verify_ns": {
+                "p50_ms": 0.11232,
+                "p95_ms": 0.147491,
+                "min_ms": 0.107861,
+                "max_ms": 0.258102
+              },
+              "disposal_ns": {
+                "p50_ms": 0.180631,
+                "p95_ms": 0.249161,
+                "min_ms": 0.175641,
+                "max_ms": 0.269612
+              },
+              "total_ns": {
+                "p50_ms": 6.603783,
+                "p95_ms": 9.266066,
+                "min_ms": 6.132371,
+                "max_ms": 9.95071
+              }
+            }
+          },
+          "candidate": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 1.425748,
+                "p95_ms": 1.541637,
+                "min_ms": 1.308056,
+                "max_ms": 3.425568
+              },
+              "prepare_ns": {
+                "p50_ms": 2.597293,
+                "p95_ms": 5.634479,
+                "min_ms": 2.460572,
+                "max_ms": 7.543068
+              },
+              "verify_ns": {
+                "p50_ms": 0.1104,
+                "p95_ms": 0.118311,
+                "min_ms": 0.10751,
+                "max_ms": 0.164821
+              },
+              "disposal_ns": {
+                "p50_ms": 0.178961,
+                "p95_ms": 0.205371,
+                "min_ms": 0.176371,
+                "max_ms": 0.254401
+              },
+              "total_ns": {
+                "p50_ms": 4.325672,
+                "p95_ms": 7.271916,
+                "min_ms": 4.078761,
+                "max_ms": 9.281006
+              }
+            }
+          }
+        },
+        "candidate_over_reference_p50_total": 0.6550293975438017
+      },
+      {
+        "extra_files": 0,
+        "preparation_mode": "live",
+        "arms": {
+          "reference": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 8.525493,
+                "p95_ms": 9.226176,
+                "min_ms": 8.192162,
+                "max_ms": 11.625648
+              },
+              "prepare_ns": {
+                "p50_ms": 3.454987,
+                "p95_ms": 3.844619,
+                "min_ms": 3.236396,
+                "max_ms": 7.175746
+              },
+              "verify_ns": {
+                "p50_ms": 1.140035,
+                "p95_ms": 1.393017,
+                "min_ms": 1.112915,
+                "max_ms": 1.497087
+              },
+              "disposal_ns": {
+                "p50_ms": 0.358891,
+                "p95_ms": 0.422652,
+                "min_ms": 0.347942,
+                "max_ms": 0.506793
+              },
+              "total_ns": {
+                "p50_ms": 13.648619,
+                "p95_ms": 15.053076,
+                "min_ms": 12.995216,
+                "max_ms": 17.70336
+              }
+            }
+          },
+          "candidate": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 6.307341,
+                "p95_ms": 8.789194,
+                "min_ms": 6.12464,
+                "max_ms": 14.291942
+              },
+              "prepare_ns": {
+                "p50_ms": 2.361252,
+                "p95_ms": 5.158726,
+                "min_ms": 2.219461,
+                "max_ms": 6.520973
+              },
+              "verify_ns": {
+                "p50_ms": 1.127716,
+                "p95_ms": 1.186026,
+                "min_ms": 1.109486,
+                "max_ms": 1.505438
+              },
+              "disposal_ns": {
+                "p50_ms": 0.357522,
+                "p95_ms": 0.411832,
+                "min_ms": 0.347341,
+                "max_ms": 0.541893
+              },
+              "total_ns": {
+                "p50_ms": 10.190971,
+                "p95_ms": 13.242976,
+                "min_ms": 9.835269,
+                "max_ms": 18.329962
+              }
+            }
+          }
+        },
+        "candidate_over_reference_p50_total": 0.7466668239475364
+      },
+      {
+        "extra_files": 1000,
+        "preparation_mode": "commit",
+        "arms": {
+          "reference": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 425.737069,
+                "p95_ms": 502.102021,
+                "min_ms": 402.32262,
+                "max_ms": 804.441325
+              },
+              "prepare_ns": {
+                "p50_ms": 427.326668,
+                "p95_ms": 518.551334,
+                "min_ms": 407.007744,
+                "max_ms": 1011.720267
+              },
+              "verify_ns": {
+                "p50_ms": 17.409108,
+                "p95_ms": 18.133942,
+                "min_ms": 16.845085,
+                "max_ms": 18.494103
+              },
+              "disposal_ns": {
+                "p50_ms": 8.749104,
+                "p95_ms": 9.190256,
+                "min_ms": 8.264671,
+                "max_ms": 11.089056
+              },
+              "total_ns": {
+                "p50_ms": 882.178863,
+                "p95_ms": 1054.391956,
+                "min_ms": 841.405066,
+                "max_ms": 1661.755075
+              }
+            }
+          },
+          "candidate": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 455.326333,
+                "p95_ms": 514.511618,
+                "min_ms": 408.97461,
+                "max_ms": 997.775046
+              },
+              "prepare_ns": {
+                "p50_ms": 458.099667,
+                "p95_ms": 506.719721,
+                "min_ms": 405.777873,
+                "max_ms": 527.930477
+              },
+              "verify_ns": {
+                "p50_ms": 17.399128,
+                "p95_ms": 18.035351,
+                "min_ms": 16.688464,
+                "max_ms": 18.779614
+              },
+              "disposal_ns": {
+                "p50_ms": 8.762594,
+                "p95_ms": 9.177486,
+                "min_ms": 8.253082,
+                "max_ms": 9.84087
+              },
+              "total_ns": {
+                "p50_ms": 941.959952,
+                "p95_ms": 1058.013161,
+                "min_ms": 847.201913,
+                "max_ms": 1471.651642
+              }
+            }
+          }
+        },
+        "candidate_over_reference_p50_total": 1.0677652701819496
+      },
+      {
+        "extra_files": 1000,
+        "preparation_mode": "live",
+        "arms": {
+          "reference": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 923.331421,
+                "p95_ms": 1059.420657,
+                "min_ms": 872.16941,
+                "max_ms": 1250.024903
+              },
+              "prepare_ns": {
+                "p50_ms": 445.206978,
+                "p95_ms": 527.748963,
+                "min_ms": 415.007404,
+                "max_ms": 834.114571
+              },
+              "verify_ns": {
+                "p50_ms": 37.418879,
+                "p95_ms": 38.128202,
+                "min_ms": 36.280353,
+                "max_ms": 38.995926
+              },
+              "disposal_ns": {
+                "p50_ms": 15.997471,
+                "p95_ms": 16.689094,
+                "min_ms": 15.447717,
+                "max_ms": 17.358767
+              },
+              "total_ns": {
+                "p50_ms": 1447.162316,
+                "p95_ms": 1690.246537,
+                "min_ms": 1344.542903,
+                "max_ms": 1786.446749
+              }
+            }
+          },
+          "candidate": {
+            "scored": 100,
+            "warm": 20,
+            "phases": {
+              "capture_ns": {
+                "p50_ms": 970.381825,
+                "p95_ms": 1186.236732,
+                "min_ms": 875.829926,
+                "max_ms": 1833.672853
+              },
+              "prepare_ns": {
+                "p50_ms": 466.813539,
+                "p95_ms": 540.625321,
+                "min_ms": 418.327416,
+                "max_ms": 889.119811
+              },
+              "verify_ns": {
+                "p50_ms": 37.357488,
+                "p95_ms": 38.019072,
+                "min_ms": 36.460684,
+                "max_ms": 39.124207
+              },
+              "disposal_ns": {
+                "p50_ms": 16.111541,
+                "p95_ms": 16.765434,
+                "min_ms": 15.172557,
+                "max_ms": 19.274567
+              },
+              "total_ns": {
+                "p50_ms": 1496.14825,
+                "p95_ms": 1837.41916,
+                "min_ms": 1350.82074,
+                "max_ms": 2339.334599
+              }
+            }
+          }
+        },
+        "candidate_over_reference_p50_total": 1.0338496473121264
+      }
+    ],
+    "blocks": [
+      {
+        "index": 0,
+        "arm": "reference",
+        "receipt": {
+          "path": "research/performance/forge-program-20261106-snapshot-sync-0.json",
+          "sha256": "9c5073f6094daa46693e3f97ef417ab115ca61411cd199a6566776548cf4a280"
+        },
+        "whole_process": {
+          "p50_ms": 27059.586213,
+          "p95_ms": 30339.502206999998,
+          "cpu_p50_ms": 3235.901,
+          "max_rss_bytes": 18866176
+        },
+        "rows": {
+          "completed": 240,
+          "failed": 0,
+          "censored_or_unknown": 0,
+          "unstarted": 0,
+          "scored": 200,
+          "warm": 40
+        },
+        "fixture_roots_absent": 10,
+        "tmpdir_empty": true
+      },
+      {
+        "index": 1,
+        "arm": "candidate",
+        "receipt": {
+          "path": "research/performance/forge-program-20261106-snapshot-sync-1.json",
+          "sha256": "26e3b6e5051d15eb69f3efa1a01cbc8d0533d2bed15958abc59faa2cb8aa1344"
+        },
+        "whole_process": {
+          "p50_ms": 29982.142591,
+          "p95_ms": 30536.766847,
+          "cpu_p50_ms": 3235.8540000000003,
+          "max_rss_bytes": 19427328
+        },
+        "rows": {
+          "completed": 240,
+          "failed": 0,
+          "censored_or_unknown": 0,
+          "unstarted": 0,
+          "scored": 200,
+          "warm": 40
+        },
+        "fixture_roots_absent": 10,
+        "tmpdir_empty": true
+      },
+      {
+        "index": 2,
+        "arm": "candidate",
+        "receipt": {
+          "path": "research/performance/forge-program-20261106-snapshot-sync-2.json",
+          "sha256": "feafe05ced9a8701467409a94cc85ab2b27a7a17415fa77db02fb77a14b7c31f"
+        },
+        "whole_process": {
+          "p50_ms": 29704.60943,
+          "p95_ms": 30166.209134,
+          "cpu_p50_ms": 3238.221,
+          "max_rss_bytes": 19247104
+        },
+        "rows": {
+          "completed": 240,
+          "failed": 0,
+          "censored_or_unknown": 0,
+          "unstarted": 0,
+          "scored": 200,
+          "warm": 40
+        },
+        "fixture_roots_absent": 10,
+        "tmpdir_empty": true
+      },
+      {
+        "index": 3,
+        "arm": "reference",
+        "receipt": {
+          "path": "research/performance/forge-program-20261106-snapshot-sync-3.json",
+          "sha256": "b2506d72b41c0e724208c7a66fd0ffb0c29f3ef5e8fdcd2ff0885840abc0fd82"
+        },
+        "whole_process": {
+          "p50_ms": 29942.298326,
+          "p95_ms": 30449.474191,
+          "cpu_p50_ms": 3256.399,
+          "max_rss_bytes": 19247104
+        },
+        "rows": {
+          "completed": 240,
+          "failed": 0,
+          "censored_or_unknown": 0,
+          "unstarted": 0,
+          "scored": 200,
+          "warm": 40
+        },
+        "fixture_roots_absent": 10,
+        "tmpdir_empty": true
+      }
+    ],
+    "scope": [
+      "ABBA four blocks, five fresh processes per block; same byte-identical benchmark/helper, two cases and commit/live modes.",
+      "Each observer process emits48 rows:40scored+8warm. Totals960rows/800scored/160warm,20fresh processes.",
+      "Phase timers are warmed preparation only: capture, target/workspace preparation, verification, disposal and total; no guest or Stage payload.",
+      "Live preparation performs three materializations and self-contained Stage ODB; committed preparation performs two and borrowed ODB.",
+      "Inner rows are nested within processes and blocks; not800 independent process replicates. Filesystem/cache warmed; no cold-cache claim.",
+      "Outer CPU/RSS are whole-shell/test-process workload observations, including fixture setup, executable hashing, assertions, reporting and cleanup.",
+      "CPU uses wait4/completed-wait propagation; RSS is largest individual waited-process peak, not simultaneous process-tree memory or per-mode attribution.",
+      "Current-source receipt hashes describe the invocation checkout; reference compiled source is separately pinned by its old clean build ledger.",
+      "Same recorded compiler/profile/features only; no full ambient build equivalence or producer authentication claim.",
+      "Native recorder supervises each process at90s; setup/hash/publication is cooperative, with no outer forced-kill timeout. Coordinator must await terminal.",
+      "Explicit per-block TMPDIR is initially/finally empty; every reported fixture parent must be within it and positively absent after its process.",
+      "Environment is a complete bounded allowlist of non-secret path/locale/toolchain values, recorded and checked against native receipt digest.",
+      "Ratios, if reported, describe only this paired preparation fixture; no guest/e2e/agent benefit inference."
+    ]
+  },
+  "decision": {
+    "accepted": false,
+    "action": "Restore all native source to981163d; remove only the owned candidate helper/tests and their hooks. Preserve candidate commit, binaries, profile, successful correctness controls and raw comparison evidence.",
+    "reason": "Small cases improved, but the intended1000-file workload has no demonstrated gain. Additional directory identity bookkeeping is not justified by these observations.",
+    "large_pooled_delta_percent": {
+      "commit": 6.7765270181949555,
+      "live": 3.3849647312126363
+    },
+    "causal_limit": "Reference1000-file block medians drifted commit861.396\u2192950.413ms and live1369.886\u21921503.822ms; candidate blocks lie near the later reference. Pooled+6.8%/+3.4% is observational and not proof of a causal regression. No rerun or baseline replacement.",
+    "independent_reviewer": "native_review agrees not to promote on this evidence"
+  },
+  "evidence_availability": {
+    "public": "This concise index and four byte-identical native recorder receipts under research/performance. The receipts contain whole-process measurements and source/workload/environment identities.",
+    "host_local": "Detailed960-row observations, raw logs, profile, failure records, build ledgers and independent audits referenced under.git or/tmp are retained on the measurement host, not published in this repository; other readers may not have them.",
+    "source": "The unchanged benchmark/helper and experimental implementation are identified by their Git revisions. The final native tree matches981163d."
+  },
+  "reproduction": {
+    "revisions": [
+      "62858f7e0c51af80f7f4a4323d1eb5cd03482a1c",
+      "a4a8431ae9785fdc90cf192c1557f4618ab394b4"
+    ],
+    "build_argv": [
+      "cargo",
+      "+1.98.0",
+      "test",
+      "--release",
+      "--offline",
+      "--locked",
+      "--jobs",
+      "2",
+      "--manifest-path",
+      "native/forge/Cargo.toml",
+      "-p",
+      "forge",
+      "--lib",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "build_environment": {
+      "PYO3_PYTHON": "/nonexistent/forbidden-python",
+      "CUDA_VISIBLE_DEVICES": ""
+    },
+    "observer_argv": [
+      "COPIED_RELEASE_UNIT_TEST_BINARY",
+      "--exact",
+      "equivalence_gate::tests::bench::compare_committed_and_live_preparation",
+      "--ignored",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "observer_environment": {
+      "FORGE_TEST_GATE_BENCH_OUTPUT": "UNIQUE_NEW_ABSOLUTE_JSON_PATH",
+      "PATH": "",
+      "TMPDIR": "EMPTY_OWNED_DIRECTORY",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null"
+    },
+    "method": "Build each revision in a clean checkout; copy and hash the forge lib-test executable reported by Cargo before changing revisions. Run reference,candidate,candidate,reference blocks of5 fresh processes each using the native performance recorder with90s/sample and zero outer warmups. Every process itself performs2 warm+10 scored iterations for each commit/live mode and0/1000-file case; preserve all48 raw rows and check tree/target/input identities and zero scratch. Never overwrite output paths. Full recorder commands are in the four public receipts; host-local driver records the exact historical allowlisted environment and oracles. New runs are new observations, not replacements for this baseline."
+  }
 }

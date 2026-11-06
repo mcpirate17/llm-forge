@@ -400,6 +400,3 @@ fn concurrent_publishers_have_one_winner_without_staging_leaks() {
 
 #[path = "verify_tests.rs"]
 mod verify_tests;
-
-#[path = "directory_sync_tests.rs"]
-mod directory_sync_tests;
