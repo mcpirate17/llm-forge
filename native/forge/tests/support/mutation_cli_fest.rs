@@ -14,6 +14,7 @@ use std::{
 
 const SOURCE: &str = "def answer(value=7):\n    assert value > 0\n    return value\n";
 const COLLECTION_SOURCE: &str = "def answer(value=7):\n    return value + 1\n";
+const POLICY: &str = "schema_version=1\nblock_at='high'\nmax_workers=1\ncache_ttl_days=7\nclaim_max_age_hours=24\nmax_file_bytes=100000\nmax_binary_bytes=200000\ncoverage_threshold=80.0\nhigh_risk_coverage_threshold=90.0\nbaseline_expires=2099-11-30\n[classes]\npython=['**/*.py']\ntest=['test_*.py','**/test_*.py']\nnative=['**/*.rs']\n[risk]\nhigh=[]\n[paths]\nprotected_deletes=[]\nhot=[]\ngenerated=[]\n[checks.mutation-evidence]\nkind='builtin'\nprofiles=['fast']\nalways=true\n";
 const SHADOW_FILES: [&str; 8] = [
     "pytest.py",
     "coverage.py",
@@ -194,8 +195,9 @@ fn fixture(cfg: &Config, config_bytes: &[u8], strong: bool, collection: bool) ->
         private_directory(&root.path().join(name));
     }
     let repo = root.path().join("repo");
-    put(&repo, "forge.toml", "schema_version=1\n[conductor]\nmutation_registry='campaigns/registry.json'\nmutation_receipt_root='campaigns/receipts'\n");
+    put(&repo, "forge.toml", "schema_version=1\n[conductor]\nmutation_registry='campaigns/registry.json'\nmutation_receipt_root='campaigns/receipts'\ncandidate_policy='policy.toml'\n");
     put(&repo, ".gitignore", "/campaigns/\n");
+    put(&repo, "policy.toml", POLICY);
     let source = if collection {
         COLLECTION_SOURCE
     } else {
@@ -274,6 +276,7 @@ fn initialize_fixture(host: &CargoFixture, cfg: &Config, source: &str) {
         &[
             "add",
             "forge.toml",
+            "policy.toml",
             ".gitignore",
             "subject.py",
             "test_subject.py",
