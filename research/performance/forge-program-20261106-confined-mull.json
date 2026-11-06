@@ -3,7 +3,7 @@
   "kind": "forge-engineering-evidence-index",
   "date": "2026-11-06",
   "issue": 196,
-  "status": "real_controls_and_freshness_validated_publication_gate_pending",
+  "status": "runtime_freshness_and_full_gate_verified_at_b09b5d8",
   "implementation_commit": "f443a20f3211f3b6d05eac41765f22558c0a9290",
   "base_commit": "edb99898aec9d884389895867957dc1cdfd47e4a",
   "compiled_source_sha256": "1be8bcc84722f8991e205708ac209385684dc85fd4e8fed3d16ad8a16aeaf780",
@@ -146,9 +146,22 @@
     "planner_passed": 41,
     "planner_ignored": 1,
     "strict_clippy": "PASS",
-    "full_local_check": "pending",
-    "local_verify": "pending",
-    "pr": null
+    "full_local_check": {
+      "head": "b09b5d8df0572d734d039bdc6bdca0bd8d4dedcd",
+      "base": "edb99898aec9d884389895867957dc1cdfd47e4a",
+      "receipt_sha256": "6153b9d567408f939dadd2d13c06564b53f23982975ac7291c2f86281123a95e",
+      "steps_passed": 18,
+      "test_executions": {
+        "passed": 5000,
+        "failed": 0,
+        "ignored": 203
+      },
+      "test_harnesses": 182,
+      "counts_scope": "summed test-result lines, includes feature-matrix/repeated executions; not unique test cases"
+    },
+    "local_verify": "PASS at b09b5d8 against origin/main edb9989; subsequent heads require matching receipts",
+    "pr": null,
+    "installed_native_source_matches_real_control_source": true
   },
   "cleanup": {
     "command_groups_absent": 21,
@@ -329,6 +342,21 @@
       "path": ".git/forge-mull-freshness-independent.json",
       "sha256": "f9444cd409172e901d6326e47a4b588a02cd3be781f3610bfe1a5351b699f02a",
       "bytes": 80172
+    },
+    "full_gate1_receipt": {
+      "path": ".git/forge-checks/run-1793983571383453218-2495981/receipt.json",
+      "sha256": "6153b9d567408f939dadd2d13c06564b53f23982975ac7291c2f86281123a95e",
+      "bytes": 13828
+    },
+    "full_gate1_counts": {
+      "path": ".git/forge-mull-gate1-summary.json",
+      "sha256": "1ab5db9029f679475b1ac7a0d666a6622a25719dfbec11d16357144f0496db67",
+      "bytes": 385
+    },
+    "full_gate1_verify": {
+      "path": ".git/forge-mull-local-verify1.log",
+      "sha256": "19e38fdb3b6e08ac413e8ceaa72fa47255e8d69c1e266ae6e5bee56641599faa",
+      "bytes": 377
     }
   }
 }

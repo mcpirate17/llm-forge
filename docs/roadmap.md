@@ -106,8 +106,8 @@ source-bound receipts. [PR #214](https://github.com/mcpirate17/llm-forge/pull/21
 merged as `edb9989` with the same checked tree. See the
 [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
-The next [confined Mull increment](mutation-mull.md) is implemented at `f443a20`
-and awaits full publication checks. It reuses the native command owner for one
+The next [confined Mull increment](mutation-mull.md) was exercised at `f443a20`
+and passed full publication checks at `b09b5d8`. It reuses the native command owner for one
 C/C++ translation unit and a standalone driver, with exact toolchain pins, a fixed
 build definition, private child permissions and shared report replay. Real controls
 produced one killed mutant (`PASS`), one surviving mutant (`RATCHET_HELD`), a
@@ -120,13 +120,15 @@ inputs. All 15 freshness phases and 36 consumer commands passed live/committed
 acceptance, admitted-input rejection and exact restoration. Independent cleanup
 observations cover 21 command groups, four snapshots and four build definitions
 before the owned supervisor was retired. Independent freshness audit verified all
-45 preparation/probe commands, bindings and exact Git restoration. The complete
-publication gate remains pending. Focused tests passed 421 Forge and 90 minimal
+45 preparation/probe commands, bindings and exact Git restoration. All 18 local
+checks and exact-head/current-base verification passed: 5,000 passing executions,
+zero failures and 203 ignored across 182 harnesses. Later heads need their own
+source-bound receipts. Focused tests passed 421 Forge and 90 minimal
 core cases, with strict Clippy and 41 planner contract tests passing. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
 for raw provenance and observational cost. Unmarked Mull and arbitrary project
-builds remain refused; C++ refresh is still absent. Next complete the source-bound
-publication gate, then reassess the native migration and agent-workflow backlog.
+builds remain refused; C++ refresh is still absent. Next publish through the normal
+PR path, then reassess the native migration and agent-workflow backlog.
 Actual-client adoption and matched agent-task benefit still require separate evidence.
 
 ### Architecture, evidence and disposition

@@ -150,7 +150,11 @@ private executable admission before baseline or mutation. The corrected runtime
 completed the controls above; preserving those failures makes the sequence
 auditable.
 
-Full publication gates are pending. No PR, global installation, host adoption,
-performance improvement, or agent-task benefit is established. See the
+The full 18-step gate and exact-head/current-base verification passed at `b09b5d8`:
+5,000 passing executions, zero failures and 203 ignored across 182 harnesses.
+Its installed source fingerprint matches the implementation used for the real
+controls. Subsequent publication heads require their own matching receipts.
+No global installation, host adoption, performance improvement, or agent-task benefit
+is established. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
 for run identities, receipts, limits, and publication status.
