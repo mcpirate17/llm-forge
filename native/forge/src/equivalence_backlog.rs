@@ -20,6 +20,8 @@ pub struct EquivalenceArgs {
 }
 #[derive(Subcommand)]
 enum Action {
+    /// Probe one whole module at an explicit commit with confined, granted execution.
+    Gate(crate::equivalence_gate::GateArgs),
     /// Fold captured equivalence summaries; preview by default, without running a probe.
     Backlog(BacklogArgs),
 }
@@ -319,7 +321,10 @@ impl Prepared {
 }
 
 pub fn run(args: EquivalenceArgs) -> Result<u8> {
-    let Action::Backlog(args) = args.action;
+    let args = match args.action {
+        Action::Gate(args) => return crate::equivalence_gate::run(args),
+        Action::Backlog(args) => args,
+    };
     let prepared = prepare(&args)?;
     let result = prepared.finish(args.apply, args.consume_recorded)?;
     if args.json {

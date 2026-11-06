@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "kind": "native_committed_equivalence_gate",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/224",
+  "base_commit": "551a506b49190059cb63d491340a73842b1a3119",
+  "status": "implementation_under_validation",
+  "scope": "One explicit full commit and one whole Python module; native orchestration shares candidate input capture, record parser and confined Stage owner. No live-worktree or Make gate migration.",
+  "validation": {
+    "equivalence": {
+      "passed": 33,
+      "ignored": 1,
+      "log": {
+        "path": ".git/forge-native-gate-focused3.log",
+        "sha256": "49c58568b52069b57c34cc1c91359e71af5633b97d879a0dc586bcea1760e119"
+      }
+    },
+    "snapshot": {
+      "passed": 16,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_snapshot-tests.log",
+        "sha256": "1e80263576576cc9c8bba2bedef20b32fe21bce2eda7a6ae39d882c4744ca899"
+      }
+    },
+    "workspace": {
+      "passed": 11,
+      "ignored": 6,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_execution_workspace-tests.log",
+        "sha256": "dc0ebeb5b58890ef0f5b4cb58bc673346335d1b4a3a3061fc28d56160ae9aa11"
+      }
+    },
+    "snapshot_inputs": {
+      "passed": 4,
+      "log": {
+        "path": ".git/forge-native-gate-snapshot_inputs-tests2.log",
+        "sha256": "eda7c10b6af0dbfd5a6c1ae5af0a533ba32eb0ee7a9cc399c8883cff74ff86f2"
+      }
+    },
+    "candidate_test_selection": {
+      "passed": 11,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_test_selection-tests3.log",
+        "sha256": "0c1a40103b7907712b777737a7247ffdabf0f85447d9eabd74ae51f3ed693839"
+      }
+    },
+    "candidate_mutation": {
+      "passed": 7,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_mutation2.log",
+        "sha256": "db47b4dbbeb5fd4da2a77761a58d76501112c751d522a5e5435f80bf667d88e2"
+      }
+    },
+    "mutation_corpus": {
+      "passed": 6,
+      "ignored": 12,
+      "log": {
+        "path": ".git/forge-native-gate-mutation_corpus2.log",
+        "sha256": "d5e19fc47ca8b52d61f747f5ef9c1628381bcaaaec443c9cc4bc2efef65359dd"
+      }
+    },
+    "cli": {
+      "passed": 2,
+      "log": {
+        "path": ".git/forge-native-gate-cli-tests1.log",
+        "sha256": "b17214d574ec61ad6e5f115518afbeb9bfd7ba7f65f69919b836f6bf9429d10a"
+      },
+      "scope": "Actual native binary, empty PATH, real committed fixture and refused guest digest; no guest execution."
+    },
+    "strict_clippy": {
+      "result": "PASS all targets including live-test compilation, shared parser and borrowed policy resolution",
+      "log": {
+        "path": ".git/forge-native-gate-clippy3.log",
+        "sha256": "bc3ca044dd5d172061511f7ad28a81024c2a4f8506f6af0c644704141e822361"
+      }
+    },
+    "live_test_build": {
+      "result": "PASS compile only; five explicit live controls remain unexecuted",
+      "log": {
+        "path": ".git/forge-native-gate-live-build1.log",
+        "sha256": "fedc0462c8703113da3647ecb4f91747ccbe064e447f654aa6d6374f7cbca163"
+      }
+    }
+  },
+  "retained_failures": [
+    {
+      "log": {
+        "path": ".git/forge-native-gate-focused1.log",
+        "sha256": "11441d573c4911434971c2d6812195989ab4b91cca6043b784893b8bb1b3573c"
+      },
+      "result": "Compile refused two remaining Inputs.entries field callers; exact method migrations fixed both. Removed an unused verifier-test import."
+    },
+    {
+      "log": {
+        "path": ".git/forge-native-gate-snapshot_inputs-tests.log",
+        "sha256": "787965dc238cd677ca0c72bca308d533ab783137a4a5be31321fb07e55f9f265"
+      },
+      "result": "Three passed, one failed: implicit temporary parent permissions refused before external registry read. Explicitly set only new authored fixture roots0700; production boundary unchanged."
+    },
+    {
+      "log": {
+        "path": ".git/forge-native-gate-clippy2.log",
+        "sha256": "4c671797d5f122735b4320a161d2381b4db2f7bd1216b186c9c0c94d425e0e4b"
+      },
+      "result": "Live fixture borrow-check failure in output-limit check; compute bounded oversized predicate before mutably signalling owned Child."
+    }
+  ],
+  "independent_review": "Static cross-review of CLI, verifier, shared inputs and Stage/grants found no remaining concrete blocker. Fixed reviewed live-test false-green PID oracle (require positive ENOENT or different start identity), interpreter spelling and blocking/LIVE distinction before execution. Removed a newly introduced full TreeEntry clone via borrowed policy-map resolution. Guest execution and timing remain unverified.",
+  "pending": [
+    "Live success/blocking/timeout/cancellation and descendant cleanup controls",
+    "Python/native semantic comparison with exact comparator provenance",
+    "Capture and complete-workload cost measurements",
+    "Final source formatting/strict checks and full publication gates"
+  ],
+  "limitations": [
+    "No host adoption, model token/cost or agent-task benefit established.",
+    "Exact committed workspace preimage does not authenticate guest results or external read-granted dependencies.",
+    "Synthetic private Git history differs from original commit history.",
+    "Record data is separately pinned and supplied, not authenticated historical data.",
+    "Materialized verification is cooperative with trusted parents, not hostile-same-UID race protection.",
+    "Stage deadline excludes filesystem preparation/publication.",
+    "No Make migration or live-worktree/default-changed/all parity."
+  ],
+  "planned_live_controls": [
+    "committed module with staged/dirty/untracked/ignored decoys produces actual blocking finding",
+    "load-bearing negative-input driver is nonblocking and LIVE",
+    "inner module timeout remains incomplete with cleanup",
+    "outer Stage deadline removes observed detached descendant",
+    "SIGTERM after observed readiness removes detached descendant"
+  ]
+}

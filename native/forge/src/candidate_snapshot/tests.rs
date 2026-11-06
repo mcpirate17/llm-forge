@@ -397,3 +397,6 @@ fn concurrent_publishers_have_one_winner_without_staging_leaks() {
         b"immutable bytes"
     );
 }
+
+#[path = "verify_tests.rs"]
+mod verify_tests;

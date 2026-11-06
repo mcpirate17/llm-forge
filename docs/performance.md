@@ -34,7 +34,8 @@ retains binary/build pins, raw observations and four independently verified rece
 The two command identities differ; this is a matched fixture comparison. Those outer
 receipts include executable hashing, fixture setup, assertions, disposal and shell
 startup; their CPU/RSS do not measure capture alone. No guest, complete-review,
-model or agent-task gain is established. Full publication validation remains pending.
+model or agent-task gain is established. All 18 publication checks and fresh-base
+verification passed before PR #223 merged with the exact checked tree.
 
 ### Confined MCP test report — 2026-11-06
 

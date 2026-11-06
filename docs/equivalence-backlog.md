@@ -1,5 +1,8 @@
 # Native equivalence backlog
 
+For new measurements of one explicitly committed module, use the
+[confined native gate](equivalence-gate.md).
+
 `forge equivalence backlog` folds existing equivalence summaries into a ledger
 and Markdown report. It reuses Slop Core's Rust fold and launches no interpreter,
 model, test driver or equivalence probe. A partial or incomplete run preserves

@@ -1,14 +1,19 @@
 //! Captured candidate configuration, recorded drivers and immutable target plan.
 use crate::{
     candidate_execution_plan::Selection,
-    candidate_execution_workspace::Workspace,
+    candidate_execution_workspace::{Grants, Workspace},
     candidate_inputs::{self, BoundFile, DirectoryBinding},
     candidate_snapshot::Snapshot,
     candidate_source::lines::RangeScope,
+    candidate_source::Source,
     candidate_test_selection::inputs::Inputs,
+    snapshot_inputs::SnapshotInputs,
 };
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::{OpenOptions, OpenOptionsExt};
+use conductor_native::test_record_config::{
+    parse_document as record_config, Table as RecordConfig,
+};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -26,20 +31,31 @@ struct ProbeConfig {
     per_module_timeout: Option<f64>,
     jobs: Option<usize>,
 }
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RecordConfig {
-    store: String,
-    #[serde(default = "yes")]
-    lines: bool,
-    #[serde(default)]
-    environment: Vec<String>,
+pub(crate) struct CaptureContext<'c, 's> {
+    pub source: &'c Source,
+    pub snapshot: &'s Snapshot,
+    pub grants: &'c Grants,
 }
-fn yes() -> bool {
-    true
+enum HeldInputs<'a> {
+    Candidate(Inputs<'a>),
+    Committed(SnapshotInputs<'a>),
+}
+impl<'a> HeldInputs<'a> {
+    fn tree_mut(&mut self) -> &mut SnapshotInputs<'a> {
+        match self {
+            Self::Candidate(inputs) => inputs.tree_mut(),
+            Self::Committed(inputs) => inputs,
+        }
+    }
+    fn verify(&self) -> Result<()> {
+        match self {
+            Self::Candidate(inputs) => inputs.verify(),
+            Self::Committed(inputs) => inputs.verify(),
+        }
+    }
 }
 pub(crate) struct Captured<'a> {
-    inputs: Inputs<'a>,
+    inputs: HeldInputs<'a>,
     record: Option<BoundFile>,
     record_path: Option<PathBuf>,
     pub targets: Vec<slop_core::gate_types::Target>,
@@ -138,8 +154,8 @@ fn no_wal(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn config(inputs: &mut Inputs<'_>) -> Result<(ProbeConfig, Option<RecordConfig>)> {
-    if !inputs.entries.contains_key("pyproject.toml") {
+fn config(inputs: &mut SnapshotInputs<'_>) -> Result<(ProbeConfig, Option<RecordConfig>)> {
+    if !inputs.entries().contains_key("pyproject.toml") {
         inputs.absent("pyproject.toml")?;
         return Ok((ProbeConfig::default(), None));
     }
@@ -152,11 +168,7 @@ fn config(inputs: &mut Inputs<'_>) -> Result<(ProbeConfig, Option<RecordConfig>)
         .map(toml::Value::try_into)
         .transpose()?
         .unwrap_or_default();
-    let record: Option<RecordConfig> = forge
-        .and_then(|v| v.get("test_record"))
-        .cloned()
-        .map(toml::Value::try_into)
-        .transpose()?;
+    let record = record_config(&doc).map_err(anyhow::Error::msg)?;
     Ok((probe, record))
 }
 fn record_path(config: &RecordConfig, root: &Path) -> Result<PathBuf> {
@@ -205,9 +217,9 @@ fn changes(
     }
     Ok(result)
 }
-fn bind_python_tree(inputs: &mut Inputs<'_>) -> Result<()> {
+fn bind_python_tree(inputs: &mut SnapshotInputs<'_>) -> Result<()> {
     let paths: Vec<_> = inputs
-        .entries
+        .entries()
         .keys()
         .filter(|p| p.ends_with(".py"))
         .cloned()
@@ -219,12 +231,12 @@ fn bind_python_tree(inputs: &mut Inputs<'_>) -> Result<()> {
     Ok(())
 }
 fn store_copy(
-    execution: &Selection,
-    snapshot: &Snapshot,
+    context: &CaptureContext<'_, '_>,
     record: Option<&[u8]>,
     changed: &[(String, Option<Vec<usize>>)],
     timeout: f64,
 ) -> Result<Vec<slop_core::gate_types::Target>> {
+    let snapshot = context.snapshot;
     if record.is_none() {
         return conductor_native::equivalence_targets::targets(
             &snapshot.path(),
@@ -233,8 +245,7 @@ fn store_copy(
             timeout,
         );
     }
-    let source = execution.source()?;
-    let workspace = Workspace::new(&source, &execution.candidate.tree_oid, &execution.grants)?;
+    let workspace = Workspace::new(context.source, &snapshot.report().tree_oid, context.grants)?;
     let path = workspace.runtime().join("equivalence-record.sqlite");
     if let Some(record) = record {
         let dir = workspace.artifact_root()?;
@@ -294,7 +305,7 @@ fn capture_record(
     }
     Ok((record, record_bytes, path))
 }
-/// Captures configured drivers and all candidate Python source the native selector/index may read.
+/// Captures candidate changed-line targets while retaining policy/date checks.
 pub(crate) fn capture<'a>(
     execution: &'a Selection,
     snapshot: &'a Snapshot,
@@ -303,13 +314,13 @@ pub(crate) fn capture<'a>(
     granted_jobs: usize,
 ) -> Result<Captured<'a>> {
     let source = execution.source()?;
-    let mut inputs = Inputs::new(
+    let inputs = HeldInputs::Candidate(Inputs::new(
         &source,
         snapshot,
         &execution.candidate,
         &execution.policy,
         execution.date(),
-    )?;
+    )?);
     let changed = changes(execution, &source)?;
     if changed.is_empty() {
         return Ok(Captured {
@@ -325,7 +336,79 @@ pub(crate) fn capture<'a>(
                 "changed":[],"target_count":0,"execution_verified":false}),
         });
     }
-    let (probe, record_config) = config(&mut inputs)?;
+    capture_common(
+        inputs,
+        CaptureContext {
+            source: &source,
+            snapshot,
+            grants: &execution.grants,
+        },
+        &changed,
+        supplied_store,
+        supplied_artifacts,
+        granted_jobs,
+    )
+}
+
+/// Select one whole regular Python module from a real committed-tree snapshot.
+/// The caller separately binds the requested commit and verifies the full tree.
+pub(crate) fn capture_committed<'s>(
+    context: CaptureContext<'_, 's>,
+    module: &str,
+    supplied_store: Option<(&Path, &str)>,
+    supplied_artifacts: Option<&Path>,
+    granted_jobs: usize,
+) -> Result<Captured<'s>> {
+    crate::candidate_source::safe_path(module.as_bytes())?;
+    ensure!(
+        module.ends_with(".py") && !module.chars().any(char::is_control),
+        "selected module must be a literal Python path"
+    );
+    let mut tree = SnapshotInputs::new(
+        context.source,
+        context.snapshot,
+        &context.snapshot.report().tree_oid,
+    )?;
+    tree.read(module)?;
+    let changes = [(module.to_owned(), None)];
+    let mut captured = capture_common(
+        HeldInputs::Committed(tree),
+        context,
+        &changes,
+        supplied_store,
+        supplied_artifacts,
+        granted_jobs,
+    )?;
+    captured.evidence["source_kind"] = serde_json::json!("commit_tree");
+    captured.evidence["scope"] = serde_json::json!("whole_module");
+    captured.evidence["module"] = serde_json::json!(module);
+    captured.evidence["record_provenance"] = if captured.record.is_some() {
+        serde_json::json!("separately_supplied_current_data")
+    } else {
+        serde_json::Value::Null
+    };
+    Ok(captured)
+}
+
+fn capture_common<'s>(
+    mut inputs: HeldInputs<'s>,
+    context: CaptureContext<'_, 's>,
+    changed: &[(String, Option<Vec<usize>>)],
+    supplied_store: Option<(&Path, &str)>,
+    supplied_artifacts: Option<&Path>,
+    granted_jobs: usize,
+) -> Result<Captured<'s>> {
+    let CaptureContext {
+        source,
+        snapshot,
+        grants,
+    } = &context;
+    ensure!(
+        grants.source_root == source.root(),
+        "equivalence grants source root differs"
+    );
+    let tree = inputs.tree_mut();
+    let (probe, record_config) = config(tree)?;
     let timeout = probe.per_module_timeout.unwrap_or(180.0);
     ensure!(
         timeout.is_finite() && (0.001..=3600.0).contains(&timeout),
@@ -335,7 +418,7 @@ pub(crate) fn capture<'a>(
     ensure!((1..=32).contains(&jobs), "invalid equivalence job count");
     let waivers = if let Some(path) = &probe.waivers {
         crate::candidate_source::safe_path(path.as_bytes())?;
-        Some(inputs.read_bytes_with_limit(path, 1024 * 1024)?.to_vec())
+        Some(tree.read_bytes_with_limit(path, 1024 * 1024)?.to_vec())
     } else {
         None
     };
@@ -344,20 +427,14 @@ pub(crate) fn capture<'a>(
         supplied_artifacts,
         source.root(),
         &snapshot.path(),
-        &execution.grants.scratch_parent,
+        &grants.scratch_parent,
     )?;
     let _other_config = (&probe.ledger, &probe.report);
     let (record, record_bytes, path) =
         capture_record(record_config, supplied_store, source.root(), snapshot)?;
-    bind_python_tree(&mut inputs)?;
-    let targets = store_copy(
-        execution,
-        snapshot,
-        record_bytes.as_deref(),
-        &changed,
-        timeout,
-    )?;
-    let evidence = serde_json::json!({"candidate_tree":execution.candidate.tree_oid,
+    bind_python_tree(tree)?;
+    let targets = store_copy(&context, record_bytes.as_deref(), changed, timeout)?;
+    let evidence = serde_json::json!({"candidate_tree":snapshot.report().tree_oid,
         "changed":changed, "target_count":targets.len(),
         "record_sha256":record_bytes.as_ref().map(|bytes| format!("{:x}",Sha256::digest(bytes))),
         "waivers_sha256":waivers.as_ref().map(|bytes| format!("{:x}",Sha256::digest(bytes))),

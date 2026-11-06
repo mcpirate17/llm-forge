@@ -199,7 +199,7 @@ enum Command {
         #[arg(long, alias = "project-dir")]
         host: Option<std::path::PathBuf>,
     },
-    /// Fold equivalence evidence without launching an interpreter or probe.
+    /// Probe committed modules with explicit grants or fold existing equivalence evidence.
     #[cfg(target_os = "linux")]
     Equivalence(forge::equivalence_backlog::EquivalenceArgs),
     /// Mutation-campaign commands that run natively, no Python interpreter.

@@ -2,6 +2,7 @@
 mod paths;
 #[cfg(test)]
 mod tests;
+mod verify;
 
 use crate::candidate_source::{Source, TreeEntry};
 use anyhow::{ensure, Context, Result};
@@ -121,12 +122,13 @@ pub struct Snapshot {
     directory: Dir,
     identity: (u64, u64),
     report: Report,
+    limits: Limits,
     keep: bool,
 }
 
 pub(crate) fn resolve_captured_file(
     source: &Source,
-    entries: &[TreeEntry],
+    entries: &BTreeMap<String, TreeEntry>,
     path: &str,
 ) -> Result<(String, Vec<(String, String)>)> {
     paths::resolve_captured_file(source, entries, path)
@@ -186,6 +188,7 @@ impl Snapshot {
             staging,
             directory,
             identity,
+            limits,
             keep: false,
         };
         snapshot.populate(source, &plan)?;
@@ -201,6 +204,11 @@ impl Snapshot {
     pub(crate) fn directory(&self) -> Result<Dir> {
         self.verify_staging()?;
         Ok(self.directory.try_clone()?)
+    }
+
+    /// Opt-in exact committed preimage check; mutable payload callers must choose its timing.
+    pub(crate) fn verify_materialized(&self, source: &Source) -> Result<()> {
+        verify::materialized(self, source)
     }
 
     /// Explicit cleanup lets callers refuse success when a private snapshot remains.

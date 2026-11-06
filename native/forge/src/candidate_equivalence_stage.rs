@@ -6,14 +6,19 @@
 use crate::{
     candidate_command::PreparedArgv,
     candidate_execution_plan::{self, Selection, Stage},
-    candidate_execution_workspace::Workspace,
+    candidate_execution_workspace::{Grants, Workspace},
     candidate_inputs::{self, BoundFile},
+    confined_execution::Limits,
 };
 use anyhow::{ensure, Context, Result};
 use cap_std::fs::{OpenOptions, OpenOptionsExt};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{io::Write, os::unix::fs::MetadataExt, path::Path};
+use std::{
+    io::Write,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+};
 
 pub(crate) struct Prepared {
     pub stage: Stage,
@@ -26,6 +31,36 @@ pub(crate) struct Probe<'a> {
     pub waivers: Option<&'a [u8]>,
     pub timeout_seconds: f64,
     pub jobs: usize,
+}
+pub(crate) struct StageContext<'a> {
+    pub source_root: &'a Path,
+    pub capture_snapshot: &'a Path,
+    pub data: Value,
+}
+pub(crate) struct AdmittedProbe<'a> {
+    probe: Probe<'a>,
+    guest_binding: BoundFile,
+    python: PathBuf,
+    targets: Vec<u8>,
+    data: Value,
+    grants_digest: String,
+}
+fn validate_probe(probe: &Probe<'_>, source_root: &Path, scratch: &Path) -> Result<()> {
+    ensure!(
+        probe.timeout_seconds.is_finite()
+            && (0.001..=3600.0).contains(&probe.timeout_seconds)
+            && (1..=32).contains(&probe.jobs),
+        "invalid equivalence limits"
+    );
+    ensure!(
+        !probe.guest_path.starts_with(scratch),
+        "guest extension must be outside stage scratch"
+    );
+    ensure!(
+        !probe.guest_path.starts_with(source_root),
+        "guest extension must be outside source repository"
+    );
+    Ok(())
 }
 fn write_new(dir: &cap_std::fs::Dir, name: &str, data: &[u8]) -> Result<()> {
     let mut file = dir.open_with(
@@ -40,19 +75,13 @@ fn write_new(dir: &cap_std::fs::Dir, name: &str, data: &[u8]) -> Result<()> {
     file.sync_all()?;
     Ok(())
 }
-fn tools(execution: &Selection) -> Result<(&Path, &Path)> {
-    let alias = execution
-        .grants
+fn tools(grants: &Grants) -> Result<(&Path, &Path)> {
+    let alias = grants
         .python
         .as_ref()
         .context("Python interpreter grant missing")?;
-    let python = execution
-        .grants
-        .programs
-        .get(alias)
-        .context("Python grant missing")?;
-    let forge = execution
-        .grants
+    let python = grants.programs.get(alias).context("Python grant missing")?;
+    let forge = grants
         .programs
         .get("forge")
         .context("forge grant missing")?;
@@ -72,84 +101,120 @@ pub(crate) fn prepare(
     check: &Value,
     probe: Probe<'_>,
 ) -> Result<Prepared> {
-    let Probe {
-        guest_path,
-        guest_sha256,
-        targets,
-        waivers,
-        timeout_seconds,
-        jobs,
-    } = probe;
     ensure!(
         check["check_id"] == "equivalence-probe",
         "incorrect check policy"
     );
-    ensure!(
-        timeout_seconds.is_finite()
-            && (0.001..=3600.0).contains(&timeout_seconds)
-            && (1..=32).contains(&jobs),
-        "invalid equivalence limits"
-    );
-    let (python, _) = tools(execution)?;
-    ensure!(
-        !guest_path.starts_with(&execution.grants.scratch_parent),
-        "guest extension must be outside stage scratch"
-    );
-    ensure!(
-        !guest_path.starts_with(execution.source()?.root()),
-        "guest extension must be outside source repository"
-    );
-    let (guest_binding, _bytes) =
-        candidate_inputs::external(guest_path, guest_sha256, 32 * 1024 * 1024, review_snapshot)?;
-    let targets = serde_json::to_vec(targets)?;
+    let limits = candidate_execution_plan::limits(check, &execution.grants)?;
+    let source = execution.source()?;
+    let context = StageContext {
+        source_root: source.root(),
+        capture_snapshot: review_snapshot,
+        data: json!({"scope":"equivalence-probe", "candidate_tree":execution.candidate.tree_oid,
+            "policy_sha256":execution.policy.digest, "grants_sha256":execution.grants.digest()}),
+    };
+    let admitted = admit_probe(&execution.grants, probe, context)?;
+    let workspace = Workspace::new(&source, &execution.candidate.tree_oid, &execution.grants)?;
+    prepare_workspace(workspace, &execution.grants, limits, admitted)
+}
+
+/// Hold and validate guest and target inputs before allocating a workspace.
+pub(crate) fn admit_probe<'a>(
+    grants: &Grants,
+    probe: Probe<'a>,
+    context: StageContext<'_>,
+) -> Result<AdmittedProbe<'a>> {
+    validate_probe(&probe, context.source_root, &grants.scratch_parent)?;
+    let (python, _) = tools(grants)?;
+    let (guest_binding, _bytes) = candidate_inputs::external(
+        probe.guest_path,
+        probe.guest_sha256,
+        32 * 1024 * 1024,
+        context.capture_snapshot,
+    )?;
+    let targets = serde_json::to_vec(probe.targets)?;
     ensure!(
         targets.len() <= 4 * 1024 * 1024,
         "equivalence targets exceed 4 MiB"
     );
-    let targets_sha256 = format!("{:x}", Sha256::digest(&targets));
-    let source = execution.source()?;
-    let workspace = Workspace::new(&source, &execution.candidate.tree_oid, &execution.grants)?;
-    let root = workspace.artifact_root()?;
-    write_new(&root, "equivalence-targets.json", &targets)?;
-    if let Some(waivers) = waivers {
+    if let Some(waivers) = probe.waivers {
         ensure!(waivers.len() <= 1024 * 1024, "waivers exceed 1 MiB");
-        write_new(&root, "equivalence-waivers.json", waivers)?;
     }
     ensure!(
-        execution
-            .grants
+        grants
             .read_only
             .iter()
-            .any(|root| guest_path.starts_with(root)),
+            .any(|root| probe.guest_path.starts_with(root)),
         "guest path lacks a read-only grant"
     );
+    let mut data = context.data;
+    let object = data
+        .as_object_mut()
+        .context("stage metadata must be an object")?;
+    object.insert("guest_sha256".into(), json!(probe.guest_sha256));
+    object.insert(
+        "targets_sha256".into(),
+        json!(format!("{:x}", Sha256::digest(&targets))),
+    );
+    object.insert("execution_verified".into(), json!(false));
+    Ok(AdmittedProbe {
+        probe,
+        guest_binding,
+        python: python.to_owned(),
+        targets,
+        data,
+        grants_digest: grants.digest().to_owned(),
+    })
+}
+
+/// Prepare the existing confined Stage from an independently admitted workspace.
+pub(crate) fn prepare_workspace(
+    workspace: Workspace,
+    grants: &Grants,
+    limits: Limits,
+    admitted: AdmittedProbe<'_>,
+) -> Result<Prepared> {
+    let AdmittedProbe {
+        probe,
+        guest_binding,
+        python,
+        targets,
+        data,
+        grants_digest,
+    } = admitted;
+    ensure!(
+        grants.digest() == grants_digest,
+        "stage grants differ from admitted probe"
+    );
+    let root = workspace.artifact_root()?;
+    write_new(&root, "equivalence-targets.json", &targets)?;
+    if let Some(waivers) = probe.waivers {
+        write_new(&root, "equivalence-waivers.json", waivers)?;
+    }
     workspace.verify_artifact_root(&root)?;
     guest_binding.verify()?;
     let runtime = workspace.runtime();
     let argv = worker_args(
-        python,
-        guest_path,
+        &python,
+        probe.guest_path,
         &runtime,
-        timeout_seconds,
-        jobs,
-        waivers.is_some(),
+        probe.timeout_seconds,
+        probe.jobs,
+        probe.waivers.is_some(),
     )?;
     let plan = workspace.plan(
         &PreparedArgv {
             argv: argv.clone(),
             changed_files: None,
         },
-        &execution.grants,
+        grants,
     )?;
-    let limits = candidate_execution_plan::limits(check, &execution.grants)?;
     let stage = Stage {
         workspace,
         plan,
         limits,
         argv,
-        data: json!({"scope":"equivalence-probe", "candidate_tree":execution.candidate.tree_oid,
-        "policy_sha256":execution.policy.digest, "grants_sha256":execution.grants.digest(),
-        "guest_sha256":guest_sha256,"targets_sha256":targets_sha256,"execution_verified":false}),
+        data,
     };
     Ok(Prepared {
         stage,
@@ -208,7 +273,7 @@ fn worker_args(
 /// Run exactly one prepared Stage through the standard batch owner and capture path.
 pub(crate) async fn execute(
     prepared: Prepared,
-    execution: std::sync::Arc<Selection>,
+    grants: std::sync::Arc<Grants>,
     interrupts: &crate::process_signals::Interrupts,
 ) -> Result<(Value, crate::confined_execution::Report, Vec<u8>, String)> {
     use crate::{
@@ -230,12 +295,12 @@ pub(crate) async fn execute(
     let mask = interrupts.child_mask();
     let budget = Arc::new(ArtifactBudget::new(4 * 1024 * 1024));
     let batch = batch_execution::start(vec![stage], 1, move |stage, cancel, owners| {
-        let execution = execution.clone();
+        let grants = grants.clone();
         let budget = budget.clone();
         async move {
             stage
                 .execute_batch_capture(
-                    &execution.grants,
+                    &grants,
                     mask,
                     cancel,
                     owners,
@@ -279,3 +344,7 @@ pub(crate) async fn execute(
     let artifact = artifact.context("equivalence Stage did not produce summary")?;
     Ok((data, report, artifact.bytes, artifact.sha256))
 }
+
+#[cfg(test)]
+#[path = "candidate_equivalence_stage_tests.rs"]
+mod tests;

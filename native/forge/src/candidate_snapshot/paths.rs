@@ -201,19 +201,19 @@ fn resolve_link(
 
 pub(super) fn resolve_captured_file(
     source: &Source,
-    entries: &[TreeEntry],
+    entries: &BTreeMap<String, TreeEntry>,
     path: &str,
 ) -> Result<(String, Vec<(String, String)>)> {
     crate::candidate_source::safe_path(path.as_bytes())?;
     if entries
-        .iter()
-        .any(|entry| entry.path == path && matches!(entry.mode.as_str(), "100644" | "100755"))
+        .get(path)
+        .is_some_and(|entry| matches!(entry.mode.as_str(), "100644" | "100755"))
     {
         return Ok((path.to_owned(), Vec::new()));
     }
     let mut symlinks = Vec::new();
     let mut total = 0u64;
-    for entry in entries.iter().filter(|entry| entry.mode == "120000") {
+    for entry in entries.values().filter(|entry| entry.mode == "120000") {
         ensure!(
             symlinks.len() < 4096,
             "candidate policy symlink inventory exceeds 4096"
@@ -229,7 +229,7 @@ pub(super) fn resolve_captured_file(
     }
     let links = read_links(source, &symlinks)?;
     let modes = entries
-        .iter()
+        .values()
         .map(|entry| (entry.path.as_str(), entry.mode.as_str()))
         .collect();
     let (resolved, followed) = resolve_link(
