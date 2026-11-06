@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "status": "IN_PROGRESS_NOT_ACCEPTED",
+  "scope": "confined Fest profile validation; no full mutation PASS or performance claim",
+  "attempts": {
+    "observer_tests_passed": 0,
+    "observer_tests_failed": 3,
+    "pre_payload_refusals": 2,
+    "partial_baseline_only_runs": 1,
+    "engine_runs_completed": 0,
+    "weak_controls_unstarted": 3,
+    "collection_error_control": "UNSTARTED"
+  },
+  "evidence": [
+    {
+      "path": ".git/forge-fest-first-refusal.json",
+      "sha256": "97337e11e2de310f3b5e93a2a1f0985878bb6046e01027d00103bffa2bfb4870",
+      "record": {
+        "scope": "pre-payload operator guest inventory refusal",
+        "fixture": "/tmp/.tmpQJp7WG",
+        "config": "/tmp/forge-fest-control-i411k67r/operator-config.json",
+        "error": "Fest guest entries must be uniquely sorted",
+        "observer_test_passed": 0,
+        "observer_test_failed": 1,
+        "strong_payload": "UNSTARTED",
+        "weak_payload": "UNSTARTED",
+        "receipt_files": [],
+        "scratch_entries": [],
+        "delegated_child_directories": [
+          "supervisor"
+        ]
+      }
+    },
+    {
+      "path": ".git/forge-fest-second-refusal.json",
+      "sha256": "cda4a8043a150caf1373cd4f59ada4ed55bd1589f94947ee48c48a181cabd94b",
+      "record": {
+        "scope": "pre-payload runtime admission refusal",
+        "fixture": "/tmp/.tmpohAFBR",
+        "error": "sandbox scratch environment cannot be overridden",
+        "observer_test_passed": 0,
+        "observer_test_failed": 1,
+        "strong_payload": "UNSTARTED",
+        "weak_payload": "UNSTARTED",
+        "receipt_files": [
+          "/tmp/.tmpohAFBR/repo/campaigns/receipts/run.json"
+        ],
+        "scratch_entries": [
+          "llm-orchestrator-snapshot-2Ehj1X"
+        ],
+        "delegated_child_directories_before_unit_stop": [
+          "supervisor"
+        ]
+      }
+    },
+    {
+      "path": ".git/forge-fest-third-debug-partial.json",
+      "sha256": "cb872eebd71f0050d3e6e87a53598678438f0b01b934d07003f128b403f9e38f",
+      "record": {
+        "scope": "DEBUG partial run; one successful baseline command, engine unstarted, no PASS evidence",
+        "fixture": "/tmp/.tmpntW2yK",
+        "receipt_sha256": "f05bafb36e5b44710398d79d7290e9952a592a6903d10797ff3a63049c01d241",
+        "native_status": "ERROR",
+        "error": "No such file or directory (os error 2)",
+        "observer_failed": 1,
+        "observed_commands": 1,
+        "command_exits": [
+          0
+        ],
+        "owned_command_cgroups_absent": [
+          "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/forge-fest-control-5z2yuxyd.service/forge-native-2285453-dedf8e3e588f8b3132f6e2fd5566c511"
+        ],
+        "snapshot_retained": "/tmp/.tmpntW2yK/scratch/llm-orchestrator-snapshot-Cfu7e4",
+        "cache_retained_empty": "/tmp/.tmpntW2yK/scratch/fest-pycache-2285453-55cecfc5f263b63626ce8fa131722adb",
+        "coverage_configuration_present": false,
+        "observations": 1,
+        "baseline_values": [
+          [
+            7,
+            7
+          ]
+        ],
+        "module_origins": [
+          {
+            "coverage": "/tmp/forge-fest-guest-1ymx6glk/prefix/lib/python3.12/dist-packages/coverage/__init__.py",
+            "json": "/tmp/forge-fest-guest-1ymx6glk/prefix/lib/python3.12/json/__init__.py",
+            "pytest": "/tmp/forge-fest-guest-1ymx6glk/prefix/lib/python3.12/dist-packages/pytest/__init__.py",
+            "pytest_cov": "/tmp/forge-fest-guest-1ymx6glk/prefix/lib/python3.12/dist-packages/pytest_cov/__init__.py"
+          }
+        ],
+        "production_cause": "coverage erase pattern datafilename + dot-star overlapped coverage.rc"
+      }
+    },
+    {
+      "path": ".git/forge-fest-clean-binary.json",
+      "sha256": "65edcc1826a2d7369bb21059a534e3078bf10c92a4142ff31c94843f20272dc0",
+      "record": {
+        "scope": "clean committed build/private install only; not shared installation or adoption",
+        "binary": "/tmp/forge-fest-clean-967f53a-kb88fmp9/bin/forge",
+        "sha256": "184eef7056ae74ce86be679a5ba207d5e3371d6712d0bc7dc0a886f19adc7aea",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "967f53a8c2e89c88d0a9e88a515355aeae27bcf9",
+          "compiled_source_sha256": "2d1b819aa137b68b3af8a0cc48d217d3520b001342265ab653236b2c62e0c385",
+          "executable_sha256": "184eef7056ae74ce86be679a5ba207d5e3371d6712d0bc7dc0a886f19adc7aea"
+        },
+        "head": "967f53a8c2e89c88d0a9e88a515355aeae27bcf9",
+        "tree": "96433d12263b514fc6353bca82e91a88591fcd9c",
+        "source_clean": true,
+        "bytes": 54371320,
+        "nlink": 1,
+        "elapsed_seconds": 225.81128358840942,
+        "build_log_sha256": "d305e9ee4621f332877e2690274177a1bf5199d935790ef42cae62cf2f983ecb"
+      }
+    },
+    {
+      "path": ".git/forge-fest-fixed-binary.json",
+      "sha256": "4d243fcbf09569055bd6b318be5ea1bc71371c09975fc62282c1f678be3a94fd",
+      "record": {
+        "scope": "clean committed build/private install only; not shared installation or adoption",
+        "binary": "/tmp/forge-fest-fixed-e38a39f-pamd0fqa/bin/forge",
+        "sha256": "1c7aa221df34dfb20b1f208295382d7ae1380dd1cfb64ad911b22d1f2db2ed23",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "e38a39fbe8499102b1bfb536372d578d73ac6c05",
+          "compiled_source_sha256": "e8555c3c8f2bcfcc2235c27dcbf3c79fc5c02b04c9c0b20ba0ca3f5a4b7b36ff",
+          "executable_sha256": "1c7aa221df34dfb20b1f208295382d7ae1380dd1cfb64ad911b22d1f2db2ed23"
+        },
+        "head": "e38a39fbe8499102b1bfb536372d578d73ac6c05",
+        "tree": "5c94c1a8b9f3c78b83c87fc42fbb02cf9297ad2a",
+        "source_clean": true,
+        "bytes": 54374624,
+        "nlink": 1,
+        "elapsed_seconds": 174.10338640213013,
+        "build_log_sha256": "147b5568b655b76e4a7ff5b833b53963f373b02863e05d62697c702397f47a6d"
+      }
+    },
+    {
+      "path": ".git/forge-fest-debug-scratch-binary.json",
+      "sha256": "899ea277610271ec7bbdd10a6efd93ace30e3e4066b96122cbfc26958f6ff39c",
+      "record": {
+        "scope": "clean DEBUG executable for runtime debugging only; no release-performance claim",
+        "binary": "/tmp/forge-fest-debug-f9347af-y9x10d0k/forge",
+        "sha256": "d30070a8a3fcd3ea8728c9b6e92ee82ca05b393429c654cfdff63992fa70b638",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "f9347afd157732ce07df0c22e51ef727fba50567",
+          "compiled_source_sha256": "0ee555c9ee991440156c8179ada170096b180f744212ecc4a222b7e763146e79",
+          "executable_sha256": "d30070a8a3fcd3ea8728c9b6e92ee82ca05b393429c654cfdff63992fa70b638"
+        },
+        "head": "f9347afd157732ce07df0c22e51ef727fba50567",
+        "source_clean": true,
+        "bytes": 531886408,
+        "build_log_sha256": "e7d42dfeda9ab22bb758c6cd84675e5e86da4f15071534efa9a47d7b6e74460f"
+      }
+    }
+  ],
+  "limitations": [
+    "Raw logs and fixture roots are retained locally, not bundled into Git.",
+    "Debug observer/runtime measurements are not release performance.",
+    "No accepted optimization, external-client result, host adoption or full release-gate result is established."
+  ],
+  "next": [
+    "Complete real automatic strong, weak and collection-error controls.",
+    "Repeat runtime controls with a clean release binary.",
+    "Independently audit receipts and live/committed supporting-input freshness.",
+    "Provide native guest inventory tooling and documented setup.",
+    "Run exact committed full local-check/local-verify before normal PR integration."
+  ]
+}

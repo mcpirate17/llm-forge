@@ -440,7 +440,7 @@ fn fest_environment(
         ),
         (
             "COVERAGE_FILE".into(),
-            output.join("coverage").to_string_lossy().into_owned(),
+            output.join("coverage-data").to_string_lossy().into_owned(),
         ),
         (
             "COVERAGE_RCFILE".into(),
@@ -594,10 +594,9 @@ impl<'a> Runtime<'a> {
         self.grants.verify()?;
         if let Some(cache) = self.fest_cache.borrow().as_ref() {
             cache.verify()?;
-            let (_, bytes) = candidate_inputs::repository_live(
-                &self.root.join("fest-output/coverage.rc"),
-                4096,
-            )?;
+            let (_, bytes) =
+                candidate_inputs::repository_live(&self.root.join("fest-output/coverage.rc"), 4096)
+                    .context("Fest coverage configuration unavailable")?;
             ensure!(
                 bytes == FEST_COVERAGE_CONFIG,
                 "Fest coverage configuration changed"
@@ -930,6 +929,15 @@ mod fest_environment_tests {
         assert_eq!(env["PYTHONPATH"], "/guest/lib/python3.12:/guest/lib/python3.12/lib-dynload:/guest/lib/python3.12/dist-packages:/scratch/worktree:/scratch/worktree/src");
         assert_eq!(env["PYTHONSAFEPATH"], "1");
         assert!(env["PYTEST_ADDOPTS"].contains("--import-mode=importlib"));
+        let data_prefix = format!("{}.", env["COVERAGE_FILE"]);
+        for protected in [
+            env["COVERAGE_RCFILE"].as_str(),
+            "/scratch/fest-output/coverage.json",
+            "/scratch/fest-output/coverage-curated.json",
+        ] {
+            assert!(!protected.starts_with(&data_prefix));
+            assert_ne!(protected, env["COVERAGE_FILE"].as_str());
+        }
         crate::sandbox::validate_environment(&env).unwrap();
         assert!(!env.contains_key("TMPDIR"));
         assert!(fest_environment(

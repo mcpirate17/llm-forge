@@ -89,9 +89,15 @@ whole-operation deadline. No external-client or host adoption is claimed.
 
 The active increment returns to [#196](https://github.com/mcpirate17/llm-forge/issues/196):
 a narrowly admitted Fest profile using a pinned private guest and the existing
-native command owner. Fresh bytecode isolation, independent supporting-input
-bindings and real automatic-engine evidence are required before acceptance.
-Existing ordinary Fest and Mull execution remain refused while this work proceeds.
+native command owner. The implementation adds independent snapshot bindings,
+read-only empty bytecode caches, guest-first imports and complete kill attribution.
+Focused native checks passed; live validation is still incomplete. Two attempts
+refused before payload launch. A debug attempt completed one pytest command, then
+correctly refused after coverage cleanup removed its configuration. These failures
+remain recorded; no Fest mutation PASS or performance benefit is established.
+Next validate automatic kills, survivors, collection-error rejection and receipt
+freshness, then run the full publication gates. Unmarked Fest and Mull execution
+remain refused. See the [active evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
 ### Architecture, evidence and disposition
 

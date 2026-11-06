@@ -1227,3 +1227,17 @@ Baseline/final result JSON SHA-256:
 | `native/conductor-native/benches/candidate_scan.rs` (both) | `38dcc773efb0e9669b011601a44889b9c4920a9aad782a1ea5d5b80906c04840` |
 | `native/conductor-native/src/candidate_checks_scan.rs` (baseline) | `461d82a167d3b89b17d71bea35898ef2ac0b661ab4e8ee0fb9391482796ed019` |
 | `native/conductor-native/src/candidate_checks_scan.rs` (final) | `838ea3e828e0ff99acce13101f70e307e6d15e6ae51aba78a38d96eec164c312` |
+
+## Confined Fest validation — active, 2026-11-06
+
+The explicit Fest profile is under validation; no mutation PASS or speedup is
+claimed. Two release attempts refused before payload launch: an incorrectly
+ordered operator inventory, then a reserved sandbox environment override.
+A debug attempt executed one pytest baseline command successfully (561 ms in
+its command ledger), then refused when coverage cleanup removed its own config.
+The snapshot and empty cache were retained, and the owned command cgroup was
+confirmed absent. This is partial correctness evidence, not benchmark evidence.
+
+The [evidence index](../research/performance/forge-program-20261106-confined-fest.json)
+retains these failed attempts, build identities and unresolved validation work.
+No agent task-success, token-cost, clean-host or installation benefit is inferred.

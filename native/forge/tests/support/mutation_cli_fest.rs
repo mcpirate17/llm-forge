@@ -29,6 +29,24 @@ const TEST_HEAD: &str = r#"import errno, hashlib, importlib, json, os, sys, time
 import pytest, pytest_cov, coverage
 
 def test_answer():
+    source = os.path.join(os.getcwd(), 'subject.py')
+    data_before = open(source, 'rb').read()
+    nonce = os.urandom(8).hex()
+    token = str(os.getpid()) + '-' + nonce
+    request = os.path.join(os.environ['TMPDIR'], 'forge-mtime-' + token + '.json')
+    with open(request + '.tmp', 'w', encoding='utf-8') as stream:
+        json.dump({'pid':os.getpid(), 'nonce':nonce, 'sha256':hashlib.sha256(data_before).hexdigest()}, stream)
+    os.replace(request + '.tmp', request)
+    ack_path = os.path.join(os.environ['TMPDIR'], 'forge-mtime-ack-' + token + '.json')
+    deadline = time.monotonic() + 8
+    while not os.path.exists(ack_path):
+        if time.monotonic() >= deadline:
+            raise RuntimeError('fixture timestamp acknowledgement timed out')
+        time.sleep(0.01)
+    with open(ack_path, encoding='utf-8') as stream:
+        ack = json.load(stream)
+    assert ack['sha256'] == hashlib.sha256(open(source, 'rb').read()).hexdigest()
+    assert ack['mtime_sec'] == 1600000000
     import subject
     normal = subject.answer()
     normal_loader = type(subject.__loader__).__name__
@@ -49,7 +67,7 @@ def test_answer():
            'size':st.st_size,'mtime_sec':int(st.st_mtime),'normal':normal,'rewritten':rewritten_value,
            'normal_loader':normal_loader,'rewritten_loader':type(rewritten.__loader__).__name__,
            'dont_write':sys.dont_write_bytecode,'prefix':sys.pycache_prefix,'write_denied':denied,
-           'guest_prefix':sys.prefix, 'origins':{name:os.path.realpath(module.__file__) for name, module in
+           'guest_prefix':sys.prefix, 'mtime_intervention':True, 'mtime_token':token, 'origins':{name:os.path.realpath(module.__file__) for name, module in
                [('pytest',pytest),('pytest_cov',pytest_cov),('coverage',coverage),('json',json)]}}
     directory = os.environ['TMPDIR']
     final = os.path.join(directory, 'forge-observation-' + str(os.getpid()) + '.json')
@@ -427,6 +445,7 @@ impl Drop for Watcher {
 }
 fn collect(root: &Path, done: &AtomicBool) -> Result<usize, String> {
     let mut seen = BTreeSet::new();
+    let mut requests = BTreeSet::new();
     loop {
         for entry in fs::read_dir(root.join("scratch")).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -440,7 +459,7 @@ fn collect(root: &Path, done: &AtomicBool) -> Result<usize, String> {
             {
                 continue;
             }
-            let Ok(files) = fs::read_dir(snapshot) else {
+            let Ok(files) = fs::read_dir(&snapshot) else {
                 continue;
             };
             for file in files {
@@ -448,6 +467,19 @@ fn collect(root: &Path, done: &AtomicBool) -> Result<usize, String> {
                 let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
                     continue;
                 };
+                if name.starts_with("forge-mtime-")
+                    && !name.starts_with("forge-mtime-ack-")
+                    && name.ends_with(".json")
+                {
+                    if !requests.contains(name) {
+                        if requests.len() >= 4096 {
+                            return Err("timestamp request count exceeds bound".into());
+                        }
+                        handle_mtime(root, &snapshot, &path, name)?;
+                        requests.insert(name.to_owned());
+                    }
+                    continue;
+                }
                 if !name.starts_with("forge-observation-")
                     || !name.ends_with(".json")
                     || seen.contains(name)
@@ -505,6 +537,190 @@ fn collect(root: &Path, done: &AtomicBool) -> Result<usize, String> {
         }
         thread::sleep(Duration::from_millis(10));
     }
+}
+
+fn valid_mtime_token(token: &str) -> bool {
+    token.split_once('-').is_some_and(|(pid, nonce)| {
+        !pid.is_empty()
+            && pid.len() <= 10
+            && pid.bytes().all(|b| b.is_ascii_digit())
+            && nonce.len() == 16
+            && nonce.bytes().all(|b| b.is_ascii_hexdigit())
+    })
+}
+
+fn open_child(parent: &fs::File, name: &str, directory: bool) -> Result<fs::File, String> {
+    use std::os::fd::{AsRawFd, FromRawFd};
+    let name = std::ffi::CString::new(name).map_err(|e| e.to_string())?;
+    let mut flags = libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK;
+    if directory {
+        flags |= libc::O_DIRECTORY;
+    }
+    // SAFETY: parent is an owned open directory and name is a single fixed component.
+    let fd = unsafe { libc::openat(parent.as_raw_fd(), name.as_ptr(), flags) };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    // SAFETY: openat returned a fresh owned descriptor.
+    Ok(unsafe { fs::File::from_raw_fd(fd) })
+}
+
+// The owner changes only metadata on the fixed subject in its private snapshot.
+fn handle_mtime(root: &Path, snapshot: &Path, request: &Path, name: &str) -> Result<(), String> {
+    use std::os::unix::fs::MetadataExt;
+    let token = name
+        .strip_prefix("forge-mtime-")
+        .and_then(|v| v.strip_suffix(".json"))
+        .ok_or("invalid timestamp request name")?;
+    if !valid_mtime_token(token) {
+        return Err("invalid timestamp token".into());
+    }
+    let (pid, nonce) = token.split_once('-').ok_or("invalid timestamp token")?;
+    let mut input = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(request)
+        .map_err(|e| e.to_string())?;
+    let meta = input.metadata().map_err(|e| e.to_string())?;
+    if !meta.is_file() || meta.nlink() != 1 || meta.len() > 8192 {
+        return Err("invalid timestamp request".into());
+    }
+    let mut bytes = Vec::new();
+    input
+        .by_ref()
+        .take(8193)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    let after_request = input.metadata().map_err(|e| e.to_string())?;
+    if (
+        meta.dev(),
+        meta.ino(),
+        meta.len(),
+        meta.mtime(),
+        meta.mtime_nsec(),
+    ) != (
+        after_request.dev(),
+        after_request.ino(),
+        after_request.len(),
+        after_request.mtime(),
+        after_request.mtime_nsec(),
+    ) {
+        return Err("timestamp request changed while reading".into());
+    }
+    let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if value["pid"].as_u64().map(|p| p.to_string()).as_deref() != Some(pid)
+        || value["nonce"].as_str() != Some(nonce)
+    {
+        return Err("timestamp request identity mismatch".into());
+    }
+    let snapshot_dir = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(snapshot)
+        .map_err(|e| e.to_string())?;
+    let worktree = open_child(&snapshot_dir, "worktree", true)?;
+    let mut file = open_child(&worktree, "subject.py", false)?;
+    let before = file.metadata().map_err(|e| e.to_string())?;
+    let named = open_child(&worktree, "subject.py", false)?
+        .metadata()
+        .map_err(|e| e.to_string())?;
+    if !before.is_file()
+        || before.nlink() != 1
+        || before.len() > 32768
+        || (before.dev(), before.ino()) != (named.dev(), named.ino())
+    {
+        return Err("invalid fixed timestamp target or changed name".into());
+    }
+    let mut source = Vec::new();
+    file.by_ref()
+        .take(32769)
+        .read_to_end(&mut source)
+        .map_err(|e| e.to_string())?;
+    let hash = format!("{:x}", Sha256::digest(&source));
+    if value["sha256"] != hash {
+        return Err("timestamp request source mismatch".into());
+    }
+    let fixed = std::time::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    file.set_times(fs::FileTimes::new().set_modified(fixed))
+        .map_err(|e| e.to_string())?;
+    let current_worktree = open_child(&snapshot_dir, "worktree", true)?
+        .metadata()
+        .map_err(|e| e.to_string())?;
+    let held_worktree = worktree.metadata().map_err(|e| e.to_string())?;
+    let named_snapshot = fs::symlink_metadata(snapshot).map_err(|e| e.to_string())?;
+    let held_snapshot = snapshot_dir.metadata().map_err(|e| e.to_string())?;
+    if (current_worktree.dev(), current_worktree.ino())
+        != (held_worktree.dev(), held_worktree.ino())
+        || (named_snapshot.dev(), named_snapshot.ino())
+            != (held_snapshot.dev(), held_snapshot.ino())
+    {
+        return Err("snapshot ancestor identity changed".into());
+    }
+    verify_mtime(root, snapshot, token, &worktree, &file, &before, &source)
+}
+
+fn verify_mtime(
+    root: &Path,
+    snapshot: &Path,
+    token: &str,
+    worktree: &fs::File,
+    file: &fs::File,
+    before: &fs::Metadata,
+    source: &[u8],
+) -> Result<(), String> {
+    let hash = format!("{:x}", Sha256::digest(source));
+    use std::io::{Seek, SeekFrom};
+    use std::os::unix::fs::MetadataExt;
+    let after = file.metadata().map_err(|e| e.to_string())?;
+    let named = open_child(worktree, "subject.py", false)?
+        .metadata()
+        .map_err(|e| e.to_string())?;
+    if (before.dev(), before.ino(), before.len()) != (after.dev(), after.ino(), after.len())
+        || (after.dev(), after.ino()) != (named.dev(), named.ino())
+        || after.nlink() != 1
+        || (before.mode(), before.uid(), before.gid()) != (after.mode(), after.uid(), after.gid())
+        || after.mtime() != 1_600_000_000
+        || after.mtime_nsec() != 0
+    {
+        return Err("timestamp target identity changed".into());
+    }
+    let mut again = file.try_clone().map_err(|e| e.to_string())?;
+    again.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    again
+        .take(32769)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    let after_hash = format!("{:x}", Sha256::digest(&bytes));
+    if bytes != source || after_hash != hash {
+        return Err("timestamp changed source bytes".into());
+    }
+    let record = json!({"before_sha256":hash,"after_sha256":after_hash,"mtime_sec":after.mtime(),"source":std::str::from_utf8(source).map_err(|e| e.to_string())?,"intervention":"fixture owner changed metadata only"});
+    let encoded = serde_json::to_vec(&record).map_err(|e| e.to_string())?;
+    let log = root.join("logs").join(format!("mtime-{token}.json"));
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(log)
+        .map_err(|e| e.to_string())?;
+    use std::io::Write;
+    output.write_all(&encoded).map_err(|e| e.to_string())?;
+    let ack = snapshot.join(format!("forge-mtime-ack-{token}.json"));
+    let temp = snapshot.join(format!("forge-mtime-ack-{token}.tmp"));
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .map_err(|e| e.to_string())?;
+    output
+        .write_all(
+            serde_json::to_string(&json!({"sha256":hash,"mtime_sec":after.mtime()}))
+                .map_err(|e| e.to_string())?
+                .as_bytes(),
+        )
+        .map_err(|e| e.to_string())?;
+    fs::rename(temp, ack).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn tracked_hashes(host: &CargoFixture, cfg: &Config, label: &str) -> BTreeMap<String, String> {
@@ -601,6 +817,26 @@ fn verify_observations(
             format!("{:x}", Sha256::digest(source.as_bytes()))
         );
         assert_eq!(row["size"], source.len());
+        assert_eq!(row["mtime_intervention"], true);
+        assert_eq!(row["mtime_sec"], 1_600_000_000_i64);
+        let token = row["mtime_token"].as_str().unwrap();
+        assert!(valid_mtime_token(token));
+        let record: Value = serde_json::from_slice(
+            &fs::read(
+                host.root
+                    .as_ref()
+                    .unwrap()
+                    .path()
+                    .join("logs")
+                    .join(format!("mtime-{token}.json")),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(record["source"], row["source"]);
+        assert_eq!(record["before_sha256"], row["sha256"]);
+        assert_eq!(record["after_sha256"], row["sha256"]);
+        assert_eq!(record["mtime_sec"], row["mtime_sec"]);
         assert_eq!(row["dont_write"], true);
         assert_eq!(row["write_denied"], true);
         assert_eq!(
