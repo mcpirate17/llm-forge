@@ -243,3 +243,99 @@ fn workspace_capture_errors_are_per_campaign_and_do_not_discard_other_profiles()
         "complete-snapshot-inputs-v2"
     );
 }
+
+#[test]
+fn empty_or_ineligible_contracts_skip_both_fingerprint_scans() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (contract, payload) = eligible_fixture();
+    let receipt = CapturedReceipt {
+        path: "receipt.json".into(),
+        text: payload.to_string(),
+    };
+    let receipts = [
+        receipt,
+        CapturedReceipt {
+            path: "malformed.json".into(),
+            text: "{".into(),
+        },
+    ];
+    let check = |contracts: &[serde_json::Value]| {
+        assert!(required_for(
+            contracts,
+            &receipts,
+            || panic!("ineligible inventory requested fingerprint"),
+            None
+        )
+        .unwrap()
+        .is_none());
+        assert!(workspace_required_for(
+            contracts,
+            &receipts,
+            || panic!("ineligible inventory requested fingerprint"),
+            None
+        )
+        .unwrap()
+        .is_empty());
+    };
+    check(&[]);
+    check(&[
+        serde_json::Value::Null,
+        serde_json::json!({"generated":"invalid"}),
+    ]);
+    for (field, value) in [
+        ("source_drifted", serde_json::json!(true)),
+        ("generated", serde_json::json!(false)),
+        ("mutation_engine", serde_json::json!("fest")),
+        ("generated_value", serde_json::json!({})),
+    ] {
+        let mut ineligible = contract.clone();
+        ineligible[field] = value;
+        assert!(!eligible_contract(&ineligible), "{field}");
+        check(&[ineligible]);
+    }
+}
+
+#[test]
+fn eligible_contract_preserves_fingerprint_failures_in_both_scans() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (contract, payload) = eligible_fixture();
+    let receipt = CapturedReceipt {
+        path: "receipt.json".into(),
+        text: payload.to_string(),
+    };
+    assert!(required_for(
+        std::slice::from_ref(&contract),
+        std::slice::from_ref(&receipt),
+        || anyhow::bail!("fingerprint unavailable"),
+        None
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("fingerprint unavailable"));
+    assert!(workspace_required_for(
+        &[contract],
+        &[receipt],
+        || anyhow::bail!("fingerprint unavailable"),
+        None
+    )
+    .err()
+    .expect("workspace fingerprint error")
+    .to_string()
+    .contains("fingerprint unavailable"));
+}
+
+#[test]
+fn receipt_detail_can_override_summary_before_contract_selection() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (contract, mut payload) = eligible_fixture();
+    payload["runner_kind"] = serde_json::json!("python");
+    payload["campaign_id"] = serde_json::json!("different");
+    payload["status"] = serde_json::json!("ERROR");
+    payload["detail"] = serde_json::json!({"encoding":"json","runner_kind":"forge-native","campaign_id":"c","status":"PASS"});
+    let receipt = CapturedReceipt {
+        path: "receipt.json".into(),
+        text: payload.to_string(),
+    };
+    let result = required_for(&[contract], &[receipt], || Ok(Some("e".repeat(64))), None).unwrap();
+    assert_eq!(result.unwrap().len(), 2);
+}

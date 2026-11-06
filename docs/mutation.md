@@ -645,18 +645,52 @@ asserts), `manifest_load_error`. The old free text survives verbatim as
 (schema `llm.mutation-testing.evidence-check.v2`; a receipt the loader cannot
 parse at all counts as `decode_error`).
 
-### CI
+### Native maintenance reports
 
-Forge CI checks that the shipped receipt tools work. It does not require changed
-tests to have mutation evidence or require PRs to record missing-evidence debt.
+Forge's full local checks verify its shipped tools. There is no hosted CI, and
+Forge does not require changed tests to have mutation evidence. Read-only reports
+use the shared native captured-input verifier:
 
-The repo-wide canary, `uv run python -m conductor.mutation_coverage
-canary` (locally `make mutation-canary`) re-checks every receipt in the tree
+```sh
+forge mutation evidence tests/test_example.py
+forge mutation evidence --changed --base origin/main
+forge mutation coverage
+forge mutation canary
+```
+
+`evidence` requires explicit test paths or `--changed`. An empty changed-test
+selection may pass; omitting the selection is a usage error. `--repo-root` selects
+the audited repository and `--registry` overrides its configured registry.
+Coverage and explicit-path evidence debt exit 5; changed-test debt exits 6.
+Validator defects exit 5 and domain refusals exit 4. These commands never run
+mutants. Inventory uses libgit2 without invoking Git or its configured hooks;
+Rust source used for classification is held and rechecked. These are bounded
+observations with drift checks, not an atomic repository snapshot.
+
+Legacy Python-produced receipts need `--legacy-component-root /path/to/package-parent`
+containing `conductor/` and `tooling/`. This is observed identity, not execution
+authority. Omission leaves those receipts with unavailable-identity debt.
+Malformed optional lineage disables lineage matching and appears in
+`identity_diagnostics`; exact current component matching remains available.
+For a host with no native Forge source inventory, `--native-runner-pin FILE`
+and `--native-runner-pin-sha256 SHA256` select an independently held identity from
+`forge mutation identity`. The clean running executable must match that pin;
+partial native inventories cannot use it as a fallback. Candidate review retains
+its stricter external runner-bundle and grandfather requirements.
+
+The Make targets use these native commands. Their default legacy component root
+is the parent of this Forge checkout's configured package root, independently of
+`CONDUCTOR_HOST_ROOT`. Set `MUTATION_LEGACY_COMPONENT_ROOT` for another producer
+package and `MUTATION_REPORT_ARGS` for native options. Make does not discover which
+Python installation an earlier `uv run` selected. The Python public APIs remain
+for existing host integrations; they are not invoked by these targets.
+
+The repo-wide canary, `forge mutation canary` (locally `make mutation-canary`), re-checks every receipt in the tree
 and exits 5 when any of them is unreadable, whoever's tests it covers, and 0
 otherwise — however much evidence is missing. That is the check that would
 have caught the #41–#46 gap on day one.
 
-The retention report, `make mutation-retention`, runs in dry-run mode in CI. It
+The separate retention report, `make mutation-retention`, defaults to dry-run. It
 prints what a sweep would keep, delete, and leave to protection, and exits:
 
 - **0** — the sweep ran; the plan on stdout *is* the report, a non-empty
@@ -664,10 +698,9 @@ prints what a sweep would keep, delete, and leave to protection, and exits:
   sweeps, so an uncitable list is a plan, not a failure;
 - **2** — the sweep could not decide (an unreadable or unloadable manifest,
   a gate that would not run) and touched nothing; the reason goes to stderr
-  and the job fails;
+  and the command fails;
 - anything else is an unhandled defect — a crash like the TypeError that
-  kept `make mutation-retention` dead for a week fails the step it always
-  should have.
+  kept `make mutation-retention` dead for a week remains a failure.
 
 `MUTATION_RETENTION_APPLY=1 make mutation-retention` performs the deletion
 locally; `MUTATION_RETENTION_ARGS="--protect FILENAME"` shelters a receipt a
@@ -676,7 +709,7 @@ lane has in flight.
 ### Optional host evidence checks
 
 A host that adopts a changed-test evidence policy can run
-`uv run python -m conductor.mutation_coverage changed --base "$merge_base" --github`.
+`forge mutation evidence --changed --base "$merge_base" --github`.
 It inventories changed tests (merge-base diff, ACMR), checks their receipts, emits
 annotations and a step-summary table, and exits:
 

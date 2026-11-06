@@ -82,6 +82,13 @@ pub(crate) fn stale_native_contract(
             .is_some_and(conductor_native::mutation_native_runner::declared)
 }
 
+fn eligible_contract(contract: &serde_json::Value) -> bool {
+    contract["source_drifted"] != true
+        && contract["generated"] == true
+        && contract["mutation_engine"] == "cargo-mutants"
+        && contract["generated_value"].is_null()
+}
+
 fn eligible_receipt(
     receipt: &conductor_native::mutation_evidence::CapturedReceipt,
     contracts: &[serde_json::Value],
@@ -144,11 +151,7 @@ fn eligible_receipt(
     {
         return Ok(None);
     }
-    if contract["source_drifted"] == true
-        || contract["generated"] != true
-        || contract["mutation_engine"] != "cargo-mutants"
-        || !contract["generated_value"].is_null()
-    {
+    if !eligible_contract(contract) {
         return Ok(None);
     }
     let current = native_fingerprint()?;
@@ -166,6 +169,9 @@ pub(crate) fn required_for(
     mut native_fingerprint: impl FnMut() -> Result<Option<String>>,
     installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
 ) -> Result<Option<BTreeMap<String, String>>> {
+    if !contracts.iter().any(eligible_contract) {
+        return Ok(None);
+    }
     let mut native_ids = std::collections::BTreeSet::new();
     for receipt in receipts {
         if let Some(id) = eligible_receipt(receipt, contracts, &mut native_fingerprint, installed)?
@@ -182,10 +188,7 @@ pub(crate) fn required_for(
         if !contract["campaign_id"]
             .as_str()
             .is_some_and(|id| native_ids.contains(id))
-            || contract["source_drifted"] == true
-            || contract["generated"] != true
-            || contract["mutation_engine"] != "cargo-mutants"
-            || !contract["generated_value"].is_null()
+            || !eligible_contract(contract)
         {
             continue;
         }
@@ -216,6 +219,9 @@ pub(crate) fn workspace_required_for(
     mut native_fingerprint: impl FnMut() -> Result<Option<String>>,
     installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
 ) -> Result<BTreeMap<String, Result<WorkspaceRequired, String>>> {
+    if !contracts.iter().any(eligible_contract) {
+        return Ok(BTreeMap::new());
+    }
     let mut eligible = std::collections::BTreeSet::new();
     for receipt in receipts {
         if let Some(id) = eligible_receipt(receipt, contracts, &mut native_fingerprint, installed)?

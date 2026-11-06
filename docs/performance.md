@@ -10,6 +10,58 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Native report migration baseline — 2026-11-06
+
+The native evidence, changed, coverage and canary commands preserve the existing
+Python reports' JSON and exit codes. The initial `88a63ef` implementation was slower:
+52 observations completed, including five timed pairs per actual Forge command and
+two untimed fixture API controls. All failures, comparators and subsequent runs are
+retained in the [reporting evidence index](../research/performance/forge-program-20261106-native-reporting.json).
+
+A path-lookup experiment (`b499dbe`) reduced explicit-report syscalls from 61,706 to
+41,655, but a matched 90-observation comparison showed only a 0–10 ms median change.
+Its extra unsafe syscall helper and kernel requirement were rejected. Original
+held-input path checks remain, together with the added regression tests.
+
+Debugger phase timing found 87 of 155 instrumented wall milliseconds in two
+supporting-input eligibility scans, versus 6 ms in final verification. Commit
+`d1fc4dd` skips those scans only when no loaded contract can pass the existing
+eligibility predicates. Eligible contracts still decode receipt detail and validate
+fingerprints; final evidence verification always runs. The current Forge corpus has
+no eligible Cargo contracts, so these gains do not predict the eligible-contract case.
+
+The final matched run used identical checkout inputs for all three arms and all six
+arm orders. All 90 observations completed with full JSON and exit-code parity;
+none failed, were censored or remained unstarted. Six timed fresh-process samples
+per arm produced these median wall times:
+
+| Actual Forge report | Existing Python CLI | Native `88a63ef` | Native `d1fc4dd` |
+| --- | ---: | ---: | ---: |
+| Explicit evidence | 40 ms | 130 ms | 40 ms |
+| Changed evidence | 40 ms | 130 ms | 50 ms |
+| Coverage | 100 ms | 270 ms | 180 ms |
+| Canary | 100 ms | 270 ms | 180 ms |
+
+The accepted optimization reduces the native baseline; it does not establish a
+Python-to-Rust speedup. Coverage remains slower and uses more memory: median maximum
+RSS was 44,858 KiB for Python and 62,272 KiB for the final native binary. Native
+reports add held-input and inventory revalidation; these measurements do not isolate
+the cost of those guarantees. GNU time has 10 ms resolution, filesystem caches were
+uncontrolled, and five/six-sample empirical p95 values are simply the sample maximum.
+CPU, RSS, p95, exact commands, binary/source hashes and raw artifact hashes are indexed.
+The CPython 3.12.3 comparator's native extension is pinned at version 0.1.94; its
+build-source provenance is unavailable. No model cost or agent benefit was measured.
+Perf sampling was denied by host policy; gprofng timer warnings made its samples
+unreliable. Debugger phase timings include instrumentation overhead.
+
+A separate real automatic Cargo control generated and killed both scoped mutants,
+then accepted the receipt only with the verified installed-runner pin. Missing identity
+produced debt and a wrong pin digest was refused. All 17 control checks and 22 commands
+completed; native snapshot and process cleanup were verified. This small fixture
+validates receipt/report behavior, not full Forge mutation coverage or issue #196.
+Make routes also ran with `UV=false`; execution traces contain Make, shell and native
+Forge only. Make returns 2 for a report's nonzero exit; the canary still tolerates debt.
+
 ### Reproducible native timeout fixture — 2026-11-06
 
 The checked-in opt-in Rust test at `5f78e9b` reproduces the interrupted-engine

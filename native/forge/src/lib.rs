@@ -325,6 +325,12 @@ pub(crate) mod mutation_corpus_record;
 #[cfg(all(test, target_os = "linux"))]
 pub(crate) mod mutation_corpus_test_support;
 #[cfg(target_os = "linux")]
+mod mutation_evidence_git_inventory;
+#[cfg(target_os = "linux")]
+pub mod mutation_evidence_inventory;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_evidence_legacy;
+#[cfg(target_os = "linux")]
 pub(crate) mod mutation_live_baseline;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_live_catalog;

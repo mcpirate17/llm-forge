@@ -1,0 +1,347 @@
+{
+  "schema": "forge.native-reporting.evidence.v1",
+  "status": "completed scoped measurements and positive control; final publication gate was pending at index assembly",
+  "scope": "Host-local bounded reporting comparisons and one scoped automatic mutation positive control; no agent productivity measurement.",
+  "historical_two_arm": {
+    "summary": ".git/forge-report-run-1793950295686621178/summary.json",
+    "summary_sha256": "3273c2a61dd30e9f1c917e03c3143ed30d34d7bec2ef9431d3b88181e70b3555",
+    "independent_audit": {
+      "path": ".git/forge-report-independent.json",
+      "sha256": "03bd8e02b466b098b54c3141516a0fce28852c5b8bbbe3bc05c3231204197b7a"
+    },
+    "accounting": {
+      "completed": 52,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0,
+      "running": 0
+    },
+    "pairs_per_case": 5,
+    "preflights_excluded": true,
+    "input_count": 1767,
+    "input_map_sha256": "3a4cd1e5a254f3dc78e135f79f28c7774124f8c0985a567c70b4a9b347adcb41",
+    "python_comparator": {
+      "python": "/home/tim/Projects/llm-forge/.venv/bin/python",
+      "extension": "/home/tim/Projects/llm-forge/.venv/lib/python3.12/site-packages/conductor_native/conductor_native.cpython-312-x86_64-linux-gnu.so",
+      "distribution_version": "0.1.94",
+      "extension_source_build_provenance": "unavailable; do not assume current Rust source"
+    },
+    "native_sha256": "c4b2a017b4b6fcbf023a20097a3a0e28a1a85e554de2d22f0b6b58d8828631c9",
+    "metrics": {
+      "explicit": {"python":{"samples":5,"wall_ms_median":40.0,"cpu_ms_median":30.0,"outer_max_rss_kib_median":42492,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":30.0},"native":{"samples":5,"wall_ms_median":130.0,"cpu_ms_median":120.0,"outer_max_rss_kib_median":46148,"wall_ms_p95_nearest_rank":130.0,"cpu_ms_p95_nearest_rank":120.0}},
+      "changed": {"python":{"samples":5,"wall_ms_median":40.0,"cpu_ms_median":30.0,"outer_max_rss_kib_median":37376,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":40.0},"native":{"samples":5,"wall_ms_median":130.0,"cpu_ms_median":130.0,"outer_max_rss_kib_median":42548,"wall_ms_p95_nearest_rank":130.0,"cpu_ms_p95_nearest_rank":130.0}},
+      "coverage": {"python":{"samples":5,"wall_ms_median":100.0,"cpu_ms_median":90.0,"outer_max_rss_kib_median":45228,"wall_ms_p95_nearest_rank":100.0,"cpu_ms_p95_nearest_rank":90.0},"native":{"samples":5,"wall_ms_median":270.0,"cpu_ms_median":260.0,"outer_max_rss_kib_median":62396,"wall_ms_p95_nearest_rank":270.0,"cpu_ms_p95_nearest_rank":270.0}},
+      "canary": {"python":{"samples":5,"wall_ms_median":100.0,"cpu_ms_median":90.0,"outer_max_rss_kib_median":44976,"wall_ms_p95_nearest_rank":100.0,"cpu_ms_p95_nearest_rank":99.99999999999999},"native":{"samples":5,"wall_ms_median":270.0,"cpu_ms_median":260.0,"outer_max_rss_kib_median":62392,"wall_ms_p95_nearest_rank":270.0,"cpu_ms_p95_nearest_rank":270.0}}
+    },
+    "parity": "full JSON and exit status for four actual and two fixture cases",
+    "fixture_scope": "Python public API adapter; fixture controls excluded from CLI timing"
+  },
+  "matched_three_arm": {
+    "summary": ".git/forge-report-native-run-1793951676086781696/summary.json",
+    "summary_sha256": "53d96cedb4b193b1da627d227808f66b75f37f34f368f8e4babe749745058951",
+    "independent_audit": {
+      "path": ".git/forge-report-three-arm-independent.json",
+      "sha256": "ea90a45210e2f8b8506b6cc165b999be9c57133d7f24e9c9c634f1d5da37f8d7"
+    },
+    "accounting": {
+      "completed": 90,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0,
+      "running": 0
+    },
+    "rounds_per_case": 6,
+    "ordering": "all six three-arm permutations once per timed case",
+    "preflights_excluded": true,
+    "checkout_before": {
+      "head": "b499dbe01f858bbe64e35cea0784150721852e22",
+      "tree": "a1453c49259f343b7a975056f7e2d408a649a7c4"
+    },
+    "checkout_after": {
+      "head": "b499dbe01f858bbe64e35cea0784150721852e22",
+      "tree": "a1453c49259f343b7a975056f7e2d408a649a7c4"
+    },
+    "input_count": 1770,
+    "input_map_sha256": "102a5a571a99f88aeb77435a8bf08f411638d2fe41417620e0766477e5c866ea",
+    "binaries": {
+      "reference_native": {
+        "selected": "/tmp/forge-report-clean-88a63ef-g30px9wy/bin/forge",
+        "private_copy": "/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/reference-forge",
+        "sha256": "c4b2a017b4b6fcbf023a20097a3a0e28a1a85e554de2d22f0b6b58d8828631c9",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "88a63ef9ebb315f7f876a8ecb159c3c194908bea",
+          "compiled_source_sha256": "f27d571d49293b8b48769f8ed74c29c29078988aeb3ebb683313b333c90d07a5",
+          "executable_sha256": "c4b2a017b4b6fcbf023a20097a3a0e28a1a85e554de2d22f0b6b58d8828631c9"
+        }
+      },
+      "candidate_native": {
+        "selected": "/tmp/forge-report-path-clean-b499dbe-hblub_tj/bin/forge",
+        "private_copy": "/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/candidate-forge",
+        "sha256": "726aef5aeb3c5c430a47dda009d16185bc2188ab9b98b09c3820fc4b7323e669",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "b499dbe01f858bbe64e35cea0784150721852e22",
+          "compiled_source_sha256": "a605d8e823f44aa8be7e3768946b1e116874a0ccffca423b5282af4ac458af80",
+          "executable_sha256": "726aef5aeb3c5c430a47dda009d16185bc2188ab9b98b09c3820fc4b7323e669"
+        }
+      }
+    },
+    "metrics": {
+      "explicit": {"python":{"samples":6,"wall_ms_median":40.0,"cpu_ms_median":30.0,"outer_max_rss_kib_median":42476.0,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":40.0},"reference_native":{"samples":6,"wall_ms_median":130.0,"cpu_ms_median":120.0,"outer_max_rss_kib_median":44666.0,"wall_ms_p95_nearest_rank":130.0,"cpu_ms_p95_nearest_rank":120.0},"candidate_native":{"samples":6,"wall_ms_median":120.0,"cpu_ms_median":120.0,"outer_max_rss_kib_median":46264.0,"wall_ms_p95_nearest_rank":120.0,"cpu_ms_p95_nearest_rank":120.0}},
+      "changed": {"python":{"samples":6,"wall_ms_median":40.0,"cpu_ms_median":40.0,"outer_max_rss_kib_median":37556.0,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":40.0},"reference_native":{"samples":6,"wall_ms_median":130.0,"cpu_ms_median":130.0,"outer_max_rss_kib_median":42486.0,"wall_ms_p95_nearest_rank":140.0,"cpu_ms_p95_nearest_rank":130.0},"candidate_native":{"samples":6,"wall_ms_median":130.0,"cpu_ms_median":130.0,"outer_max_rss_kib_median":42308.0,"wall_ms_p95_nearest_rank":130.0,"cpu_ms_p95_nearest_rank":130.0}},
+      "coverage": {"python":{"samples":6,"wall_ms_median":100.0,"cpu_ms_median":95.0,"outer_max_rss_kib_median":45106.0,"wall_ms_p95_nearest_rank":100.0,"cpu_ms_p95_nearest_rank":99.99999999999999},"reference_native":{"samples":6,"wall_ms_median":270.0,"cpu_ms_median":260.0,"outer_max_rss_kib_median":62746.0,"wall_ms_p95_nearest_rank":270.0,"cpu_ms_p95_nearest_rank":270.0},"candidate_native":{"samples":6,"wall_ms_median":260.0,"cpu_ms_median":250.0,"outer_max_rss_kib_median":62580.0,"wall_ms_p95_nearest_rank":260.0,"cpu_ms_p95_nearest_rank":260.0}},
+      "canary": {"python":{"samples":6,"wall_ms_median":100.0,"cpu_ms_median":90.0,"outer_max_rss_kib_median":45124.0,"wall_ms_p95_nearest_rank":100.0,"cpu_ms_p95_nearest_rank":99.99999999999999},"reference_native":{"samples":6,"wall_ms_median":270.0,"cpu_ms_median":265.0,"outer_max_rss_kib_median":62554.0,"wall_ms_p95_nearest_rank":270.0,"cpu_ms_p95_nearest_rank":270.0},"candidate_native":{"samples":6,"wall_ms_median":260.0,"cpu_ms_median":250.0,"outer_max_rss_kib_median":61998.0,"wall_ms_p95_nearest_rank":260.0,"cpu_ms_p95_nearest_rank":250.0}}
+    },
+    "parity": "full JSON and exit status for four actual and two fixture cases"
+  },
+  "commands": {
+    "note": "Exact sampled argv follow; replace host-local binary, root, registry and base paths with independently pinned equivalents. Each measurement used /usr/bin/time fresh process, and fixture API lanes were not timed.",
+    "two_arm": {
+      "explicit": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_testing","verify-evidence","--registry","campaigns/registry.json","src/conductor/test_mutation_attribution.py"],"native":["/home/tim/Projects/llm-forge/.git/forge-report-run-1793950295686621178/forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","src/conductor/test_mutation_attribution.py"]},
+      "changed": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","changed","--registry","campaigns/registry.json","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"],"native":["/home/tim/Projects/llm-forge/.git/forge-report-run-1793950295686621178/forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","--changed","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"]},
+      "coverage": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","coverage","--registry","campaigns/registry.json"],"native":["/home/tim/Projects/llm-forge/.git/forge-report-run-1793950295686621178/forge","mutation","coverage","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"]},
+      "canary": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","canary","--registry","campaigns/registry.json"],"native":["/home/tim/Projects/llm-forge/.git/forge-report-run-1793950295686621178/forge","mutation","canary","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"]}
+    },
+    "three_arm": {
+      "explicit": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_testing","verify-evidence","--registry","campaigns/registry.json","src/conductor/test_mutation_attribution.py"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/reference-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","src/conductor/test_mutation_attribution.py"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/candidate-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","src/conductor/test_mutation_attribution.py"]},
+      "changed": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","changed","--registry","campaigns/registry.json","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/reference-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","--changed","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/candidate-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","--changed","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"]},
+      "coverage": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","coverage","--registry","campaigns/registry.json"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/reference-forge","mutation","coverage","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/candidate-forge","mutation","coverage","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"]},
+      "canary": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","canary","--registry","campaigns/registry.json"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/reference-forge","mutation","canary","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/candidate-forge","mutation","canary","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"]}
+    },
+    "final_three_arm": {
+      "explicit": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_testing","verify-evidence","--registry","campaigns/registry.json","src/conductor/test_mutation_attribution.py"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/reference-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","src/conductor/test_mutation_attribution.py"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/candidate-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","src/conductor/test_mutation_attribution.py"]},
+      "changed": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","changed","--registry","campaigns/registry.json","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/reference-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","--changed","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/candidate-forge","mutation","evidence","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src","--changed","--base","1e597fe675f646c92fcca2146f87a1c99eb1dbc1"]},
+      "coverage": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","coverage","--registry","campaigns/registry.json"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/reference-forge","mutation","coverage","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/candidate-forge","mutation","coverage","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"]},
+      "canary": {"python":["/home/tim/Projects/llm-forge/.venv/bin/python","-m","conductor.mutation_coverage","canary","--registry","campaigns/registry.json"],"reference_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/reference-forge","mutation","canary","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"],"candidate_native":["/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/candidate-forge","mutation","canary","--repo-root","/home/tim/Projects/llm-forge","--registry","campaigns/registry.json","--legacy-component-root","/home/tim/Projects/llm-forge/src"]}
+    }
+  },
+  "openat2_experiment": {
+    "candidate": {
+      "selected": "/tmp/forge-report-path-clean-b499dbe-hblub_tj/bin/forge",
+      "private_copy": "/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793951676086781696/candidate-forge",
+      "sha256": "726aef5aeb3c5c430a47dda009d16185bc2188ab9b98b09c3820fc4b7323e669",
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "b499dbe01f858bbe64e35cea0784150721852e22",
+        "compiled_source_sha256": "a605d8e823f44aa8be7e3768946b1e116874a0ccffca423b5282af4ac458af80",
+        "executable_sha256": "726aef5aeb3c5c430a47dda009d16185bc2188ab9b98b09c3820fc4b7323e669"
+      }
+    },
+    "decision": "rejected; small measured differences at coarse resolution did not justify kernel-specific dependency and unsafe complexity",
+    "evidence": "matched_three_arm"
+  },
+  "debugger_phase_observation": {
+    "profile": ".git/forge-report-phase-profile2.json",
+    "sha256": "6a8a41c3e00efe2181c5c101d337c3e8102a20378404737b4d2c8cfd2e63d2f1",
+    "exit_code": 5,
+    "rows": [
+      {
+        "phase": "catalog",
+        "wall_ns": 22543940
+      },
+      {
+        "phase": "root_eligibility",
+        "wall_ns": 44414417
+      },
+      {
+        "phase": "workspace_eligibility",
+        "wall_ns": 42736967
+      },
+      {
+        "phase": "verification",
+        "wall_ns": 6034384
+      },
+      {
+        "phase": "report",
+        "wall_ns": 154882795
+      }
+    ],
+    "scope": "GDB-instrumented wall durations include debugger overhead, not uninstrumented latency or CPU attribution",
+    "supporting_artifacts": [
+      {
+        "path": ".git/forge-report-phase-profile2.gdb",
+        "sha256": "4fa9f755e29d3075b8fb0fb6c64dd67bc3e4bdb8c43a5207e2e9f071d29e961a"
+      },
+      {
+        "path": ".git/forge-report-phase-profile2.log",
+        "sha256": "1d5bcb9ae09406cd59f02ffa79bdfa1f38507e31204b5872bd1d9c2e6eb27ee6"
+      },
+      {
+        "path": ".git/forge-report-path-perf.stderr",
+        "sha256": "3b875364531fb011c58a90062b7facf2a2b424b12a660285c299762895a7584a"
+      },
+      {
+        "path": ".git/forge-report-path-gprofng-functions.txt",
+        "sha256": "f474cbb6ac6987db84ea71716f77a3df16f5059167076a1fd1c502d8255257b6"
+      },
+      {
+        "path": ".git/forge-report-path-gprofng2-functions.txt",
+        "sha256": "87697f433091ae80efa6980ab521dc6b828ff4f5d30e94f2912c1a3ffc71681a"
+      },
+      {
+        "path": ".git/forge-report-path-gprofng3.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "profiling_limits": [
+    "perf CPU events denied by kernel permissions; no sampling profile",
+    "gprofng output unreliable for this workload; no CPU attribution inferred"
+  ],
+  "limitations": [
+    "GNU time wall/CPU quantized to 10 ms; six/five fresh-process rounds with uncontrolled filesystem caches are not general performance claims.",
+    "In the rejected openat2 experiment, the candidate remained slower than Python in all four workloads and native-reference differences were small. In the final comparison, candidate and Python explicit medians were equal; candidate remained slower for changed, coverage and canary.",
+    "Extension build-source provenance unavailable; identical output does not establish identical implementation.",
+    "Outer RSS is not aggregate simultaneous process-tree memory; benchmark-owner descendant cleanup is not attested. The separate native positive control records verified cleanup.",
+    "Raw artifacts and supplied tools are host-local; this index is not a portable replay bundle.",
+    "No model tokens, cost, user benefit or agent productivity measured.",
+    "Empirical p95 uses nearest rank from only five or six timed samples; in both sets it is the sample maximum, not a reliable tail estimate."
+  ],
+  "pending": {
+    "zero_eligible_contract_fix": "implemented at measured candidate; publication checks were pending at index assembly",
+    "final_comparison": "completed; see final_matched_three_arm",
+    "positive_control": "completed: scoped automatic two-mutant PASS; see positive_control",
+    "publication_gate": "At index assembly: pending make local-check and make local-verify on final committed tree and current origin/main"
+  },
+  "final_matched_three_arm": {
+    "summary": ".git/forge-report-native-run-1793953091546186807/summary.json",
+    "summary_sha256": "efa938c51cb6fefe6b426a6b7f1eee5b8fe0fe5b3a91971ed214b4317e4bbdc6",
+    "independent_audit": {
+      "path": ".git/forge-report-eligible-independent.json",
+      "sha256": "181b4a7d99dd9804fcdb93fc7448a376db77eb82969152752d87027cdee2544f"
+    },
+    "accounting": {
+      "completed": 90,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0,
+      "running": 0
+    },
+    "checkout_before": {
+      "head": "d1fc4dd9d4a73da7147848287430418fdd980d6d",
+      "tree": "bdcb6029aec0fe843cee81988d3f6f2300de3cca"
+    },
+    "checkout_after": {
+      "head": "d1fc4dd9d4a73da7147848287430418fdd980d6d",
+      "tree": "bdcb6029aec0fe843cee81988d3f6f2300de3cca"
+    },
+    "input_count": 1768,
+    "input_map_sha256": "cdb5e803cfb467cf823898a8e15853d61b3eaa2e0aa728bf950074ab1529f3fd",
+    "binaries": {
+      "reference_native": {
+        "selected": "/tmp/forge-report-clean-88a63ef-g30px9wy/bin/forge",
+        "private_copy": "/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/reference-forge",
+        "sha256": "c4b2a017b4b6fcbf023a20097a3a0e28a1a85e554de2d22f0b6b58d8828631c9",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "88a63ef9ebb315f7f876a8ecb159c3c194908bea",
+          "compiled_source_sha256": "f27d571d49293b8b48769f8ed74c29c29078988aeb3ebb683313b333c90d07a5",
+          "executable_sha256": "c4b2a017b4b6fcbf023a20097a3a0e28a1a85e554de2d22f0b6b58d8828631c9"
+        }
+      },
+      "candidate_native": {
+        "selected": "/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge",
+        "private_copy": "/home/tim/Projects/llm-forge/.git/forge-report-native-run-1793953091546186807/candidate-forge",
+        "sha256": "1da583517e8665db9e16178f716e47cbd63ac86d4f4daeb535ae8b051a19c6b2",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "d1fc4dd9d4a73da7147848287430418fdd980d6d",
+          "compiled_source_sha256": "c3ae539c78522bf77153845bfc46c544a5490d5238e21ed9d58162c3c5c204b1",
+          "executable_sha256": "1da583517e8665db9e16178f716e47cbd63ac86d4f4daeb535ae8b051a19c6b2"
+        }
+      }
+    },
+    "rounds_per_case": 6,
+    "ordering": "all six three-arm permutations once per timed case",
+    "parity": "full JSON and exit status for four actual and two fixture cases",
+    "metrics": {
+      "explicit": {"python":{"samples":6,"wall_ms_median":40.0,"cpu_ms_median":30.0,"outer_max_rss_kib_median":42490.0,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":40.0},"reference_native":{"samples":6,"wall_ms_median":130.0,"cpu_ms_median":120.0,"outer_max_rss_kib_median":46002.0,"wall_ms_p95_nearest_rank":130.0,"cpu_ms_p95_nearest_rank":130.0},"candidate_native":{"samples":6,"wall_ms_median":40.0,"cpu_ms_median":35.0,"outer_max_rss_kib_median":45378.0,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":40.0}},
+      "changed": {"python":{"samples":6,"wall_ms_median":40.0,"cpu_ms_median":35.0,"outer_max_rss_kib_median":37424.0,"wall_ms_p95_nearest_rank":40.0,"cpu_ms_p95_nearest_rank":40.0},"reference_native":{"samples":6,"wall_ms_median":130.0,"cpu_ms_median":130.0,"outer_max_rss_kib_median":42454.0,"wall_ms_p95_nearest_rank":140.0,"cpu_ms_p95_nearest_rank":130.0},"candidate_native":{"samples":6,"wall_ms_median":50.0,"cpu_ms_median":45.0,"outer_max_rss_kib_median":41724.0,"wall_ms_p95_nearest_rank":50.0,"cpu_ms_p95_nearest_rank":50.0}},
+      "coverage": {"python":{"samples":6,"wall_ms_median":100.0,"cpu_ms_median":90.0,"outer_max_rss_kib_median":44858.0,"wall_ms_p95_nearest_rank":100.0,"cpu_ms_p95_nearest_rank":100.0},"reference_native":{"samples":6,"wall_ms_median":270.0,"cpu_ms_median":265.0,"outer_max_rss_kib_median":62270.0,"wall_ms_p95_nearest_rank":270.0,"cpu_ms_p95_nearest_rank":270.0},"candidate_native":{"samples":6,"wall_ms_median":180.0,"cpu_ms_median":180.0,"outer_max_rss_kib_median":62272.0,"wall_ms_p95_nearest_rank":190.0,"cpu_ms_p95_nearest_rank":180.0}},
+      "canary": {"python":{"samples":6,"wall_ms_median":100.0,"cpu_ms_median":95.0,"outer_max_rss_kib_median":45026.0,"wall_ms_p95_nearest_rank":100.0,"cpu_ms_p95_nearest_rank":100.0},"reference_native":{"samples":6,"wall_ms_median":270.0,"cpu_ms_median":265.0,"outer_max_rss_kib_median":62594.0,"wall_ms_p95_nearest_rank":270.0,"cpu_ms_p95_nearest_rank":270.0},"candidate_native":{"samples":6,"wall_ms_median":180.0,"cpu_ms_median":180.0,"outer_max_rss_kib_median":62432.0,"wall_ms_p95_nearest_rank":190.0,"cpu_ms_p95_nearest_rank":180.00000000000003}}
+    },
+    "interpretation": "Candidate explicit median equals Python at 40 ms; changed remains 50 vs 40 ms and coverage/canary remain 180 vs 100 ms. These are bounded host-local observations, not overall speedup or productivity evidence."
+  },
+  "positive_control": {
+    "summary": "/tmp/forge-report-positive-hhge8p5r/summary.json",
+    "summary_sha256": "86e0a3dc1940211e8282f3b323e4e39385262a37173eb1fa2f733e29ed5028b1",
+    "independent_audit": {
+      "path": ".git/forge-report-positive-independent.json",
+      "sha256": "1b9f004890d8a988f7906061ec4e56400e49b316a415b9d6344e0abf55942822"
+    },
+    "decision": "SCOPED_POSITIVE_CONTROL_AND_NEGATIVES_VERIFIED",
+    "check_accounting": {
+      "completed": 17,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0,
+      "running": 0
+    },
+    "command_accounting": {
+      "completed": 22,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0,
+      "running": 0
+    },
+    "streams_checked": 44,
+    "argv_records_checked": 22,
+    "receipt": {"path":"/tmp/forge-report-positive-hhge8p5r/host/evidence/result.json","sha256":"3ad98580fe333beae79f133345e649df49d9ade02e105c77052011a5f56625e7","status":"PASS","complete_campaign":true,"detail_encoding":"json","raw_detail_matches_retained_receipt_show":true,"accounting":{"censored":0,"completed":2,"failed":0,"planned":2,"unstarted":0},"source_coverage":{"complete":true,"missing":[],"schema_version":1,"scored_by_source":{"crates/workspace/member/src/selected.rs":2}},"mutants":[{"duration_seconds":0.100788,"function":"alpha","id":"FnValue-12ba2715a127-0","line":1,"mutated_text":"false","operator":"FnValue","original_text":"alpha-> bool","outcome":"KILLED","package":"workspace_subject","path":"crates/workspace/member/src/selected.rs"},{"duration_seconds":0.100807,"function":"beta","id":"FnValue-4b9d8e79fb1c-0","line":2,"mutated_text":"false","operator":"FnValue","original_text":"beta-> bool","outcome":"KILLED","package":"workspace_subject","path":"crates/workspace/member/src/selected.rs"}],"outcome_counts":{"ERROR":0,"KILLED":2,"NO_COVERAGE":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0},"workspace_baseline":{"direct":{"frames":2,"ignored":0,"passed":1,"scope":"observed libtest output, not producer attestation"},"engine":{"frames":2,"ignored":0,"passed":1,"scope":"observed libtest output, not producer attestation"},"engine_log_sha256":"41d205ecac8992d7055a796447a2ccac75208e3e1fa084b444b883e3dac9e9d4"},"engine_result":{"duration_seconds":0.321,"returncode":0,"stderr_tail":"","stdout_tail":"Found 2 mutants to test\nok       Unmutated baseline in 0s build + 0s test\n2 mutants tested in 0s: 2 caught\n","timed_out":false}},
+    "automatic_manifest": {"path":"/tmp/forge-report-positive-hhge8p5r/host/campaigns/workspace-trial_member_cargo_20261106.json","before_sha256":"fa325339ace7285330d31a4c22b00beb60bf365432cf90167ca1581d4870ed37","after_sha256":"84a231c9296bcabecc5a5fab91d68bf834dd859e95d814b3edfc381bd05b3eb2","initial_canonical_json_reconstructs_recorded_hash":true,"native_rewrite_fields_only":["survivor_baseline","survivor_baseline_note","survivor_baseline_recorded","survivor_baseline_recorded_at"]},
+    "report_controls": [{"name":"report-pinned","returncode":0,"status":"PASS","checked_test_paths":["crates/workspace/member/src/lib.rs"],"evidence":[{"campaign_id":"workspace-trial_member_cargo_20261106","path":"crates/workspace/member/src/lib.rs","receipt":"evidence/result.json","scope":{"mode":"complete","selection":"test_argv"}}],"missing_evidence":[],"rejection_counts":{},"error":null},{"name":"report-unpinned","returncode":5,"status":"FAIL","checked_test_paths":["crates/workspace/member/src/lib.rs"],"evidence":[],"missing_evidence":[{"campaigns":["workspace-trial_member_cargo_20261106"],"path":"crates/workspace/member/src/lib.rs","reason":"no current complete PASS receipt","reason_kind":"not_pass","receipt_rejections":[{"detail":"workspace receipt root unavailable or receipt outside configured root","kind":"scope_error","receipt":"result.json"}]}],"rejection_counts":{"not_pass":1,"scope_error":1},"error":null},{"name":"report-bad-digest","returncode":4,"status":"REFUSED","checked_test_paths":null,"evidence":null,"missing_evidence":null,"rejection_counts":null,"error":"input digest mismatch"}],
+    "snapshot": {
+      "path": "/tmp/forge-report-positive-hhge8p5r/scratch/llm-orchestrator-snapshot-EGMQ5t",
+      "removed_recorded": true,
+      "absent_now": true
+    },
+    "process_groups": [{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1949179-dada77aace9a47b38c2e614559089277","absent_now":true,"receipt_cleanup_complete":true,"outcome":"exited","duration_ms":20},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1949179-c3f6fb90418925674f7dffd422b7847f","absent_now":true,"receipt_cleanup_complete":true,"outcome":"exited","duration_ms":72},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1949179-ee039673403e4bab7193323da1f666e0","absent_now":true,"receipt_cleanup_complete":true,"outcome":"exited","duration_ms":321}],
+    "limits": [
+      "One automatic std-only selected-source workspace campaign; no whole candidate approval or per-test value claim.",
+      "Original cargo-mutants report/log directory was removed with verified snapshot cleanup; retained native receipt rows and engine stdout tail were checked, not replayed.",
+      "Initial manifest and pre-transformation grant byte hashes are independently reconstructed from retained objects using their recorded canonical writers; original overwritten files are unavailable.",
+      "Cleanup absence is a fresh point observation, not process identity authority or execution attestation.",
+      "No payloads, builds or shared environment changes during this audit."
+    ],
+    "scope": "One automatic std-only selected-source two-mutant PASS and receipt reporting controls; not actual Forge #196 campaign PASS or whole candidate approval."
+  },
+  "make_controls": {
+    "ledger": ".git/forge-report-make-controls.json",
+    "ledger_sha256": "94f88912056b47950e9ca9ad3ae14f09bab5da4f25719a44a407b6aa5690ac0a",
+    "rows": [{"case":"explicit","make_exit_code":2,"report_status":"FAIL","matches_final_candidate_json":true,"candidate_report_exit":5,"execve_programs":["/bin/sh","/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","/usr/bin/make"],"artifacts":{".stdout":{"path":".git/forge-report-make-explicit.stdout","sha256":"42c32f237d249a5a09681478a360dcdb3cfb8992c784b430b6245573ace84633"},".stderr":{"path":".git/forge-report-make-explicit.stderr","sha256":"8eeaccd5e0ce197a4f20758cb0a0bbadc5dbaa05e26880bf2a984ecbf5490b5e"},".execve":{"path":".git/forge-report-make-explicit.execve","sha256":"7957f598e64a794fc618f1f2c1432557caa1f1df05b80ba239d250d411c11bbe"}},"argv":["strace","-f","-e","trace=execve","-o","/home/tim/Projects/llm-forge/.git/forge-report-make-explicit.execve","make","--no-print-directory","mutation-evidence","FORGE=/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","UV=false","MUTATION_REPORT_ARGS=--registry campaigns/registry.json","MUTATION_PATHS=src/conductor/test_mutation_attribution.py"]},{"case":"changed","make_exit_code":2,"report_status":"FAIL","matches_final_candidate_json":true,"candidate_report_exit":6,"execve_programs":["/bin/sh","/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","/usr/bin/make"],"artifacts":{".stdout":{"path":".git/forge-report-make-changed.stdout","sha256":"ec28f6e374fc107a6c0fb924bc765cd5abd2998ab2094a1a611b673dce2a6eb6"},".stderr":{"path":".git/forge-report-make-changed.stderr","sha256":"c1787e4fd8b5f31bb7de58f34a251b48b5cb53eefade43791dcb0bb1cf8d90d1"},".execve":{"path":".git/forge-report-make-changed.execve","sha256":"58e6f030a3e11826f8732d8e594392088e8529a0be2634a646311b8969b2db38"}},"argv":["strace","-f","-e","trace=execve","-o","/home/tim/Projects/llm-forge/.git/forge-report-make-changed.execve","make","--no-print-directory","mutation-evidence","FORGE=/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","UV=false","MUTATION_REPORT_ARGS=--registry campaigns/registry.json","MUTATION_BASE=1e597fe675f646c92fcca2146f87a1c99eb1dbc1"]},{"case":"coverage","make_exit_code":2,"report_status":"FAIL","matches_final_candidate_json":true,"candidate_report_exit":5,"execve_programs":["/bin/sh","/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","/usr/bin/make"],"artifacts":{".stdout":{"path":".git/forge-report-make-coverage.stdout","sha256":"a71e34f074761e070f6a72834567845555d785bac3104e2c9c7ec8d74859786c"},".stderr":{"path":".git/forge-report-make-coverage.stderr","sha256":"6d37147fbb3c9e5a99b09a8ca82b9a3f8d0559cccf6c6324aca7044e3cbcf521"},".execve":{"path":".git/forge-report-make-coverage.execve","sha256":"19e13b4f074d2bed285c01afe01554585e6fc3b0479d020c02534cefaefc6e14"}},"argv":["strace","-f","-e","trace=execve","-o","/home/tim/Projects/llm-forge/.git/forge-report-make-coverage.execve","make","--no-print-directory","mutation-coverage","FORGE=/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","UV=false","MUTATION_REPORT_ARGS=--registry campaigns/registry.json"]},{"case":"canary","make_exit_code":0,"report_status":"FAIL","matches_final_candidate_json":true,"candidate_report_exit":0,"execve_programs":["/bin/sh","/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","/usr/bin/make"],"artifacts":{".stdout":{"path":".git/forge-report-make-canary.stdout","sha256":"a65465326890649a67e46cc68ac8220e1ea008b11d9cde6a791ce7531f5385a1"},".stderr":{"path":".git/forge-report-make-canary.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},".execve":{"path":".git/forge-report-make-canary.execve","sha256":"5cf8fab6c22dd18711f1dd9718e44428befbb2102f1598435784a7600f2ba2b6"}},"argv":["strace","-f","-e","trace=execve","-o","/home/tim/Projects/llm-forge/.git/forge-report-make-canary.execve","make","--no-print-directory","mutation-canary","FORGE=/tmp/forge-report-eligible-clean-d1fc4dd-2c1n83lh/bin/forge","UV=false","MUTATION_REPORT_ARGS=--registry campaigns/registry.json"]}],
+    "scope": "Raw execve traces show only Make, shell and selected native Forge; no Python or mutation engine. Make maps nonzero child exits to 2; canary returned 0 with report FAIL."
+  },
+  "focused_validation": {
+    "artifacts": [
+      {
+        "path": ".git/forge-report-eligibility-tests.log",
+        "sha256": "a652eb4b87408098f9c0ddb9fb35e3cd2bedcfb37db07283a2c208d2b4097f01"
+      },
+      {
+        "path": ".git/forge-report-optimized-evidence-tests.log",
+        "sha256": "1657ece06b62794ef4b6931db53c5063988db22debd7ef43e837727b941797a6"
+      },
+      {
+        "path": ".git/forge-report-cli-tests2.log",
+        "sha256": "1d43d2c56a0d94a7808bb4d39be560ccdf213dd705099d6c6148c3f639e26d89"
+      },
+      {
+        "path": ".git/forge-report-eligibility-clippy.log",
+        "sha256": "65185e869fd900a1fce87cb57c8253a8cb71b700d75873d1ca1b90c6a41fdc2c"
+      },
+      {
+        "path": ".git/forge-report-eligible-clean-binary.json",
+        "sha256": "d69c273ad8c10bd8f68442d7dbc345d25e70fbfb938f63b9cf7ebda90992f6d8"
+      },
+      {
+        "path": ".git/forge-report-restored-pin-tests.log",
+        "sha256": "f62af8c3cfd7946a8bc08ea96f17d10ad688ea358e18757c90a311e29007c128"
+      },
+      {
+        "path": ".git/forge-report-restored-live-tests.log",
+        "sha256": "038539bf81b671b8a02b29e2b185733881c318cc5075ef64102515d508560cc5"
+      }
+    ],
+    "result": "37 focused library tests passed (10 eligibility, 12 evidence, 6 restored pin and 9 restored live); 5 CLI tests passed separately; focused Clippy completed. At index assembly, full publication checks remained pending."
+  }
+}

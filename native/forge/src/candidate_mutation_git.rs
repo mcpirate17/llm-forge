@@ -5,7 +5,7 @@ use git2::{ObjectType, Oid};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-pub(super) struct GitInputs<'a> {
+pub(crate) struct GitInputs<'a> {
     source: &'a Source,
     trees: BTreeMap<String, BTreeMap<String, TreeEntry>>,
     blobs: BTreeMap<(String, String), Vec<u8>>,

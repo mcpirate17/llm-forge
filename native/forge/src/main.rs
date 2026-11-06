@@ -37,6 +37,8 @@ mod mailbox;
 mod mcp_setup;
 mod merge;
 use forge::mutation_plan;
+#[cfg(target_os = "linux")]
+mod mutation_evidence_cli;
 mod mutation_results;
 mod mutation_run_cli;
 use forge::mutation_receipt_verify;
@@ -295,6 +297,15 @@ enum LedgerCommand {
 
 #[derive(Subcommand)]
 enum MutationCommand {
+    /// Verify existing receipts for explicit test paths or changed tests; runs nothing.
+    #[cfg(target_os = "linux")]
+    Evidence(mutation_evidence_cli::EvidenceArgs),
+    /// Inventory all test files against existing receipts; runs nothing.
+    #[cfg(target_os = "linux")]
+    Coverage(mutation_evidence_cli::ReportArgs),
+    /// Check receipt readability across the repository, independently of coverage debt.
+    #[cfg(target_os = "linux")]
+    Canary(mutation_evidence_cli::ReportArgs),
     /// Describe this clean native executable for explicit operator pinning; grants no authority.
     #[cfg(target_os = "linux")]
     Identity,
@@ -524,6 +535,24 @@ fn run_worktree_runtime(args: forge::worktree_runtime_cli::RuntimeArgs) -> ExitC
 
 fn run_mutation(action: MutationCommand) -> ExitCode {
     match action {
+        #[cfg(target_os = "linux")]
+        MutationCommand::Evidence(args) => command_exit(
+            "mutation evidence",
+            mutation_evidence_cli::evidence(args, &build_stamp()),
+            4,
+        ),
+        #[cfg(target_os = "linux")]
+        MutationCommand::Coverage(args) => command_exit(
+            "mutation coverage",
+            mutation_evidence_cli::coverage(args, &build_stamp()),
+            4,
+        ),
+        #[cfg(target_os = "linux")]
+        MutationCommand::Canary(args) => command_exit(
+            "mutation canary",
+            mutation_evidence_cli::canary(args, &build_stamp()),
+            4,
+        ),
         #[cfg(target_os = "linux")]
         MutationCommand::Identity => command_exit("mutation identity", native_runner_identity(), 1),
         #[cfg(target_os = "linux")]

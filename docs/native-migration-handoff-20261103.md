@@ -114,15 +114,18 @@ reports. Neither replaces the complete automatic writer/runner.
 
 ### P2 — Mutation evidence, coverage and governance compatibility
 
-- Remaining functions: `mutation_testing.py::{verify_evidence,receipt_drift}`;
-  `mutation_coverage.py::{coverage_report,verify_changed,canary_report}`;
-  mutation retention/registry/receipt maintenance helpers. Callers remain in
-  `Makefile:147–156` and `conductor.mk`.
+- Native `forge mutation evidence`, `coverage`, and `canary` now share held
+  inventory/receipt validation, and the three corresponding Make targets use them.
+  See [report identity and compatibility](mutation.md#native-maintenance-reports).
+  Python `verify_evidence`, `coverage_report`, `verify_changed`, and `canary_report`
+  remain public host compatibility APIs; those consumers have not been retired.
+  `receipt_drift`, retention/registry/receipt maintenance and other `conductor.mk`
+  callers remain separate migration work.
 - Reuse `native/forge/src/mutation_receipt_verify.rs::run`, candidate review/waiver
   collectors and native manifest handling. Byte-binding verification does not
   replace registry coverage, retention policy or authentic execution evidence.
-- Finish native inventory, changed-test checks, canary/coverage reports, retention
-  and their caller migration. Preserve externally granted policy boundaries.
+- Finish host caller adoption and retention migration. Preserve externally granted
+  policy boundaries; native report identity selection grants no execution authority.
 - Portable grandfather configuration is already implemented through operator-owned
   `MutationGrandfather` grants (`commit`, `tree`, `inventory_path`, `inventory_sha256`)
   in `candidate_execution_grants.rs` and `candidate_mutation_definitions.rs::grandfather`.

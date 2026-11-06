@@ -113,3 +113,25 @@ fn directory_binding_detects_replacement() {
     mkdir(&path).unwrap();
     assert!(bound.verify().is_err());
 }
+
+#[test]
+fn repository_group_write_and_replaced_ancestor_remain_distinct() {
+    let temp = tempfile::tempdir().unwrap();
+    let parent = temp.path().join("repo");
+    let directory = parent.join("dir");
+    fs::create_dir_all(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o775)).unwrap();
+    let path = directory.join("data");
+    fs::write(&path, b"unchanged").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o664)).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o777)).unwrap();
+    assert!(repository_live(&path, 1024).is_err());
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o775)).unwrap();
+    let (held, _) = repository_live(&path, 1024).unwrap();
+    held.verify().unwrap();
+    assert!(DirectoryBinding::open(&directory, None).is_err());
+    fs::rename(&directory, parent.join("old")).unwrap();
+    fs::create_dir(&directory).unwrap();
+    fs::write(&path, b"unchanged").unwrap();
+    assert!(held.verify().is_err());
+}
