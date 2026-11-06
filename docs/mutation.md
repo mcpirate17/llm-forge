@@ -499,6 +499,73 @@ presence makes a PASS claim inadmissible and prevents PASS/RATCHET_HELD corpus
 acceptance, including null or malformed values. These are cooperative observations,
 not execution attestation; ordinary snapshot verification and retention still apply.
 
+### Reproduce the real-engine timeout control
+
+The Linux integration case
+`confined_cli::real::real_automatic_workspace_timeout_retains_partial_diagnostics_and_owned_cleanup`
+authors a small std-only workspace, automatically plans and writes its campaign,
+then runs real cargo-mutants 27.1.0. Either boolean mutant writes a marker and
+sleeps; the ten-second engine limit interrupts it. The expected native result is
+incomplete ERROR with retained diagnostics and snapshot, while the test requires
+successful cleanup, exact campaign/source/test bindings and independently
+reconciled report hashes and identity digests. A zero completed-outcome prefix is
+expected. This control does not establish mutation PASS or agent productivity.
+
+It is ignored by default and requires an explicitly provisioned native toolchain,
+delegated cgroup v2 CPU/memory/PID controllers, and operator-selected read grants.
+Prepare an absolute JSON configuration with this shape, replacing every example
+path and digest with the intended canonical executable and its SHA-256:
+
+```json
+{
+  "schema_version": 1,
+  "programs": {
+    "cargo": {"path": "/opt/test-toolchain/bin/cargo", "sha256": "<64 hex digits>"},
+    "rustc": {"path": "/opt/test-toolchain/bin/rustc", "sha256": "<64 hex digits>"},
+    "rustdoc": {"path": "/opt/test-toolchain/bin/rustdoc", "sha256": "<64 hex digits>"},
+    "cargo-mutants": {"path": "/opt/test-tools/cargo-mutants", "sha256": "<64 hex digits>"},
+    "cc": {"path": "/usr/bin/x86_64-linux-gnu-gcc-13", "sha256": "<64 hex digits>"}
+  },
+  "setup_git": {"path": "/usr/bin/git", "sha256": "<64 hex digits>"},
+  "read_only": ["/opt/test-toolchain", "/usr/bin", "/usr/lib", "/usr/libexec/gcc", "/etc/ld.so.cache"],
+  "cgroup_parent": "/sys/fs/cgroup/<operator-delegated-parent>"
+}
+```
+
+Add any native compiler/linker aliases required by the supplied toolchain using
+the same pinned-program shape. The listed read roots are an example for a GNU
+Linux toolchain; select the actual loader, library and toolchain inputs. The test
+does not discover additional read authority. Program paths must be regular,
+singly linked canonical files; rustup launcher symlinks are not substitutes for
+the provisioned Cargo/rustc/rustdoc binaries. Setup Git is separate from payload
+programs, with isolated configuration, hooks and templates. The test supplies its
+own private source/scratch roots and fixes native limits at one CPU, 1 GiB and
+64 processes. No registry dependency seed is needed.
+
+From a clean committed checkout, install into a dedicated local prefix and run
+only the explicitly enabled case. The install supplies a singly linked executable;
+Cargo's direct build output may be a hard link to its dependency artifact:
+
+```sh
+mutation_install="$PWD/.git/forge-tools/real-mutation-install"
+make install INSTALL_ROOT="$mutation_install"
+mutation_config=/absolute/real-mutation-tools.json
+mutation_config_sha=$(sha256sum "$mutation_config" | cut -d' ' -f1)
+FORGE_TEST_BIN="$mutation_install/bin/forge" \
+FORGE_TEST_MUTATION_CONFIG="$mutation_config" \
+FORGE_TEST_MUTATION_CONFIG_SHA256="$mutation_config_sha" \
+cargo +1.98.0 test --release --offline --locked \
+  --manifest-path native/forge/Cargo.toml --test mutation_run_cli \
+  confined_cli::real::real_automatic_workspace_timeout_retains_partial_diagnostics_and_owned_cleanup \
+  -- --ignored --exact --test-threads=1 --nocapture
+```
+
+The test prints its retained evidence root. That root contains operator input
+provenance, raw command logs, the automatically generated manifest and receipt,
+and the unrestored snapshot. Failed or uncertain executions retain their artifacts.
+The fixture is reproducible from source with supplied tools and grants; it does
+not bundle a toolchain. The synthetic confined CLI tests remain protocol tests.
+
 ## Receipt format
 
 A mutation receipt is one JSON file with two blocks (slice L):

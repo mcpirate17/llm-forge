@@ -141,11 +141,18 @@ observed two discovered mutants and zero completed outcomes before timeout; no
 unstarted count is inferred. Two failed predecessor controls exposed and prompted
 fixes for timeout reason propagation and JSON key-order dependence. Their failures
 remain in the [evidence](performance.md#interrupted-cargo-progress-controls--2026-11-06).
+[PR #206](https://github.com/mcpirate17/llm-forge/pull/206) landed as `c95592a`,
+with a tree identical to checked head `6369de3`. All 18 local checks and
+exact-head/current-base verification passed: 4,819 passing executions, zero
+failures and 188 ignored across 179 harnesses. This is source and isolated-install
+verification; no shared-host installation or actual-client activation is implied.
 
-Next for #196: add independent negative receipt-admission tests for four observed
-predicate survivors in the actual selected campaign, then obtain useful bounded
-actual-package campaign evidence. Three other survivors do not yet establish that
-their guards are redundant; retain them pending proof. Restore
+Active test work for #196 adds independent negative receipt-admission cases for
+four observed predicate survivors and an opt-in Rust real-engine timeout control.
+The existing controls are host-local; a checked-in fixture must use explicitly
+pinned tools and grants, automatic generation, and the existing process owner.
+Then obtain useful bounded actual-package campaign evidence. Three other survivors
+do not yet establish that their guards are redundant; retain them pending proof. Restore
 Fest/Mull through the same command owner. A shared native coordinator for mutation
 evidence, coverage and canary remains queued; migration must preserve legacy
 identity and anchor semantics without weakening candidate approval requirements.

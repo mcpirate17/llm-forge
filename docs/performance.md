@@ -39,6 +39,12 @@ official mutant accounting nor scoring. Either diagnostic field prevents passing
 receipt admission. Focused tests, strict Clippy and the clean control do not
 replace full publication checks for the final committed tree.
 
+The final tree subsequently passed all 18 publication checks and exact-head/base
+verification at `6369de3`: 4,819 passing test executions, zero failures and 188
+ignored across 179 harnesses. [PR #206](https://github.com/mcpirate17/llm-forge/pull/206)
+merged the identical tree as `c95592a`. This verifies the source and isolated
+installation, without claiming a shared-host upgrade or client activation.
+
 ### Compiler-header control and actual Forge timeout — 2026-11-06
 
 A small authored workspace passed its C-header build probe with `/usr/include`
