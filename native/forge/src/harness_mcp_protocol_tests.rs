@@ -153,7 +153,7 @@ fn valid_arguments_survive_forwarding_and_tool_errors_are_visible() {
     let mut request = modern("tools/call");
     request["params"]["name"] = json!("echo");
     request["params"]["arguments"] = json!({"text":"λ"});
-    let Action::Forward { id, era, bytes } =
+    let Action::Forward { id, era, bytes, .. } =
         protocol.prepare(&serde_json::to_vec(&request).unwrap(), &BTreeMap::new())
     else {
         panic!("call not forwarded")

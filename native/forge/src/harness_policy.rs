@@ -23,6 +23,8 @@ pub struct Policy {
     pub memory_indexes: BTreeMap<String, super::workspace::MemoryCapability>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outbound_mcp: Option<OutboundCapability>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_report: Option<TestReportCapability>,
     pub aggregate: Limits,
     pub session: Limits,
     pub max_sessions: usize,
@@ -33,6 +35,16 @@ pub struct Policy {
     pub retention_seconds: u64,
     pub replay_bytes: usize,
     pub log_bytes: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestReportCapability {
+    pub executable: OutboundPin,
+    pub read_only: Vec<PathBuf>,
+    pub resources: Limits,
+    pub max_wall_seconds: u64,
+    pub max_output_bytes: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -242,6 +254,9 @@ impl Policy {
         if let Some(capability) = &self.outbound_mcp {
             capability.bind(&self, &state)?;
         }
+        if let Some(capability) = &self.test_report {
+            crate::harness::test_report::validate(capability, &self, &state)?;
+        }
         self.validate_indexes(&state)?;
         super::workspace::validate(&self, &state)?;
         Ok(self)
@@ -286,10 +301,26 @@ impl Policy {
                 "invalid outbound resources"
             );
         }
+        if let Some(capability) = &self.test_report {
+            let r = capability.resources;
+            ensure!(
+                (10..=1_024_000).contains(&r.cpu_millis)
+                    && (16..=1_048_576).contains(&r.memory_mib)
+                    && (1..=4096).contains(&r.processes)
+                    && (1..=20).contains(&capability.max_wall_seconds)
+                    && capability.max_wall_seconds <= self.lifetime_seconds
+                    && (512..=262144).contains(&capability.max_output_bytes),
+                "invalid test report capability bounds"
+            );
+        }
         // Cover bounded request/reply buffers, retained replay and native workers.
         let supervisor_mib = 384
             + self
                 .outbound_mcp
+                .as_ref()
+                .map_or(0, |c| c.resources.memory_mib + 20)
+            + self
+                .test_report
                 .as_ref()
                 .map_or(0, |c| c.resources.memory_mib + 20)
             + self.index_reservation()?
@@ -302,11 +333,11 @@ impl Policy {
                 .unwrap_or(0)
             + (self.max_retained_sessions * self.replay_bytes).div_ceil(1024 * 1024) as u64;
         ensure!(
-            u64::from(self.aggregate.cpu_millis) >= u64::from(self.session.cpu_millis) + self.outbound_mcp.as_ref().map_or(0, |c| u64::from(c.resources.cpu_millis))
+            u64::from(self.aggregate.cpu_millis) >= u64::from(self.session.cpu_millis) + self.outbound_mcp.as_ref().map_or(0, |c| u64::from(c.resources.cpu_millis)) + self.test_report.as_ref().map_or(0, |c| u64::from(c.resources.cpu_millis))
                 && self.aggregate.memory_mib
                     >= supervisor_mib + self.session.memory_mib * self.max_sessions as u64
                 && u64::from(self.aggregate.processes)
-                    >= 16 + u64::from(self.session.processes) * self.max_sessions as u64 + self.outbound_mcp.as_ref().map_or(0, |c| u64::from(c.resources.processes)),
+                    >= 16 + u64::from(self.session.processes) * self.max_sessions as u64 + self.outbound_mcp.as_ref().map_or(0, |c| u64::from(c.resources.processes)) + self.test_report.as_ref().map_or(0, |c| u64::from(c.resources.processes)),
             "aggregate budget must cover all sessions plus {supervisor_mib} MiB and 16 supervisor tasks"
         );
         Ok(())

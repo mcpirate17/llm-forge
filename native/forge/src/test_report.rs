@@ -30,7 +30,10 @@ struct Snapshot {
 
 impl Snapshot {
     fn capture(root: &Path) -> Result<Self> {
-        let source = Source::open(root)?;
+        Self::capture_source(Source::open(root)?)
+    }
+
+    fn capture_source(source: Source) -> Result<Self> {
         let inventory = Inventory::capture(&source)?;
         let mut inputs = Capture::open(source.root())?;
         let references = References::capture(&mut inputs, &inventory.tracked)?;
@@ -114,6 +117,19 @@ impl Snapshot {
             "report output must be an untracked .json file outside captured inputs and reference trees");
         Ok(path)
     }
+}
+
+/// Fixed read-only worker path. Admission precedes classification; the caller
+/// supplies confinement because libgit2 can read configuration while opening.
+pub(crate) fn readonly_exact(root: &Path, max_bytes: usize) -> Result<Vec<u8>> {
+    let admission = crate::test_report_worker::Admission::capture(root)?;
+    let source = Source::open(root)?;
+    admission.verify(&source)?;
+    let snapshot = Snapshot::capture_source(source)?;
+    let output = crate::analysis::encode(&snapshot.envelope()?, max_bytes)?;
+    snapshot.verify()?;
+    admission.verify(&snapshot.source)?;
+    Ok(output)
 }
 
 pub(crate) fn run(root: &Path, max_bytes: usize, args: TestArgs) -> Result<u8> {

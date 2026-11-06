@@ -140,6 +140,11 @@ pub async fn serve(harness: Harness, root: &Path, unit: &str) -> Result<()> {
     stop.send_replace(true);
     drop(listener);
     let mut failures = Vec::new();
+    if let Some(reports) = &harness.reports {
+        if let Err(error) = reports.shutdown().await {
+            failures.push(format!("test report shutdown: {error:#}"));
+        }
+    }
     if let Some(outbound) = &harness.outbound {
         match tokio::time::timeout(Duration::from_secs(4), outbound.shutdown()).await {
             Ok(Ok(())) => (),
@@ -196,6 +201,7 @@ async fn connection(
             break;
         }
         let mut shutdown = false;
+        let mut one_shot = false;
         let outcome = match parse_request(&frame) {
             Ok(Request::Catalog) => Ok(harness.catalog().clone()),
             Ok(Request::Grammar) => Ok(json!({"grammar":harness.grammar()})),
@@ -205,14 +211,27 @@ async fn connection(
                 if let Some(outbound) = &harness.outbound {
                     status["outbound_mcp"] = outbound.status();
                 }
+                if let Some(reports) = &harness.reports {
+                    status["python_test_report"] = reports.status();
+                }
                 Ok(status)
             }
             Ok(Request::Shutdown) => {
                 shutdown = true;
                 Ok(json!({"stopping":true}))
             }
-            Ok(Request::Call { call, repair }) => harness.call(call.get(), repair).await,
-            Ok(Request::CallText { input, repair }) => harness.call(&input, repair).await,
+            Ok(Request::Call { call, repair }) => {
+                let (result, close) =
+                    controlled_call(&harness, call.get(), repair, &mut read, &mut stopped).await;
+                one_shot = close;
+                result
+            }
+            Ok(Request::CallText { input, repair }) => {
+                let (result, close) =
+                    controlled_call(&harness, &input, repair, &mut read, &mut stopped).await;
+                one_shot = close;
+                result
+            }
             Err(error) => Err(error),
         };
         let reply = match outcome {
@@ -229,8 +248,50 @@ async fn connection(
             stop.send_replace(true);
             break;
         }
+        if one_shot {
+            break;
+        }
     }
     Ok(())
+}
+
+// Only the read-only report opts into one-shot disconnect cancellation. Existing
+// terminal and mutating calls keep their serial, persistent connection behavior.
+async fn controlled_call(
+    harness: &Harness,
+    input: &str,
+    repair: bool,
+    reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+    stopped: &mut watch::Receiver<bool>,
+) -> (Result<Value>, bool) {
+    let call = match harness.prepare_call(input, repair) {
+        Ok(call) => call,
+        Err(error) => return (Err(error), false),
+    };
+    let (cancel, cancelled) = watch::channel(false);
+    if call.name() != "python_test_report" {
+        return (harness.execute_call(&call, cancelled).await, false);
+    }
+    let work = harness.execute_call(&call, cancelled);
+    tokio::pin!(work);
+    let reason = tokio::select! {
+        biased;
+        _ = stopped.changed() => "service stopped during test report".to_owned(),
+        next = reader.fill_buf() => match next {
+            Ok([]) => "test report caller closed its write side".to_owned(),
+            Ok(_) => "test report requires a one-shot connection without pipelined data".to_owned(),
+            Err(error) => format!("test report caller read failed: {error}"),
+        },
+        result = &mut work => return (result, true),
+    };
+    cancel.send_replace(true);
+    // Keep polling the owner through setup and teardown. Dropping an execution
+    // requests cancellation, but does not establish that cleanup completed.
+    let result = match work.await {
+        Ok(_) => Err(anyhow::anyhow!(reason)),
+        Err(error) => Err(error.context(reason)),
+    };
+    (result, true)
 }
 
 pub async fn read_frame<R: AsyncBufRead + Unpin>(

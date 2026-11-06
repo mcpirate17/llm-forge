@@ -38,7 +38,7 @@ Remaining priorities include issue #196's ordinary mutation profiles and native
 prompt/tool assistance. Report overhead remains a documented limitation, not a
 general speedup claim; select the next increment from current user-value evidence.
 
-The active increment is [#210](https://github.com/mcpirate17/llm-forge/issues/210):
+Issue [#210](https://github.com/mcpirate17/llm-forge/issues/210) is delivered:
 the shared dead-test classifier now backs `forge analyze tests` and `make dead-tests`
 through native Git/reference collection, retaining advisory classifications and
 explicit legacy JSON output. Focused classifier/input/path/report/CLI checks,
@@ -52,9 +52,21 @@ benchmark completed 108 executions: median native latency fell from 510.75 to
 218.97 ms, while Python remained faster at 181.06 ms. Independent audit verified
 all 18 receipts and exact report comparisons. The original slower baseline and
 remaining gap are retained in the [performance report](performance.md#full-native-test-import-report--2026-11-06).
-Final publication gates remain pending. See the
+The full 18-check gate passed on `378ee44`: 4,889 passing test executions, zero
+failures and 189 ignored across 181 harnesses. Exact-head/current-base verification
+passed before [PR #211](https://github.com/mcpirate17/llm-forge/pull/211) merged as
+`22ec5bf`; its tree matches the checked head. See the
 [command contract](native-analysis.md#python-test-import-report). MCP admission and
 cancellation remain a separate integration gap; no host adoption is claimed.
+
+The active increment is [#212](https://github.com/mcpirate17/llm-forge/issues/212):
+an operator-enabled MCP report using the existing confined native worker owner.
+The first implementation adds fixed-root admission, isolated Git configuration,
+report-specific disconnect cancellation and bounded output. Strict Clippy and
+67 focused debug test executions passed, including CLI parity and adapter wire
+tests. Live service cleanup, release validation and matched service overhead
+remain unverified. Filesystem preparation remains cooperative; the child deadline
+does not establish a hard whole-operation deadline. No service adoption is claimed.
 
 ### Architecture, evidence and disposition
 

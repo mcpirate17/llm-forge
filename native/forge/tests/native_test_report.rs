@@ -2,6 +2,7 @@
 mod support;
 use git2::{Repository, Signature, Time};
 use serde_json::{json, Value};
+use std::os::unix::fs::PermissionsExt;
 use std::{fs, path::Path, process::Output};
 
 fn fixture() -> support::Host {
@@ -98,4 +99,57 @@ fn refusal_and_output_overflow_publish_neither_json_nor_artifact() {
     assert!(output.stdout.is_empty());
     assert!(!host.0.join("audit").exists());
     assert!(String::from_utf8_lossy(&output.stderr).contains("test_broken.py"));
+}
+
+fn worker(host: &support::Host, root: &Path, config: &Path, extra: &[&str]) -> Output {
+    host.command()
+        .env_clear()
+        .env("PATH", "")
+        .env("HOME", &host.0)
+        .env("XDG_CONFIG_HOME", &host.0)
+        .args(["harness", "test-report-worker", "--root"])
+        .arg(root)
+        .arg("--config-root")
+        .arg(config)
+        .args(["--max-bytes", "65536"])
+        .args(extra)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn dedicated_worker_matches_cli_without_path_tools_or_artifact_authority() {
+    let host = fixture();
+    let config = tempfile::tempdir().unwrap();
+    fs::set_permissions(config.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let normal = call(&host, &[]);
+    assert!(normal.status.success());
+    let isolated = worker(&host, &host.0, config.path(), &[]);
+    assert!(
+        isolated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&isolated.stderr)
+    );
+    assert_eq!(isolated.stdout, normal.stdout);
+    assert!(!host.0.join("audit").exists());
+    for extra in [vec!["--check"], vec!["--json-out", "audit/report.json"]] {
+        let denied = worker(&host, &host.0, config.path(), &extra);
+        assert_eq!(denied.status.code(), Some(2));
+        assert!(denied.stdout.is_empty());
+    }
+    assert!(!host.0.join("audit").exists());
+}
+
+#[test]
+fn dedicated_worker_refuses_parent_discovery_and_nonempty_configuration_root() {
+    let host = fixture();
+    let config = tempfile::tempdir().unwrap();
+    fs::set_permissions(config.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let nested = worker(&host, &host.0.join("pkg"), config.path(), &[]);
+    assert_eq!(nested.status.code(), Some(2));
+    assert!(nested.stdout.is_empty());
+    fs::write(config.path().join("config"), "[diff]\nrenames=false\n").unwrap();
+    let contaminated = worker(&host, &host.0, config.path(), &[]);
+    assert_eq!(contaminated.status.code(), Some(2));
+    assert!(contaminated.stdout.is_empty());
 }
