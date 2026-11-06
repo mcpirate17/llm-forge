@@ -423,3 +423,69 @@ fn report_data_directories_allow_group_write_but_parent_and_identity_remain_stri
         "replacement source root must be refused"
     );
 }
+
+#[test]
+fn exact_large_executable_uses_program_pin_without_weakening_data_limit() {
+    let f = Fixture::new();
+    git2::Repository::init(f.path("repo")).unwrap();
+    let path = f.path("tools/cargo");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&path)
+        .unwrap();
+    file.set_len(MAX_READ_FILE_BYTES as u64 + 1).unwrap();
+    drop(file);
+    let hash = crate::candidate_engine_identity::executable_file(
+        fs::File::open(&path).unwrap(),
+        || Ok(()),
+    )
+    .unwrap()
+    .sha256;
+    let reads = vec![path.clone()];
+    let bind = |report: bool, granted: &[PathBuf], pin: &str| {
+        if report {
+            OutboundBindings::capture_report(
+                &path,
+                pin,
+                granted,
+                &f.path("repo"),
+                &f.path("scratch"),
+                granted,
+            )
+        } else {
+            OutboundBindings::capture(
+                &path,
+                pin,
+                granted,
+                &[],
+                &f.path("repo"),
+                &f.path("scratch"),
+                granted,
+            )
+        }
+    };
+    for report in [true, false] {
+        let held = bind(report, &reads, &hash).unwrap();
+        held.verify().unwrap();
+        assert!(bind(report, &reads, &"0".repeat(64)).is_err());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(held.verify().is_err());
+        assert!(bind(report, &reads, &hash).is_err());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let data = f.path("tools/data");
+    let file = fs::File::create(&data).unwrap();
+    file.set_len(MAX_READ_FILE_BYTES as u64 + 1).unwrap();
+    fs::set_permissions(&data, fs::Permissions::from_mode(0o600)).unwrap();
+    let grants = vec![path.clone(), data];
+    for report in [true, false] {
+        let error = bind(report, &grants, &hash)
+            .err()
+            .expect("oversized data grant must refuse");
+        assert!(
+            format!("{error:#}").contains("bound"),
+            "unexpected refusal: {error:#}"
+        );
+    }
+}

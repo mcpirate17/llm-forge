@@ -758,6 +758,11 @@ impl OutboundBindings {
             for previous in &reads[..index] {
                 disjoint(read, previous)?;
             }
+            // The exact executable is pinned and reverified by HeldProgram below.
+            // Do not apply the smaller data-file bound to the same file twice.
+            if read == program {
+                continue;
+            }
             if fs::symlink_metadata(read)?.is_dir() {
                 directories.push(directory(read)?);
             } else {
