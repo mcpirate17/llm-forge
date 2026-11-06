@@ -133,10 +133,19 @@ unknown. The snapshot is retained and all three owned process scopes are absent.
 This is selected-baseline evidence, not a completed campaign or full package suite.
 See the [measurement scope and evidence](performance.md#compiler-header-control-and-actual-forge-timeout--2026-11-06).
 
-Active work: [#205](https://github.com/mcpirate17/llm-forge/issues/205) preserves
-bounded, explicitly incomplete engine progress after timeout. Such observations
-must remain separate from scoring and cannot support passing receipt admission.
-Next for #196: finish useful bounded actual-package campaign evidence and restore
+Implemented [#205](https://github.com/mcpirate17/llm-forge/issues/205): bounded,
+explicitly incomplete engine progress after timeout, separate from scoring and
+refused on passing receipts. The clean `ad6f12f` control completed all 12 diagnostic
+checks and matched retained report hashes and canonical identity digests. It
+observed two discovered mutants and zero completed outcomes before timeout; no
+unstarted count is inferred. Two failed predecessor controls exposed and prompted
+fixes for timeout reason propagation and JSON key-order dependence. Their failures
+remain in the [evidence](performance.md#interrupted-cargo-progress-controls--2026-11-06).
+
+Next for #196: add independent negative receipt-admission tests for four observed
+predicate survivors in the actual selected campaign, then obtain useful bounded
+actual-package campaign evidence. Three other survivors do not yet establish that
+their guards are redundant; retain them pending proof. Restore
 Fest/Mull through the same command owner. A shared native coordinator for mutation
 evidence, coverage and canary remains queued; migration must preserve legacy
 identity and anchor semantics without weakening candidate approval requirements.

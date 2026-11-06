@@ -482,6 +482,10 @@ After an engine timeout or abnormal stop, Forge can record
 explicitly incomplete diagnostic binds the discovery and outcome files, reconciles
 unique mutant identities against the selected source/package, and reports observed
 counts and identity digests. It supports the cargo-mutants 27.1 report shape.
+Identity digests use canonical JSON so nested object key order and omitted diff
+bodies do not change identity. A matched observed engine timeout remains the
+diagnostic reason even if subsequent source verification also fails; the original
+failure and verification errors are preserved.
 Each input is bounded to 16 MiB, with row and identity limits; serialized progress
 is bounded to 64 KiB. Missing, malformed, inconsistent or changed reports instead
 produce a bounded `engine_partial_progress_error`. Neither case replaces the

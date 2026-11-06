@@ -10,6 +10,35 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Interrupted Cargo progress controls — 2026-11-06
+
+The clean native release build at `ad6f12f` preserves bounded partial engine progress
+after confirmed process cleanup. The unchanged automatic timeout control completed
+all 12 diagnostic checks: its receipt records two discovered mutants, zero
+completed mutant outcomes, and an unknown remainder. Raw report hashes, byte sizes
+and canonical identity digests match the retained files. The first mutant was
+interrupted, so this control does not demonstrate a nonzero completed-outcome
+capture; positive reconciliation and refusal cases have focused unit coverage.
+
+The [three-attempt index](../research/performance/forge-program-20261106-partial-progress.json)
+retains both preceding failed controls. Each completed 10 checks, failed validation,
+and left the final toolchain check unstarted. The first exposed a timeout reported
+as an actor error after source verification failed; the second exposed JSON
+key-order dependence in mutant identities. Both producer defects were corrected;
+the independent oracle and authored fixture stayed unchanged. No attempt was
+repeated merely to obtain a different completed-mutant count.
+
+For the corrected control, metadata, direct baseline and engine wall times were
+13, 155 and 10,004 ms under one CPU, 1 GiB and a ten-second engine bound. These
+single observations exclude preparation and are not matched speed measurements.
+CPU, RSS, allocations, model usage and agent-task benefit were not measured.
+Independent audit verified the retained streams, report identities and absence of
+all three owned process scopes. The unrestored automatic-mutant snapshot remains.
+All three native receipts are incomplete ERROR results; progress changes neither
+official mutant accounting nor scoring. Either diagnostic field prevents passing
+receipt admission. Focused tests, strict Clippy and the clean control do not
+replace full publication checks for the final committed tree.
+
 ### Compiler-header control and actual Forge timeout — 2026-11-06
 
 A small authored workspace passed its C-header build probe with `/usr/include`

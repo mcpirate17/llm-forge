@@ -1,0 +1,922 @@
+{
+  "schema": "forge.program.partial-progress-evidence.v1",
+  "scope": "three automatic timeout controls; diagnostic observations, never mutation PASS",
+  "generator": {
+    "path": "/home/tim/Projects/llm-forge/.git/forge-205-after-report.py",
+    "sha256": "482c61dd39e12793fb9f08ba262a1a5e969628c0b9fa7749ab32178e069f5ecb",
+    "bytes": 11778,
+    "argv": [
+      "/home/tim/Projects/llm-forge/.git/forge-205-after-report.py",
+      "--before",
+      "/home/tim/Projects/llm-forge/research/performance/forge-program-20261106-compiler-and-timeout.json",
+      "48af99db663bbf241cccaa493ccc6cb87fa6e25a16ff21b475a0b64138f24b59",
+      "--case",
+      "initial-failed",
+      "/tmp/forge-196-workspace-timeout-g0_h2end/summary.json",
+      "ec10bbd02cb20b0474ab572d49c6da2041985fa85dc59dda248f1094c232ebce",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-initial-independent.json",
+      "bd773475808f6a8c6e65f4cfa543d60086c1f0d4a080c64c5252ec8939cb44ab",
+      "--case",
+      "second-failed",
+      "/tmp/forge-196-workspace-timeout-9jh39q0n/summary.json",
+      "cfb0fb0f50e776e7924772c7e69fbef62840f4dedd5c532ee88b6ef96f99ef2d",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-second-independent.json",
+      "c5b8cd324d383ead3a160e5ea9789f36d2e7eb85f69db6ee9cf4f3cd4521c0ce",
+      "--case",
+      "third-corrected",
+      "/tmp/forge-196-workspace-timeout-w45j7c_2/summary.json",
+      "1160f91228234d33032e2b33de7c6dec28c8f38b0f6595a944e949e0f7f92e09",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-third-independent.json",
+      "df2eca8af659b43cad25231997f1e6232a3b4f8cc4a3ce02c1a10a3952fc8f38",
+      "--attachment",
+      "build-ledger",
+      "/home/tim/Projects/llm-forge/.git/forge-205-clean-binary.json",
+      "7e87ceba746911c5152a39f8c39f747dee1c343bf2b8f2af39296cdc37a23783",
+      "--attachment",
+      "build-ledger",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-binary.json",
+      "6f38121f0a455bb5fdafa706fd9abae39d35342d5aa9cb4eef34e784b9a06526",
+      "--attachment",
+      "build-ledger",
+      "/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-binary.json",
+      "83bdded7634d2aec12e9284314d489b77673d3c871561c6c655d7854105dee25",
+      "--attachment",
+      "launch-args",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch-args.json",
+      "617ce07568dc917ae7a3302be5dc339064bca3ee405a6403894ef7437052471d",
+      "--attachment",
+      "launch-args",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch-args2.json",
+      "852bb376c3347f5c1cb789cbe50fe629bc84ad798347664cd20420f4c9acbb51",
+      "--attachment",
+      "launch-args",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch-args3.json",
+      "9b27141f24cf3f2ce72bf63d00918be04bdf6148cc4cc02e66161caed3a506a7",
+      "--attachment",
+      "build-input",
+      "/home/tim/Projects/llm-forge/.git/forge-205-clean-build-input.json",
+      "c48d2ebbc5a6a3fac00d2c95230946a6f962f24e72900c6bd8f0c5b06f05c304",
+      "--attachment",
+      "build-input",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build-input.json",
+      "7f643240773f02fb3257fe5c60227f749c6e87a8d1c346dfebda88f654605fe8",
+      "--attachment",
+      "build-input",
+      "/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build-input.json",
+      "c9871b5c2d9d2ad384562993df57247a96cd4d8d976f83517380cfbd9673e049",
+      "--attachment",
+      "build-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-clean-build.log",
+      "ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066",
+      "--attachment",
+      "build-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build.log",
+      "ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066",
+      "--attachment",
+      "build-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build.log",
+      "ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066",
+      "--attachment",
+      "build-timing",
+      "/home/tim/Projects/llm-forge/.git/forge-205-clean-build-time.txt",
+      "dd5d6d769413b8a85bfb5a41308035ca532d70113f25051acc11ebc1ed326618",
+      "--attachment",
+      "build-timing",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build-time.txt",
+      "525a281f8057384c1588a8223a0997145b11b7f2a6887f9f4c54f62facc1e4ca",
+      "--attachment",
+      "build-timing",
+      "/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build-time.txt",
+      "9b5cbc5952b910837ca723e3d39dd5e35a6c9b42ee3e60fa35680f550562b2ab",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-conductor-focused.log",
+      "102ec65fcaf42771422f2ec5b0f896019ecd098b994328f512563867337aa6ba",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-conductor-focused2.log",
+      "8a96fab104b5c327dd4ab44442c972743358a8004af103ec89bf6abc3ecb7a0e",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-forge-focused.log",
+      "26f284f075562c9b5bbac828c289da59a37109df69f1453f2b55ed9bf7a4af72",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-forge-partial-focused2.log",
+      "5a88c0e6779dbcff1783035557554996d3ccb74227ee0535713993e16cfcee54",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-focused.log",
+      "fa460bc2ba192c89b40200984f527f95dc3d9117988ba2d18b3d2410977ed44d",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-reason-focused.log",
+      "8374bccdfa37343ece74759873925048f7fd1a7c8c6072a3d35db820554b8583",
+      "--attachment",
+      "focused-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-receipt-slim.log",
+      "163cd647d2f22de667a4c1449e52698cc7765cd07c69e4ac4cae7b4cf8b52438",
+      "--attachment",
+      "clippy-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-conductor-clippy.log",
+      "cc1de39ba51f13e3de58f5c06d044890338b4d6c9fc62d1412010faceb57fb36",
+      "--attachment",
+      "clippy-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-forge-clippy.log",
+      "0afc51c105bb95ba0a17776c87e2457da2402e2f536801771b50632c04bc4ae6",
+      "--attachment",
+      "clippy-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-clippy.log",
+      "92cc3d894728aaa3c37620b93cda9add07ffae3f9785d32423c3d6d1b87545ec",
+      "--attachment",
+      "clippy-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-reason-clippy.log",
+      "8f928477b89b26a1330f5214c450103604909c26f19f032f957807c2ec73e8e3",
+      "--attachment",
+      "function-audit",
+      "/home/tim/Projects/llm-forge/.git/forge-205-function-audit.json",
+      "6b04bbb6d69198b798ce10da4dbaf7f1a6e8a4f122fb2437396ba6c8a36fd990",
+      "--attachment",
+      "function-audit",
+      "/home/tim/Projects/llm-forge/.git/forge-205-function-audit2.json",
+      "1708d1709afebc5d25e8315a43e42b01907ef7aecfcb7860ead20f471d44dbe3",
+      "--attachment",
+      "function-audit",
+      "/home/tim/Projects/llm-forge/.git/forge-205-function-audit3.json",
+      "b256ce998061f27035e39225082adcc2a6dbcc3a558f6d94e8c3117ba0a454b7",
+      "--attachment",
+      "function-audit",
+      "/home/tim/Projects/llm-forge/.git/forge-205-canonical-function-audit.json",
+      "b6c25ff90bad5ea4ae47228d254314599c23ad91ffea68d683cc4a59736c4ad6",
+      "--attachment",
+      "launch-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch.log",
+      "42623ed72374f324e48be1a364bedd48faada8d89a0cd1018416636e9b128d3f",
+      "--attachment",
+      "launch-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch2.log",
+      "fdfda5a17bd917e8ceb25a4b6ead49ff1f3cd84c2907382c80fd6a2d313a8503",
+      "--attachment",
+      "launch-log",
+      "/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch3.log",
+      "8334958b5ae944d85f73346513e1ba66918c0d1a81131221712e7d8af0c6cb6d",
+      "--attachment",
+      "frozen-wrapper",
+      "/home/tim/Projects/llm-forge/.git/forge-program-205-partial-timeout-trial.py",
+      "9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4",
+      "--output",
+      "/home/tim/Projects/llm-forge/.git/forge-205-after-index.json"
+    ],
+    "role": "private evidence transformer"
+  },
+  "before_index": {
+    "path": "/home/tim/Projects/llm-forge/research/performance/forge-program-20261106-compiler-and-timeout.json",
+    "sha256": "48af99db663bbf241cccaa493ccc6cb87fa6e25a16ff21b475a0b64138f24b59",
+    "bytes": 82627
+  },
+  "attachments": [
+      {"kind":"build-ledger","path":"/home/tim/Projects/llm-forge/.git/forge-205-clean-binary.json","sha256":"7e87ceba746911c5152a39f8c39f747dee1c343bf2b8f2af39296cdc37a23783","bytes":904,"record":{"head":"436c95e4e8f912ca0d674b0695a238ee26a358e3","tree":"f06375a0606ec94c96c6445f09d773a46caeb50b","source_status":"clean","scope":"candidate build input; full publication gate not yet run","path":"/tmp/forge-partial-clean-436c95e-j4kekepl/bin/forge","sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","bytes":53648880,"identity":{"schema_version":"llm.mutation-testing.native-runner-pin.v1","compiled_git_commit":"436c95e4e8f912ca0d674b0695a238ee26a358e3","compiled_source_sha256":"219fabee3ec88693dedde8e770e7289e7dd2eaba947a5bff8787300b527060d9","executable_sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f"},"build_log_sha256":"ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066","build_time_path":"/home/tim/Projects/llm-forge/.git/forge-205-clean-build-time.txt"}},
+      {"kind":"build-ledger","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-binary.json","sha256":"6f38121f0a455bb5fdafa706fd9abae39d35342d5aa9cb4eef34e784b9a06526","bytes":943,"record":{"head":"ad6f12f17a5bedbb5b3463cbc851bc4527d72b39","tree":"9bfaf59e2f7b56b9e9b711278515ab3b460c2ccf","source_status":"clean","scope":"canonical identity corrected candidate build input; full publication gate not yet run","path":"/tmp/forge-partial-clean-ad6f12f-pl1p142b/bin/forge","sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","bytes":53647968,"identity":{"schema_version":"llm.mutation-testing.native-runner-pin.v1","compiled_git_commit":"ad6f12f17a5bedbb5b3463cbc851bc4527d72b39","compiled_source_sha256":"c55f23f38b3da80b706f21e4b674f69aae3ed14f60c5a57ea64e5df7cadd0843","executable_sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2"},"build_log_sha256":"ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066","build_time_path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build-time.txt"}},
+      {"kind":"build-ledger","path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-binary.json","sha256":"83bdded7634d2aec12e9284314d489b77673d3c871561c6c655d7854105dee25","bytes":921,"record":{"head":"bd2681083400040fa836be1e46fb46f5b9b9e128","tree":"bc9b99e1f8abf172fb68d271450ea956132e9b31","source_status":"clean","scope":"corrected candidate build input; full publication gate not yet run","path":"/tmp/forge-partial-clean-bd26810-6p_knz7q/bin/forge","sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","bytes":53649008,"identity":{"schema_version":"llm.mutation-testing.native-runner-pin.v1","compiled_git_commit":"bd2681083400040fa836be1e46fb46f5b9b9e128","compiled_source_sha256":"6fec3f3ff1a516f9ec636b6fe01bd66af5a049499102027742c2112fa1cc8c5f","executable_sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a"},"build_log_sha256":"ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066","build_time_path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build-time.txt"}},
+      {"kind":"launch-args","path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch-args.json","sha256":"617ce07568dc917ae7a3302be5dc339064bca3ee405a6403894ef7437052471d","bytes":1068,"record":["--forge","/tmp/forge-partial-clean-436c95e-j4kekepl/bin/forge","--forge-sha256","cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","--forge-commit","436c95e4e8f912ca0d674b0695a238ee26a358e3","--forge-source-sha256","219fabee3ec88693dedde8e770e7289e7dd2eaba947a5bff8787300b527060d9","--cargo","/tmp/forge-192-toolchain-fdiy923q/bin/cargo","--cargo-sha256","ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","--tool-pins","/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json","--toolchain-inventory","/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json","--toolchain-inventory-sha256","68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","--cgroup-parent","/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service","--read-only","/usr/bin","--read-only","/usr/lib","--read-only","/usr/libexec/gcc","--read-only","/etc/ld.so.cache","--read-only","/tmp/forge-192-toolchain-fdiy923q"]},
+      {"kind":"launch-args","path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch-args2.json","sha256":"852bb376c3347f5c1cb789cbe50fe629bc84ad798347664cd20420f4c9acbb51","bytes":1068,"record":["--forge","/tmp/forge-partial-clean-bd26810-6p_knz7q/bin/forge","--forge-sha256","1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","--forge-commit","bd2681083400040fa836be1e46fb46f5b9b9e128","--forge-source-sha256","6fec3f3ff1a516f9ec636b6fe01bd66af5a049499102027742c2112fa1cc8c5f","--cargo","/tmp/forge-192-toolchain-fdiy923q/bin/cargo","--cargo-sha256","ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","--tool-pins","/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json","--toolchain-inventory","/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json","--toolchain-inventory-sha256","68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","--cgroup-parent","/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service","--read-only","/usr/bin","--read-only","/usr/lib","--read-only","/usr/libexec/gcc","--read-only","/etc/ld.so.cache","--read-only","/tmp/forge-192-toolchain-fdiy923q"]},
+      {"kind":"launch-args","path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch-args3.json","sha256":"9b27141f24cf3f2ce72bf63d00918be04bdf6148cc4cc02e66161caed3a506a7","bytes":1068,"record":["--forge","/tmp/forge-partial-clean-ad6f12f-pl1p142b/bin/forge","--forge-sha256","7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","--forge-commit","ad6f12f17a5bedbb5b3463cbc851bc4527d72b39","--forge-source-sha256","c55f23f38b3da80b706f21e4b674f69aae3ed14f60c5a57ea64e5df7cadd0843","--cargo","/tmp/forge-192-toolchain-fdiy923q/bin/cargo","--cargo-sha256","ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","--tool-pins","/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json","--toolchain-inventory","/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json","--toolchain-inventory-sha256","68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","--cgroup-parent","/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service","--read-only","/usr/bin","--read-only","/usr/lib","--read-only","/usr/libexec/gcc","--read-only","/etc/ld.so.cache","--read-only","/tmp/forge-192-toolchain-fdiy923q"]},
+      {"kind":"build-input","path":"/home/tim/Projects/llm-forge/.git/forge-205-clean-build-input.json","sha256":"c48d2ebbc5a6a3fac00d2c95230946a6f962f24e72900c6bd8f0c5b06f05c304","bytes":210,"record":{"head":"436c95e4e8f912ca0d674b0695a238ee26a358e3","tree":"f06375a0606ec94c96c6445f09d773a46caeb50b","source_status":"clean","scope":"candidate build input; full publication gate not yet run"}},
+      {"kind":"build-input","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build-input.json","sha256":"7f643240773f02fb3257fe5c60227f749c6e87a8d1c346dfebda88f654605fe8","bytes":239,"record":{"head":"ad6f12f17a5bedbb5b3463cbc851bc4527d72b39","tree":"9bfaf59e2f7b56b9e9b711278515ab3b460c2ccf","source_status":"clean","scope":"canonical identity corrected candidate build input; full publication gate not yet run"}},
+      {"kind":"build-input","path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build-input.json","sha256":"c9871b5c2d9d2ad384562993df57247a96cd4d8d976f83517380cfbd9673e049","bytes":220,"record":{"head":"bd2681083400040fa836be1e46fb46f5b9b9e128","tree":"bc9b99e1f8abf172fb68d271450ea956132e9b31","source_status":"clean","scope":"corrected candidate build input; full publication gate not yet run"}},
+      {"kind":"build-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-clean-build.log","sha256":"ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066","bytes":213},
+      {"kind":"build-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build.log","sha256":"ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066","bytes":213},
+      {"kind":"build-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build.log","sha256":"ce95a43cd1e715075fd72f30a4ea6c81000f6ea7b2ebd1bf215b8591aca1a066","bytes":213},
+      {"kind":"build-timing","path":"/home/tim/Projects/llm-forge/.git/forge-205-clean-build-time.txt","sha256":"dd5d6d769413b8a85bfb5a41308035ca532d70113f25051acc11ebc1ed326618","bytes":918},
+      {"kind":"build-timing","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-build-time.txt","sha256":"525a281f8057384c1588a8223a0997145b11b7f2a6887f9f4c54f62facc1e4ca","bytes":918},
+      {"kind":"build-timing","path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-clean-build-time.txt","sha256":"9b5cbc5952b910837ca723e3d39dd5e35a6c9b42ee3e60fa35680f550562b2ab","bytes":918},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-conductor-focused.log","sha256":"102ec65fcaf42771422f2ec5b0f896019ecd098b994328f512563867337aa6ba","bytes":24584},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-conductor-focused2.log","sha256":"8a96fab104b5c327dd4ab44442c972743358a8004af103ec89bf6abc3ecb7a0e","bytes":23798},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-forge-focused.log","sha256":"26f284f075562c9b5bbac828c289da59a37109df69f1453f2b55ed9bf7a4af72","bytes":40751},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-forge-partial-focused2.log","sha256":"5a88c0e6779dbcff1783035557554996d3ccb74227ee0535713993e16cfcee54","bytes":4231},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-focused.log","sha256":"fa460bc2ba192c89b40200984f527f95dc3d9117988ba2d18b3d2410977ed44d","bytes":915},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-focused.log","sha256":"8374bccdfa37343ece74759873925048f7fd1a7c8c6072a3d35db820554b8583","bytes":457},
+      {"kind":"focused-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-receipt-slim.log","sha256":"163cd647d2f22de667a4c1449e52698cc7765cd07c69e4ac4cae7b4cf8b52438","bytes":1361},
+      {"kind":"clippy-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-conductor-clippy.log","sha256":"cc1de39ba51f13e3de58f5c06d044890338b4d6c9fc62d1412010faceb57fb36","bytes":269},
+      {"kind":"clippy-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-forge-clippy.log","sha256":"0afc51c105bb95ba0a17776c87e2457da2402e2f536801771b50632c04bc4ae6","bytes":316},
+      {"kind":"clippy-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clippy.log","sha256":"92cc3d894728aaa3c37620b93cda9add07ffae3f9785d32423c3d6d1b87545ec","bytes":222},
+      {"kind":"clippy-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-reason-clippy.log","sha256":"8f928477b89b26a1330f5214c450103604909c26f19f032f957807c2ec73e8e3","bytes":222},
+      {"kind":"function-audit","path":"/home/tim/Projects/llm-forge/.git/forge-205-function-audit.json","sha256":"6b04bbb6d69198b798ce10da4dbaf7f1a6e8a4f122fb2437396ba6c8a36fd990","bytes":2998,"record":[{"path":"native/conductor-native/src/mutation_corpus_receipts.rs","sha256":"7e69dd813b03f4e9787ce0e5d2e6a44205b617a770f3c6ab0f18187e0fe92681","lines":361,"symbol_count":11,"symbols_returned":11,"source_hash_matches":true,"oversized_functions":[{"name":"rejection_with_supporting","lines":101}]},{"path":"native/conductor-native/src/mutation_corpus_receipts_tests.rs","sha256":"5ae329054229eb18bcfb5a56c7622f1512914d7a789a0998ea4427ad0a122347","lines":528,"symbol_count":18,"symbols_returned":18,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_native_runner.rs","sha256":"b68410cdb28b405342a5b8ac0782099353da29611b73c0b0ac57ed60c8a58e19","lines":352,"symbol_count":18,"symbols_returned":18,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_generated.rs","sha256":"4cdd8d1459271036a09cd031cefe6792f82605927fbdc34e1d2232200f59e1de","lines":484,"symbol_count":12,"symbols_returned":12,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_partial_tests.rs","sha256":"0d9e95c343ecb546f84dffb6a542996c7f092cbc9b5b9b0cbd5c573e6e7fc81e","lines":40,"symbol_count":2,"symbols_returned":2,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_tests.rs","sha256":"385d40b7d9dd2aa8cfc68a1b71dda15611e3c4680ed4ec1f81ca824cb9c6676c","lines":1249,"symbol_count":47,"symbols_returned":47,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/receipt_slim.rs","sha256":"0e612ac90863afeb76128517aa57c0a892107496aaee602b72db774b1abe2bf9","lines":830,"symbol_count":45,"symbols_returned":45,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_cargo_partial.rs","sha256":"3846c38a15f376759e371cd0504732d710d257d1b224ec193390ba83c1cfdbc7","lines":301,"symbol_count":8,"symbols_returned":8,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_cargo_partial_tests.rs","sha256":"732f416d5eae4f11a56c7296e829b020b701972155fffd45e9660d53ae8f6eae","lines":146,"symbol_count":7,"symbols_returned":7,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_engine_cargo.rs","sha256":"d69b5d2bfbe16069a3aec08db8ddb9e1bd1111cbacbaf4f655b052c00a401250","lines":465,"symbol_count":23,"symbols_returned":23,"source_hash_matches":true,"oversized_functions":[]}]},
+      {"kind":"function-audit","path":"/home/tim/Projects/llm-forge/.git/forge-205-function-audit2.json","sha256":"1708d1709afebc5d25e8315a43e42b01907ef7aecfcb7860ead20f471d44dbe3","bytes":2911,"record":[{"path":"native/conductor-native/src/mutation_corpus_receipts.rs","sha256":"29b73b7040214bd078183c2c31f394ad406b3b889797ca6f621e9ab6323a4ffb","lines":363,"symbol_count":12,"symbols_returned":12,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_corpus_receipts_tests.rs","sha256":"5ae329054229eb18bcfb5a56c7622f1512914d7a789a0998ea4427ad0a122347","lines":528,"symbol_count":18,"symbols_returned":18,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_native_runner.rs","sha256":"b68410cdb28b405342a5b8ac0782099353da29611b73c0b0ac57ed60c8a58e19","lines":352,"symbol_count":18,"symbols_returned":18,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_generated.rs","sha256":"4cdd8d1459271036a09cd031cefe6792f82605927fbdc34e1d2232200f59e1de","lines":484,"symbol_count":12,"symbols_returned":12,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_partial_tests.rs","sha256":"0d9e95c343ecb546f84dffb6a542996c7f092cbc9b5b9b0cbd5c573e6e7fc81e","lines":40,"symbol_count":2,"symbols_returned":2,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_tests.rs","sha256":"385d40b7d9dd2aa8cfc68a1b71dda15611e3c4680ed4ec1f81ca824cb9c6676c","lines":1249,"symbol_count":47,"symbols_returned":47,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/receipt_slim.rs","sha256":"0e612ac90863afeb76128517aa57c0a892107496aaee602b72db774b1abe2bf9","lines":830,"symbol_count":45,"symbols_returned":45,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_cargo_partial.rs","sha256":"3846c38a15f376759e371cd0504732d710d257d1b224ec193390ba83c1cfdbc7","lines":301,"symbol_count":8,"symbols_returned":8,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_cargo_partial_tests.rs","sha256":"732f416d5eae4f11a56c7296e829b020b701972155fffd45e9660d53ae8f6eae","lines":146,"symbol_count":7,"symbols_returned":7,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_engine_cargo.rs","sha256":"d69b5d2bfbe16069a3aec08db8ddb9e1bd1111cbacbaf4f655b052c00a401250","lines":465,"symbol_count":23,"symbols_returned":23,"source_hash_matches":true,"oversized_functions":[]}]},
+      {"kind":"function-audit","path":"/home/tim/Projects/llm-forge/.git/forge-205-function-audit3.json","sha256":"b256ce998061f27035e39225082adcc2a6dbcc3a558f6d94e8c3117ba0a454b7","bytes":2911,"record":[{"path":"native/conductor-native/src/mutation_corpus_receipts.rs","sha256":"29b73b7040214bd078183c2c31f394ad406b3b889797ca6f621e9ab6323a4ffb","lines":363,"symbol_count":12,"symbols_returned":12,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_corpus_receipts_tests.rs","sha256":"5ae329054229eb18bcfb5a56c7622f1512914d7a789a0998ea4427ad0a122347","lines":528,"symbol_count":18,"symbols_returned":18,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_native_runner.rs","sha256":"b68410cdb28b405342a5b8ac0782099353da29611b73c0b0ac57ed60c8a58e19","lines":352,"symbol_count":18,"symbols_returned":18,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_generated.rs","sha256":"4cdd8d1459271036a09cd031cefe6792f82605927fbdc34e1d2232200f59e1de","lines":484,"symbol_count":12,"symbols_returned":12,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_partial_tests.rs","sha256":"39a808a25fe305141ec0bccca84f878de4d37115f198eecccbaa69aece8ddfa6","lines":54,"symbol_count":2,"symbols_returned":2,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/mutation_receipt_tests.rs","sha256":"385d40b7d9dd2aa8cfc68a1b71dda15611e3c4680ed4ec1f81ca824cb9c6676c","lines":1249,"symbol_count":47,"symbols_returned":47,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/conductor-native/src/receipt_slim.rs","sha256":"0e612ac90863afeb76128517aa57c0a892107496aaee602b72db774b1abe2bf9","lines":830,"symbol_count":45,"symbols_returned":45,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_cargo_partial.rs","sha256":"0e373e016989240586c94aeea64c6f02e5008c27dec3317047025cbed457f893","lines":299,"symbol_count":8,"symbols_returned":8,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_cargo_partial_tests.rs","sha256":"9b366651ac7250ee365238b8cfa1091d85fc4fba3200be0c111ac3c200a37d0e","lines":160,"symbol_count":7,"symbols_returned":7,"source_hash_matches":true,"oversized_functions":[]},{"path":"native/forge/src/mutation_engine_cargo.rs","sha256":"d69b5d2bfbe16069a3aec08db8ddb9e1bd1111cbacbaf4f655b052c00a401250","lines":465,"symbol_count":23,"symbols_returned":23,"source_hash_matches":true,"oversized_functions":[]}]},
+      {"kind":"function-audit","path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-function-audit.json","sha256":"b6c25ff90bad5ea4ae47228d254314599c23ad91ffea68d683cc4a59736c4ad6","bytes":461,"record":[{"path":"native/forge/src/mutation_cargo_partial.rs","source_sha256":"6f828a7f31ad9e6faa8effb2f428a66109e7ced8cfe5b5bccaf7194dd89f9b41","lines":299,"max_function_lines":77,"symbol_count":8},{"path":"native/forge/src/mutation_cargo_partial_tests.rs","source_sha256":"0656571918f237b66b52608cc662c7ec13cbbc19222c74b87d28363ea2b6c793","lines":206,"max_function_lines":60,"symbol_count":8}]},
+      {"kind":"launch-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch.log","sha256":"42623ed72374f324e48be1a364bedd48faada8d89a0cd1018416636e9b128d3f","bytes":193},
+      {"kind":"launch-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch2.log","sha256":"fdfda5a17bd917e8ceb25a4b6ead49ff1f3cd84c2907382c80fd6a2d313a8503","bytes":193},
+      {"kind":"launch-log","path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-launch3.log","sha256":"8334958b5ae944d85f73346513e1ba66918c0d1a81131221712e7d8af0c6cb6d","bytes":209},
+      {"kind":"frozen-wrapper","path":"/home/tim/Projects/llm-forge/.git/forge-program-205-partial-timeout-trial.py","sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","bytes":7822}
+    ],
+  "limitations": [
+    "Failed driver controls remain failed independently of native ERROR status.",
+    "Partial counts are not authoritative mutant accounting, scored coverage or execution attestation.",
+    "Resource grants are limits, not CPU/RSS measurements; timings are single observations.",
+    "Current bound-input drift does not rewrite independently audited historical observations.",
+    "Cleanup paths and absence checks are recorded observations at audit time, not future kill authority.",
+    "Raw artifacts, drivers and tools are host-local; this index is not a portable replay bundle."
+  ],
+  "trials": [
+    {
+      "name": "initial-failed",
+      "summary": {
+        "path": "/tmp/forge-196-workspace-timeout-g0_h2end/summary.json",
+        "sha256": "ec10bbd02cb20b0474ab572d49c6da2041985fa85dc59dda248f1094c232ebce",
+        "bytes": 59635
+      },
+      "driver_decision": "FAILED_OR_INCOMPLETE",
+      "driver_completed": false,
+      "driver_error": "RuntimeError('invalid partial progress semantics')",
+      "checks": [
+      {"name":"capture","state":"completed","elapsed_seconds":0.0921427340072114,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"toolchain_identity","state":"completed","elapsed_seconds":0.32236616298905574,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"identity","state":"completed","elapsed_seconds":0.17852130498795304,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"tool_versions","state":"completed","elapsed_seconds":0.4518331120052608,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"fixture","state":"completed","elapsed_seconds":1.5353044999937993,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"plan","state":"completed","elapsed_seconds":0.15457702400453854,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"write","state":"completed","elapsed_seconds":0.15868070301075932,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"grants","state":"completed","elapsed_seconds":0.0008262920018751174,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"run","state":"completed","elapsed_seconds":11.070407216000604,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"receipt","state":"completed","elapsed_seconds":0.15305853899917565,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"validate","state":"failed","error":"RuntimeError('invalid partial progress semantics')","elapsed_seconds":0.000686362007400021,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"final_toolchain","state":"unstarted"}
+    ],
+      "check_accounting": {
+        "recorded": {
+          "completed": 10,
+          "failed": 1,
+          "censored": 0,
+          "unstarted": 1,
+          "running": 0
+        },
+        "recounted": {
+          "completed": 10,
+          "failed": 1,
+          "censored": 0,
+          "unstarted": 1,
+          "running": 0
+        }
+      },
+      "command_accounting": {
+        "recorded": {
+          "completed": 18,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        },
+        "recounted": {
+          "completed": 18,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        }
+      },
+      "native_status": "ERROR",
+      "native_complete_campaign": false,
+      "native_accounting": {
+        "censored": 0,
+        "completed": 0,
+        "failed": 0,
+        "planned": null,
+        "unstarted": null
+      },
+      "mutation_pass": false,
+      "native_error": "workspace snapshot inputs changed",
+      "native_runner": {
+        "compiled_git_commit": "436c95e4e8f912ca0d674b0695a238ee26a358e3",
+        "compiled_source_sha256": "219fabee3ec88693dedde8e770e7289e7dd2eaba947a5bff8787300b527060d9",
+        "executable_sha256": "cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": true
+      },
+      "partial_progress": {
+        "complete": false,
+        "inventory": {
+          "bytes": 1774,
+          "discovered": 2,
+          "identities_sha256": "9a417fc788bded97cb2fe62f79a1fedd9e7f2a8da1fc9977beaec6f7bc5468d4",
+          "sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d"
+        },
+        "outcomes": {
+          "bytes": 1131,
+          "counts": {
+            "ERROR": 0,
+            "KILLED": 0,
+            "SURVIVED": 0,
+            "TIMED_OUT": 0,
+            "UNVIABLE": 0
+          },
+          "identities_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "observed": 0,
+          "sha256": "fd296703d03a5de92cdca309e46c948492819bbcd8e6f6f0e14b3fc4e173ba84"
+        },
+        "reason": "actor_error",
+        "remaining_or_interrupted": null,
+        "schema_version": 1,
+        "scope": "partial automatic engine observations; not scored coverage or execution attestation"
+      },
+      "partial_progress_error": null,
+      "partial_control": null,
+      "inputs": {"raw_receipt":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/host/evidence/result.json","sha256":"dfeb477e6d3eb9e76cae51ae8480f1d2e53a49ae7e89a146a3d15f389e0670ac","bytes":9674},"receipt_show":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0017-receipt.stdout","sha256":"54b0b064fde8a4accb84c67a5fcda9ba6b6e9caa5e524dc2b0d6424bcca29f85","bytes":9628},"manifest":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/host/campaigns/workspace-trial_member_cargo_20261106.json","sha256":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","bytes":1567},"manifest_before_sha256":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","grants":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/host-execution-grants.json","sha256":"bde89af66586046c1ebecef9a1f38cc9160df86ade7dd25b8020ca275623dedf","bytes":2707},"executed_private_binary":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","bytes":53648880}},
+      "independently_supplied": {
+        "forge_path": "/tmp/forge-partial-clean-436c95e-j4kekepl/bin/forge",
+        "forge_sha256": "cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f",
+        "forge_commit": "436c95e4e8f912ca0d674b0695a238ee26a358e3",
+        "cargo_path": "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+        "cargo_sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
+        "tool_pins_path": "/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json",
+        "tool_pins_sha256": "17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1"
+      },
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "436c95e4e8f912ca0d674b0695a238ee26a358e3",
+        "compiled_source_sha256": "219fabee3ec88693dedde8e770e7289e7dd2eaba947a5bff8787300b527060d9",
+        "executable_sha256": "cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f"
+      },
+      "tool_pins": {"cargo":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"},"rustc":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustc","sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"},"rustdoc":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc","sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"},"cargo-mutants":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/engine/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"},"git":{"path":"/usr/bin/git","sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"},"cc":{"path":"/usr/bin/x86_64-linux-gnu-gcc-13","sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"},"ld":{"path":"/usr/bin/x86_64-linux-gnu-ld.bfd","sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"},"as":{"path":"/usr/bin/x86_64-linux-gnu-as","sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"},"ar":{"path":"/usr/bin/x86_64-linux-gnu-ar","sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"},"ranlib":{"path":"/usr/bin/x86_64-linux-gnu-ranlib","sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"},"strip":{"path":"/usr/bin/x86_64-linux-gnu-strip","sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"},"nm":{"path":"/usr/bin/x86_64-linux-gnu-nm","sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"},"objcopy":{"path":"/usr/bin/x86_64-linux-gnu-objcopy","sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"},"sh":{"path":"/usr/bin/dash","sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"}},
+      "resource_grants_not_usage": {
+        "cpu_millis": 1000,
+        "memory_mib": 1024,
+        "processes": 64
+      },
+      "bounds": {"native_wall_seconds":10,"sleep_seconds":30,"outer_wait_seconds":75,"existing_cooperative_cancel_seconds":45,"retries":0,"scope":"native command bound; no hard whole-driver watchdog"},
+      "read_roots": [
+      {"path":"/usr/bin","identity":[66309,91881474,0,16877]},
+      {"path":"/usr/lib","identity":[66309,91881477,0,16877]},
+      {"path":"/usr/libexec/gcc","identity":[66309,91896443,0,16877]},
+      {"path":"/etc/ld.so.cache","identity":[66309,24773043,0,33188]},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q","identity":[66309,74877504,1000,16832]},
+      {"path":"/tmp/forge-196-workspace-timeout-g0_h2end/engine/cargo-mutants","identity":[66309,75497945,1000,33088]}
+    ],
+      "baseline": {
+        "direct": {
+          "frames": 2,
+          "ignored": 0,
+          "passed": 1,
+          "scope": "observed libtest output, not producer attestation"
+        }
+      },
+      "process_commands": [
+      {"argv":["cargo","metadata","--manifest-path","crates/workspace/member/Cargo.toml","--format-version=1","--locked","--offline"],"confinement":{"cleanup_complete":true,"duration_ms":21,"errors":[],"exit_code":0,"outcome":"exited","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1763240-a85af1f7421f6277c4503d14ffe9eb8b","processes_max":64,"verified":true},"signal":null,"stderr_bytes":0,"stdout_bytes":3810},"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/worktree","state":"observed"},
+      {"argv":["cargo","test","--manifest-path","crates/workspace/member/Cargo.toml","--package","workspace_subject","--locked","--offline"],"confinement":{"cleanup_complete":true,"duration_ms":145,"errors":[],"exit_code":0,"outcome":"exited","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1763240-8ce0b649ac901647df4f8261b353dc15","processes_max":64,"verified":true},"signal":null,"stderr_bytes":577,"stdout_bytes":253},"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/worktree","state":"observed"},
+      {"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/engine/cargo-mutants","mutants","--manifest-path","crates/workspace/member/Cargo.toml","--in-place","--timeout","60","--output","/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/mutants-output","--package","workspace_subject","--file","member/src/selected.rs","--no-config","--cargo-arg=--locked","--cargo-arg=--offline","--test-package","workspace_subject"],"confinement":{"cleanup_complete":true,"duration_ms":10010,"errors":[],"exit_code":null,"outcome":"timed_out","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1763240-ea29a5e6808a1e79f2dd7a0044e936c5","processes_max":64,"verified":true},"signal":9,"stderr_bytes":0,"stdout_bytes":74},"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/worktree","state":"observed"}
+    ],
+      "process_cleanup": {
+        "commands_observed": 3,
+        "complete": true,
+        "schema_version": 1,
+        "scope": "owned cgroup cleanup"
+      },
+      "snapshot": {
+        "commit": "c9e6e3a1778bed7d1af607fb31cb202bbf855ae9",
+        "git_history": "private Git metadata removed; history unavailable",
+        "included_untracked": [],
+        "removed": false,
+        "retained_reason": "process cleanup or execution input verification is incomplete",
+        "root": "/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm"
+      },
+      "watcher": {"marker_seen":true,"snapshot":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm","mutated_source_sha256":"74c4b6d3e811431183b55179fab8f05a0b107aeef050dd0737441dde958dde8e"},
+      "streams": [
+      {"name":"identity","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.17803725400881376,"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","mutation","identity"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0000-identity.stdout","sha256":"548c8319b5324c7b907fabf35554ad0f767e279dbf603e3f9f8ba0ba32413131","bytes":307},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0000-identity.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"cargo-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14993009199679364,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/cargo","--version"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0001-cargo-version.stdout","sha256":"fb3f25aefd6d5441842d285f5a9b125b3f0f0b0bf2013d9a32677f9e99c6c854","bytes":36},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0001-cargo-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"rustc-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15424513099424075,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/rustc","--version"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0002-rustc-version.stdout","sha256":"785f1364c0d5bf077f7bfb885fd4bde99899dfd80ce0fb6226a4527d9b27724c","bytes":36},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0002-rustc-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"cargo-mutants-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14664594500209205,"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/engine/cargo-mutants","mutants","--version"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0003-cargo-mutants-version.stdout","sha256":"ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5","bytes":21},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0003-cargo-mutants-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-lock","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1655307869950775,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/cargo","generate-lockfile","--offline","--manifest-path","crates/workspace/Cargo.toml"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0004-fixture-lock.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0004-fixture-lock.stderr","sha256":"ad264a7d7c14ee137c35c236654f60a5f1b2b4462fbfee2157ba33d442769c57","bytes":52}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15292963899264578,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","init","-q","-b","main"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0005-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0005-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1518955469946377,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","add","-f","--",".gitignore","forge.toml","policy.toml","crates/workspace/Cargo.toml","crates/workspace/member/Cargo.toml","crates/workspace/member/src/selected.rs","crates/workspace/member/src/lib.rs","crates/workspace/member/fixtures/contract.txt","crates/support/Cargo.toml","crates/support/src/lib.rs","campaigns/registry.json","crates/workspace/Cargo.lock"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0006-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0006-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15196417800325435,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","commit","-q","-m","authored nested workspace and local dependency"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0007-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0007-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14996046300802846,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","checkout","-q","-b","fixture-topic"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0008-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0008-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-add","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14986969300662167,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","add","-f","--","crates/workspace/member/src/selected.rs"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0009-select two boolean functions in one source-add.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0009-select two boolean functions in one source-add.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-staged","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14988401300797705,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","diff","--cached","--name-only","-z"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0010-select two boolean functions in one source-staged.stdout","sha256":"48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c","bytes":40},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0010-select two boolean functions in one source-staged.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-commit","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1543908530002227,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","commit","-q","-m","select two boolean functions in one source"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0011-select two boolean functions in one source-commit.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0011-select two boolean functions in one source-commit.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-refs","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15330418100347742,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","rev-parse","HEAD","HEAD^{tree}","main","main^{tree}"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0012-select two boolean functions in one source-refs.stdout","sha256":"fe2ae3619ab79396226fcc2e238ee2259e5ab4119bc57e7d362340f5c6686e79","bytes":164},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0012-select two boolean functions in one source-refs.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-selection","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15174973700777628,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","diff","--name-only","-z","main","HEAD"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0013-select two boolean functions in one source-selection.stdout","sha256":"48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c","bytes":40},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0013-select two boolean functions in one source-selection.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"plan","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15390319199650548,"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","mutation","plan","rust","--repo-root","/tmp/forge-196-workspace-timeout-g0_h2end/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10","--day","20261106"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0014-plan.stdout","sha256":"5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299","bytes":223},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0014-plan.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"write","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1579825609951513,"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","mutation","write","rust","--repo-root","/tmp/forge-196-workspace-timeout-g0_h2end/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10","--day","20261106"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0015-write.stdout","sha256":"8371c0f20e760f6bc3c858860c82e185589440453d7d6dc010233ebd586e713a","bytes":373},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0015-write.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"run","state":"completed","returncode":4,"launched":true,"elapsed_seconds":11.069588564001606,"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","mutation","run","/tmp/forge-196-workspace-timeout-g0_h2end/host/campaigns/workspace-trial_member_cargo_20261106.json","--repo-root","/tmp/forge-196-workspace-timeout-g0_h2end/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--allow-mutations","--receipt","evidence/result.json","--execution-grants","/tmp/forge-196-workspace-timeout-g0_h2end/host-execution-grants.json","--execution-grants-sha256","bde89af66586046c1ebecef9a1f38cc9160df86ade7dd25b8020ca275623dedf"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0016-run.stdout","sha256":"76f0e8345927c9bb2560a934d92b2371d1d41f2291ce10801ed04fccb05d2320","bytes":74},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0016-run.stderr","sha256":"2c468b25aa2aa514bd2d4ee8d5ead1f16530fc51751cfbb2ac656bf3c559d5e0","bytes":118}},
+      {"name":"receipt","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15238795700133778,"argv":["/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","receipt","show","/tmp/forge-196-workspace-timeout-g0_h2end/host/evidence/result.json"],"cwd":"/tmp/forge-196-workspace-timeout-g0_h2end/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0017-receipt.stdout","sha256":"54b0b064fde8a4accb84c67a5fcda9ba6b6e9caa5e524dc2b0d6424bcca29f85","bytes":9628},"stderr":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/logs/0017-receipt.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}}
+    ],
+      "historical_bound_inputs_current_observation": [
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-ordinary-cargo-experiment-v2.py","sha256":"5da0c4dbe0ad4d902d324caffd3a8ba2ebc3015d3299c2e91b493957178a862b","bytes":30604,"recorded_sha256":"5da0c4dbe0ad4d902d324caffd3a8ba2ebc3015d3299c2e91b493957178a862b","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-no-python-check.py","sha256":"7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b","bytes":17610,"recorded_sha256":"7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-installed-experiment.py","sha256":"0f17b6a03f2f5253bb2779d673f6af414c604e804fd1573f25b815f6250787ac","bytes":23956,"recorded_sha256":"0f17b6a03f2f5253bb2779d673f6af414c604e804fd1573f25b815f6250787ac","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json","sha256":"17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1","bytes":2040,"recorded_sha256":"17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1","current_observation":"matches"},
+      {"path":"/tmp/forge-partial-clean-436c95e-j4kekepl/bin/forge","sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","bytes":53648880,"recorded_sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","bytes":40688400,"recorded_sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustc","sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2","bytes":645016,"recorded_sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc","sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a","bytes":12806952,"recorded_sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a","current_observation":"matches"},
+      {"path":"/home/tim/.cargo/bin/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","bytes":9833120,"recorded_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","current_observation":"matches"},
+      {"path":"/usr/bin/git","sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201","bytes":4066232,"recorded_sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-gcc-13","sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26","bytes":1023032,"recorded_sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ld.bfd","sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b","bytes":1359128,"recorded_sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-as","sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0","bytes":745768,"recorded_sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ar","sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe","bytes":55792,"recorded_sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ranlib","sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee","bytes":55792,"recorded_sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-strip","sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42","bytes":166568,"recorded_sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-nm","sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202","bytes":44544,"recorded_sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-objcopy","sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713","bytes":166536,"recorded_sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713","current_observation":"matches"},
+      {"path":"/usr/bin/dash","sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42","bytes":129784,"recorded_sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-196-workspace-timeout-trial.py","sha256":"7eba7265dc00570d80df3275e429bb67d66899c51be8a22872acdf413cca175a","bytes":15458,"recorded_sha256":"7eba7265dc00570d80df3275e429bb67d66899c51be8a22872acdf413cca175a","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-196-workspace-trial.py","sha256":"4743b7e331f56dbbdb5ca16815df2bb96b669362940a10ccc4b4ec2aac2798ea","bytes":27417,"recorded_sha256":"4743b7e331f56dbbdb5ca16815df2bb96b669362940a10ccc4b4ec2aac2798ea","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-197-ordinary-freshness-v2.py","sha256":"2b542562263a0c0107548d6a33422a55126a5bdfc87c63d5efeb46a267884c19","bytes":19273,"recorded_sha256":"2b542562263a0c0107548d6a33422a55126a5bdfc87c63d5efeb46a267884c19","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json","sha256":"68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","bytes":22682,"recorded_sha256":"68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-g0_h2end/engine/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","bytes":9833120,"recorded_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-g0_h2end/bin/forge","sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","bytes":53648880,"recorded_sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/campaigns/registry.json","sha256":"db4ee900b94146fc8cc903efb85e30787fb620f9529667182fddba77140bd40b","bytes":919,"recorded_sha256":"db4ee900b94146fc8cc903efb85e30787fb620f9529667182fddba77140bd40b","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-g0_h2end/host-execution-grants.json","sha256":"bde89af66586046c1ebecef9a1f38cc9160df86ade7dd25b8020ca275623dedf","bytes":2707,"recorded_sha256":"bde89af66586046c1ebecef9a1f38cc9160df86ade7dd25b8020ca275623dedf","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-205-partial-timeout-trial.py","sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","bytes":7822,"recorded_sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","current_observation":"matches"}
+    ],
+      "independent_audit": {"path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-initial-independent.json","sha256":"bd773475808f6a8c6e65f4cfa543d60086c1f0d4a080c64c5252ec8939cb44ab","bytes":4653,"findings":{"schema":"forge.205.timeout-initial-independent.v1","audited_at_utc":"2026-11-06T05:10:29.091667+00:00","summary":"/tmp/forge-196-workspace-timeout-g0_h2end/summary.json","summary_sha256":"ec10bbd02cb20b0474ab572d49c6da2041985fa85dc59dda248f1094c232ebce","decision":"FAILED_OR_INCOMPLETE","error":"RuntimeError('invalid partial progress semantics')","check_accounting":{"completed":10,"failed":1,"censored":0,"unstarted":1,"running":0},"streams_checked":36,"stream_mismatches":[],"bound_files_checked":28,"bound_file_mismatches":[],"receipt_raw_sha256_matches":true,"receipt_show_matches":true,"native_status":"ERROR","complete_campaign":false,"accounting":{"censored":0,"completed":0,"failed":0,"planned":null,"unstarted":null},"native_runner":{"compiled_git_commit":"436c95e4e8f912ca0d674b0695a238ee26a358e3","compiled_source_sha256":"219fabee3ec88693dedde8e770e7289e7dd2eaba947a5bff8787300b527060d9","executable_sha256":"cc3a519f20f18b07224acd61926f1610341d2d50e2677755684358a62e65cc4f","forge_version":"0.8.21","schema_version":"llm.mutation-testing.native-runner.v2","source_matches_git":true},"manifest_before":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","manifest_after":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","manifest_current_matches":true,"grants_matches":true,"partial_progress":{"complete":false,"inventory":{"bytes":1774,"discovered":2,"identities_sha256":"9a417fc788bded97cb2fe62f79a1fedd9e7f2a8da1fc9977beaec6f7bc5468d4","sha256":"9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d"},"outcomes":{"bytes":1131,"counts":{"ERROR":0,"KILLED":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0},"identities_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","observed":0,"sha256":"fd296703d03a5de92cdca309e46c948492819bbcd8e6f6f0e14b3fc4e173ba84"},"reason":"actor_error","remaining_or_interrupted":null,"schema_version":1,"scope":"partial automatic engine observations; not scored coverage or execution attestation"},"reports":{"inventory":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/mutants-output/mutants.out/mutants.json","sha256":"9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d","sha256_matches_receipt":true,"bytes_match_receipt":true,"row_count":2},"outcomes":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/mutants-output/mutants.out/outcomes.json","sha256":"fd296703d03a5de92cdca309e46c948492819bbcd8e6f6f0e14b3fc4e173ba84","sha256_matches_receipt":true,"bytes_match_receipt":true,"row_count":1}},"process_groups":[{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1763240-a85af1f7421f6277c4503d14ffe9eb8b","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited"},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1763240-8ce0b649ac901647df4f8261b353dc15","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited"},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1763240-ea29a5e6808a1e79f2dd7a0044e936c5","receipt_cleanup_complete":true,"absent_now":true,"outcome":"timed_out"}],"snapshot":{"path":"/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm","retained":true,"receipt_retained_reason":"process cleanup or execution input verification is incomplete","host_source_sha256":"e575e5592457642056a4d0de11875b6e48c8db1cd36dd709b6789f01fd5768e1","authored_source_sha256":"e575e5592457642056a4d0de11875b6e48c8db1cd36dd709b6789f01fd5768e1","snapshot_source_sha256":"74c4b6d3e811431183b55179fab8f05a0b107aeef050dd0737441dde958dde8e","marker_seen_by_watcher":true,"marker_exists_now":true,"marker_sha256":"62865a94ab91e2b99f1809c5a295cc8ff482807874345c919c0f3e48633dc21d"},"limits":"Cooperative retained files and point-in-time cleanup; no PASS or execution attestation. Final toolchain check was unstarted."}},
+      "engine_reports": {
+        "inventory": {
+          "path": "/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/mutants-output/mutants.out/mutants.json",
+          "sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d",
+          "bytes": 1774,
+          "raw_row_count": 2
+        },
+        "outcomes": {
+          "path": "/tmp/forge-196-workspace-timeout-g0_h2end/scratch/llm-orchestrator-snapshot-45mqpm/mutants-output/mutants.out/outcomes.json",
+          "sha256": "fd296703d03a5de92cdca309e46c948492819bbcd8e6f6f0e14b3fc4e173ba84",
+          "bytes": 1131,
+          "raw_row_count": 1
+        }
+      }
+    },
+    {
+      "name": "second-failed",
+      "summary": {
+        "path": "/tmp/forge-196-workspace-timeout-9jh39q0n/summary.json",
+        "sha256": "cfb0fb0f50e776e7924772c7e69fbef62840f4dedd5c532ee88b6ef96f99ef2d",
+        "bytes": 59675
+      },
+      "driver_decision": "FAILED_OR_INCOMPLETE",
+      "driver_completed": false,
+      "driver_error": "ValueError('receipt partial progress differs from retained engine reports')",
+      "checks": [
+      {"name":"capture","state":"completed","elapsed_seconds":0.09215215999574866,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"toolchain_identity","state":"completed","elapsed_seconds":0.32206787400355097,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"identity","state":"completed","elapsed_seconds":0.18094653700245544,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"tool_versions","state":"completed","elapsed_seconds":0.45031080101034604,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"fixture","state":"completed","elapsed_seconds":1.524234782991698,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"plan","state":"completed","elapsed_seconds":0.1527325109927915,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"write","state":"completed","elapsed_seconds":0.15722344799723942,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"grants","state":"completed","elapsed_seconds":0.000798893001046963,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"run","state":"completed","elapsed_seconds":11.069572227992467,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"receipt","state":"completed","elapsed_seconds":0.15332086599664763,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"validate","state":"failed","error":"ValueError('receipt partial progress differs from retained engine reports')","elapsed_seconds":0.0007823630003258586,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"final_toolchain","state":"unstarted"}
+    ],
+      "check_accounting": {
+        "recorded": {
+          "completed": 10,
+          "failed": 1,
+          "censored": 0,
+          "unstarted": 1,
+          "running": 0
+        },
+        "recounted": {
+          "completed": 10,
+          "failed": 1,
+          "censored": 0,
+          "unstarted": 1,
+          "running": 0
+        }
+      },
+      "command_accounting": {
+        "recorded": {
+          "completed": 18,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        },
+        "recounted": {
+          "completed": 18,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        }
+      },
+      "native_status": "ERROR",
+      "native_complete_campaign": false,
+      "native_accounting": {
+        "censored": 0,
+        "completed": 0,
+        "failed": 0,
+        "planned": null,
+        "unstarted": null
+      },
+      "mutation_pass": false,
+      "native_error": "workspace snapshot inputs changed",
+      "native_runner": {
+        "compiled_git_commit": "bd2681083400040fa836be1e46fb46f5b9b9e128",
+        "compiled_source_sha256": "6fec3f3ff1a516f9ec636b6fe01bd66af5a049499102027742c2112fa1cc8c5f",
+        "executable_sha256": "1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": true
+      },
+      "partial_progress": {
+        "complete": false,
+        "inventory": {
+          "bytes": 1774,
+          "discovered": 2,
+          "identities_sha256": "9a417fc788bded97cb2fe62f79a1fedd9e7f2a8da1fc9977beaec6f7bc5468d4",
+          "sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d"
+        },
+        "outcomes": {
+          "bytes": 1131,
+          "counts": {
+            "ERROR": 0,
+            "KILLED": 0,
+            "SURVIVED": 0,
+            "TIMED_OUT": 0,
+            "UNVIABLE": 0
+          },
+          "identities_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "observed": 0,
+          "sha256": "33b252d56c4cd310febb33ae4d5b926c35eddc919aa510f52f8974e83694161c"
+        },
+        "reason": "timeout",
+        "remaining_or_interrupted": null,
+        "schema_version": 1,
+        "scope": "partial automatic engine observations; not scored coverage or execution attestation"
+      },
+      "partial_progress_error": null,
+      "partial_control": null,
+      "inputs": {"raw_receipt":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/host/evidence/result.json","sha256":"92998e35c59e0be2981d24fac93db574d23284061daff74c009ed1d776ef5545","bytes":9670},"receipt_show":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0017-receipt.stdout","sha256":"1959d4ceadab07b43eeba2fc9620ab6b6569b58e99b590816b9ba1bf7298142a","bytes":9624},"manifest":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/host/campaigns/workspace-trial_member_cargo_20261106.json","sha256":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","bytes":1567},"manifest_before_sha256":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","grants":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/host-execution-grants.json","sha256":"09998934c82c672a644e5c3e39e99032872824747d6ac13a77a89078401e4de5","bytes":2707},"executed_private_binary":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","bytes":53649008}},
+      "independently_supplied": {
+        "forge_path": "/tmp/forge-partial-clean-bd26810-6p_knz7q/bin/forge",
+        "forge_sha256": "1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a",
+        "forge_commit": "bd2681083400040fa836be1e46fb46f5b9b9e128",
+        "cargo_path": "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+        "cargo_sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
+        "tool_pins_path": "/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json",
+        "tool_pins_sha256": "17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1"
+      },
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "bd2681083400040fa836be1e46fb46f5b9b9e128",
+        "compiled_source_sha256": "6fec3f3ff1a516f9ec636b6fe01bd66af5a049499102027742c2112fa1cc8c5f",
+        "executable_sha256": "1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a"
+      },
+      "tool_pins": {"cargo":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"},"rustc":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustc","sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"},"rustdoc":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc","sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"},"cargo-mutants":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/engine/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"},"git":{"path":"/usr/bin/git","sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"},"cc":{"path":"/usr/bin/x86_64-linux-gnu-gcc-13","sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"},"ld":{"path":"/usr/bin/x86_64-linux-gnu-ld.bfd","sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"},"as":{"path":"/usr/bin/x86_64-linux-gnu-as","sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"},"ar":{"path":"/usr/bin/x86_64-linux-gnu-ar","sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"},"ranlib":{"path":"/usr/bin/x86_64-linux-gnu-ranlib","sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"},"strip":{"path":"/usr/bin/x86_64-linux-gnu-strip","sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"},"nm":{"path":"/usr/bin/x86_64-linux-gnu-nm","sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"},"objcopy":{"path":"/usr/bin/x86_64-linux-gnu-objcopy","sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"},"sh":{"path":"/usr/bin/dash","sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"}},
+      "resource_grants_not_usage": {
+        "cpu_millis": 1000,
+        "memory_mib": 1024,
+        "processes": 64
+      },
+      "bounds": {"native_wall_seconds":10,"sleep_seconds":30,"outer_wait_seconds":75,"existing_cooperative_cancel_seconds":45,"retries":0,"scope":"native command bound; no hard whole-driver watchdog"},
+      "read_roots": [
+      {"path":"/usr/bin","identity":[66309,91881474,0,16877]},
+      {"path":"/usr/lib","identity":[66309,91881477,0,16877]},
+      {"path":"/usr/libexec/gcc","identity":[66309,91896443,0,16877]},
+      {"path":"/etc/ld.so.cache","identity":[66309,24773043,0,33188]},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q","identity":[66309,74877504,1000,16832]},
+      {"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/engine/cargo-mutants","identity":[66309,75498346,1000,33088]}
+    ],
+      "baseline": {
+        "direct": {
+          "frames": 2,
+          "ignored": 0,
+          "passed": 1,
+          "scope": "observed libtest output, not producer attestation"
+        }
+      },
+      "process_commands": [
+      {"argv":["cargo","metadata","--manifest-path","crates/workspace/member/Cargo.toml","--format-version=1","--locked","--offline"],"confinement":{"cleanup_complete":true,"duration_ms":24,"errors":[],"exit_code":0,"outcome":"exited","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1766341-9d749a8f4bb33dec80dd9ddbd98f56d7","processes_max":64,"verified":true},"signal":null,"stderr_bytes":0,"stdout_bytes":3810},"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/worktree","state":"observed"},
+      {"argv":["cargo","test","--manifest-path","crates/workspace/member/Cargo.toml","--package","workspace_subject","--locked","--offline"],"confinement":{"cleanup_complete":true,"duration_ms":145,"errors":[],"exit_code":0,"outcome":"exited","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1766341-e285e3562a8080b846973ae83ab331e3","processes_max":64,"verified":true},"signal":null,"stderr_bytes":577,"stdout_bytes":253},"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/worktree","state":"observed"},
+      {"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/engine/cargo-mutants","mutants","--manifest-path","crates/workspace/member/Cargo.toml","--in-place","--timeout","60","--output","/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/mutants-output","--package","workspace_subject","--file","member/src/selected.rs","--no-config","--cargo-arg=--locked","--cargo-arg=--offline","--test-package","workspace_subject"],"confinement":{"cleanup_complete":true,"duration_ms":10010,"errors":[],"exit_code":null,"outcome":"timed_out","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1766341-cc8b4ab8607c77516f4232a13b27ccb4","processes_max":64,"verified":true},"signal":9,"stderr_bytes":0,"stdout_bytes":74},"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/worktree","state":"observed"}
+    ],
+      "process_cleanup": {
+        "commands_observed": 3,
+        "complete": true,
+        "schema_version": 1,
+        "scope": "owned cgroup cleanup"
+      },
+      "snapshot": {
+        "commit": "559dc43acde6eed8db5fdc6dd265801d49c55938",
+        "git_history": "private Git metadata removed; history unavailable",
+        "included_untracked": [],
+        "removed": false,
+        "retained_reason": "process cleanup or execution input verification is incomplete",
+        "root": "/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc"
+      },
+      "watcher": {"marker_seen":true,"snapshot":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc","mutated_source_sha256":"74c4b6d3e811431183b55179fab8f05a0b107aeef050dd0737441dde958dde8e"},
+      "streams": [
+      {"name":"identity","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1796632320038043,"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","mutation","identity"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0000-identity.stdout","sha256":"27910b711ad96b33a5cfcf382e3b748fa520088cc0b51b502b6f4ad25bd8e17c","bytes":307},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0000-identity.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"cargo-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1489636760088615,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/cargo","--version"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0001-cargo-version.stdout","sha256":"fb3f25aefd6d5441842d285f5a9b125b3f0f0b0bf2013d9a32677f9e99c6c854","bytes":36},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0001-cargo-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"rustc-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15252375999989454,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/rustc","--version"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0002-rustc-version.stdout","sha256":"785f1364c0d5bf077f7bfb885fd4bde99899dfd80ce0fb6226a4527d9b27724c","bytes":36},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0002-rustc-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"cargo-mutants-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14779385100700893,"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/engine/cargo-mutants","mutants","--version"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0003-cargo-mutants-version.stdout","sha256":"ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5","bytes":21},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0003-cargo-mutants-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-lock","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1646590960008325,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/cargo","generate-lockfile","--offline","--manifest-path","crates/workspace/Cargo.toml"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0004-fixture-lock.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0004-fixture-lock.stderr","sha256":"ad264a7d7c14ee137c35c236654f60a5f1b2b4462fbfee2157ba33d442769c57","bytes":52}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1506418220087653,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","init","-q","-b","main"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0005-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0005-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15277456099283881,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","add","-f","--",".gitignore","forge.toml","policy.toml","crates/workspace/Cargo.toml","crates/workspace/member/Cargo.toml","crates/workspace/member/src/selected.rs","crates/workspace/member/src/lib.rs","crates/workspace/member/fixtures/contract.txt","crates/support/Cargo.toml","crates/support/src/lib.rs","campaigns/registry.json","crates/workspace/Cargo.lock"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0006-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0006-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15178496700536925,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","commit","-q","-m","authored nested workspace and local dependency"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0007-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0007-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14983278900035657,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","checkout","-q","-b","fixture-topic"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0008-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0008-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-add","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14978580900060479,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","add","-f","--","crates/workspace/member/src/selected.rs"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0009-select two boolean functions in one source-add.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0009-select two boolean functions in one source-add.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-staged","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14971181898727082,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","diff","--cached","--name-only","-z"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0010-select two boolean functions in one source-staged.stdout","sha256":"48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c","bytes":40},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0010-select two boolean functions in one source-staged.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-commit","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1520354380045319,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","commit","-q","-m","select two boolean functions in one source"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0011-select two boolean functions in one source-commit.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0011-select two boolean functions in one source-commit.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-refs","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14984487000037916,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","rev-parse","HEAD","HEAD^{tree}","main","main^{tree}"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0012-select two boolean functions in one source-refs.stdout","sha256":"9092ea4e920be90d280f5b5d92043ce479b40c290a64db6b7030896f371fed47","bytes":164},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0012-select two boolean functions in one source-refs.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-selection","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14981822900881525,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","diff","--name-only","-z","main","HEAD"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0013-select two boolean functions in one source-selection.stdout","sha256":"48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c","bytes":40},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0013-select two boolean functions in one source-selection.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"plan","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15225474900216796,"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","mutation","plan","rust","--repo-root","/tmp/forge-196-workspace-timeout-9jh39q0n/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10","--day","20261106"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0014-plan.stdout","sha256":"5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299","bytes":223},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0014-plan.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"write","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1566849859955255,"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","mutation","write","rust","--repo-root","/tmp/forge-196-workspace-timeout-9jh39q0n/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10","--day","20261106"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0015-write.stdout","sha256":"8371c0f20e760f6bc3c858860c82e185589440453d7d6dc010233ebd586e713a","bytes":373},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0015-write.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"run","state":"completed","returncode":4,"launched":true,"elapsed_seconds":11.068764955009101,"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","mutation","run","/tmp/forge-196-workspace-timeout-9jh39q0n/host/campaigns/workspace-trial_member_cargo_20261106.json","--repo-root","/tmp/forge-196-workspace-timeout-9jh39q0n/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--allow-mutations","--receipt","evidence/result.json","--execution-grants","/tmp/forge-196-workspace-timeout-9jh39q0n/host-execution-grants.json","--execution-grants-sha256","09998934c82c672a644e5c3e39e99032872824747d6ac13a77a89078401e4de5"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0016-run.stdout","sha256":"76f0e8345927c9bb2560a934d92b2371d1d41f2291ce10801ed04fccb05d2320","bytes":74},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0016-run.stderr","sha256":"5f48e1bce0e777ea04543e0ef8c94ce1b15f68030ddcdbd84189d12a9d48fbc7","bytes":118}},
+      {"name":"receipt","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15262925300339703,"argv":["/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","receipt","show","/tmp/forge-196-workspace-timeout-9jh39q0n/host/evidence/result.json"],"cwd":"/tmp/forge-196-workspace-timeout-9jh39q0n/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0017-receipt.stdout","sha256":"1959d4ceadab07b43eeba2fc9620ab6b6569b58e99b590816b9ba1bf7298142a","bytes":9624},"stderr":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/logs/0017-receipt.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}}
+    ],
+      "historical_bound_inputs_current_observation": [
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-ordinary-cargo-experiment-v2.py","sha256":"5da0c4dbe0ad4d902d324caffd3a8ba2ebc3015d3299c2e91b493957178a862b","bytes":30604,"recorded_sha256":"5da0c4dbe0ad4d902d324caffd3a8ba2ebc3015d3299c2e91b493957178a862b","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-no-python-check.py","sha256":"7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b","bytes":17610,"recorded_sha256":"7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-installed-experiment.py","sha256":"0f17b6a03f2f5253bb2779d673f6af414c604e804fd1573f25b815f6250787ac","bytes":23956,"recorded_sha256":"0f17b6a03f2f5253bb2779d673f6af414c604e804fd1573f25b815f6250787ac","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json","sha256":"17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1","bytes":2040,"recorded_sha256":"17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1","current_observation":"matches"},
+      {"path":"/tmp/forge-partial-clean-bd26810-6p_knz7q/bin/forge","sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","bytes":53649008,"recorded_sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","bytes":40688400,"recorded_sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustc","sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2","bytes":645016,"recorded_sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc","sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a","bytes":12806952,"recorded_sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a","current_observation":"matches"},
+      {"path":"/home/tim/.cargo/bin/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","bytes":9833120,"recorded_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","current_observation":"matches"},
+      {"path":"/usr/bin/git","sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201","bytes":4066232,"recorded_sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-gcc-13","sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26","bytes":1023032,"recorded_sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ld.bfd","sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b","bytes":1359128,"recorded_sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-as","sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0","bytes":745768,"recorded_sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ar","sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe","bytes":55792,"recorded_sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ranlib","sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee","bytes":55792,"recorded_sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-strip","sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42","bytes":166568,"recorded_sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-nm","sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202","bytes":44544,"recorded_sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-objcopy","sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713","bytes":166536,"recorded_sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713","current_observation":"matches"},
+      {"path":"/usr/bin/dash","sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42","bytes":129784,"recorded_sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-196-workspace-timeout-trial.py","sha256":"7eba7265dc00570d80df3275e429bb67d66899c51be8a22872acdf413cca175a","bytes":15458,"recorded_sha256":"7eba7265dc00570d80df3275e429bb67d66899c51be8a22872acdf413cca175a","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-196-workspace-trial.py","sha256":"4743b7e331f56dbbdb5ca16815df2bb96b669362940a10ccc4b4ec2aac2798ea","bytes":27417,"recorded_sha256":"4743b7e331f56dbbdb5ca16815df2bb96b669362940a10ccc4b4ec2aac2798ea","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-197-ordinary-freshness-v2.py","sha256":"2b542562263a0c0107548d6a33422a55126a5bdfc87c63d5efeb46a267884c19","bytes":19273,"recorded_sha256":"2b542562263a0c0107548d6a33422a55126a5bdfc87c63d5efeb46a267884c19","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json","sha256":"68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","bytes":22682,"recorded_sha256":"68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/engine/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","bytes":9833120,"recorded_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/bin/forge","sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","bytes":53649008,"recorded_sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/campaigns/registry.json","sha256":"db4ee900b94146fc8cc903efb85e30787fb620f9529667182fddba77140bd40b","bytes":919,"recorded_sha256":"db4ee900b94146fc8cc903efb85e30787fb620f9529667182fddba77140bd40b","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/host-execution-grants.json","sha256":"09998934c82c672a644e5c3e39e99032872824747d6ac13a77a89078401e4de5","bytes":2707,"recorded_sha256":"09998934c82c672a644e5c3e39e99032872824747d6ac13a77a89078401e4de5","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-205-partial-timeout-trial.py","sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","bytes":7822,"recorded_sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","current_observation":"matches"}
+    ],
+      "independent_audit": {"path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-second-independent.json","sha256":"c5b8cd324d383ead3a160e5ea9789f36d2e7eb85f69db6ee9cf4f3cd4521c0ce","bytes":4769,"findings":{"schema":"forge.205.timeout-second-independent.v1","audited_at_utc":"2026-11-06T05:20:18.645755+00:00","summary":"/tmp/forge-196-workspace-timeout-9jh39q0n/summary.json","summary_sha256":"cfb0fb0f50e776e7924772c7e69fbef62840f4dedd5c532ee88b6ef96f99ef2d","decision":"FAILED_OR_INCOMPLETE","error":"ValueError('receipt partial progress differs from retained engine reports')","check_accounting":{"completed":10,"failed":1,"censored":0,"unstarted":1,"running":0},"streams_checked":36,"stream_mismatches":[],"bound_files_checked":28,"bound_file_mismatches":[],"receipt_raw_sha256_matches":true,"receipt_show_matches":true,"native_status":"ERROR","complete_campaign":false,"accounting":{"censored":0,"completed":0,"failed":0,"planned":null,"unstarted":null},"native_runner":{"compiled_git_commit":"bd2681083400040fa836be1e46fb46f5b9b9e128","compiled_source_sha256":"6fec3f3ff1a516f9ec636b6fe01bd66af5a049499102027742c2112fa1cc8c5f","executable_sha256":"1e6e344a37c6cbf4556bdf271d0c5ff4a64966bcf7f4c24c38bd94ac9c37591a","forge_version":"0.8.21","schema_version":"llm.mutation-testing.native-runner.v2","source_matches_git":true},"manifest_before":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","manifest_after":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","manifest_current_matches":true,"grants_matches":true,"partial_progress":{"complete":false,"inventory":{"bytes":1774,"discovered":2,"identities_sha256":"9a417fc788bded97cb2fe62f79a1fedd9e7f2a8da1fc9977beaec6f7bc5468d4","sha256":"9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d"},"outcomes":{"bytes":1131,"counts":{"ERROR":0,"KILLED":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0},"identities_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","observed":0,"sha256":"33b252d56c4cd310febb33ae4d5b926c35eddc919aa510f52f8974e83694161c"},"reason":"timeout","remaining_or_interrupted":null,"schema_version":1,"scope":"partial automatic engine observations; not scored coverage or execution attestation"},"canonical_inventory_digest":"1c8886f18a06c72b0dc1357dd18650a1c822384979cb2e290300f235066a92b9","reports":{"inventory":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/mutants-output/mutants.out/mutants.json","sha256":"9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d","sha256_matches_receipt":true,"bytes_match_receipt":true,"row_count":2},"outcomes":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/mutants-output/mutants.out/outcomes.json","sha256":"33b252d56c4cd310febb33ae4d5b926c35eddc919aa510f52f8974e83694161c","sha256_matches_receipt":true,"bytes_match_receipt":true,"row_count":1}},"process_groups":[{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1766341-9d749a8f4bb33dec80dd9ddbd98f56d7","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited"},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1766341-e285e3562a8080b846973ae83ab331e3","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited"},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1766341-cc8b4ab8607c77516f4232a13b27ccb4","receipt_cleanup_complete":true,"absent_now":true,"outcome":"timed_out"}],"snapshot":{"path":"/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc","retained":true,"receipt_retained_reason":"process cleanup or execution input verification is incomplete","host_source_sha256":"e575e5592457642056a4d0de11875b6e48c8db1cd36dd709b6789f01fd5768e1","authored_source_sha256":"e575e5592457642056a4d0de11875b6e48c8db1cd36dd709b6789f01fd5768e1","snapshot_source_sha256":"74c4b6d3e811431183b55179fab8f05a0b107aeef050dd0737441dde958dde8e","marker_seen_by_watcher":true,"marker_exists_now":true,"marker_sha256":"62865a94ab91e2b99f1809c5a295cc8ff482807874345c919c0f3e48633dc21d"},"limits":"Cooperative retained files and point-in-time cleanup; no PASS or execution attestation. Final toolchain check unstarted."}},
+      "engine_reports": {
+        "inventory": {
+          "path": "/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/mutants-output/mutants.out/mutants.json",
+          "sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d",
+          "bytes": 1774,
+          "raw_row_count": 2
+        },
+        "outcomes": {
+          "path": "/tmp/forge-196-workspace-timeout-9jh39q0n/scratch/llm-orchestrator-snapshot-QUzYLc/mutants-output/mutants.out/outcomes.json",
+          "sha256": "33b252d56c4cd310febb33ae4d5b926c35eddc919aa510f52f8974e83694161c",
+          "bytes": 1131,
+          "raw_row_count": 1
+        }
+      }
+    },
+    {
+      "name": "third-corrected",
+      "summary": {
+        "path": "/tmp/forge-196-workspace-timeout-w45j7c_2/summary.json",
+        "sha256": "1160f91228234d33032e2b33de7c6dec28c8f38b0f6595a944e949e0f7f92e09",
+        "bytes": 60179
+      },
+      "driver_decision": "OBSERVED_TIMEOUT_UNRESTORED_RETAINED",
+      "driver_completed": true,
+      "driver_error": null,
+      "checks": [
+      {"name":"capture","state":"completed","elapsed_seconds":0.09164381999289617,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"toolchain_identity","state":"completed","elapsed_seconds":0.32163924199994653,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"identity","state":"completed","elapsed_seconds":0.17940214200643823,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"tool_versions","state":"completed","elapsed_seconds":0.45280653500230983,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"fixture","state":"completed","elapsed_seconds":1.5348606319894316,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"plan","state":"completed","elapsed_seconds":0.15278173600381706,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"write","state":"completed","elapsed_seconds":0.15704787500726525,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"grants","state":"completed","elapsed_seconds":0.0007946840050863102,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"run","state":"completed","elapsed_seconds":11.073190487004467,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"receipt","state":"completed","elapsed_seconds":0.15366966999135911,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"validate","state":"completed","elapsed_seconds":0.0007821229955879971,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"},
+      {"name":"final_toolchain","state":"completed","elapsed_seconds":0.3226910790108377,"timing_scope":"single observation including orchestration/cancellation, not a benchmark"}
+    ],
+      "check_accounting": {
+        "recorded": {
+          "completed": 12,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        },
+        "recounted": {
+          "completed": 12,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        }
+      },
+      "command_accounting": {
+        "recorded": {
+          "completed": 18,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        },
+        "recounted": {
+          "completed": 18,
+          "failed": 0,
+          "censored": 0,
+          "unstarted": 0,
+          "running": 0
+        }
+      },
+      "native_status": "ERROR",
+      "native_complete_campaign": false,
+      "native_accounting": {
+        "censored": 0,
+        "completed": 0,
+        "failed": 0,
+        "planned": null,
+        "unstarted": null
+      },
+      "mutation_pass": false,
+      "native_error": "workspace snapshot inputs changed",
+      "native_runner": {
+        "compiled_git_commit": "ad6f12f17a5bedbb5b3463cbc851bc4527d72b39",
+        "compiled_source_sha256": "c55f23f38b3da80b706f21e4b674f69aae3ed14f60c5a57ea64e5df7cadd0843",
+        "executable_sha256": "7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": true
+      },
+      "partial_progress": {
+        "complete": false,
+        "inventory": {
+          "bytes": 1774,
+          "discovered": 2,
+          "identities_sha256": "1c8886f18a06c72b0dc1357dd18650a1c822384979cb2e290300f235066a92b9",
+          "sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d"
+        },
+        "outcomes": {
+          "bytes": 1131,
+          "counts": {
+            "ERROR": 0,
+            "KILLED": 0,
+            "SURVIVED": 0,
+            "TIMED_OUT": 0,
+            "UNVIABLE": 0
+          },
+          "identities_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "observed": 0,
+          "sha256": "327e24b2537dd05398ed474d6e111bbd8f631ce1eccdc654d2dcb197813c94b4"
+        },
+        "reason": "timeout",
+        "remaining_or_interrupted": null,
+        "schema_version": 1,
+        "scope": "partial automatic engine observations; not scored coverage or execution attestation"
+      },
+      "partial_progress_error": null,
+      "partial_control": {
+        "discovered": 2,
+        "observed": 0,
+        "counts": {
+          "KILLED": 0,
+          "SURVIVED": 0,
+          "TIMED_OUT": 0,
+          "UNVIABLE": 0,
+          "ERROR": 0
+        },
+        "inventory_sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d",
+        "outcomes_sha256": "327e24b2537dd05398ed474d6e111bbd8f631ce1eccdc654d2dcb197813c94b4",
+        "remaining": "unknown",
+        "scope": "cooperative retained engine observations; not scored evidence",
+        "result": "VERIFIED_PARTIAL_OBSERVATION"
+      },
+      "inputs": {"raw_receipt":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/host/evidence/result.json","sha256":"2065e8bcdec419c57de849cb37905cfd72724078e4e77a272c02b318c56085d4","bytes":9671},"receipt_show":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0017-receipt.stdout","sha256":"f7d504cfc3bc429cc44259f186a456c38d851a0c1ba2c39821b6c87d5b47c0b6","bytes":9625},"manifest":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/host/campaigns/workspace-trial_member_cargo_20261106.json","sha256":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","bytes":1567},"manifest_before_sha256":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","grants":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/host-execution-grants.json","sha256":"9d4483e0bff0e0415f25c831eb3a03508813be548803fbad391987438a6a382c","bytes":2707},"executed_private_binary":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","bytes":53647968}},
+      "independently_supplied": {
+        "forge_path": "/tmp/forge-partial-clean-ad6f12f-pl1p142b/bin/forge",
+        "forge_sha256": "7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2",
+        "forge_commit": "ad6f12f17a5bedbb5b3463cbc851bc4527d72b39",
+        "cargo_path": "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+        "cargo_sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
+        "tool_pins_path": "/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json",
+        "tool_pins_sha256": "17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1"
+      },
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "ad6f12f17a5bedbb5b3463cbc851bc4527d72b39",
+        "compiled_source_sha256": "c55f23f38b3da80b706f21e4b674f69aae3ed14f60c5a57ea64e5df7cadd0843",
+        "executable_sha256": "7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2"
+      },
+      "tool_pins": {"cargo":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"},"rustc":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustc","sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"},"rustdoc":{"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc","sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"},"cargo-mutants":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/engine/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"},"git":{"path":"/usr/bin/git","sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"},"cc":{"path":"/usr/bin/x86_64-linux-gnu-gcc-13","sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"},"ld":{"path":"/usr/bin/x86_64-linux-gnu-ld.bfd","sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"},"as":{"path":"/usr/bin/x86_64-linux-gnu-as","sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"},"ar":{"path":"/usr/bin/x86_64-linux-gnu-ar","sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"},"ranlib":{"path":"/usr/bin/x86_64-linux-gnu-ranlib","sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"},"strip":{"path":"/usr/bin/x86_64-linux-gnu-strip","sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"},"nm":{"path":"/usr/bin/x86_64-linux-gnu-nm","sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"},"objcopy":{"path":"/usr/bin/x86_64-linux-gnu-objcopy","sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"},"sh":{"path":"/usr/bin/dash","sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"}},
+      "resource_grants_not_usage": {
+        "cpu_millis": 1000,
+        "memory_mib": 1024,
+        "processes": 64
+      },
+      "bounds": {"native_wall_seconds":10,"sleep_seconds":30,"outer_wait_seconds":75,"existing_cooperative_cancel_seconds":45,"retries":0,"scope":"native command bound; no hard whole-driver watchdog"},
+      "read_roots": [
+      {"path":"/usr/bin","identity":[66309,91881474,0,16877]},
+      {"path":"/usr/lib","identity":[66309,91881477,0,16877]},
+      {"path":"/usr/libexec/gcc","identity":[66309,91896443,0,16877]},
+      {"path":"/etc/ld.so.cache","identity":[66309,24773043,0,33188]},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q","identity":[66309,74877504,1000,16832]},
+      {"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/engine/cargo-mutants","identity":[66309,75498745,1000,33088]}
+    ],
+      "baseline": {
+        "direct": {
+          "frames": 2,
+          "ignored": 0,
+          "passed": 1,
+          "scope": "observed libtest output, not producer attestation"
+        }
+      },
+      "process_commands": [
+      {"argv":["cargo","metadata","--manifest-path","crates/workspace/member/Cargo.toml","--format-version=1","--locked","--offline"],"confinement":{"cleanup_complete":true,"duration_ms":13,"errors":[],"exit_code":0,"outcome":"exited","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1769895-c2fa86f7bee0ee07907e2ba28ba1b611","processes_max":64,"verified":true},"signal":null,"stderr_bytes":0,"stdout_bytes":3810},"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/worktree","state":"observed"},
+      {"argv":["cargo","test","--manifest-path","crates/workspace/member/Cargo.toml","--package","workspace_subject","--locked","--offline"],"confinement":{"cleanup_complete":true,"duration_ms":155,"errors":[],"exit_code":0,"outcome":"exited","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1769895-94bd8ae1de9695f985dfe525da767137","processes_max":64,"verified":true},"signal":null,"stderr_bytes":577,"stdout_bytes":253},"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/worktree","state":"observed"},
+      {"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/engine/cargo-mutants","mutants","--manifest-path","crates/workspace/member/Cargo.toml","--in-place","--timeout","60","--output","/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/mutants-output","--package","workspace_subject","--file","member/src/selected.rs","--no-config","--cargo-arg=--locked","--cargo-arg=--offline","--test-package","workspace_subject"],"confinement":{"cleanup_complete":true,"duration_ms":10004,"errors":[],"exit_code":null,"outcome":"timed_out","resources":{"backend":"delegated-cgroup-v2","cpu_period_us":100000,"cpu_quota_us":100000,"memory_max_bytes":1073741824,"memory_swap_max_bytes":0,"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1769895-3525fbea3cd9e53835550b3cd3adf691","processes_max":64,"verified":true},"signal":9,"stderr_bytes":0,"stdout_bytes":74},"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/worktree","state":"observed"}
+    ],
+      "process_cleanup": {
+        "commands_observed": 3,
+        "complete": true,
+        "schema_version": 1,
+        "scope": "owned cgroup cleanup"
+      },
+      "snapshot": {
+        "commit": "ecbe20519d91362d3ce859ee81676d2a68b229bc",
+        "git_history": "private Git metadata removed; history unavailable",
+        "included_untracked": [],
+        "removed": false,
+        "retained_reason": "process cleanup or execution input verification is incomplete",
+        "root": "/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA"
+      },
+      "watcher": {"marker_seen":true,"snapshot":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA","mutated_source_sha256":"74c4b6d3e811431183b55179fab8f05a0b107aeef050dd0737441dde958dde8e"},
+      "streams": [
+      {"name":"identity","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1782324259984307,"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","mutation","identity"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0000-identity.stdout","sha256":"8dd69547cf94568b71ee99aaea922960dc417c6f731e5f3f56961997bedfa675","bytes":307},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0000-identity.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"cargo-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14962072200432885,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/cargo","--version"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0001-cargo-version.stdout","sha256":"fb3f25aefd6d5441842d285f5a9b125b3f0f0b0bf2013d9a32677f9e99c6c854","bytes":36},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0001-cargo-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"rustc-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1539052809966961,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/rustc","--version"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0002-rustc-version.stdout","sha256":"785f1364c0d5bf077f7bfb885fd4bde99899dfd80ce0fb6226a4527d9b27724c","bytes":36},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0002-rustc-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"cargo-mutants-version","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14791831499314867,"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/engine/cargo-mutants","mutants","--version"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0003-cargo-mutants-version.stdout","sha256":"ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5","bytes":21},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0003-cargo-mutants-version.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-lock","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.16453332699893508,"argv":["/tmp/forge-192-toolchain-fdiy923q/bin/cargo","generate-lockfile","--offline","--manifest-path","crates/workspace/Cargo.toml"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0004-fixture-lock.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0004-fixture-lock.stderr","sha256":"ad264a7d7c14ee137c35c236654f60a5f1b2b4462fbfee2157ba33d442769c57","bytes":52}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15183747200353537,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","init","-q","-b","main"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0005-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0005-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1535612699954072,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","add","-f","--",".gitignore","forge.toml","policy.toml","crates/workspace/Cargo.toml","crates/workspace/member/Cargo.toml","crates/workspace/member/src/selected.rs","crates/workspace/member/src/lib.rs","crates/workspace/member/fixtures/contract.txt","crates/support/Cargo.toml","crates/support/src/lib.rs","campaigns/registry.json","crates/workspace/Cargo.lock"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0006-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0006-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15333144800388254,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","commit","-q","-m","authored nested workspace and local dependency"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0007-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0007-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"fixture-git","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15330356800404843,"argv":["/usr/bin/git","-c","user.name=Forge fixture","-c","user.email=fixture@invalid.example","checkout","-q","-b","fixture-topic"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0008-fixture-git.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0008-fixture-git.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-add","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1508933180011809,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","add","-f","--","crates/workspace/member/src/selected.rs"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0009-select two boolean functions in one source-add.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0009-select two boolean functions in one source-add.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-staged","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1503278849995695,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","diff","--cached","--name-only","-z"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0010-select two boolean functions in one source-staged.stdout","sha256":"48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c","bytes":40},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0010-select two boolean functions in one source-staged.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-commit","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15295542699459475,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","commit","-q","-m","select two boolean functions in one source"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0011-select two boolean functions in one source-commit.stdout","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0011-select two boolean functions in one source-commit.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-refs","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1500954249931965,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","rev-parse","HEAD","HEAD^{tree}","main","main^{tree}"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0012-select two boolean functions in one source-refs.stdout","sha256":"ff261fbb2afb13c52adf34fd0b92413c8c0bfec7f14b11cbeb09c097d5e15e86","bytes":164},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0012-select two boolean functions in one source-refs.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"select two boolean functions in one source-selection","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.14984169299714267,"argv":["/usr/bin/git","-c","user.name=Forge diagnostic","-c","user.email=fixture@invalid.example","diff","--name-only","-z","main","HEAD"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0013-select two boolean functions in one source-selection.stdout","sha256":"48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c","bytes":40},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0013-select two boolean functions in one source-selection.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"plan","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1523090940027032,"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","mutation","plan","rust","--repo-root","/tmp/forge-196-workspace-timeout-w45j7c_2/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10","--day","20261106"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0014-plan.stdout","sha256":"5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299","bytes":223},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0014-plan.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"write","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.1565501629956998,"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","mutation","write","rust","--repo-root","/tmp/forge-196-workspace-timeout-w45j7c_2/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10","--day","20261106"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0015-write.stdout","sha256":"8371c0f20e760f6bc3c858860c82e185589440453d7d6dc010233ebd586e713a","bytes":373},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0015-write.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}},
+      {"name":"run","state":"completed","returncode":4,"launched":true,"elapsed_seconds":11.07233710300352,"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","mutation","run","/tmp/forge-196-workspace-timeout-w45j7c_2/host/campaigns/workspace-trial_member_cargo_20261106.json","--repo-root","/tmp/forge-196-workspace-timeout-w45j7c_2/host","--owner","workspace-trial","--base","main","--only","crates/workspace/member/src/selected.rs","--allow-mutations","--receipt","evidence/result.json","--execution-grants","/tmp/forge-196-workspace-timeout-w45j7c_2/host-execution-grants.json","--execution-grants-sha256","9d4483e0bff0e0415f25c831eb3a03508813be548803fbad391987438a6a382c"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0016-run.stdout","sha256":"76f0e8345927c9bb2560a934d92b2371d1d41f2291ce10801ed04fccb05d2320","bytes":74},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0016-run.stderr","sha256":"8f347a4f58f29689ad7ddce0e3a3058a04e014225a4af95eb7b3b30c73b706a7","bytes":118}},
+      {"name":"receipt","state":"completed","returncode":0,"launched":true,"elapsed_seconds":0.15299317699100357,"argv":["/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","receipt","show","/tmp/forge-196-workspace-timeout-w45j7c_2/host/evidence/result.json"],"cwd":"/tmp/forge-196-workspace-timeout-w45j7c_2/host","stdout":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0017-receipt.stdout","sha256":"f7d504cfc3bc429cc44259f186a456c38d851a0c1ba2c39821b6c87d5b47c0b6","bytes":9625},"stderr":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/logs/0017-receipt.stderr","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","bytes":0}}
+    ],
+      "historical_bound_inputs_current_observation": [
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-ordinary-cargo-experiment-v2.py","sha256":"5da0c4dbe0ad4d902d324caffd3a8ba2ebc3015d3299c2e91b493957178a862b","bytes":30604,"recorded_sha256":"5da0c4dbe0ad4d902d324caffd3a8ba2ebc3015d3299c2e91b493957178a862b","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-no-python-check.py","sha256":"7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b","bytes":17610,"recorded_sha256":"7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-installed-experiment.py","sha256":"0f17b6a03f2f5253bb2779d673f6af414c604e804fd1573f25b815f6250787ac","bytes":23956,"recorded_sha256":"0f17b6a03f2f5253bb2779d673f6af414c604e804fd1573f25b815f6250787ac","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-private-tool-pins.json","sha256":"17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1","bytes":2040,"recorded_sha256":"17e3fe6a479b4e0a60f6e348bf65d2a2d8ee972af6d8e45f02b16e6f96ee36e1","current_observation":"matches"},
+      {"path":"/tmp/forge-partial-clean-ad6f12f-pl1p142b/bin/forge","sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","bytes":53647968,"recorded_sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","bytes":40688400,"recorded_sha256":"ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustc","sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2","bytes":645016,"recorded_sha256":"3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2","current_observation":"matches"},
+      {"path":"/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc","sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a","bytes":12806952,"recorded_sha256":"20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a","current_observation":"matches"},
+      {"path":"/home/tim/.cargo/bin/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","bytes":9833120,"recorded_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","current_observation":"matches"},
+      {"path":"/usr/bin/git","sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201","bytes":4066232,"recorded_sha256":"eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-gcc-13","sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26","bytes":1023032,"recorded_sha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ld.bfd","sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b","bytes":1359128,"recorded_sha256":"e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-as","sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0","bytes":745768,"recorded_sha256":"21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ar","sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe","bytes":55792,"recorded_sha256":"6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-ranlib","sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee","bytes":55792,"recorded_sha256":"60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-strip","sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42","bytes":166568,"recorded_sha256":"0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-nm","sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202","bytes":44544,"recorded_sha256":"3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202","current_observation":"matches"},
+      {"path":"/usr/bin/x86_64-linux-gnu-objcopy","sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713","bytes":166536,"recorded_sha256":"9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713","current_observation":"matches"},
+      {"path":"/usr/bin/dash","sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42","bytes":129784,"recorded_sha256":"86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-196-workspace-timeout-trial.py","sha256":"7eba7265dc00570d80df3275e429bb67d66899c51be8a22872acdf413cca175a","bytes":15458,"recorded_sha256":"7eba7265dc00570d80df3275e429bb67d66899c51be8a22872acdf413cca175a","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-196-workspace-trial.py","sha256":"4743b7e331f56dbbdb5ca16815df2bb96b669362940a10ccc4b4ec2aac2798ea","bytes":27417,"recorded_sha256":"4743b7e331f56dbbdb5ca16815df2bb96b669362940a10ccc4b4ec2aac2798ea","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-197-ordinary-freshness-v2.py","sha256":"2b542562263a0c0107548d6a33422a55126a5bdfc87c63d5efeb46a267884c19","bytes":19273,"recorded_sha256":"2b542562263a0c0107548d6a33422a55126a5bdfc87c63d5efeb46a267884c19","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json","sha256":"68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","bytes":22682,"recorded_sha256":"68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/engine/cargo-mutants","sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","bytes":9833120,"recorded_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/bin/forge","sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","bytes":53647968,"recorded_sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/campaigns/registry.json","sha256":"db4ee900b94146fc8cc903efb85e30787fb620f9529667182fddba77140bd40b","bytes":919,"recorded_sha256":"db4ee900b94146fc8cc903efb85e30787fb620f9529667182fddba77140bd40b","current_observation":"matches"},
+      {"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/host-execution-grants.json","sha256":"9d4483e0bff0e0415f25c831eb3a03508813be548803fbad391987438a6a382c","bytes":2707,"recorded_sha256":"9d4483e0bff0e0415f25c831eb3a03508813be548803fbad391987438a6a382c","current_observation":"matches"},
+      {"path":"/home/tim/Projects/llm-forge/.git/forge-program-205-partial-timeout-trial.py","sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","bytes":7822,"recorded_sha256":"9462fa853d8933f93fd45d11b10da16dce87da9919e82afe2805521f97af3fb4","current_observation":"matches"}
+    ],
+      "independent_audit": {"path":"/home/tim/Projects/llm-forge/.git/forge-205-timeout-third-independent.json","sha256":"df2eca8af659b43cad25231997f1e6232a3b4f8cc4a3ce02c1a10a3952fc8f38","bytes":5589,"findings":{"schema":"forge.205.timeout-third-independent.v1","audited_at_utc":"2026-11-06T05:30:36.028654+00:00","summary":"/tmp/forge-196-workspace-timeout-w45j7c_2/summary.json","summary_sha256":"1160f91228234d33032e2b33de7c6dec28c8f38b0f6595a944e949e0f7f92e09","decision":"OBSERVED_TIMEOUT_UNRESTORED_RETAINED","error":null,"check_accounting":{"completed":12,"failed":0,"censored":0,"unstarted":0,"running":0},"streams_checked":36,"stream_mismatches":[],"bound_files_checked":28,"bound_file_mismatches":[],"authored_pins_mismatches":[],"receipt_raw_sha256_matches":true,"receipt_show_matches":true,"native_status":"ERROR","complete_campaign":false,"accounting":{"censored":0,"completed":0,"failed":0,"planned":null,"unstarted":null},"native_runner":{"compiled_git_commit":"ad6f12f17a5bedbb5b3463cbc851bc4527d72b39","compiled_source_sha256":"c55f23f38b3da80b706f21e4b674f69aae3ed14f60c5a57ea64e5df7cadd0843","executable_sha256":"7b11ba0d4869ac4041ad40da0c74beb025372e5fe61878047d0582d384d78dc2","forge_version":"0.8.21","schema_version":"llm.mutation-testing.native-runner.v2","source_matches_git":true},"binary_ledger":{"path":"/home/tim/Projects/llm-forge/.git/forge-205-canonical-clean-binary.json","sha256":"6f38121f0a455bb5fdafa706fd9abae39d35342d5aa9cb4eef34e784b9a06526","identity_matches_receipt":true,"binary_bytes_match":true},"manifest_before":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","manifest_after":"ddd9a5b19761c62e5b41f3d6ac3655e153a9a0f257f2470714b5b3a3259f2a3d","manifest_current_matches":true,"grants_matches":true,"partial_progress":{"complete":false,"inventory":{"bytes":1774,"discovered":2,"identities_sha256":"1c8886f18a06c72b0dc1357dd18650a1c822384979cb2e290300f235066a92b9","sha256":"9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d"},"outcomes":{"bytes":1131,"counts":{"ERROR":0,"KILLED":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0},"identities_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","observed":0,"sha256":"327e24b2537dd05398ed474d6e111bbd8f631ce1eccdc654d2dcb197813c94b4"},"reason":"timeout","remaining_or_interrupted":null,"schema_version":1,"scope":"partial automatic engine observations; not scored coverage or execution attestation"},"reports":{"inventory":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/mutants-output/mutants.out/mutants.json","sha256":"9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d","sha256_matches_receipt":true,"bytes_match_receipt":true,"row_count":2},"outcomes":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/mutants-output/mutants.out/outcomes.json","sha256":"327e24b2537dd05398ed474d6e111bbd8f631ce1eccdc654d2dcb197813c94b4","sha256_matches_receipt":true,"bytes_match_receipt":true,"row_count":1}},"independent_reconciliation":{"canonical_inventory_digest":"1c8886f18a06c72b0dc1357dd18650a1c822384979cb2e290300f235066a92b9","canonical_observed_digest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","inventory_digest_matches":true,"observed_digest_matches":true,"inventory_unique":true,"outcomes_unique_and_listed":true,"source_scope_matches":true,"counts":{"KILLED":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0,"ERROR":0},"counts_match":true,"observed_count":0,"observed_count_matches":true,"baseline_rows":["Success"]},"process_groups":[{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1769895-c2fa86f7bee0ee07907e2ba28ba1b611","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited"},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1769895-94bd8ae1de9695f985dfe525da767137","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited"},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1769895-3525fbea3cd9e53835550b3cd3adf691","receipt_cleanup_complete":true,"absent_now":true,"outcome":"timed_out"}],"snapshot":{"path":"/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA","retained":true,"receipt_retained_reason":"process cleanup or execution input verification is incomplete","host_source_sha256":"e575e5592457642056a4d0de11875b6e48c8db1cd36dd709b6789f01fd5768e1","authored_source_sha256":"e575e5592457642056a4d0de11875b6e48c8db1cd36dd709b6789f01fd5768e1","snapshot_source_sha256":"74c4b6d3e811431183b55179fab8f05a0b107aeef050dd0737441dde958dde8e","marker_seen_by_watcher":true,"marker_exists_now":true,"marker_sha256":"62865a94ab91e2b99f1809c5a295cc8ff482807874345c919c0f3e48633dc21d"},"limits":"Cooperative retained files and point-in-time cleanup; no PASS or execution attestation. Discovery minus observed is unknown."}},
+      "engine_reports": {
+        "inventory": {
+          "path": "/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/mutants-output/mutants.out/mutants.json",
+          "sha256": "9fd3d6ebaec568ca215c738512b4fbbb72db7699805700f83a3447f09d551b0d",
+          "bytes": 1774,
+          "raw_row_count": 2
+        },
+        "outcomes": {
+          "path": "/tmp/forge-196-workspace-timeout-w45j7c_2/scratch/llm-orchestrator-snapshot-ZyA1jA/mutants-output/mutants.out/outcomes.json",
+          "sha256": "327e24b2537dd05398ed474d6e111bbd8f631ce1eccdc654d2dcb197813c94b4",
+          "bytes": 1131,
+          "raw_row_count": 1
+        }
+      }
+    }
+  ]
+}
