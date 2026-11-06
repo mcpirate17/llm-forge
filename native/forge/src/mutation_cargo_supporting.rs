@@ -228,7 +228,10 @@ pub(crate) fn workspace_required_for(
         let Some(id) = contract["campaign_id"].as_str() else {
             continue;
         };
-        if contract["execution_profile"] != "cargo-workspace-v2" || !eligible.contains(id) {
+        if !conductor_native::mutation_workspace_selector::is_workspace(
+            contract["execution_profile"].as_str(),
+        ) || !eligible.contains(id)
+        {
             continue;
         }
         ensure!(

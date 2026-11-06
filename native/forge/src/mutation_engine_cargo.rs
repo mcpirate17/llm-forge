@@ -245,7 +245,9 @@ pub(crate) fn engine_argv(
         "--manifest-path".to_string(),
         manifest,
     ];
-    if campaign.option_text("execution_profile").as_deref() == Some("cargo-workspace-v2") {
+    if conductor_native::mutation_workspace_selector::is_workspace(
+        campaign.option_text("execution_profile").as_deref(),
+    ) {
         if campaign.jobs != 1 {
             return Err("in-place workspace mutation requires exactly one worker".into());
         }

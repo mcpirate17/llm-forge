@@ -103,3 +103,31 @@ fn actual_command_ancestors_refuse_scratch_configuration_and_aliases() {
     assert!(verify_command_ancestors(&root.path().join("aliased-cwd")).is_err());
     verify_command_ancestors(&cwd).unwrap();
 }
+
+#[test]
+fn selected_workspace_admission_requires_exact_typed_profile_and_command() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut c = fixture(dir.path());
+    let selector =
+        json!({"schema_version":1,"target":{"kind":"test","name":"contract"},"filter":"checks::"});
+    c.options
+        .insert("workspace_selector".into(), selector.clone());
+    assert!(
+        campaign(&c).is_err(),
+        "v2 must not silently accept a selector"
+    );
+    c.options
+        .insert("execution_profile".into(), json!("cargo-workspace-v3"));
+    assert!(
+        campaign(&c).is_err(),
+        "v3 must not retain a package-wide test command"
+    );
+    c.test_argv
+        .extend(["--test=contract".into(), "--".into(), "checks::".into()]);
+    assert!(campaign(&c).is_ok());
+    c.test_argv.push("--ignored".into());
+    assert!(campaign(&c).is_err());
+    c.test_argv.pop();
+    c.options.remove("workspace_selector");
+    assert!(campaign(&c).is_err(), "v3 requires explicit selector");
+}

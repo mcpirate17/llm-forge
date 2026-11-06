@@ -5,22 +5,42 @@ pub fn execution_profile(
     language: &str,
     engine: &str,
 ) -> Result<Option<String>, String> {
-    let Some(options) = generator.get("options") else {
+    let Some(raw) = generator.get("options") else {
         return Ok(None);
     };
-    let options = options
+    let options = raw
         .as_object()
         .ok_or("generator.options must be an object")?;
+    crate::mutation_workspace_selector::parse(options)?;
     let Some(value) = options.get("execution_profile") else {
         return Ok(None);
     };
     let profile = value
         .as_str()
         .ok_or("generator.options.execution_profile must be a string")?;
-    if profile != "cargo-workspace-v2" || language != "rust" || engine != "cargo-mutants" {
+    if !crate::mutation_workspace_selector::is_workspace(Some(profile))
+        || language != "rust"
+        || engine != "cargo-mutants"
+    {
         return Err("unsupported generator execution profile for campaign".into());
     }
     Ok(Some(profile.to_owned()))
+}
+
+pub(super) fn generated_test_scopes(
+    tests: &Map<String, Value>,
+    selected: bool,
+) -> Map<String, Value> {
+    // Selected targets leave these pins as anchors, not complete per-file coverage.
+    let scope = if selected {
+        serde_json::json!({"mode": "partial", "selection": "workspace_selector"})
+    } else {
+        serde_json::json!({"mode": "complete", "selection": "test_argv"})
+    };
+    tests
+        .keys()
+        .map(|path| (path.clone(), scope.clone()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -55,10 +75,9 @@ mod tests {
     fn verified_manifest_selects_profile_and_old_shape_stays_unchanged() {
         let mut payload = payload();
         let old = contract(&payload, "cargo-mutants").unwrap();
-        assert!(serde_json::to_value(old)
-            .unwrap()
-            .get("execution_profile")
-            .is_none());
+        let old = serde_json::to_value(old).unwrap();
+        assert!(old.get("execution_profile").is_none());
+        assert_eq!(old["test_scopes"]["tests/a.rs"]["mode"], "complete");
         payload["generator"]["options"]["execution_profile"] = json!("cargo-workspace-v2");
         let selected = contract(&payload, "cargo-mutants").unwrap();
         assert_eq!(
@@ -69,6 +88,23 @@ mod tests {
             serde_json::to_value(selected).unwrap()["execution_profile"],
             "cargo-workspace-v2"
         );
+    }
+    #[test]
+    fn v3_selector_is_bound_and_v2_shape_remains_unchanged() {
+        let mut payload = payload();
+        payload["generator"]["options"]["execution_profile"] = json!("cargo-workspace-v3");
+        payload["generator"]["options"]["workspace_selector"] =
+            json!({"schema_version":1,"target":{"kind":"lib"},"filter":"module::tests::"});
+        let selected = contract(&payload, "cargo-mutants").unwrap();
+        let encoded = serde_json::to_value(selected).unwrap();
+        assert_eq!(encoded["workspace_selector"]["target"]["kind"], "lib");
+        assert_eq!(encoded["test_scopes"]["tests/a.rs"]["mode"], "partial");
+        assert_eq!(
+            encoded["test_scopes"]["tests/a.rs"]["selection"],
+            "workspace_selector"
+        );
+        payload["generator"]["options"]["execution_profile"] = json!("cargo-workspace-v2");
+        assert!(contract(&payload, "cargo-mutants").is_err());
     }
     #[test]
     fn malformed_unknown_or_wrong_engine_profiles_refuse() {

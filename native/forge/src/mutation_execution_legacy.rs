@@ -287,7 +287,7 @@ impl Inputs {
                 );
                 RootInputs::capture(campaign, root).map(|inputs| Self::Root(Box::new(inputs)))
             }
-            Some("cargo-workspace-v2") => {
+            Some("cargo-workspace-v2" | "cargo-workspace-v3") => {
                 crate::mutation_workspace_inputs::Inputs::capture(campaign, root, grants)
                     .map(|inputs| Self::Workspace(Box::new(inputs)))
             }
@@ -497,12 +497,21 @@ impl<'a> Runtime<'a> {
             )
             .map_err(|e| format!("workspace metadata admission: {e:#}"))?;
         let tests = inputs.tests().map_err(error)?;
-        run.receipt.insert("workspace_execution".into(), serde_json::json!({
-            "profile":"cargo-workspace-v2", "package_id":tests.package_id,
+        let mut execution = serde_json::json!({
+            "profile":run.campaign.option_text("execution_profile"), "package_id":tests.package_id,
             "package":tests.package_name,"targets":tests.targets,"test_scope":tests.test_scope,
             "seed":self.seed.as_ref().map(|s| s.identity()),
             "input_scope":"captured source and selected registry inputs; operator runtime read grants remain separate"
-        }));
+        });
+        if let Some(selector) = &tests.selector {
+            execution["selector"] = serde_json::to_value(selector).map_err(error)?;
+            let target = tests
+                .selected_target
+                .as_ref()
+                .ok_or("selected Cargo target observation missing")?;
+            execution["selected_target"] = serde_json::to_value(target).map_err(error)?;
+        }
+        run.receipt.insert("workspace_execution".into(), execution);
         Ok(run.write_receipt()?)
     }
     pub fn output(&self) -> PathBuf {
@@ -512,8 +521,15 @@ impl<'a> Runtime<'a> {
         if !self.workspace() {
             return Ok(());
         }
-        let observed =
-            conductor_native::mutation_cargo_observations::parse_package_baseline(stdout)?;
+        let selector = conductor_native::mutation_workspace_selector::parse(&run.campaign.options)?;
+        let observed = match &selector {
+            Some(selector) => {
+                conductor_native::mutation_cargo_observations::parse_selected_baseline(
+                    stdout, selector,
+                )?
+            }
+            None => conductor_native::mutation_cargo_observations::parse_package_baseline(stdout)?,
+        };
         run.receipt.insert(
             "workspace_baseline".into(),
             serde_json::json!({"direct":observed}),
@@ -559,14 +575,26 @@ impl<'a> Runtime<'a> {
             .map_err(error)?
             .to_str()
             .ok_or("Cargo path UTF-8")?;
-        let observed =
-            conductor_native::mutation_cargo_observations::parse_package_engine_baseline(
+        let log = std::str::from_utf8(&bytes).map_err(error)?;
+        let observed = match &tests.selector {
+            Some(selector) => {
+                conductor_native::mutation_cargo_observations::parse_selected_engine_baseline(
+                    row,
+                    log,
+                    cargo,
+                    &tests.package_name,
+                    &tests.package_version,
+                    selector,
+                )?
+            }
+            None => conductor_native::mutation_cargo_observations::parse_package_engine_baseline(
                 row,
-                std::str::from_utf8(&bytes).map_err(error)?,
+                log,
                 cargo,
                 &tests.package_name,
                 &tests.package_version,
-            )?;
+            )?,
+        };
         held.verify().map_err(error)?;
         if observed != run.receipt["workspace_baseline"]["direct"] {
             return Err("engine and direct baseline test observations differ".into());

@@ -121,6 +121,37 @@ fn ordinary_supporting_error(
         Some(Value::String(value)) => Some(value.as_str()),
         Some(_) => return Some("invalid verified execution profile".into()),
     };
+    let contract = campaign.ordinary_contract?;
+    let selector = match contract.get("workspace_selector") {
+        None | Some(Value::Null) => None,
+        Some(value) => match serde_json::from_value(value.clone()) {
+            Ok(value) => Some(value),
+            Err(_) => return Some("invalid verified workspace selector".into()),
+        },
+    };
+    let argv: Vec<String> = match contract.get("test_argv").and_then(Value::as_array) {
+        Some(values) => match values
+            .iter()
+            .map(|v| v.as_str().map(str::to_owned))
+            .collect()
+        {
+            Some(values) => values,
+            None => return Some("invalid verified test argv".into()),
+        },
+        None if profile == Some("cargo-workspace-v3") => {
+            return Some("verified test argv unavailable".into())
+        }
+        None => Vec::new(),
+    };
+    if let Err(error) = crate::mutation_workspace_receipt::validate(
+        profile,
+        selector.as_ref(),
+        &argv,
+        contract.get("source_sha256").unwrap_or(&Value::Null),
+        object,
+    ) {
+        return Some(error);
+    }
     crate::mutation_cargo_supporting_binding::compare_profile(
         object.get("supporting_inputs"),
         supporting,
@@ -151,6 +182,16 @@ pub fn rejection_with_supporting(
     let status = object.get("status").unwrap_or(&Value::Null);
     if !matches!(status.as_str(), Some("PASS" | "RATCHET_HELD")) {
         return Ok(Some(format!("status={}", python_status(status))));
+    }
+    if campaign.ordinary_cargo
+        && campaign
+            .ordinary_contract
+            .and_then(|v| v.get("execution_profile"))
+            .and_then(Value::as_str)
+            == Some("cargo-workspace-v3")
+        && !native_runner::declared(object)
+    {
+        return Ok(Some("workspace v3 requires a native runner receipt".into()));
     }
     if native_runner::declared(object) {
         if campaign.ordinary_cargo {

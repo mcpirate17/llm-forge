@@ -98,14 +98,19 @@ baseline, which failed because the C compiler could not read an ungranted system
 header. It produced BASELINE_FAILED, with both owned scopes and snapshot removed.
 Forge's complete package suite and engine remain unproven under these grants.
 
-The initial implementation at `0522270` passed all 18 local checks and verification
-(4,749 passing executions, zero failures, 188 ignored, 179 harnesses). Subsequent
-integration fixes passed 342 focused Forge tests, with zero failures and 28
-ignored, plus strict Clippy and independent review. Publication requires fresh
-full checks for the final committed head and current `origin/main`.
-Next for #196: validate an explicit compiler-header and test-fixture profile for
-Forge's package, then restore Fest/Mull through the same command owner. Read grants,
-test executables and environment are separate operator decisions; a seed grants none.
+[PR #203](https://github.com/mcpirate17/llm-forge/pull/203) landed this workspace
+slice as `623c3d8`. Its merged tree matched checked head `4891291`: all 18 local
+checks and exact-head/current-base verification passed, with 4,755 passing
+executions, zero failures and 188 ignored across 179 harnesses. The earlier
+`0522270` gate and intermediate focused results remain historical observations.
+
+Active #196 increment: explicit library/integration-target selection with a
+bounded libtest substring filter, matched direct/engine test inventories and
+campaign-bound admission. Validation is pending; this is not a delivered result.
+Then validate explicit compiler-header and test-fixture grants for an actual
+Forge test scope and restore Fest/Mull through the same command owner. Read
+grants, test executables and environment are separate operator decisions; a seed
+grants none.
 
 1. Validate and measure the implemented outbound MCP slice through the existing
    inbound service. It reuses the confined process owner, registers the endpoint

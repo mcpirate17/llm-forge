@@ -231,3 +231,93 @@ fn workspace_profile_refuses_python_and_rust_value_declarations() {
         assert!(!dir.path().join("campaigns").exists());
     }
 }
+
+#[test]
+fn selected_workspace_manifest_preserves_scope_and_binds_the_test_selection() {
+    let dir = branch_host();
+    let plain = forge(dir.path(), &["plan", "rust", "--base", "main", "--verbose"]);
+    assert_eq!(plain.status.code(), Some(0), "{plain:?}");
+    let original = payload(&plain)["manifests"][0].clone();
+    for target in ["lib", "test:contract"] {
+        let result = forge(
+            dir.path(),
+            &[
+                "plan",
+                "rust",
+                "--base",
+                "main",
+                "--verbose",
+                "--cargo-workspace",
+                "--cargo-test-target",
+                target,
+                "--cargo-test-filter",
+                "chosen::smoke",
+            ],
+        );
+        assert_eq!(result.status.code(), Some(0), "{target}: {result:?}");
+        let selected = &payload(&result)["manifests"][0];
+        let expected_target = if target == "lib" {
+            serde_json::json!({"kind":"lib"})
+        } else {
+            serde_json::json!({"kind":"test","name":"contract"})
+        };
+        assert_eq!(
+            selected["generator"]["options"]["execution_profile"],
+            "cargo-workspace-v3"
+        );
+        assert_eq!(
+            selected["generator"]["options"]["workspace_selector"],
+            serde_json::json!({"schema_version":1,"target":expected_target,"filter":"chosen::smoke"})
+        );
+        for field in ["source_sha256", "test_sha256", "survivor_baseline"] {
+            assert_eq!(selected[field], original[field], "{target}: {field}");
+        }
+        assert_eq!(
+            selected["generator"]["source"],
+            original["generator"]["source"]
+        );
+        let mut expected_argv = original["test_argv"].as_array().unwrap().clone();
+        expected_argv.extend([
+            serde_json::json!(if target == "lib" {
+                "--lib"
+            } else {
+                "--test=contract"
+            }),
+            serde_json::json!("--"),
+            serde_json::json!("chosen::smoke"),
+        ]);
+        assert_eq!(selected["test_argv"], serde_json::json!(expected_argv));
+    }
+    assert!(!dir.path().join("campaigns").exists());
+}
+
+#[test]
+fn workspace_selection_rejects_missing_prerequisites_and_option_injection() {
+    let dir = branch_host();
+    for extra in [
+        vec!["--cargo-test-target", "lib"],
+        vec!["--cargo-workspace", "--cargo-test-filter", "chosen"],
+        vec!["--cargo-workspace", "--cargo-test-target", "test:"],
+        vec!["--cargo-workspace", "--cargo-test-target", "bin:forge"],
+        vec!["--cargo-workspace", "--cargo-test-target", "test:../escape"],
+        vec![
+            "--cargo-workspace",
+            "--cargo-test-target",
+            "lib",
+            "--cargo-test-filter=--ignored",
+        ],
+        vec![
+            "--cargo-workspace",
+            "--cargo-test-target",
+            "lib",
+            "--cargo-test-filter",
+            "a b",
+        ],
+    ] {
+        let mut args = vec!["write", "rust", "--base", "main"];
+        args.extend(extra);
+        let result = forge(dir.path(), &args);
+        assert!(!result.status.success(), "{args:?}: {result:?}");
+        assert!(!dir.path().join("campaigns").exists(), "{args:?}");
+    }
+}

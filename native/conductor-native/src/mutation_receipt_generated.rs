@@ -84,10 +84,27 @@ pub(crate) fn generated_errors_with_installed(
         }
     }
     errors.extend(identity_errors(payload, campaign));
+    if campaign.execution_profile.as_deref() == Some("cargo-workspace-v3")
+        && !native_runner::declared(payload)
+    {
+        errors.push(reject(
+            RejectionKind::NotPass,
+            "workspace v3 requires a native runner receipt",
+        ));
+    }
     if native_runner::declared(payload)
         && campaign.generated_value.is_none()
         && campaign.mutation_engine == "cargo-mutants"
     {
+        if let Err(detail) = crate::mutation_workspace_receipt::validate(
+            campaign.execution_profile.as_deref(),
+            campaign.workspace_selector.as_ref(),
+            &campaign.test_argv,
+            &campaign.source_sha256,
+            payload,
+        ) {
+            errors.push(reject(RejectionKind::NotPass, detail));
+        }
         let checked = match supporting {
             Ok(identity) => crate::mutation_cargo_supporting_binding::compare_profile(
                 payload.get("supporting_inputs"),
