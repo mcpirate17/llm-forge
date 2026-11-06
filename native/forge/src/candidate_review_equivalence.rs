@@ -58,9 +58,12 @@ pub(super) fn collect<'a>(
             jobs: captured.jobs,
         },
     )?;
-    let (stage, report, bytes, summary_sha256) = runtime.block_on(
-        candidate_equivalence_stage::execute(prepared, execution.clone(), interrupts),
-    )?;
+    let (stage, report, bytes, summary_sha256) =
+        runtime.block_on(candidate_equivalence_stage::execute(
+            prepared,
+            Arc::new(execution.grants.clone()),
+            interrupts,
+        ))?;
     captured.verify()?;
     let text = std::str::from_utf8(&bytes).context("equivalence summary is not UTF-8")?;
     let summary: Value = serde_json::from_str(text)?;

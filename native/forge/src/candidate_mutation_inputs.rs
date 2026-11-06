@@ -36,7 +36,7 @@ impl<'a> Capture<'a> {
         ] {
             if self
                 .inputs
-                .entries
+                .entries()
                 .keys()
                 .any(|path| path == root || path.starts_with(&format!("{root}/")))
             {
@@ -61,7 +61,7 @@ impl<'a> Capture<'a> {
         use conductor_native::source_fingerprint::{self, Fingerprint, EXTRA_FILES, SOURCE_TREES};
         let mut paths: Vec<String> = self
             .inputs
-            .entries
+            .entries()
             .keys()
             .filter(|path| source_fingerprint::includes(path))
             .cloned()
@@ -70,12 +70,12 @@ impl<'a> Capture<'a> {
         paths.sort_by(|left, right| Path::new(left).cmp(Path::new(right)));
         if EXTRA_FILES
             .iter()
-            .any(|path| !self.inputs.entries.contains_key(*path))
+            .any(|path| !self.inputs.entries().contains_key(*path))
             || SOURCE_TREES.iter().any(|name| {
                 let base = format!("native/{name}/");
                 ["Cargo.toml", "Cargo.lock"]
                     .iter()
-                    .any(|file| !self.inputs.entries.contains_key(&format!("{base}{file}")))
+                    .any(|file| !self.inputs.entries().contains_key(&format!("{base}{file}")))
                     || !paths
                         .iter()
                         .any(|path| path.starts_with(&format!("{base}src/")))
@@ -95,7 +95,7 @@ impl<'a> Capture<'a> {
         );
         let mut fingerprint = Fingerprint::new();
         for path in paths {
-            let entry = &self.inputs.entries[&path];
+            let entry = &self.inputs.entries()[&path];
             ensure!(
                 matches!(entry.mode.as_str(), "100644" | "100755") && entry.object_type == "blob",
                 "native source is not a regular file: {path}"
@@ -152,7 +152,7 @@ impl<'a> Capture<'a> {
         let bytes = captured.to_vec();
         let entry = self
             .inputs
-            .entries
+            .entries()
             .get(path)
             .context("mutation input entry unavailable")?;
         self.ledger.entry(path.into()).or_insert_with(|| {
@@ -172,14 +172,14 @@ impl<'a> Capture<'a> {
     }
     pub fn optional_hash(&mut self, path: &str) -> Result<Option<String>> {
         crate::candidate_source::safe_path(path.as_bytes())?;
-        if !self.inputs.entries.contains_key(path) {
+        if !self.inputs.entries().contains_key(path) {
             self.inputs.absent(path)?;
             return Ok(None);
         }
         Ok(Some(hex(&self.read(path, 1024 * 1024)?)))
     }
     pub fn config(&mut self) -> Result<Option<conductor_native::project_config::ProjectConfig>> {
-        if self.inputs.entries.contains_key("forge.toml") {
+        if self.inputs.entries().contains_key("forge.toml") {
             return conductor_native::project_config::parse_native(
                 Path::new("forge.toml"),
                 &self.text("forge.toml", 65536)?,
@@ -188,7 +188,7 @@ impl<'a> Capture<'a> {
             .map_err(anyhow::Error::msg);
         }
         self.inputs.absent("forge.toml")?;
-        if self.inputs.entries.contains_key("pyproject.toml") {
+        if self.inputs.entries().contains_key("pyproject.toml") {
             return conductor_native::project_config::parse_legacy(
                 Path::new("pyproject.toml"),
                 &self.text("pyproject.toml", 65536)?,
@@ -211,7 +211,7 @@ impl<'a> Capture<'a> {
         let budget = cargo_budget(&self.cargo_inventories)?;
         let mut relevant_count = 0usize;
         let mut map = BTreeMap::new();
-        let entries: Vec<_> = self.inputs.entries.values().cloned().collect();
+        let entries: Vec<_> = self.inputs.entries().values().cloned().collect();
         ensure!(
             entries.len() <= 16384,
             "Cargo candidate inventory exceeds 16384 entries"
@@ -280,7 +280,7 @@ impl<'a> Capture<'a> {
         use conductor_native::mutation_cargo_inventory::{self as cargo, Entry};
         let budget = cargo_budget(&self.cargo_inventories)?;
         let mut map = BTreeMap::new();
-        let entries: Vec<_> = self.inputs.entries.values().cloned().collect();
+        let entries: Vec<_> = self.inputs.entries().values().cloned().collect();
         ensure!(
             entries.len() <= 16384,
             "supporting Git inventory exceeds 16384 entries"

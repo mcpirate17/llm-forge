@@ -180,6 +180,15 @@ impl Workspace {
             .context("workspace snapshot missing")?
             .directory()
     }
+    /// Verify only before intentional payload writes; this is not a post-execution invariant.
+    pub(crate) fn verify_materialized(&self, source: &Source) -> Result<()> {
+        self.scratch.verify()?;
+        self.snapshot
+            .as_ref()
+            .context("workspace snapshot missing")?
+            .verify_materialized(source)?;
+        self.scratch.verify()
+    }
     pub(crate) fn sandbox_report(&self) -> Result<Value> {
         let mut report = serde_json::to_value(self.sandbox.report())?;
         // Admission starts with an empty scratch; the actual command enters the

@@ -1,28 +1,21 @@
-//! Captured Git-bound inputs for review test selection.
+//! Candidate policy/date/link authority around shared held snapshot reads.
 use crate::{
-    candidate_inputs::{self, BoundFile},
     candidate_policy::{self, Policy},
     candidate_snapshot::Snapshot,
     candidate_source::{Candidate, Source, TreeEntry},
+    snapshot_inputs::SnapshotInputs,
 };
-use anyhow::{ensure, Context, Result};
+use anyhow::{ensure, Result};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::{collections::BTreeMap, path::Path};
 
 pub(crate) struct Inputs<'a> {
     snapshot: &'a Snapshot,
     policy: &'a Policy,
     today: &'a str,
-    source_root: PathBuf,
-    common_dir: PathBuf,
     policy_resolved: String,
     policy_links: Vec<(String, String)>,
-    pub entries: BTreeMap<String, TreeEntry>,
-    held: Vec<BoundFile>,
-    texts: BTreeMap<String, Vec<u8>>,
-    absent: Vec<String>,
-    bytes: usize,
+    tree: SnapshotInputs<'a>,
 }
 impl<'a> Inputs<'a> {
     pub fn new(
@@ -36,27 +29,16 @@ impl<'a> Inputs<'a> {
             snapshot.report().tree_oid == candidate.tree_oid,
             "candidate and selection snapshot differ"
         );
-        snapshot.directory()?;
-        let tree_entries = source.list_tree(&candidate.tree_oid)?;
+        let tree = SnapshotInputs::new(source, snapshot, &candidate.tree_oid)?;
         let (policy_resolved, policy_links) =
-            crate::candidate_snapshot::resolve_captured_file(source, &tree_entries, &policy.path)?;
-        let entries = tree_entries
-            .into_iter()
-            .map(|entry| (entry.path.clone(), entry))
-            .collect();
+            crate::candidate_snapshot::resolve_captured_file(source, tree.entries(), &policy.path)?;
         let mut inputs = Self {
             snapshot,
             policy,
             today,
-            source_root: source.root().to_owned(),
-            common_dir: source.common_dir().to_owned(),
             policy_resolved,
             policy_links,
-            entries,
-            held: Vec::new(),
-            texts: BTreeMap::new(),
-            absent: Vec::new(),
-            bytes: 0,
+            tree,
         };
         inputs.check_policy()?;
         let resolved = inputs.policy_resolved.clone();
@@ -67,53 +49,17 @@ impl<'a> Inputs<'a> {
         );
         Ok(inputs)
     }
+    pub(crate) fn entries(&self) -> &BTreeMap<String, TreeEntry> {
+        self.tree.entries()
+    }
+    pub(crate) fn tree_mut(&mut self) -> &mut SnapshotInputs<'a> {
+        &mut self.tree
+    }
     pub fn absent(&mut self, path: &str) -> Result<()> {
-        ensure!(
-            !self.entries.contains_key(path),
-            "cannot assert absence of tracked selection input"
-        );
-        self.check_absent(path)?;
-        self.absent.push(path.into());
-        Ok(())
+        self.tree.absent(path)
     }
     pub fn external_registry(&mut self, path: &Path, sha256: &str) -> Result<String> {
-        let resolved = path
-            .canonicalize()
-            .context("resolve external contract registry")?;
-        ensure!(
-            !resolved.starts_with(&self.source_root) && !resolved.starts_with(&self.common_dir),
-            "external contract registry must be outside source and Git metadata"
-        );
-        let (held, bytes) =
-            candidate_inputs::external(path, sha256, 1024 * 1024, &self.snapshot.path())?;
-        self.bytes = self
-            .bytes
-            .checked_add(bytes.len())
-            .context("selection byte overflow")?;
-        ensure!(
-            self.bytes <= 32 * 1024 * 1024,
-            "test-selection inputs exceed 32 MiB"
-        );
-        let text = String::from_utf8(bytes).context("external contract registry must be UTF-8")?;
-        ensure!(
-            !text.contains('\0'),
-            "external contract registry contains NUL"
-        );
-        self.held.push(held);
-        Ok(text)
-    }
-    fn check_absent(&self, path: &str) -> Result<()> {
-        ensure!(
-            conductor_native::candidate_cargo_lint::read_optional(
-                &self.snapshot.directory()?,
-                path,
-                1024 * 1024
-            )
-            .map_err(anyhow::Error::msg)?
-            .is_none(),
-            "absent selection input appeared: {path}"
-        );
-        Ok(())
+        self.tree.external_registry(path, sha256)
     }
     fn check_policy(&self) -> Result<()> {
         let directory = self.snapshot.directory()?;
@@ -147,52 +93,10 @@ impl<'a> Inputs<'a> {
         self.read_with_limit(path, 1024 * 1024)
     }
     pub(crate) fn read_with_limit(&mut self, path: &str, limit: usize) -> Result<&str> {
-        let bytes = self.read_bytes_with_limit(path, limit)?;
-        let text = std::str::from_utf8(bytes).context("test-selection input must be UTF-8")?;
-        ensure!(!text.contains('\0'), "test-selection input contains NUL");
-        Ok(text)
+        self.tree.read_with_limit(path, limit)
     }
     pub(crate) fn read_bytes_with_limit(&mut self, path: &str, limit: usize) -> Result<&[u8]> {
-        ensure!(
-            (1..=2 * 1024 * 1024).contains(&limit),
-            "invalid captured read limit"
-        );
-        if !self.texts.contains_key(path) {
-            ensure!(
-                self.texts.len() < 4096,
-                "test-selection captured file count exceeds 4096"
-            );
-            let entry = self
-                .entries
-                .get(path)
-                .context("selection input absent from captured Git tree")?;
-            ensure!(
-                matches!(entry.mode.as_str(), "100644" | "100755")
-                    && entry.object_type == "blob"
-                    && entry.size.is_some_and(|size| size <= limit as u64),
-                "selection input must be a regular Git blob within {limit} bytes: {path}"
-            );
-            let (held, bytes) =
-                candidate_inputs::snapshot(&self.snapshot.path(), path, &entry.oid, limit)?;
-            self.bytes = self
-                .bytes
-                .checked_add(bytes.len())
-                .context("test-selection bytes overflow")?;
-            ensure!(
-                self.bytes <= 32 * 1024 * 1024,
-                "test-selection inputs exceed 32 MiB"
-            );
-            self.held.push(held);
-            self.texts.insert(path.into(), bytes);
-        }
-        ensure!(
-            self.texts.get(path).is_some_and(|text| text.len() <= limit),
-            "cached captured input exceeds requested read limit"
-        );
-        self.texts
-            .get(path)
-            .map(Vec::as_slice)
-            .context("captured selection input missing")
+        self.tree.read_bytes_with_limit(path, limit)
     }
     pub(crate) fn check_context(
         &self,
@@ -200,26 +104,17 @@ impl<'a> Inputs<'a> {
         snapshot: &Snapshot,
         policy: &Policy,
     ) -> Result<()> {
+        self.tree.check_context(source, snapshot)?;
         ensure!(
-            self.source_root == source.root()
-                && self.common_dir == source.common_dir()
-                && self.snapshot.path() == snapshot.path()
-                && self.snapshot.report().tree_oid == snapshot.report().tree_oid
-                && self.policy.path == policy.path
+            self.policy.path == policy.path
                 && self.policy.digest == policy.digest
                 && self.policy.document == policy.document,
             "test selection belongs to another review context"
         );
-        self.verify()
+        self.check_policy()
     }
     pub fn verify(&self) -> Result<()> {
-        self.snapshot.directory()?;
-        for held in &self.held {
-            held.verify()?;
-        }
-        for path in &self.absent {
-            self.check_absent(path)?;
-        }
+        self.tree.verify()?;
         self.check_policy()
     }
 }

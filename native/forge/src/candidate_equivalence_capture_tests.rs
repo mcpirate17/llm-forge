@@ -372,3 +372,239 @@ fn benchmark_no_record_capture_small_and_large() {
         fixture.dispose();
     }
 }
+
+/// A committed source fixture with real operator grants and no candidate policy.
+struct CommittedFixture {
+    source: Source,
+    snapshot: Snapshot,
+    grants: crate::candidate_execution_workspace::Grants,
+    root: tempfile::TempDir,
+}
+impl CommittedFixture {
+    fn new() -> Self {
+        Self::authored(false, CANDIDATE)
+    }
+    fn authored(alias: bool, module: &str) -> Self {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let repo_path = root.path().join("repo");
+        let repository = git2::Repository::init(&repo_path).unwrap();
+        for (name, data) in [
+            ("pyproject.toml", CONFIG),
+            ("waivers.json", "[]\n"),
+            ("pkg/target.py", module),
+            ("tests/test_target.py", TEST),
+            (".gitignore", "ignored.py\n"),
+        ] {
+            stage(&repository, name, data.as_bytes());
+        }
+        let mut index = repository.index().unwrap();
+        if alias {
+            std::os::unix::fs::symlink("target.py", repo_path.join("pkg/alias.py")).unwrap();
+            index.add_path(Path::new("pkg/alias.py")).unwrap();
+            index.write().unwrap();
+        }
+        let tree = repository.find_tree(index.write_tree().unwrap()).unwrap();
+        let signature = git2::Signature::now("fixture", "fixture@example.invalid").unwrap();
+        let commit = repository
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                "committed module",
+                &tree,
+                &[],
+            )
+            .unwrap();
+        for name in ["scratch", "cgroup"] {
+            let path = root.path().join(name);
+            fs::create_dir(&path).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let source = Source::open(&repo_path).unwrap();
+        let tree = source.commit_tree(&commit.to_string()).unwrap();
+        let snapshot = Snapshot::create(
+            &source,
+            &tree,
+            &root.path().join("snapshot"),
+            Limits::default(),
+        )
+        .unwrap();
+        let path = root.path().join("grants.json");
+        let document = json!({"version":1,"source_root":repo_path,"read_only":[repo_path],
+            "programs":{},"environment":{},"scratch_parent":root.path().join("scratch"),
+            "cgroup_parent":root.path().join("cgroup"),"python":null,
+            "resources":{"cpu_millis":1000,"memory_mib":128,"processes":16},
+            "max_wall_seconds":30,"max_cpu_seconds":30,"max_address_space_mib":512});
+        fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let grants = crate::candidate_execution_workspace::Grants::load(&path, &source).unwrap();
+        Self {
+            source,
+            snapshot,
+            grants,
+            root,
+        }
+    }
+    fn capture(&self, module: &str) -> Result<Captured<'_>> {
+        capture_committed(
+            CaptureContext {
+                source: &self.source,
+                snapshot: &self.snapshot,
+                grants: &self.grants,
+            },
+            module,
+            None,
+            None,
+            1,
+        )
+    }
+    fn assert_clean(&self) {
+        assert_eq!(
+            fs::read_dir(self.root.path().join("scratch"))
+                .unwrap()
+                .count(),
+            0
+        );
+    }
+}
+
+#[test]
+fn committed_whole_module_uses_committed_inputs_despite_dirty_host() {
+    let fixture = CommittedFixture::new();
+    let repository = git2::Repository::open(fixture.source.root()).unwrap();
+    stage(&repository, "pkg/target.py", b"staged = True\n");
+    for (name, bytes) in [
+        ("pkg/target.py", "dirty = True\n"),
+        ("pyproject.toml", "broken = [\n"),
+        ("waivers.json", "dirty waivers\n"),
+        ("tests/test_target.py", "invalid test\n"),
+        ("untracked.py", "untracked = True\n"),
+        ("ignored.py", "ignored = True\n"),
+    ] {
+        fs::write(fixture.source.root().join(name), bytes).unwrap();
+    }
+    let index = fs::read(fixture.source.root().join(".git/index")).unwrap();
+    let captured = fixture.capture("pkg/target.py").unwrap();
+    assert_eq!(
+        captured.targets,
+        vec![(
+            "pkg/target.py".into(),
+            true,
+            vec![
+                ("changed".into(), 1, vec![]),
+                ("untouched".into(), 5, vec![])
+            ],
+            vec![]
+        )]
+    );
+    assert_eq!(captured.waivers.as_deref(), Some(b"[]\n".as_slice()));
+    assert_eq!(captured.timeout_seconds, 12.5);
+    assert_eq!(captured.jobs, 1);
+    assert_eq!(captured.evidence["source_kind"], "commit_tree");
+    assert_eq!(captured.evidence["scope"], "whole_module");
+    assert!(captured.evidence["record_provenance"].is_null());
+    assert!(!fixture.snapshot.path().join("untracked.py").exists());
+    assert!(!fixture.snapshot.path().join("ignored.py").exists());
+    assert!(!fixture.snapshot.path().join("policy.toml").exists());
+    captured.verify().unwrap();
+    assert_eq!(
+        fs::read(fixture.source.root().join(".git/index")).unwrap(),
+        index
+    );
+    assert_eq!(
+        fs::read_to_string(fixture.source.root().join("pkg/target.py")).unwrap(),
+        "dirty = True\n"
+    );
+    fixture.assert_clean();
+}
+
+#[test]
+fn committed_module_refusals_and_snapshot_input_drift_fail_closed() {
+    let linked = CommittedFixture::authored(true, CANDIDATE);
+    assert!(linked.capture("pkg/alias.py").is_err());
+    linked.assert_clean();
+    let fixture = CommittedFixture::new();
+    for module in [
+        "../target.py",
+        "/pkg/target.py",
+        "pkg//target.py",
+        "pkg/*.py",
+        "pkg/alias.py",
+        "pkg/missing.py",
+        "pyproject.toml",
+    ] {
+        assert!(fixture.capture(module).is_err(), "accepted {module}");
+    }
+    fixture.assert_clean();
+    for name in [
+        "pkg/target.py",
+        "tests/test_target.py",
+        "pyproject.toml",
+        "waivers.json",
+    ] {
+        let fixture = CommittedFixture::new();
+        let captured = fixture.capture("pkg/target.py").unwrap();
+        captured.verify().unwrap();
+        fs::write(fixture.snapshot.path().join(name), b"drift\n").unwrap();
+        assert!(
+            captured.verify().is_err(),
+            "accepted committed input drift: {name}"
+        );
+        fixture.assert_clean();
+    }
+}
+
+#[test]
+fn distinct_committed_module_bytes_produce_distinct_bound_whole_plans() {
+    let first = CommittedFixture::new();
+    let second = CommittedFixture::authored(false, "def other(x):\n    return x + 7\n");
+    let one = first.capture("pkg/target.py").unwrap();
+    let two = second.capture("pkg/target.py").unwrap();
+    assert_ne!(
+        first.snapshot.report().tree_oid,
+        second.snapshot.report().tree_oid
+    );
+    assert_ne!(
+        one.evidence["candidate_tree"],
+        two.evidence["candidate_tree"]
+    );
+    assert_ne!(one.targets, two.targets);
+    assert_eq!(
+        two.targets,
+        vec![(
+            "pkg/target.py".into(),
+            true,
+            vec![("other".into(), 1, vec![])],
+            vec![]
+        )]
+    );
+    one.verify().unwrap();
+    two.verify().unwrap();
+    first.assert_clean();
+    second.assert_clean();
+}
+
+#[test]
+fn committed_capture_refuses_unsolicited_external_record_grant() {
+    let fixture = CommittedFixture::new();
+    let path = fixture.root.path().join("record.sqlite");
+    fs::write(&path, b"unconfigured record").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let hash = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
+    let result = capture_committed(
+        CaptureContext {
+            source: &fixture.source,
+            snapshot: &fixture.snapshot,
+            grants: &fixture.grants,
+        },
+        "pkg/target.py",
+        Some((&path, &hash)),
+        None,
+        1,
+    );
+    let error = result.err().expect("unsolicited record grant was accepted");
+    assert!(format!("{error:#}").contains("without enabled captured configuration"));
+    assert_eq!(fs::read(&path).unwrap(), b"unconfigured record");
+    fixture.assert_clean();
+}

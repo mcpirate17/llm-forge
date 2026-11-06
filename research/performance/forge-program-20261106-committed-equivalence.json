@@ -1,0 +1,570 @@
+{
+  "schema_version": 1,
+  "kind": "native_committed_equivalence_gate",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/224",
+  "base_commit": "551a506b49190059cb63d491340a73842b1a3119",
+  "status": "runtime_and_capture_verified_publication_pending",
+  "scope": "One explicit full commit and one whole Python module; native orchestration shares candidate input capture, record parser and confined Stage owner. No live-worktree or Make gate migration.",
+  "validation": {
+    "equivalence": {
+      "passed": 33,
+      "ignored": 1,
+      "log": {
+        "path": ".git/forge-native-gate-focused3.log",
+        "sha256": "49c58568b52069b57c34cc1c91359e71af5633b97d879a0dc586bcea1760e119"
+      }
+    },
+    "snapshot": {
+      "passed": 16,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_snapshot-tests.log",
+        "sha256": "1e80263576576cc9c8bba2bedef20b32fe21bce2eda7a6ae39d882c4744ca899"
+      }
+    },
+    "workspace": {
+      "passed": 11,
+      "ignored": 6,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_execution_workspace-tests.log",
+        "sha256": "dc0ebeb5b58890ef0f5b4cb58bc673346335d1b4a3a3061fc28d56160ae9aa11"
+      }
+    },
+    "snapshot_inputs": {
+      "passed": 4,
+      "log": {
+        "path": ".git/forge-native-gate-snapshot_inputs-tests2.log",
+        "sha256": "eda7c10b6af0dbfd5a6c1ae5af0a533ba32eb0ee7a9cc399c8883cff74ff86f2"
+      }
+    },
+    "candidate_test_selection": {
+      "passed": 11,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_test_selection-tests3.log",
+        "sha256": "0c1a40103b7907712b777737a7247ffdabf0f85447d9eabd74ae51f3ed693839"
+      }
+    },
+    "candidate_mutation": {
+      "passed": 7,
+      "log": {
+        "path": ".git/forge-native-gate-candidate_mutation2.log",
+        "sha256": "db47b4dbbeb5fd4da2a77761a58d76501112c751d522a5e5435f80bf667d88e2"
+      }
+    },
+    "mutation_corpus": {
+      "passed": 6,
+      "ignored": 12,
+      "log": {
+        "path": ".git/forge-native-gate-mutation_corpus2.log",
+        "sha256": "d5e19fc47ca8b52d61f747f5ef9c1628381bcaaaec443c9cc4bc2efef65359dd"
+      }
+    },
+    "cli": {
+      "passed": 2,
+      "log": {
+        "path": ".git/forge-native-gate-cli-tests1.log",
+        "sha256": "b17214d574ec61ad6e5f115518afbeb9bfd7ba7f65f69919b836f6bf9429d10a"
+      },
+      "scope": "Actual native binary, empty PATH, real committed fixture and refused guest digest; no guest execution."
+    },
+    "strict_clippy": {
+      "result": "PASS all targets including live-test compilation, shared parser and borrowed policy resolution",
+      "log": {
+        "path": ".git/forge-native-gate-clippy3.log",
+        "sha256": "bc3ca044dd5d172061511f7ad28a81024c2a4f8506f6af0c644704141e822361"
+      }
+    },
+    "live_test_build": {
+      "result": "PASS compilation; subsequent five real controls all passed",
+      "log": {
+        "path": ".git/forge-native-gate-live-build1.log",
+        "sha256": "fedc0462c8703113da3647ecb4f91747ccbe064e447f654aa6d6374f7cbca163"
+      }
+    },
+    "release_cli": {
+      "passed": 2,
+      "ignored": 0,
+      "log": {
+        "path": ".git/forge-native-gate-release-cli1.log",
+        "sha256": "d797d4d063cdb24fb05a7e2d5008f531128f3d36896951494c23e62d4bef7dfc"
+      }
+    },
+    "release_unit": {
+      "passed": 33,
+      "ignored": 1,
+      "log": {
+        "path": ".git/forge-native-gate-release-unit1.log",
+        "sha256": "9923a2d1a84cb2a3c53bf4ea600ee45bc99cb690bab4c48428652541b35bee81"
+      }
+    },
+    "standalone_live": {
+      "completed": 5,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0,
+      "summary": {
+        "path": ".git/forge-native-gate-controls1.json",
+        "sha256": "47f76a40258096fa853fd8457cab794c25b83a83f0215e22d5d69584c4aa2bda"
+      },
+      "independent_audit": {
+        "path": ".git/forge-native-gate-controls-independent.json",
+        "sha256": "e49e3627602fa56476be35106da66669456eda504bcdf83ecb45ffc46c28218e"
+      },
+      "runs": [
+        {
+          "name": "nonblocking",
+          "test": "nonblocking_committed_module_completes_without_enforcement_failure",
+          "returncode": 0,
+          "elapsed_seconds": 1.115370512008667,
+          "log": {
+            "path": "/home/tim/Projects/llm-forge/.git/forge-native-gate-control-nonblocking1.log",
+            "sha256": "6811489597d4d9e7940341ade40ae360f9cf630a54e30906b62834a9b97a2e58"
+          }
+        },
+        {
+          "name": "blocking",
+          "test": "committed_module_ignores_dirty_staged_untracked_and_ignored_host_inputs",
+          "returncode": 0,
+          "elapsed_seconds": 1.0152769088745117,
+          "log": {
+            "path": "/home/tim/Projects/llm-forge/.git/forge-native-gate-control-blocking1.log",
+            "sha256": "7629d3481b1570bc01a2fe9b23ee3ab10784f18d2e1b3c15afedf66f3032aa33"
+          }
+        },
+        {
+          "name": "inner-timeout",
+          "test": "inner_module_timeout_is_incomplete_and_owned_cleanup_completes",
+          "returncode": 0,
+          "elapsed_seconds": 0.11385655403137207,
+          "log": {
+            "path": "/home/tim/Projects/llm-forge/.git/forge-native-gate-control-inner-timeout1.log",
+            "sha256": "00d12e521db62cd9529b59b72fb60be82be9ecf7ef93736ae5e3cb77274e49ad"
+          }
+        },
+        {
+          "name": "outer-timeout",
+          "test": "stage_wall_timeout_kills_observed_detached_descendant",
+          "returncode": 0,
+          "elapsed_seconds": 90.06155824661255,
+          "log": {
+            "path": "/home/tim/Projects/llm-forge/.git/forge-native-gate-control-outer-timeout1.log",
+            "sha256": "696cdb73b8e7fcac1ecb33337a1570db80e681dd54c0699fbf4ab8a5f2f7b049"
+          }
+        },
+        {
+          "name": "sigterm",
+          "test": "sigterm_kills_observed_detached_descendant",
+          "returncode": 0,
+          "elapsed_seconds": 0.16389179229736328,
+          "log": {
+            "path": "/home/tim/Projects/llm-forge/.git/forge-native-gate-control-sigterm1.log",
+            "sha256": "507179eeef361edf929e712f50457f7d04dc631907e408de52de7c4b4c9e7f42"
+          }
+        }
+      ],
+      "retirement": {
+        "path": ".git/forge-native-gate-control-retirement.json",
+        "sha256": "428d028f81cb41d2408ed61b3c95d819e68642e9bf73fbb4c49992c7d3a184ca"
+      },
+      "scope": "Real strong/nonblocking, dirty-decoy blocking, inner timeout, outer timeout and SIGTERM controls. Independent fresh five-cgroup absence, five empty scratch roots and four observed PID absences. Historical ancestry/setsid/index equality are pinned fixture assertions; all evidence retained."
+    },
+    "candidate_live": {
+      "passed": 4,
+      "summary": {
+        "path": ".git/forge-native-gate-candidate-live1.json",
+        "sha256": "83ef29d119f2dcd52bbfa42c50fc7a6927687e6a2e64759316fda5a1b0a7ac13"
+      },
+      "log": {
+        "path": ".git/forge-native-gate-candidate-live1.log",
+        "sha256": "7c7ed685967dc63e0160dc67167b891b535b53a02446e90381ac54248a9ce007"
+      },
+      "scope": "Existing candidate Stage controls passed after shared refactor. Pinned test assertion execution, not independently retained fixture reconstruction."
+    }
+  },
+  "retained_failures": [
+    {
+      "log": {
+        "path": ".git/forge-native-gate-focused1.log",
+        "sha256": "11441d573c4911434971c2d6812195989ab4b91cca6043b784893b8bb1b3573c"
+      },
+      "result": "Compile refused two remaining Inputs.entries field callers; exact method migrations fixed both. Removed an unused verifier-test import."
+    },
+    {
+      "log": {
+        "path": ".git/forge-native-gate-snapshot_inputs-tests.log",
+        "sha256": "787965dc238cd677ca0c72bca308d533ab783137a4a5be31321fb07e55f9f265"
+      },
+      "result": "Three passed, one failed: implicit temporary parent permissions refused before external registry read. Explicitly set only new authored fixture roots0700; production boundary unchanged."
+    },
+    {
+      "log": {
+        "path": ".git/forge-native-gate-clippy2.log",
+        "sha256": "4c671797d5f122735b4320a161d2381b4db2f7bd1216b186c9c0c94d425e0e4b"
+      },
+      "result": "Live fixture borrow-check failure in output-limit check; compute bounded oversized predicate before mutably signalling owned Child."
+    }
+  ],
+  "independent_review": "Static cross-review of CLI/verifier/shared inputs/Stage cleared known blockers; live-control audit independently checked retained inputs/outputs and fresh cleanup. Capture comparison independently reconstructed all480rows, four receipt seals and quantiles. No unreviewed allocation clone retained; borrowed existing input map and shared record parser preserve behavior.",
+  "pending": [
+    "Full18-step local-check and fresh-head/base local-verify before publication"
+  ],
+  "limitations": [
+    "No host adoption, model token/cost or agent-task benefit established.",
+    "Exact committed workspace preimage does not authenticate guest results or external read-granted dependencies.",
+    "Synthetic private Git history differs from original commit history.",
+    "Record data is separately pinned and supplied, not authenticated historical data.",
+    "Materialized verification is cooperative with trusted parents, not hostile-same-UID race protection.",
+    "Stage deadline excludes filesystem preparation/publication.",
+    "No Make migration or live-worktree/default-changed/all parity.",
+    "Full workload CPU/RSS/allocations and cold-cache latency were not measured; single functional invocation timings have differing harness overhead.",
+    "Live test grants explicitly include broad system/dependency reads and are not a hermetic dependency closure.",
+    "The preserved Python comparator is ac7e415, not current HEAD; guest copies are byte-identical and original artifacts remain unchanged.",
+    "Raw per-call logs and retained snapshots are local .git/tmp evidence. Committed index pins them and four compact performance receipts; it is not a self-contained archive."
+  ],
+  "implementation_commit": "16b54452e416ab9e3c657c1b63371b977572caff",
+  "builds": {
+    "cli": {
+      "path": ".git/forge-native-gate-release-binary.json",
+      "sha256": "20099aeafdd80335b1158e6c97d797b2e4b103e49a1aa3099db7cb8ff80b9462"
+    },
+    "observers": {
+      "path": ".git/forge-native-gate-observer-binaries.json",
+      "sha256": "a69fe37a87f7d8d3e9e580cac76828fd7cee6725b03b22d4abdad4bfdefdd4be"
+    },
+    "cli_binary": {
+      "path": "/tmp/forge-native-gate-release-16b5445-8m_8k88j/bin/forge",
+      "sha256": "ac3c3e48dfc97c49c5a394346fee217ab39187dcc37feda7ac77d389520623b4"
+    },
+    "compiled_source_sha256": "f733c3112425dbb25c39afb3055ce5cd3635de03831f9ce90c234fc47c834e54",
+    "scope": "Clean committed release builds; private copied binaries, Rust1.98 offline/locked. No shared installation."
+  },
+  "semantic_comparison": {
+    "result": "Three complete raw comparisons matched without normalization",
+    "summary": {
+      "path": "/tmp/forge-native-gate-compare-om2t6ooe/comparison.json",
+      "sha256": "c900bc513bf43f783de23705b639b493c9839b6118aa59c48aaf7bfc49b71d8a"
+    },
+    "runner": {
+      "path": ".git/forge-native-gate-compare.py",
+      "sha256": "d7914ed68f790e82ab26f9758176a72e4af88f67644f908c9049442319446313"
+    },
+    "driver": {
+      "path": ".git/forge-native-gate-compare-driver.py",
+      "sha256": "cd3dfe467e42e18e2312a9c656a6234e8625184d12230d0958654a3bb1bfb22e"
+    },
+    "log": {
+      "path": ".git/forge-native-gate-compare1.log",
+      "sha256": "a57fa78bb38d6d2b4d9ac2c2c70c9bcb3645152ba808c9b2b0e0df91d0d77cfc"
+    },
+    "commands_completed": 96,
+    "payload_invocations_completed": 9,
+    "failed": 0,
+    "censored": 0,
+    "unstarted": 0,
+    "python_source_commit": "ac7e415108312df989ac12d5bad4797b91d7308e",
+    "guest_copies": {
+      "path": ".git/forge-native-gate-guest-copies.json",
+      "sha256": "babd05c46f109328688a6905c245f7def12d69b077a6240fdf84117ef4b6a354"
+    },
+    "private_interpreter": {
+      "path": ".git/forge-native-gate-comparator-environment.json",
+      "sha256": "bfd1e6e01641d2d3112670d2955ac201ee4169e39451aa8472e44978964c38a4"
+    },
+    "retirement": {
+      "path": ".git/forge-native-gate-control-retirement2.json",
+      "sha256": "6b95d40bf1287ff36579d4b47d072dcf3c8c71d430767a0057e0f8b93a53fdee"
+    },
+    "scenarios": [
+      {
+        "name": "strong-live",
+        "commit": "d3560584a2eeb03783d188652b7556cc571cd24c",
+        "tree": "ebc5c1e43372b543b97731fe2c64cbc2be56a86c",
+        "checks": {
+          "complete_summary": true,
+          "complete_rendered_report": true,
+          "semantic_exit": true
+        },
+        "native_exit": 0,
+        "python_semantic_exit": 0,
+        "summary": {
+          "modules_probed": 1,
+          "measured": [
+            {
+              "module": "src/probe_target.py",
+              "units": null
+            }
+          ],
+          "modules_without_drivers": [],
+          "modules_index_driven": [
+            "src/probe_target.py"
+          ],
+          "blocking": [],
+          "advisory": [],
+          "untested": [],
+          "unreached": [],
+          "incomplete": [],
+          "unmeasured": [],
+          "live": 2
+        }
+      },
+      {
+        "name": "weak-blocking",
+        "commit": "7610f5cf1caa661d7ea35fe16b3f81f0bfdd7855",
+        "tree": "7e571c426994e35fe547de9d4e4a354189cadb5f",
+        "checks": {
+          "complete_summary": true,
+          "complete_rendered_report": true,
+          "semantic_exit": true
+        },
+        "native_exit": 1,
+        "python_semantic_exit": 1,
+        "summary": {
+          "modules_probed": 1,
+          "measured": [
+            {
+              "module": "src/probe_target.py",
+              "units": null
+            }
+          ],
+          "modules_without_drivers": [],
+          "modules_index_driven": [
+            "src/probe_target.py"
+          ],
+          "blocking": [
+            {
+              "qualname": "clamp",
+              "rule": "drop_clamp_min",
+              "description": ".clamp_min(...) removed",
+              "lineno": 2,
+              "verdict": "REACHABLE_BUT_UNTESTED",
+              "calls_seen": 1,
+              "usable_calls": 1,
+              "dropped_calls": 0,
+              "max_diff_recorded": 0.0,
+              "max_diff_amplified": 1.9999999999999998e+30,
+              "amplifier": "neg",
+              "max_diff_control": 0.0,
+              "detail": "",
+              "module": "src/probe_target.py",
+              "drivers_source": "index"
+            }
+          ],
+          "advisory": [],
+          "untested": [],
+          "unreached": [],
+          "incomplete": [],
+          "unmeasured": [],
+          "live": 1
+        }
+      },
+      {
+        "name": "inner-timeout",
+        "commit": "656906a08bf95ef7bae51a6f5c2e1b80151d2337",
+        "tree": "cda401709cfa983ec53e7355f7ad0acd4cfed6cc",
+        "checks": {
+          "complete_summary": true,
+          "complete_rendered_report": true,
+          "semantic_exit": true
+        },
+        "native_exit": 0,
+        "python_semantic_exit": 0,
+        "summary": {
+          "modules_probed": 0,
+          "measured": [],
+          "modules_without_drivers": [],
+          "modules_index_driven": [
+            "src/probe_target.py"
+          ],
+          "blocking": [],
+          "advisory": [],
+          "untested": [],
+          "unreached": [],
+          "incomplete": [
+            {
+              "qualname": "src/probe_target.py",
+              "rule": "timeout",
+              "lineno": 0,
+              "verdict": "TIMEOUT",
+              "description": "probe exceeded its 0.001s budget; nothing was measured for this module",
+              "duration_s": 0.1,
+              "stderr_tail": "",
+              "module": "src/probe_target.py",
+              "drivers_source": "index"
+            }
+          ],
+          "unmeasured": [],
+          "live": 0
+        }
+      }
+    ],
+    "scope": "Same authored commit/tree, private interpreter and byte-identical guest. Actual confined normal child imports rehashed. Native JSON and human output versus old Python _gate under existing run-isolated owner. Python transport exits0 to retain actual semantic exit/artifacts; it does not turn blocking/incomplete results into PASS evidence. Python task snapshots and disposition receipts intentionally retained; native cleanup differs. Parent-present cgroup absence observations and later supervisor retirement are separate.",
+    "functional_observations": [
+      {
+        "command": "strong-live-native-json",
+        "elapsed_seconds": 0.9999418258666992,
+        "transport_exit": 0
+      },
+      {
+        "command": "strong-live-native-report",
+        "elapsed_seconds": 0.9525656700134277,
+        "transport_exit": 0
+      },
+      {
+        "command": "strong-live-python",
+        "elapsed_seconds": 1.141916275024414,
+        "transport_exit": 0
+      },
+      {
+        "command": "weak-blocking-native-json",
+        "elapsed_seconds": 1.1956636905670166,
+        "transport_exit": 1
+      },
+      {
+        "command": "weak-blocking-native-report",
+        "elapsed_seconds": 1.0060536861419678,
+        "transport_exit": 1
+      },
+      {
+        "command": "weak-blocking-python",
+        "elapsed_seconds": 1.1310431957244873,
+        "transport_exit": 0
+      },
+      {
+        "command": "inner-timeout-native-json",
+        "elapsed_seconds": 0.08155274391174316,
+        "transport_exit": 0
+      },
+      {
+        "command": "inner-timeout-native-report",
+        "elapsed_seconds": 0.08230924606323242,
+        "transport_exit": 0
+      },
+      {
+        "command": "inner-timeout-python",
+        "elapsed_seconds": 0.23855948448181152,
+        "transport_exit": 0
+      }
+    ],
+    "measurement_limit": "Single functional invocations with different wrapper/pin-check/output/retention overhead. These timings are not matched performance, cold-cache, CPU/RSS/allocations or agent benefit; those measurements are unavailable for this full workload.",
+    "independent_audit": {
+      "path": ".git/forge-native-gate-comparison-independent.json",
+      "sha256": "3e845eed8f8dc64b125adb7edd04199162f2ec1b8e4b13c1de160ed54715ca46"
+    }
+  },
+  "capture_regression": {
+    "result": "Similar observed capture cost; targets/input evidence match and no scratch activity",
+    "summary": {
+      "path": ".git/native-gate-capture-compare-3xbrvybv/summary.json",
+      "sha256": "0613bfea1c2d9f2aee957da98103fa5066884b62fce2c55a9654923964cff389"
+    },
+    "driver": {
+      "path": ".git/forge-native-gate-capture-compare.py",
+      "sha256": "3b94e5f1b48b5a9f12c06523222a388127e4ae5269fd1ad110ddb7a5a14eb27d"
+    },
+    "independent_audit": {
+      "path": ".git/forge-native-gate-capture-independent.json",
+      "sha256": "98abc20180e2a177c0a1db60963c2b17b849ba48b71e518489f5274de62b240c"
+    },
+    "arms": {
+      "reference_8dbdc85": {
+        "binary": "/home/tim/Projects/llm-forge/.git/capture-current-8dbdc85-oxdjdb3g/unit-tests",
+        "sha256": "65757d1c88658e2d21fab5db8b787e9d764ace04d3279b012c44dfe60be16caa",
+        "head": "8dbdc85166a853c5e47b51e1ead18ecfceebd8ce",
+        "tree": "a589120df763f60973b455388bed485e4824cef7"
+      },
+      "candidate_16b5445": {
+        "binary": "/home/tim/Projects/llm-forge/.git/native-gate-observers-16b5445-bgdha2u6/forge",
+        "sha256": "cbed711cc16fd47412ccf3d30fc555c81cdde3b290d2c7af6d5d8542ae8131dc",
+        "head": "16b54452e416ab9e3c657c1b63371b977572caff",
+        "tree": "ca3667c773b7895799aa0bb394f5cdd05da2b69e"
+      }
+    },
+    "accounting": {
+      "completed_blocks": 4,
+      "failed_blocks": 0,
+      "censored_or_unknown_blocks": 0,
+      "unstarted_blocks": 0
+    },
+    "scored": 400,
+    "warmups": 80,
+    "receipts": [
+      {
+        "path": "research/performance/forge-program-20261106-committed-equivalence-capture-0.json",
+        "sha256": "9bf667d29f10a243812fac5d363c32b5e7827504adbc0806f919bd863259bd1b"
+      },
+      {
+        "path": "research/performance/forge-program-20261106-committed-equivalence-capture-1.json",
+        "sha256": "ba05b62b4cb28631b056df2a193bdd93eb668f5c3058b077e96b615618451bca"
+      },
+      {
+        "path": "research/performance/forge-program-20261106-committed-equivalence-capture-2.json",
+        "sha256": "88e31be423c81f701b756708298fa55f744a83f01e04263ff2fd537625415a76"
+      },
+      {
+        "path": "research/performance/forge-program-20261106-committed-equivalence-capture-3.json",
+        "sha256": "e302f3fcceff28caf71a450ed2c033e0fd88934d5321ef81e7014a3f3666d0e4"
+      }
+    ],
+    "fixture_identity": {
+      "reference_full_sha256": "18f287850040ef8830b28387cf8da3523b941098561bfa2803315d2f41ac52c3",
+      "candidate_full_sha256": "81fc84e337cb9e1d5d0a5482295c992e3cdfee06e58903b42d38b1c911ad6e29",
+      "original_complete_file_bytes_unchanged_prefix": true,
+      "original_prefix_bytes": 14694
+    },
+    "aggregate": [
+      {
+        "auxiliary_files": 0,
+        "arms": {
+          "reference_8dbdc85": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 0.245051,
+            "p95_ms": 0.268611,
+            "min_ms": 0.233871,
+            "max_ms": 0.273381,
+            "scratch_events_per_capture": 0
+          },
+          "candidate_16b5445": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 0.240391,
+            "p95_ms": 0.258652,
+            "min_ms": 0.230811,
+            "max_ms": 0.479302,
+            "scratch_events_per_capture": 0
+          }
+        }
+      },
+      {
+        "auxiliary_files": 1000,
+        "arms": {
+          "reference_8dbdc85": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 2.127811,
+            "p95_ms": 2.16973,
+            "min_ms": 2.08413,
+            "max_ms": 2.420402,
+            "scratch_events_per_capture": 0
+          },
+          "candidate_16b5445": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 2.140081,
+            "p95_ms": 2.212542,
+            "min_ms": 2.09645,
+            "max_ms": 2.595013,
+            "scratch_events_per_capture": 0
+          }
+        }
+      }
+    ],
+    "scope": "ABBA four blocks, five fresh test processes each; 480 captures, 400 scored +80 warm. Original benchmark and helpers unchanged byte prefix; semantic input/target/evidence parity and zero scratch events mandatory. Inner timers are capture-only warmed in-process calls; automatic native receipts measure whole test process including fixture setup, executable hashing, assertions, disposal and shell, so outer CPU/RSS is not inner capture usage. Current source pins describe current workload, not reference compiled source. Same recorded compiler/profile/features; current build lacks complete captured ambient build environment, so no full build-environment equivalence claim. No guest, mutation engine, end-to-end review, cold-cache, task/agent benefit or authenticated producer claim."
+  },
+  "reproduction": {
+    "release": "cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --lib equivalence",
+    "capture": "cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --lib candidate_equivalence_inputs::capture_tests::benchmark_no_record_capture_small_and_large -- --exact --ignored --nocapture --test-threads=1",
+    "live": "With explicit owned FORGE_TEST_BIN, FORGE_TEST_PYTHON, FORGE_TEST_SLOP_EXTENSION, FORGE_TEST_SLOP_SHA256 and delegated FORGE_TEST_CGROUP_PARENT: cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --test equivalence_gate_live -- --ignored --nocapture --test-threads=1",
+    "live_prerequisites": "Private operator-owned roots, CPU torch+pytest, Linux cgroup/Landlock/seccomp prerequisites; read native/forge/tests/equivalence_gate_live.rs for exact fixture contract and cleanup observations."
+  }
+}

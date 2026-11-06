@@ -263,6 +263,8 @@ pub mod equivalence_backlog;
 #[cfg(target_os = "linux")]
 mod equivalence_backlog_inputs;
 #[cfg(target_os = "linux")]
+pub mod equivalence_gate;
+#[cfg(target_os = "linux")]
 pub mod mutation_attribution;
 #[cfg(target_os = "linux")]
 pub mod mutation_bytecode;
@@ -333,6 +335,8 @@ pub(crate) mod mutation_workspace_metadata;
 pub(crate) mod mutation_workspace_policy;
 #[cfg(target_os = "linux")]
 pub mod mutation_write;
+#[cfg(target_os = "linux")]
+mod snapshot_inputs;
 
 #[cfg(target_os = "linux")]
 pub mod graph_test_select;

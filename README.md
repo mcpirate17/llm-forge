@@ -142,7 +142,8 @@ that need your workload's inputs, and missing comparisons.
 [Code tools](docs/native-code-tools.md) · [Search](docs/native-code-search.md) ·
 [Context budgets](docs/native-context.md) · [Persistent execution](docs/native-execution.md) ·
 [Candidate review](docs/native-candidate-review.md) · [Workspace hygiene](docs/native-workspace-hygiene.md) ·
-[Checkout preservation](docs/native-checkout-sync.md)
+[Checkout preservation](docs/native-checkout-sync.md) ·
+[Committed equivalence gate](docs/equivalence-gate.md) · [Evidence backlog](docs/equivalence-backlog.md)
 
 Forge's native runtime is usable while some interpreted maintenance adapters and
 host integrations remain in migration. Native graph seeding is still prerequisite

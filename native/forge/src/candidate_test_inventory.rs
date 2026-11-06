@@ -15,7 +15,7 @@ pub(super) fn python_tests(inputs: &Inputs<'_>, needed: bool) -> Result<Vec<Stri
         return Ok(Vec::new());
     }
     let mut selected = Vec::new();
-    for entry in inputs.entries.values() {
+    for entry in inputs.entries().values() {
         if entry.path.ends_with(".py") && conductor_native::graph_context::is_test_path(&entry.path)
         {
             ensure!(
@@ -41,7 +41,7 @@ fn owner(inputs: &Inputs<'_>, path: &str) -> Option<String> {
         } else {
             format!("{root}/Cargo.toml")
         };
-        if inputs.entries.contains_key(&manifest) {
+        if inputs.entries().contains_key(&manifest) {
             return Some(root.to_owned());
         }
         parent = directory.parent();
@@ -63,11 +63,11 @@ pub(super) fn rust_tests(
         roots.len() <= 256
             && roots
                 .len()
-                .checked_mul(inputs.entries.len())
+                .checked_mul(inputs.entries().len())
                 .is_some_and(|n| n <= 10_000_000),
         "Rust test inventory exceeds work limit"
     );
-    let path_work = inputs.entries.keys().try_fold(0usize, |sum, path| {
+    let path_work = inputs.entries().keys().try_fold(0usize, |sum, path| {
         let depth = path.bytes().filter(|b| *b == b'/').count() + 1;
         sum.checked_add(
             path.len()
@@ -130,7 +130,7 @@ fn rust_tests_in_crate(inputs: &mut Inputs<'_>, root: &str) -> Result<Vec<String
         format!("{root}/")
     };
     let files = inputs
-        .entries
+        .entries()
         .keys()
         .filter(|path| {
             path.starts_with(&prefix)
@@ -172,10 +172,10 @@ fn registry(
     inputs: &mut Inputs<'_>,
     external: Option<(&std::path::Path, &str)>,
 ) -> Result<Option<Registry>> {
-    if !inputs.entries.contains_key(REGISTRY) {
+    if !inputs.entries().contains_key(REGISTRY) {
         inputs.absent(REGISTRY)?;
         ensure!(
-            !inputs.entries.contains_key(EXTENSION),
+            !inputs.entries().contains_key(EXTENSION),
             "orphaned candidate contract registry extension"
         );
         inputs.absent(EXTENSION)?;
@@ -194,7 +194,7 @@ fn registry(
     if base.lines().any(|line| line == DIRECTIVE) {
         base.push('\n');
         base.push_str(inputs.read(EXTENSION)?);
-    } else if inputs.entries.contains_key(EXTENSION) {
+    } else if inputs.entries().contains_key(EXTENSION) {
         anyhow::bail!("contract registry extension exists but is not declared");
     } else {
         inputs.absent(EXTENSION)?;
@@ -219,7 +219,7 @@ pub(super) fn contracts(
     };
     let registered: BTreeSet<String> = registry.targets().map(str::to_owned).collect();
     let mut all = registered.clone();
-    for path in inputs.entries.keys() {
+    for path in inputs.entries().keys() {
         if let Some(name) = path
             .strip_prefix(&format!("{TEST_DIR}/"))
             .and_then(|name| name.strip_suffix(".rs"))
@@ -292,13 +292,13 @@ pub(super) fn contracts(
 fn validate_changed_registries(inputs: &mut Inputs<'_>, changes: &[String]) -> Result<()> {
     if changes.iter().any(|path| path == REGISTRY) {
         ensure!(
-            inputs.entries.contains_key(REGISTRY),
+            inputs.entries().contains_key(REGISTRY),
             "changed candidate contract registry is missing"
         );
     }
     if changes.iter().any(|path| path == EXTENSION) {
         ensure!(
-            inputs.entries.contains_key(REGISTRY) && inputs.entries.contains_key(EXTENSION),
+            inputs.entries().contains_key(REGISTRY) && inputs.entries().contains_key(EXTENSION),
             "changed candidate contract registry extension is missing"
         );
         ensure!(

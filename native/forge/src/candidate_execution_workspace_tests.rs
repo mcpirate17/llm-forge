@@ -768,3 +768,15 @@ fn separate_stage_workspaces_do_not_share_candidate_writes() {
     assert!(!probe_scratch.exists());
     assert!(!review_scratch.exists());
 }
+
+#[test]
+fn explicit_materialized_verification_checks_workspace_before_payload() {
+    let f = Fixture::new();
+    let source = f.source();
+    let workspace = Workspace::new(&source, &f.tree(), &f.grants()).unwrap();
+    workspace.verify_materialized(&source).unwrap();
+    fs::create_dir(workspace.path().join("extra-empty")).unwrap();
+    assert!(workspace.verify_materialized(&source).is_err());
+    // Verification is opt-in; the owned workspace can still dispose mutated payloads.
+    workspace.discard().unwrap();
+}

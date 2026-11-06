@@ -24,7 +24,7 @@ pub(crate) fn registry(
 }
 pub(crate) fn registry_at(capture: &mut Capture<'_>, path: &str) -> Result<Option<Registry>> {
     let path = normalize(path)?;
-    if !capture.inputs.entries.contains_key(&path) {
+    if !capture.inputs.entries().contains_key(&path) {
         capture.inputs.absent(&path)?;
         return Ok(None);
     }
@@ -34,7 +34,7 @@ pub(crate) fn registry_at(capture: &mut Capture<'_>, path: &str) -> Result<Optio
         .unwrap_or(Path::new(""))
         .join("registry.d");
     let fragments = direct_json(
-        &capture.inputs.entries,
+        capture.inputs.entries(),
         directory
             .to_str()
             .context("fragment directory must be UTF-8")?,
@@ -108,7 +108,7 @@ pub(crate) fn catalog(
     let mut seen = BTreeSet::new();
     for dir in dirs {
         let dir = engine::normalize_path(&dir).map_err(anyhow::Error::msg)?;
-        for path in direct_json(&capture.inputs.entries, &dir)? {
+        for path in direct_json(capture.inputs.entries(), &dir)? {
             if !seen.insert(path.clone()) {
                 continue;
             }
@@ -140,7 +140,7 @@ pub(crate) fn catalog(
 }
 fn campaign(capture: &mut Capture<'_>, path: &str, selected: &[String]) -> Result<(Value, Value)> {
     let path = engine::normalize_path(path).map_err(anyhow::Error::msg)?;
-    if !capture.inputs.entries.contains_key(&path) {
+    if !capture.inputs.entries().contains_key(&path) {
         capture.inputs.absent(&path)?;
         anyhow::bail!("registered campaign is absent: {path}");
     }
@@ -201,7 +201,7 @@ fn campaign(capture: &mut Capture<'_>, path: &str, selected: &[String]) -> Resul
         if files.contains_key(&input) {
             continue;
         }
-        if capture.inputs.entries.contains_key(&input) {
+        if capture.inputs.entries().contains_key(&input) {
             files.insert(input.clone(), capture.read(&input, 2 * 1024 * 1024)?);
         } else {
             capture.inputs.absent(&input)?;

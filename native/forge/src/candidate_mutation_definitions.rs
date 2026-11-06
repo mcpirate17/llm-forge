@@ -71,7 +71,7 @@ pub(super) fn grandfather(
         .filter(|v| !v.is_empty() && v.len() <= 256 && !v.chars().any(char::is_control))
         .context("grandfather inventory milestone missing or invalid")?;
     let present: Vec<_> = inputs
-        .entries
+        .entries()
         .iter()
         .filter(|(_, entry)| {
             entry.object_type == "blob" && matches!(entry.mode.as_str(), "100644" | "100755")
@@ -173,7 +173,7 @@ fn definitions(
 }
 fn rust_files(inputs: &mut Inputs<'_>) -> Result<BTreeMap<PathBuf, Vec<u8>>> {
     let paths: Vec<_> = inputs
-        .entries
+        .entries()
         .keys()
         .filter(|path| {
             path.ends_with(".rs")

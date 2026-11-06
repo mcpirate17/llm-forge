@@ -238,7 +238,7 @@ pub(crate) fn capture_baseline(
     capture: &mut Capture<'_>,
     path: &str,
 ) -> Result<Option<serde_json::Value>> {
-    if capture.inputs.entries.contains_key(path) {
+    if capture.inputs.entries().contains_key(path) {
         Ok(Some(capture.json(path)?))
     } else {
         capture.inputs.absent(path)?;

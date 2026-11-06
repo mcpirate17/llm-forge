@@ -37,7 +37,7 @@ impl CorpusInputs for Capture<'_> {
     }
     fn present(&mut self, path: &str) -> Result<bool> {
         crate::candidate_source::safe_path(path.as_bytes())?;
-        if self.inputs.entries.contains_key(path) {
+        if self.inputs.entries().contains_key(path) {
             Ok(true)
         } else {
             self.inputs.absent(path)?;

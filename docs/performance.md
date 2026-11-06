@@ -34,7 +34,19 @@ retains binary/build pins, raw observations and four independently verified rece
 The two command identities differ; this is a matched fixture comparison. Those outer
 receipts include executable hashing, fixture setup, assertions, disposal and shell
 startup; their CPU/RSS do not measure capture alone. No guest, complete-review,
-model or agent-task gain is established. Full publication validation remains pending.
+model or agent-task gain is established. All 18 publication checks and fresh-base
+verification passed before PR #223 merged with the exact checked tree.
+
+### Committed-module gate — 2026-11-06
+
+Release `16b5445` passed five standalone lifecycle and four candidate Stage controls.
+Three fixtures matched Python's complete summaries, reports and enforcement exits;
+these are functional comparisons, not speedups. All 480 shared-capture observations
+(400 scored/80 warm) retained exact inputs, targets and zero scratch activity.
+Reference/current p50/p95 ms: **0.245051/0.268611 → 0.240391/0.258652** (0 extra files),
+**2.127811/2.169730 → 2.140081/2.212542** (1,000 files): similar observed cost.
+Four ABBA blocks preserve the benchmark body. [Receipts and audits](../research/performance/forge-program-20261106-committed-equivalence.json) bind compiled identities.
+Outer CPU/RSS includes setup/hashing; full-workload usage, cold-cache latency and agent benefit are unmeasured.
 
 ### Confined MCP test report — 2026-11-06
 
@@ -1227,19 +1239,12 @@ Baseline/final result JSON SHA-256:
 
 ## Confined Fest validation — 2026-11-06
 
-Implementation release `c8722ce` passed both observer tests: strong/weak in 16.31
-seconds and collection-error in 8.20 seconds. These single functional-control
-timings include a debug harness and are not benchmark comparisons. Strong produced
-`PASS` (3/3 kills attributed), weak `RATCHET_HELD` (2 kills, 1 survivor), and
-collection `ERROR` (3 engine-classified kills, none attributed). Independent audit
-confirmed all 20 command cgroups, three snapshots and three caches absent before
-supervisor retirement. Native export matched 1,302 entries and refused overwrite.
-
-A 31-command freshness probe accepted the original receipt, rejected an admitted
-`.json` addition live and committed, and accepted restoration. The earlier excluded
-`.txt` probe, six failed mutation observer runs and failed first gate remain recorded.
-The same-size mutant was witnessed at an imposed mtime; its default return stayed 7.
-The full 18-step gate passed at `c8722ce`: 4,956 successful executions, zero failures,
-200 ignored across 182 harnesses, followed by exact-head/current-base verification.
-The [evidence index](../research/performance/forge-program-20261106-confined-fest.json)
-retains identities and limits; no agent-task, token-cost or installation benefit is inferred.
+Release `c8722ce` strong/weak controls took 16.31 s; collection-error took 8.20 s.
+These debug-observer timings are not benchmarks: strong PASS (3 attributed kills),
+weak RATCHET_HELD (2 kills/1 survivor), collection ERROR (3 classifications/no attribution).
+Audit verified 20 cgroups, three snapshots/caches absent; export matched 1,302 entries.
+The 31-command probe rejected live/committed admitted additions and accepted restoration.
+The [evidence index](../research/performance/forge-program-20261106-confined-fest.json) retains the excluded .txt probe,
+six failed observers, first gate failure and same-size/mtime control. The full 18-check
+PASS counted 4,956 successes, zero failures, 200 ignored across 182 harnesses, then
+exact-head/base verification. No agent, token-cost or installation benefit inferred.

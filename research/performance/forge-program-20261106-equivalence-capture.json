@@ -4,7 +4,7 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/222",
   "base_commit": "b34f6b37c552f386ee4cc33641e93d5cc482121d",
-  "status": "matched_capture_improvement_and_independent_audit_passed_full_gate_pending",
+  "status": "merged_with_exact_checked_tree",
   "scope": "No-record target capture reuses the existing captured review snapshot without creating an unused full execution workspace. Record-present copying and later guest Stage admission are unchanged.",
   "baseline_verification": {
     "original_capture_tests": {
@@ -200,7 +200,130 @@
       }
     ]
   },
-  "full_local_check": "PENDING final optimized source and evidence head",
+  "full_local_check": {
+    "receipt": ".git/forge-checks/run-1793995202733407749-2830613/receipt.json",
+    "receipt_sha256": "96744366f8d66b13d62ad9a380f0cf374f26d7bb52c3b24c276463a4e758434a",
+    "head": "3d8ae38888ca0aa3f64158004191c808a45b6110",
+    "tree": "e69fa6a5eecb69a0ec980f89e40657d8d2f91fa8",
+    "base": "b34f6b37c552f386ee4cc33641e93d5cc482121d",
+    "steps": [
+      {
+        "name": "resource-preflight",
+        "verdict": "passed",
+        "log_sha256": "18f2de305e7c58e80a0884f44117dcf7a60063830885ffcaf5b32035184623e3",
+        "harnesses": 0
+      },
+      {
+        "name": "install",
+        "verdict": "passed",
+        "log_sha256": "b86d1f9bd74573b863961f140f5504de1b8928d1a634084a37ec477ca51bf592",
+        "harnesses": 0
+      },
+      {
+        "name": "git-diff-check",
+        "verdict": "passed",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnesses": 0
+      },
+      {
+        "name": "installed-runtime",
+        "verdict": "passed",
+        "log_sha256": "e441401e0a19c8c2bc09fb7e1dcd7ac37f4f22ef40e1e529012281cd85dadd8e",
+        "harnesses": 1
+      },
+      {
+        "name": "rust-forge-format",
+        "verdict": "passed",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-forge-clippy",
+        "verdict": "passed",
+        "log_sha256": "c634efc0b7994784f3af637269bb831eb481106c0103ce861a8ddbcd03821430",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-forge-tests",
+        "verdict": "passed",
+        "log_sha256": "4cc63d52a86468239ef06fc43f921839cb546063662803f33414c6c122dc0167",
+        "harnesses": 152
+      },
+      {
+        "name": "rust-conductor-format",
+        "verdict": "passed",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-conductor-clippy",
+        "verdict": "passed",
+        "log_sha256": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-conductor-tests",
+        "verdict": "passed",
+        "log_sha256": "f60e15c34ab7ca316206154d1903638f6eafcdf34524aae30a9e5f914e81ca58",
+        "harnesses": 23
+      },
+      {
+        "name": "native-contract-registry",
+        "verdict": "passed",
+        "log_sha256": "6e7a8e1ebaa4177034acb0bd9b3b3243a9c3c2831f0da05921bc1040c3c47883",
+        "harnesses": 2
+      },
+      {
+        "name": "rust-slop-format",
+        "verdict": "passed",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-slop-clippy",
+        "verdict": "passed",
+        "log_sha256": "736e2582f563605dd272e5fb977840b0c0767377d27b6940c440caf75eec7157",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-slop-tests",
+        "verdict": "passed",
+        "log_sha256": "041db96f54aec9d23503fe46e401a3d1aa5ddacb9fc995aff7167b2f04a1f955",
+        "harnesses": 2
+      },
+      {
+        "name": "rust-product-value-format",
+        "verdict": "passed",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-product-value-clippy",
+        "verdict": "passed",
+        "log_sha256": "ee1d3fffa2022e962e63e0dbe4d35c9c198450a20c29fc09030f635dbb38bfcd",
+        "harnesses": 0
+      },
+      {
+        "name": "rust-product-value-tests",
+        "verdict": "passed",
+        "log_sha256": "7c2a593abc22f7cca242c6f202ff05a7eaa10db5060ec66b1b6bae0283346114",
+        "harnesses": 3
+      },
+      {
+        "name": "rust-dependency-audit",
+        "verdict": "passed",
+        "log_sha256": "ad1e8b98818c74f8a99d8cbaf87eca0dc1159b969067b84e457a39eaa8d3591d",
+        "harnesses": 0
+      }
+    ],
+    "test_executions": {
+      "passed": 5051,
+      "failed": 0,
+      "ignored": 204
+    },
+    "harnesses": 183,
+    "scope": "Summed test-result lines, includes repeated feature-matrix executions, not unique tests."
+  },
   "limitations": [
     "In-process capture cost is not total candidate review or guest latency.",
     "No new model-token, task-success, CPU/RSS/allocation or host-adoption evidence.",
@@ -234,5 +357,18 @@
     "sha256": "7f53ca9a75e2ec856f5f9adf53398dd4858242c09e3a9be0d6e7f952ac334531",
     "result": "No discrepancy across four seals/pins, twenty logs, 480 inner rows, exact patch/build/binary identities, targets/input trees and scratch controls; recomputed all p50/p95. Integrity is not producer authentication."
   },
-  "prelaunch_review": "Recorder minimum is five samples; the initial one-sample design was corrected before execution. No one-sample attempt or receipt exists."
+  "prelaunch_review": "Recorder minimum is five samples; the initial one-sample design was corrected before execution. No one-sample attempt or receipt exists.",
+  "integration": {
+    "pr": 223,
+    "issue": 222,
+    "head": "3d8ae38888ca0aa3f64158004191c808a45b6110",
+    "merge": "551a506b49190059cb63d491340a73842b1a3119",
+    "tree": "e69fa6a5eecb69a0ec980f89e40657d8d2f91fa8",
+    "identical_tree": true,
+    "source_entries_preserved": 1481,
+    "agent_trailer": true,
+    "receipt": ".git/forge-checks/run-1793995202733407749-2830613/receipt.json",
+    "receipt_sha256": "96744366f8d66b13d62ad9a380f0cf374f26d7bb52c3b24c276463a4e758434a"
+  },
+  "local_verify": "PASS twice with fresh origin/main b34f6b37c552f386ee4cc33641e93d5cc482121d before PR223 merge"
 }

@@ -122,7 +122,7 @@ fn read(
 ) -> Result<Vec<u8>> {
     let bytes = inputs.read_bytes_with_limit(path, limit)?.to_vec();
     let oid = &inputs
-        .entries
+        .entries()
         .get(path)
         .context("captured evidence entry missing")?
         .oid;
