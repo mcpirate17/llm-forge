@@ -132,9 +132,12 @@ would otherwise combine files that Git treats differently.
 
 The Python `conductor.dead_tests` API remains for host compatibility and delegates
 classification to the same Rust implementation. Its legacy collector and human
-summary remain distinct. This report is not yet exposed through MCP: external Git
-metadata/configuration admission and whole-operation cancellation need a service
-boundary before it can use the harness's source-root capability safely.
+summary remain distinct. The optional operator-enabled `python_test_report`
+harness tool exposes the same advisory envelope for the exact configured root,
+without artifact publication; see [the capability and cancellation
+boundary](native-harness.md#optional-python-test-report). Its isolated worker
+has a child deadline; filesystem setup and verification remain cooperative.
+This interface does not establish use by an external coding client.
 
 ## Ablation proposals
 

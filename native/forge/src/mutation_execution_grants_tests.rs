@@ -323,3 +323,169 @@ fn a_file_grant_can_bind_a_single_executable_and_detect_replacement() {
     fs::copy(f.path("tools/old"), f.path("tools/cargo")).unwrap();
     assert!(grants.verify().is_err());
 }
+
+#[test]
+fn report_binding_avoids_git_config_parsing_and_refuses_linked_metadata() {
+    let f = Fixture::new();
+    fs::write(f.path("repo/.git/config"), b"invalid [ git configuration").unwrap();
+    let reads = vec![f.path("tools")];
+    let hash = f.document["programs"]["cargo"]["sha256"].as_str().unwrap();
+    let held = OutboundBindings::capture_report(
+        &f.path("tools/cargo"),
+        hash,
+        &reads,
+        &f.path("repo"),
+        &f.path("scratch"),
+        &reads,
+    )
+    .unwrap();
+    held.verify().unwrap();
+    fs::write(f.path("tools/cargo"), b"changed executable").unwrap();
+    assert!(held.verify().is_err());
+    fs::write(f.path("tools/cargo"), b"fixture executable; never launched").unwrap();
+    let held = OutboundBindings::capture_report(
+        &f.path("tools/cargo"),
+        hash,
+        &reads,
+        &f.path("repo"),
+        &f.path("scratch"),
+        &reads,
+    )
+    .unwrap();
+    fs::remove_dir_all(f.path("repo/.git")).unwrap();
+    fs::write(f.path("repo/.git"), b"gitdir: ../elsewhere\n").unwrap();
+    assert!(held.verify().is_err());
+    assert!(OutboundBindings::capture_report(
+        &f.path("tools/cargo"),
+        hash,
+        &reads,
+        &f.path("repo"),
+        &f.path("scratch"),
+        &reads
+    )
+    .is_err());
+    fs::remove_file(f.path("repo/.git")).unwrap();
+    symlink(f.path("tools"), f.path("repo/.git")).unwrap();
+    assert!(OutboundBindings::capture_report(
+        &f.path("tools/cargo"),
+        hash,
+        &reads,
+        &f.path("repo"),
+        &f.path("scratch"),
+        &reads
+    )
+    .is_err());
+}
+
+#[test]
+fn report_data_directories_allow_group_write_but_parent_and_identity_remain_strict() {
+    let f = Fixture::new();
+    fs::write(f.path("repo/.git/config"), b"invalid [ git configuration").unwrap();
+    for path in ["repo", "repo/.git"] {
+        fs::set_permissions(f.path(path), fs::Permissions::from_mode(0o775)).unwrap();
+    }
+    let reads = vec![f.path("tools")];
+    let hash = f.document["programs"]["cargo"]["sha256"].as_str().unwrap();
+    let capture = || {
+        OutboundBindings::capture_report(
+            &f.path("tools/cargo"),
+            hash,
+            &reads,
+            &f.path("repo"),
+            &f.path("scratch"),
+            &reads,
+        )
+    };
+    let held = capture().unwrap();
+    held.verify().unwrap();
+    fs::set_permissions(f.path("repo/.git"), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(
+        held.verify().is_err(),
+        "Git data directory mode drift must refuse"
+    );
+    let held = capture().unwrap();
+    fs::set_permissions(f.root.path(), fs::Permissions::from_mode(0o775)).unwrap();
+    assert!(
+        capture().is_err(),
+        "group-writable source parent must be refused"
+    );
+    assert!(
+        held.verify().is_err(),
+        "source ancestor drift must be refused"
+    );
+    fs::set_permissions(f.root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let held = capture().unwrap();
+    fs::rename(f.path("repo"), f.path("old-repo")).unwrap();
+    fs::create_dir(f.path("repo")).unwrap();
+    fs::create_dir(f.path("repo/.git")).unwrap();
+    assert!(
+        held.verify().is_err(),
+        "replacement source root must be refused"
+    );
+}
+
+#[test]
+fn exact_large_executable_uses_program_pin_without_weakening_data_limit() {
+    let f = Fixture::new();
+    git2::Repository::init(f.path("repo")).unwrap();
+    let path = f.path("tools/cargo");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&path)
+        .unwrap();
+    file.set_len(MAX_READ_FILE_BYTES as u64 + 1).unwrap();
+    drop(file);
+    let hash = crate::candidate_engine_identity::executable_file(
+        fs::File::open(&path).unwrap(),
+        || Ok(()),
+    )
+    .unwrap()
+    .sha256;
+    let reads = vec![path.clone()];
+    let bind = |report: bool, granted: &[PathBuf], pin: &str| {
+        if report {
+            OutboundBindings::capture_report(
+                &path,
+                pin,
+                granted,
+                &f.path("repo"),
+                &f.path("scratch"),
+                granted,
+            )
+        } else {
+            OutboundBindings::capture(
+                &path,
+                pin,
+                granted,
+                &[],
+                &f.path("repo"),
+                &f.path("scratch"),
+                granted,
+            )
+        }
+    };
+    for report in [true, false] {
+        let held = bind(report, &reads, &hash).unwrap();
+        held.verify().unwrap();
+        assert!(bind(report, &reads, &"0".repeat(64)).is_err());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(held.verify().is_err());
+        assert!(bind(report, &reads, &hash).is_err());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let data = f.path("tools/data");
+    let file = fs::File::create(&data).unwrap();
+    file.set_len(MAX_READ_FILE_BYTES as u64 + 1).unwrap();
+    fs::set_permissions(&data, fs::Permissions::from_mode(0o600)).unwrap();
+    let grants = vec![path.clone(), data];
+    for report in [true, false] {
+        let error = bind(report, &grants, &hash)
+            .err()
+            .expect("oversized data grant must refuse");
+        assert!(
+            format!("{error:#}").contains("bound"),
+            "unexpected refusal: {error:#}"
+        );
+    }
+}

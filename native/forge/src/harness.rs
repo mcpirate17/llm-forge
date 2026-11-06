@@ -22,6 +22,8 @@ mod source;
 pub(crate) mod state;
 #[path = "harness_terminal.rs"]
 mod terminal;
+#[path = "harness_test_report.rs"]
+mod test_report;
 #[path = "harness_transport.rs"]
 pub mod transport;
 #[path = "harness_workspace.rs"]
@@ -45,6 +47,7 @@ pub struct Harness {
     context: context::Contexts,
     workspace: workspace::Workspace,
     outbound: Option<outbound::Outbound>,
+    reports: Option<test_report::Reports>,
     fatal: watch::Receiver<Option<String>>,
     stopping: Arc<AtomicBool>,
 }
@@ -70,6 +73,8 @@ impl Harness {
         let stopping = Arc::new(AtomicBool::new(false));
         let outbound =
             outbound::Outbound::new(&policy, &state.root, parent.clone(), stopping.clone())?;
+        let reports =
+            test_report::Reports::new(&policy, &state.root, parent.clone(), stopping.clone())?;
         let terminals = Arc::new(terminal::Terminals::new(
             policy.clone(),
             Arc::new(state),
@@ -91,6 +96,7 @@ impl Harness {
             context,
             workspace,
             outbound,
+            reports,
             fatal,
             stopping,
         })
@@ -104,6 +110,16 @@ impl Harness {
     }
 
     pub async fn call(&self, input: &str, repair: bool) -> Result<Value> {
+        let call = self.prepare_call(input, repair)?;
+        let (_cancel, cancelled) = watch::channel(false);
+        self.execute_call(&call, cancelled).await
+    }
+
+    fn prepare_call<'r, 'i>(
+        &'r self,
+        input: &'i str,
+        repair: bool,
+    ) -> Result<crate::tool_schema::ValidatedCall<'r, 'i>> {
         ensure!(
             !self.stopping.load(Ordering::Acquire),
             "harness is stopping"
@@ -112,11 +128,25 @@ impl Harness {
             self.fatal.borrow().is_none(),
             "harness persistence/ownership failed"
         );
-        let call = self
-            .registry
+        self.registry
             .validate_call(input, repair)
-            .context("invalid tool call")?;
-        let result = self.dispatch(&call).await?;
+            .context("invalid tool call")
+    }
+
+    async fn execute_call(
+        &self,
+        call: &crate::tool_schema::ValidatedCall<'_, '_>,
+        cancelled: watch::Receiver<bool>,
+    ) -> Result<Value> {
+        let result = if call.name() == "python_test_report" {
+            self.reports
+                .as_ref()
+                .context("test report capability unavailable")?
+                .call(call.arguments(), cancelled)
+                .await?
+        } else {
+            self.dispatch(call).await?
+        };
         Ok(json!({"result":result,"repaired":call.repaired()}))
     }
 

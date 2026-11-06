@@ -264,3 +264,37 @@ fn registry_annotations_are_optional_strict_boolean_metadata_without_defaults() 
     );
     assert!(ToolRegistry::from_json(&duplicate).is_err());
 }
+
+#[test]
+fn report_tool_is_opt_in_and_accepts_only_bounded_output_budget() {
+    let mut p = policy();
+    assert!(!catalog(&p)["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|t| t["name"] == "python_test_report"));
+    p.test_report = Some(
+        serde_json::from_value(json!({
+            "executable":{"path":"/opt/forge","sha256":"a".repeat(64)},
+            "read_only":["/opt"],"resources":{"cpu_millis":100,"memory_mib":128,"processes":8},
+            "max_wall_seconds":10,"max_output_bytes":4096
+        }))
+        .unwrap(),
+    );
+    let registry = registry(&p);
+    let call = |args: Value| json!({"name":"python_test_report","arguments":args}).to_string();
+    assert!(registry
+        .validate_call(&call(json!({"max_output_bytes":512})), false)
+        .is_ok());
+    assert!(registry
+        .validate_call(&call(json!({"max_output_bytes":4096})), false)
+        .is_ok());
+    for args in [
+        json!({}),
+        json!({"max_output_bytes":511}),
+        json!({"max_output_bytes":4097}),
+        json!({"max_output_bytes":512,"path":"/tmp"}),
+    ] {
+        assert!(registry.validate_call(&call(args), false).is_err());
+    }
+}

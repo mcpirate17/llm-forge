@@ -48,7 +48,12 @@ pub enum Action {
     Ignore,
     Cancel(String),
     Reply(Value),
-    Forward { id: Value, era: Era, bytes: Vec<u8> },
+    Forward {
+        id: Value,
+        era: Era,
+        bytes: Vec<u8>,
+        cancel_on_disconnect: bool,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -251,7 +256,12 @@ impl Protocol {
                 Action::Reply(success(id, era, result))
             }
             "tools/call" => match self.call(&params) {
-                Ok(bytes) => Action::Forward { id, era, bytes },
+                Ok(bytes) => Action::Forward {
+                    id,
+                    era,
+                    bytes,
+                    cancel_on_disconnect: params.name.as_deref() == Some("python_test_report"),
+                },
                 Err(error) => {
                     let unknown = params.name.as_ref().is_some_and(|name| {
                         !self.catalog["tools"]

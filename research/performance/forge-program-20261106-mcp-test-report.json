@@ -1,0 +1,414 @@
+{
+  "schema": "forge.mcp-test-report.evidence.v1",
+  "status": "Live protocol/shutdown/error controls and performance observation independently audited; final committed-tree publication gate pending at index assembly.",
+  "scope": "Operator-enabled fixed-root native Python import report through MCP. Authored repository correctness and lifecycle evidence; no external-client or agent-productivity claim.",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/212",
+  "implementation": {
+    "initial_commit": "93632cfbf7a010e7881d388d1f39693f51a789ae",
+    "fixed_release": {
+      "scope": "clean committed build and private copy; not global installation or adoption",
+      "binary": "/tmp/forge-212-clean-2d23d1c-_si9gtpk/bin/forge",
+      "sha256": "843794c37b699e592f0df34e07965d507a439269fa9cfe4340719bde4672f88e",
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "2d23d1ce20d897258db02a2c882467b9e68c1ea3",
+        "compiled_source_sha256": "607c8ebd86527ac63e666b44ab2a75869d8e955d1267cb3c0f08e62ba6d9f602",
+        "executable_sha256": "843794c37b699e592f0df34e07965d507a439269fa9cfe4340719bde4672f88e"
+      },
+      "head": "2d23d1ce20d897258db02a2c882467b9e68c1ea3",
+      "tree": "ac4fa5ef217282d3eb34529591eea39272c8ac91",
+      "source_clean": true,
+      "bytes": 54201536,
+      "nlink": 1,
+      "build_log_sha256": "dcdb505f448c4b1a4db3e71daf79d819be6173239ce44ac3cbcced1c3ea0025a",
+      "live_compile_log_sha256": "91dea117401743a03ee840b3f8246c60620baa87ab9b2a2e60bc4ae208b83aed"
+    },
+    "observation_source_commit": "a3ac2954c877b7b981577eb1ab10934e0bd3811e",
+    "debug_observer_sha256": "e1cfa18682af8dcc8202fd68ad2f4ead87ee92fef0b2cb8ca033208adf1c30b0",
+    "production_implementation": "Shared native classifier and confined filter owner; fixed worker arguments; held exact executable/read/source bindings; isolated Git search directories; report-only cancellation forwarding."
+  },
+  "live_controls": {
+    "trials": [
+      {
+        "label": "real-first",
+        "ledger": {
+          "path": ".git/forge-212-live-real-first.json",
+          "sha256": "65e8e1dbcfefa05ca046907531bcbb68aae8875fe21dceb7e495c082d7c3741f"
+        },
+        "log": {
+          "path": ".git/forge-212-live-real-first.log",
+          "sha256": "ff17cf68943a4d73c7feb7b7dd822c8bf3e2c973b04d51b8102e497782a107f7"
+        },
+        "returncode": 101,
+        "elapsed_seconds": 2.7732978040003218,
+        "retained_roots": [
+          "/tmp/.tmpKylbnl"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "real-fixed",
+        "ledger": {
+          "path": ".git/forge-212-live-real-fixed.json",
+          "sha256": "d064ad205f7b34ba51fa15f48078c8988fe06f1316b1eadf1f7f19d2e8c0feeb"
+        },
+        "log": {
+          "path": ".git/forge-212-live-real-fixed.log",
+          "sha256": "945121c6fba01bc7efbfb087b3931ad6880494d9193389c6c851756bf36d2dbd"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 6.25836072700622,
+        "retained_roots": [
+          "/tmp/.tmpG10J6S"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "admission",
+        "ledger": {
+          "path": ".git/forge-212-live-admission.json",
+          "sha256": "7a79282d76611c557837f1cd6deba0197a99a4aa77f3eefcf0623f7df90dd4df"
+        },
+        "log": {
+          "path": ".git/forge-212-live-admission.log",
+          "sha256": "546555283e742a717181207e795c32d532d6369ffe9536d6d427eb236427fb93"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 9.633115293996525,
+        "retained_roots": [
+          "/tmp/.tmphXJskC",
+          "/tmp/.tmpsOKsWM"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "bounds",
+        "ledger": {
+          "path": ".git/forge-212-live-bounds.json",
+          "sha256": "59e0b3824837bb607de9508b942c74fabba8835171cc00275314dcb44b9b1f09"
+        },
+        "log": {
+          "path": ".git/forge-212-live-bounds.log",
+          "sha256": "47e25c10f966dd17d27b0030e7dccbb4770e98403cb68fddab36c259181d6e9e"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 14.734914914006367,
+        "retained_roots": [
+          "/tmp/.tmpk8KTwM",
+          "/tmp/.tmp5m1QIz",
+          "/tmp/.tmp4AP5y8",
+          "/tmp/.tmpqvuxhR"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "cancellation",
+        "ledger": {
+          "path": ".git/forge-212-live-cancellation.json",
+          "sha256": "a4aeb44572ccc0d9118ae544792bcd48869e405bec140061fdb60b07f9d89129"
+        },
+        "log": {
+          "path": ".git/forge-212-live-cancellation.log",
+          "sha256": "717e94d293b37bfbffb0cfe47748c422d8c4a7d96591b1013b9918fad213770b"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 6.753765322995605,
+        "retained_roots": [
+          "/tmp/.tmpoafFVE",
+          "/tmp/.tmpROy0Uc"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "early",
+        "ledger": {
+          "path": ".git/forge-212-live-early.json",
+          "sha256": "d2600bc10c7faa94b9ca9be7e4a616f13286d02e278276fb5f08c276abd2a3f8"
+        },
+        "log": {
+          "path": ".git/forge-212-live-early.log",
+          "sha256": "da24ad18de7fd8cb47a7f6a70aca34c084bbed068e36ea636d5fd7549f244142"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 6.855220997997094,
+        "retained_roots": [
+          "/tmp/.tmpp1kMp6",
+          "/tmp/.tmpyGpeSI"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "active-disconnect",
+        "ledger": {
+          "path": ".git/forge-212-live-active-disconnect.json",
+          "sha256": "feacfc17fad1be79ab27a93a4c028bdd02ec518345ff0b18a6a1ebf40dcbb521"
+        },
+        "log": {
+          "path": ".git/forge-212-live-active-disconnect.log",
+          "sha256": "74d4b8f993456ad15ed5a8ea8df7bdf1490e7e4f9cbcd5a766aa088b4448a025"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 6.8613437180028995,
+        "retained_roots": [
+          "/tmp/.tmp2A0QpW",
+          "/tmp/.tmpUVBTul"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "ordinary-cancel",
+        "ledger": {
+          "path": ".git/forge-212-live-ordinary-cancel.json",
+          "sha256": "019a0e363fcb223624c677ac8044ac856e12f03be98c53202ba1af26b5189580"
+        },
+        "log": {
+          "path": ".git/forge-212-live-ordinary-cancel.log",
+          "sha256": "74c41b121512701da04c2674fe6d4e921c84a45101509e7ac123c2e9aaebb7f9"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 0.5775202740042005,
+        "retained_roots": [],
+        "scope": "existing ordinary terminal cancellation behavior regression"
+      },
+      {
+        "label": "shutdown",
+        "ledger": {
+          "path": ".git/forge-212-live-shutdown.json",
+          "sha256": "d905540b694561e8ff17eed07d5355b3086af4130b785ad6b40fa31b9820d0d1"
+        },
+        "log": {
+          "path": ".git/forge-212-live-shutdown.log",
+          "sha256": "15c5578b8854049348afeaa30afe0e1a223d351f081ff7019f940c868f936fef"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 6.786298317994806,
+        "retained_roots": [
+          "/tmp/.tmpAgb98m",
+          "/tmp/.tmpFgvvIJ"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      },
+      {
+        "label": "bounds-with-nonzero",
+        "ledger": {
+          "path": ".git/forge-212-live-bounds-with-nonzero.json",
+          "sha256": "215ac1bb031f7eb527b7663f11029a052cb9b2842255362cf6627c7fc87ad22c"
+        },
+        "log": {
+          "path": ".git/forge-212-live-bounds-with-nonzero.log",
+          "sha256": "e8a059589575d13c728fabf85879780b7b769eb7b83382e02594e693b42e22a5"
+        },
+        "returncode": 0,
+        "elapsed_seconds": 17.783144365996122,
+        "retained_roots": [
+          "/tmp/.tmpC9RjfM",
+          "/tmp/.tmpQl7BZz",
+          "/tmp/.tmp9Eu4RU",
+          "/tmp/.tmp5yerUV",
+          "/tmp/.tmpI0Y9GM"
+        ],
+        "scope": "owned opt-in live test; synthetic cases do not prove report classification"
+      }
+    ],
+    "independent_audit": {
+      "path": ".git/forge-212-live-independent.json",
+      "sha256": "31c7b89be8fc9a4af35fd902f563f0b6d989e7cb756b02ccde3c87cc3842b86c"
+    },
+    "first_failure": "54 MB executable was captured both as a program and as a 32 MiB data-file grant; refused before service launch. Exact program grant now reuses the strict held-program pin. Data-file bounds remain.",
+    "limitations": [
+      "Real classifier control uses an authored two-module/one-test repository.",
+      "Synthetic worker results establish lifecycle/confinement behavior, not classifier correctness.",
+      "Admission rejection replies and detached-child FD link targets were asserted live but not separately retained.",
+      "Existing ordinary cancellation test has its passing log, without the same retained fixture depth.",
+      "Integration observer is debug; service, adapter and real worker use the pinned release executable."
+    ],
+    "shutdown_error_audit": {
+      "path": ".git/forge-212-shutdown-independent.json",
+      "sha256": "118f7b771018a9a642ea54becf4f14e996e904b0607ada22f24e15bfd90b8a91"
+    },
+    "shutdown_scope": "One early request was observed preparing with zero launches; active case witnessed detached worker tree. Worker/daemon/socket absence was checked before explicit Service::stop. Automatic manager exit handling is not excluded.",
+    "passing_test_executions": 9,
+    "retained_failed_attempts": 1,
+    "accounting_scope": "Nine targeted passing test executions include the original bounds matrix and its five-mode extension; the ordinary cancellation regression is included. Six performance observation executions are separate."
+  },
+  "performance": {
+    "invocation": {
+      "path": ".git/forge-212-observation-bench-zj92h33i/invocation.json",
+      "sha256": "4d0506094ab9c6dbe7c897bd36b9ba98ee4f0e64efb3fcb34bb599e00f4f0d45"
+    },
+    "stdout": {
+      "path": ".git/forge-212-observation-bench-zj92h33i/stdout",
+      "sha256": "853c30a5f9ea466e84aaa2c90941b387496cf190b3ba7ea00ab0d2ecb7a61852"
+    },
+    "stderr": {
+      "path": ".git/forge-212-observation-bench-zj92h33i/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native_outer_receipt": {
+      "path": ".git/forge-212-observation-bench-zj92h33i/outer-receipt.json",
+      "sha256": "4b0affb38d9301d4cc1d16e5994c8a2a7d2c56bf184557757c9a419b1af3cc41"
+    },
+    "native_outer_receipt_seal": "945be9b63b3306fbe3b0b65daf52f78f1c81f72257b84cd90a7414eb7d3a3193",
+    "independent_audit": {
+      "path": ".git/forge-212-observation-independent.json",
+      "sha256": "b896c7a17e56795eb6893037c2f11edefe00d4b22416beccd0dc97de2c378f02"
+    },
+    "source_file_bindings": 1292,
+    "accounting": {
+      "outer_observations": 6,
+      "outer_warmups": 1,
+      "outer_scored": 5,
+      "inner_calls_completed": 396,
+      "inner_calls_per_observation": 66,
+      "inner_pairs_per_observation": 31,
+      "inner_first_calls_per_observation": 2,
+      "inner_unscored_warmups_per_observation": 2,
+      "failed": 0,
+      "censored": 0,
+      "unstarted": 0
+    },
+    "five_scored_inner_distributions_ns": {
+      "cli": {
+        "p50_ns": [
+          2356921,
+          2254050,
+          2327430,
+          2338110,
+          2220858
+        ],
+        "p95_ns": [
+          2635353,
+          2731804,
+          2716293,
+          2533311,
+          2841424
+        ]
+      },
+      "mcp": {
+        "p50_ns": [
+          80101070,
+          79993237,
+          80581691,
+          80594221,
+          80066165
+        ],
+        "p95_ns": [
+          88396653,
+          85831748,
+          87981494,
+          87850181,
+          85571951
+        ]
+      }
+    },
+    "first_call_observations_ns": [
+      {
+        "outer_sample_index": 0,
+        "outer_role": "warmup",
+        "first_cli_ns": 2681924,
+        "first_mcp_ns": 82049720
+      },
+      {
+        "outer_sample_index": 1,
+        "outer_role": "scored",
+        "first_cli_ns": 2970726,
+        "first_mcp_ns": 82228049
+      },
+      {
+        "outer_sample_index": 2,
+        "outer_role": "scored",
+        "first_cli_ns": 2452951,
+        "first_mcp_ns": 81998945
+      },
+      {
+        "outer_sample_index": 3,
+        "outer_role": "scored",
+        "first_cli_ns": 2504382,
+        "first_mcp_ns": 82570629
+      },
+      {
+        "outer_sample_index": 4,
+        "outer_role": "scored",
+        "first_cli_ns": 2712283,
+        "first_mcp_ns": 86086847
+      },
+      {
+        "outer_sample_index": 5,
+        "outer_role": "scored",
+        "first_cli_ns": 2649012,
+        "first_mcp_ns": 82176933
+      }
+    ],
+    "adapter_service_rss_point_ranges_bytes": {
+      "adapter": [
+        16084992,
+        16797696
+      ],
+      "service": [
+        21602304,
+        29212672
+      ]
+    },
+    "outer_whole_debug_observer_summary": {
+      "p50_ms": 20268.005714000003,
+      "p95_ms": 20328.246923000002,
+      "cpu_p50_ms": 17284.212,
+      "max_rss_bytes": 372113408
+    },
+    "outer_scope": "Includes setup, fixture creation, executable hashing, calls and cleanup. Native wait4 does not include separately managed service/workers; maximum RSS is not an aggregate tree peak.",
+    "worker_policy": {
+      "cpu_millis": 500,
+      "memory_mib": 128,
+      "processes": 16,
+      "wall_seconds": 20
+    },
+    "limitations": [
+      "As-configured comparison: direct CLI has no equivalent worker cgroup cap; latency difference is not pure wire overhead.",
+      "Each MCP report launches a fresh worker; only service/adapter persist. Kernel/filesystem caches uncontrolled.",
+      "Worker and direct-CLI CPU/RSS and allocations unavailable; process CPU tick deltas include observation work.",
+      "Inner MCP replies are retained parsed JSON; raw wire bytes are unavailable.",
+      "Same-file outer receipt comparison validates its seal only; it is not cross-command improvement evidence.",
+      "No task success, model usage/cache tokens, dollar savings, client activation, global installation or completed Rust migration claim."
+    ]
+  },
+  "runtime_grants": {
+    "path": ".git/forge-212-runtime-read-grants.json",
+    "sha256": "a108c85bd519e06d0c31e8c6c56b8fc0eac3e667d6a55cc9f0aa11cbdcb272d7"
+  },
+  "synthetic_worker": {
+    "path": ".git/forge-212-synthetic-binary.json",
+    "sha256": "83a300ddc949b87ba7e7c5d95f7717d2356d6ffac3618ad540d38b0925c22fc1"
+  },
+  "validation": {
+    "first_focused_debug_executions": 67,
+    "large_program_grant_debug_tests": 17,
+    "strict_all_target_clippy": "PASS; original, grant-fix and observation builds",
+    "size_audits": [
+      {
+        "path": ".git/forge-212-second-function-audit.json",
+        "sha256": "1ac26553f15ea7e6f970b774cb1549923f3bed02f026aa4769a30329cc56e552"
+      },
+      {
+        "path": ".git/forge-212-final-size-audit.json",
+        "sha256": "d8012e3b07940bd316b0b8ecea787d0994d5b8a290dda94768caf1a4cd89f051"
+      },
+      {
+        "path": ".git/forge-212-publication-size-audit.json",
+        "sha256": "0278695aadb2ddf7e9165b1c2e7309e805ddf1c7920316fa0656a54db2a4da89"
+      }
+    ],
+    "full_publication_gate": "pending for final committed tree",
+    "shutdown_all_target_clippy": "PASS",
+    "shutdown_debug_integration_compile": "PASS",
+    "production_paths_unchanged_since_measured_release": true
+  },
+  "operational_limits": [
+    "The child wall deadline is hard within the confined owner; blocking filesystem setup/capture/verification remain cooperative.",
+    "Executable SHA pins selected bytes, not producer authenticity. Runtime/credential/ancestor checks remain strict.",
+    "No public HTTP service, network authority or caller-selectable root/argv/artifact path is introduced."
+  ],
+  "synthetic_worker_exit7": {
+    "path": ".git/forge-212-shutdown-synthetic-binary.json",
+    "sha256": "8642bc50e268a84e0eb8c0adfd4ce7106e9534894e45193ba49ee3ee34c0a82d"
+  }
+}

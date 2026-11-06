@@ -574,6 +574,7 @@ pub(crate) struct OutboundBindings {
     protected: Vec<PathBuf>,
     source: PathBuf,
     git: Option<(PathBuf, PathBuf, PathBuf)>,
+    report_only: bool,
 }
 fn outbound_covers(reads: &[PathBuf], path: &Path) -> bool {
     reads
@@ -607,6 +608,65 @@ fn bind_outbound_pins(
     }
     Ok(())
 }
+struct OutboundCapture<'a> {
+    program: &'a Path,
+    hash: &'a str,
+    reads: &'a [PathBuf],
+    pins: &'a [(PathBuf, String)],
+    source: &'a Path,
+    state: &'a Path,
+    allowed: &'a [PathBuf],
+    report_only: bool,
+}
+struct ReportGitInputs {
+    git: Option<(PathBuf, PathBuf)>,
+    git_dir: Option<PathBuf>,
+    git_identity: Option<(PathBuf, PathBuf, PathBuf)>,
+    directories: Vec<DirectoryBinding>,
+    report_git: PathBuf,
+}
+fn outbound_git_inputs(source: &Path, report_only: bool) -> Result<ReportGitInputs> {
+    let git = if report_only {
+        None
+    } else {
+        crate::repository::checkout_of_checked(source)?
+    };
+    let git_dir = match &git {
+        Some((root, _)) => Some(git2::Repository::open(root)?.path().canonicalize()?),
+        None => None,
+    };
+    let git_identity = git.as_ref().map(|(root, common)| {
+        (
+            root.clone(),
+            common.clone(),
+            git_dir.clone().expect("checkout has git directory"),
+        )
+    });
+    let report_git = source.join(".git");
+    let mut directories = if report_only {
+        canonical(source)?;
+        ancestors(source)?;
+        vec![
+            DirectoryBinding::repository(source, None)?,
+            DirectoryBinding::repository(&report_git, None)?,
+        ]
+    } else {
+        vec![directory(source)?]
+    };
+    if let Some((_, common, git_dir)) = &git_identity {
+        directories.push(directory(common)?);
+        if git_dir != common {
+            directories.push(directory(git_dir)?);
+        }
+    }
+    Ok(ReportGitInputs {
+        git,
+        git_dir,
+        git_identity,
+        directories,
+        report_git,
+    })
+}
 impl OutboundBindings {
     pub(crate) fn capture(
         program: &Path,
@@ -617,31 +677,60 @@ impl OutboundBindings {
         state: &Path,
         allowed: &[PathBuf],
     ) -> Result<Self> {
+        Self::capture_inner(OutboundCapture {
+            program,
+            hash,
+            reads,
+            pins,
+            source,
+            state,
+            allowed,
+            report_only: false,
+        })
+    }
+    pub(crate) fn capture_report(
+        program: &Path,
+        hash: &str,
+        reads: &[PathBuf],
+        source: &Path,
+        state: &Path,
+        allowed: &[PathBuf],
+    ) -> Result<Self> {
+        Self::capture_inner(OutboundCapture {
+            program,
+            hash,
+            reads,
+            pins: &[],
+            source,
+            state,
+            allowed,
+            report_only: true,
+        })
+    }
+    fn capture_inner(input: OutboundCapture<'_>) -> Result<Self> {
+        let OutboundCapture {
+            program,
+            hash,
+            reads,
+            pins,
+            source,
+            state,
+            allowed,
+            report_only,
+        } = input;
         ensure!(
             (1..=120).contains(&reads.len()),
             "invalid outbound read grant count"
         );
         ensure!(pins.len() <= 128, "too many outbound pins");
         let (home, protected) = protected_roots()?;
-        let git = crate::repository::checkout_of_checked(source)?;
-        let git_dir = match &git {
-            Some((root, _)) => Some(git2::Repository::open(root)?.path().canonicalize()?),
-            None => None,
-        };
-        let git_identity = git.as_ref().map(|(root, common)| {
-            (
-                root.clone(),
-                common.clone(),
-                git_dir.clone().expect("checkout has git directory"),
-            )
-        });
-        let mut directories = vec![directory(source)?];
-        if let Some((_, common, git_dir)) = &git_identity {
-            directories.push(directory(common)?);
-            if git_dir != common {
-                directories.push(directory(git_dir)?);
-            }
-        }
+        let ReportGitInputs {
+            git,
+            git_dir,
+            git_identity,
+            mut directories,
+            report_git,
+        } = outbound_git_inputs(source, report_only)?;
         let mut files = Vec::new();
         let mut total = 0usize;
         for (index, read) in reads.iter().enumerate() {
@@ -656,6 +745,9 @@ impl OutboundBindings {
             for path in &protected {
                 disjoint(read, path)?;
             }
+            if report_only {
+                disjoint(read, &report_git)?;
+            }
             if let Some((root, common)) = &git {
                 disjoint(read, &root.join(".git"))?;
                 disjoint(read, common)?;
@@ -665,6 +757,11 @@ impl OutboundBindings {
             }
             for previous in &reads[..index] {
                 disjoint(read, previous)?;
+            }
+            // The exact executable is pinned and reverified by HeldProgram below.
+            // Do not apply the smaller data-file bound to the same file twice.
+            if read == program {
+                continue;
             }
             if fs::symlink_metadata(read)?.is_dir() {
                 directories.push(directory(read)?);
@@ -701,6 +798,7 @@ impl OutboundBindings {
             protected,
             source: source.into(),
             git: git_identity,
+            report_only,
         };
         result.verify()?;
         Ok(result)
@@ -711,14 +809,18 @@ impl OutboundBindings {
                 && protected_roots()? == (self.home.clone(), self.protected.clone()),
             "outbound credential roots changed"
         );
-        let current = crate::repository::checkout_of_checked(&self.source)?;
-        let current = current
-            .map(|(root, common)| -> Result<_> {
-                let git_dir = git2::Repository::open(&root)?.path().canonicalize()?;
-                Ok((root, common, git_dir))
-            })
-            .transpose()?;
-        ensure!(current == self.git, "outbound source Git metadata changed");
+        if self.report_only {
+            ancestors(&self.source)?;
+        } else {
+            let current = crate::repository::checkout_of_checked(&self.source)?;
+            let current = current
+                .map(|(root, common)| -> Result<_> {
+                    let git_dir = git2::Repository::open(&root)?.path().canonicalize()?;
+                    Ok((root, common, git_dir))
+                })
+                .transpose()?;
+            ensure!(current == self.git, "outbound source Git metadata changed");
+        }
         self.program.verify()?;
         for directory in &self.directories {
             directory.verify()?;

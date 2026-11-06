@@ -102,6 +102,14 @@ When configured, the existing Forge adapter advertises its single public tool;
 its remote output remains untrusted. `bind` does not create this capability or
 prove that a client will select or use it.
 
+## Operator-configured test report
+
+When the operator enables [`test_report`](native-harness.md#optional-python-test-report),
+the adapter advertises `python_test_report` for the service's exact source root.
+It returns the native advisory Python import report without running tests or
+writing an artifact. Binding a client neither enables this capability nor proves
+the client will use it; client approval remains separate.
+
 ## Hook interaction
 
 When [native provider hooks](native-providers.md) are installed, only

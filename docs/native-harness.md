@@ -4,7 +4,9 @@
 confined PTYs and the existing SQLite task journal. It requires Linux Landlock
 ABI 6 or newer, seccomp user notifications and a systemd user manager/client
 version 254 or newer. Start fails if enforcement or controller readback fails.
-There is no unconfined fallback. No Python or Node process is involved.
+There is no unconfined fallback. The Forge-owned service and adapter need no
+Python or Node runtime; operator-selected external programs may use their own
+toolchains.
 
 The operator supplies capabilities once, when starting the service. Model calls
 can select a configured executable and arguments, inspect source, or apply an
@@ -127,6 +129,86 @@ and replies are checked at bounded points, not authenticated producer identity o
 atomic proof of when remote bytes were generated. This describes the native
 interface, not proof that an external coding client uses it.
 
+## Optional Python test report
+
+Add `test_report` inside the complete harness policy to expose the native
+[Python test import report](native-analysis.md#python-test-import-report).
+Replace the paths and digest below with independently measured values. Include
+the executable and every required runtime read path in the enclosing
+`read_only` grants as well; this fragment is not a standalone policy.
+
+```json
+"test_report": {
+  "executable": {"path": "/absolute/tools/forge", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+  "read_only": ["/absolute/tools/forge", "/absolute/required/runtime/file"],
+  "resources": {"cpu_millis": 500, "memory_mib": 512, "processes": 16},
+  "max_wall_seconds": 20,
+  "max_output_bytes": 262144
+}
+```
+
+The enabled `python_test_report` tool requires `max_output_bytes`, from 512
+through the configured maximum (at most 262144). It uses the exact policy
+`source_root`; callers cannot select a root, executable, arguments, environment
+or artifact path. The result is the same advisory envelope as the native CLI,
+without artifact publication or test execution. Only one report runs at a time.
+Reserve its CPU, memory and process limits in the aggregate policy in addition
+to session and supervisor reservations.
+
+Runtime grants retain strict ownership and ancestor checks. The final source
+and in-root `.git` directories may be group-writable repository data; source
+ancestors remain strict, and held directory identities are rechecked. Directory
+grants are capabilities, not recursive content pins. Source observations remain
+cooperative checks, not an atomic snapshot or hostile replace-and-restore proof.
+
+Supply a trusted Forge executable: the digest binds the selected bytes and does
+not attest their producer. The service invokes that executable with fixed worker
+arguments inside the existing network-denying sandbox. The shipped worker uses
+a cleared environment, private HOME/cache/temp and empty Git search directories.
+The sandbox bounds its initial Git metadata/configuration reads; subsequent
+semantic checks reject linked/external Git directories and unsupported Git
+configuration. The worker does not launch Git or Python. Its child wall deadline
+is 1–20 seconds. Pre/post filesystem capture and verification are cooperative
+and can delay cancellation or shutdown; this is not a hard whole-call deadline.
+Cancellation requests child termination and waits for owned cleanup. Uncertain
+cleanup fails closed and retains scratch for inspection.
+
+### Reproduce report controls
+
+The ignored `native_test_report_service` integration tests require the kernel
+and user-manager controls above. Build a release Forge, select its absolute path
+as `FORGE_TEST_BIN`, and supply its independently measured SHA-256 through
+`FORGE_TEST_BIN_SHA256`. Set `FORGE_TEST_REPORT_RUNTIME_READS` to a JSON array
+of explicitly authorized, canonical runtime library/cache file paths for that
+binary. The fixture adds its private executable copy to those grants; it does
+not discover or grant a host runtime automatically.
+
+The synthetic lifecycle cases additionally require a separately compiled fixture:
+
+```sh
+rustc +1.98.0 --edition=2021 \
+  native/forge/tests/support/test_report_worker_fixture.rs -o /private/path/worker
+```
+
+Set `FORGE_TEST_REPORT_WORKER` to that absolute path and
+`FORGE_TEST_REPORT_WORKER_SHA256` to its independently measured digest, then run:
+
+```sh
+cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml \
+  --test native_test_report_service -- --ignored --nocapture --test-threads=1 \
+  --skip observation::matched_cli_mcp_python_test_report_observation
+```
+
+These controls retain evidence on success and failure and print its location.
+The actual Forge report comparison is separate from synthetic ownership/error
+controls. For the as-configured performance observation, set
+`FORGE_TEST_REPORT_OBSERVATION` to a new absolute JSON output path and select
+`observation::matched_cli_mcp_python_test_report_observation` with
+`--exact --ignored --nocapture`. It measures first calls and 31 alternating pairs;
+see [measurement limits](performance.md#confined-mcp-test-report--2026-11-06).
+An outer native `forge performance benchmark` receipt measures the entire test,
+including setup, hashing and cleanup, rather than individual MCP calls.
+
 ## Calls and reconnects
 
 The socket accepts one UTF-8 JSON object per newline-delimited request, with a
@@ -161,6 +243,7 @@ The catalog exposes:
   `context` capability exists; see [native context](native-context.md).
 - `session_brief` when a `workspace` capability exists, and `workspace_recall`
   for named `memory_indexes`; see [workspace context](native-session-brief.md#persistent-service).
+- `python_test_report` when `test_report` is configured, as described above.
 
 After a lost spawn response, reuse the same `id` and identical arguments. A live
 or retained session returns its existing PID; different arguments are rejected.
@@ -200,8 +283,12 @@ remaining responsive to other requests during long terminal reads. Repeated
 in-flight RPC IDs fail; malformed parameters cannot become valid through JSON
 key collapse. Tool failures are visible content with `isError:true`.
 
-RPC cancellation suppresses the eventual response. It cannot undo a tool already
-handed to the persistent daemon; use `terminal_close` to stop an owned process.
+For `python_test_report`, MCP cancellation closes the forwarded connection;
+the service requests cancellation and awaits cleanup. That report connection
+is one-shot: closing its write half or sending a pipelined frame requests
+cancellation. Other calls retain their existing semantics: RPC cancellation
+suppresses the response and cannot undo work already handed to the daemon;
+use `terminal_close` to stop an owned terminal.
 Closing or restarting the adapter leaves terminal ownership with the finite-lived
 service. Retain session IDs, write sequences and cursors when reconnecting.
 

@@ -13,6 +13,9 @@ pub struct HarnessArgs {
 }
 #[derive(Subcommand)]
 enum Action {
+    /// Internal fixed read-only analysis worker; only safe under caller confinement.
+    #[command(hide = true)]
+    TestReportWorker(crate::test_report_worker::WorkerArgs),
     /// Native MCP stdio adapter for an already authorized persistent service.
     Stdio {
         #[arg(long)]
@@ -65,11 +68,16 @@ enum Action {
 }
 
 pub fn run(args: HarnessArgs) -> Result<u8> {
+    let action = match args.action {
+        Action::TestReportWorker(worker) => return crate::test_report_worker::run(worker),
+        action => action,
+    };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .max_blocking_threads(8)
         .build()?;
-    let result = match args.action {
+    let result = match action {
+        Action::TestReportWorker(_) => unreachable!("worker dispatched before runtime"),
         Action::Stdio {
             socket,
             source_root,

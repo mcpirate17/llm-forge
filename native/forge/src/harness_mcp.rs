@@ -10,9 +10,13 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::io::{AsyncBufRead, AsyncWrite, AsyncWriteExt, BufReader};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 const MAX_REPLY: usize = 4 * 1024 * 1024;
+
+#[cfg(test)]
+#[path = "harness_mcp_cancellation_tests.rs"]
+mod cancellation_tests;
 
 pub async fn serve<R, W>(socket: PathBuf, mut input: R, mut output: W) -> Result<()>
 where
@@ -44,6 +48,7 @@ where
         }
     });
     let mut pending = BTreeMap::<String, bool>::new();
+    let mut cancellation = BTreeMap::<String, oneshot::Sender<()>>::new();
     let mut workers = tokio::task::JoinSet::new();
     let result=async {
         loop {
@@ -52,20 +57,27 @@ where
                     let Some(frame)=frame else {break};let Some(frame)=frame? else {break};
                     match protocol.prepare(&frame,&pending) {
                         Action::Ignore=>{},
-                        Action::Cancel(id)=>{if let Some(cancelled)=pending.get_mut(&id) {*cancelled=true;}},
+                        Action::Cancel(id)=>{
+                            if let Some(cancelled)=pending.get_mut(&id) {*cancelled=true;}
+                            if let Some(cancel)=cancellation.remove(&id) {let _=cancel.send(());}
+                        },
                         Action::Reply(value)=>write_reply(&mut output,&value).await?,
-                        Action::Forward{id,era,bytes}=>{
+                        Action::Forward{id,era,bytes,cancel_on_disconnect}=>{
                             let key=id.to_string();
                             if pending.contains_key(&key) {write_reply(&mut output,&protocol::error_reply(id,-32600,"Request id is already in flight",None)).await?;continue;}
                             if pending.len()>=16 {write_reply(&mut output,&protocol::error_reply(id,-32000,"Native adapter request capacity exhausted",None)).await?;continue;}
                             pending.insert(key.clone(),false);let socket=socket.clone();
-                            workers.spawn(async move {(key,protocol::tool_result(id,era,forward(&socket,&bytes).await))});
+                            let cancelled=if cancel_on_disconnect {
+                                let (send,receive)=oneshot::channel();cancellation.insert(key.clone(),send);Some(receive)
+                            } else {None};
+                            workers.spawn(async move {(key,forwarded(id,era,&socket,&bytes,cancelled).await)});
                         },
                     }
                 },
                 done=workers.join_next(),if !workers.is_empty()=>{
                     let (key,value)=done.context("missing native MCP worker")?.context("native MCP worker panicked")?;
-                    if pending.remove(&key)==Some(false) {write_reply(&mut output,&value).await?;}
+                    cancellation.remove(&key);
+                    if pending.remove(&key)==Some(false) {if let Some(value)=value {write_reply(&mut output,&value).await?;}}
                 },
             }
         }
@@ -76,6 +88,25 @@ where
     workers.abort_all();
     while workers.join_next().await.is_some() {}
     result
+}
+
+async fn forwarded(
+    id: Value,
+    era: protocol::Era,
+    socket: &Path,
+    bytes: &[u8],
+    cancelled: Option<oneshot::Receiver<()>>,
+) -> Option<Value> {
+    let result = if let Some(cancelled) = cancelled {
+        tokio::select! {
+            biased;
+            _ = cancelled => return None,
+            result = forward(socket, bytes) => result,
+        }
+    } else {
+        forward(socket, bytes).await
+    };
+    Some(protocol::tool_result(id, era, result))
 }
 
 async fn forward(socket: &Path, bytes: &[u8]) -> std::result::Result<Value, String> {

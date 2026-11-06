@@ -10,6 +10,36 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Confined MCP test report — 2026-11-06
+
+The operator-enabled `python_test_report` uses the native classifier through an
+owned confined worker. Release source `2d23d1c` and observer source `a3ac295` were
+measured on the same authored repository: one Python test and two modules.
+The [evidence index](../research/performance/forge-program-20261106-mcp-test-report.json)
+retains the initial pre-launch admission failure, correction, live controls,
+native performance receipt, raw observations and independent audits.
+
+| Five scored observations, 31 calls per arm each | Inner median range | Inner p95 range |
+| --- | ---: | ---: |
+| Direct CLI | 2.221–2.357 ms | 2.533–2.841 ms |
+| MCP through the persistent service | 79.993–80.594 ms | 85.572–88.397 ms |
+
+All 396 calls completed: six observations including one outer warmup, each with
+separate first calls, one inner warmup per arm and 31 alternating pairs. Complete
+report values matched, inputs were rechecked and owned cleanup was verified.
+These are as-configured costs: the worker has 500 milliCPU/128 MiB limits while
+the CLI has no equivalent cgroup cap. Every MCP call launches a fresh worker;
+only the service/adapter are reused. Filesystem caches were uncontrolled.
+
+Service RSS point samples ranged from 20.6–27.9 MiB and adapter samples from
+15.3–16.0 MiB. Worker/direct-CLI CPU and RSS were unavailable. Recorded process
+ticks include hashing and observation work; they are not per-call attribution.
+The outer receipt measures the entire debug observer, including large executable
+hashes, setup and cleanup: median/p95 20.268/20.328 seconds, CPU median 17.284
+seconds and maximum RSS 354.9 MiB. It excludes separately managed service/worker
+resources and is not a product latency or aggregate-memory result. No speedup,
+model-token savings, external-client adoption or task benefit is established.
+
 ### Full native test-import report — 2026-11-06
 
 `forge analyze tests` shares the existing classifier and replaces the Make target's
@@ -33,126 +63,76 @@ The pinned Python extension's build provenance is unknown. Full release status i
 
 ### Native report migration baseline — 2026-11-06
 
-The native evidence, changed, coverage and canary commands preserve the existing
-Python reports' JSON and exit codes. The initial `88a63ef` implementation was slower:
-52 observations completed, including five timed pairs per actual Forge command and
-two untimed fixture API controls. All failures, comparators and subsequent runs are
-retained in the [reporting evidence index](../research/performance/forge-program-20261106-native-reporting.json).
+The native evidence, changed, coverage and canary commands preserve Python JSON
+and exit codes. The [reporting evidence index](../research/performance/forge-program-20261106-native-reporting.json)
+retains the slower 52-observation baseline, rejected path-lookup experiment,
+profiles, failures, commands, comparators and final matched 90-observation run.
+The rejected syscall change saved 0–10 ms while adding unsafe code. Accepted
+`d1fc4dd` skips supporting-input scans only when no contract can be eligible;
+eligible contracts and final verification retain their checks. The Forge corpus
+has no eligible Cargo contracts, so these gains do not predict that case.
 
-A path-lookup experiment (`b499dbe`) reduced explicit-report syscalls from 61,706 to
-41,655, but a matched 90-observation comparison showed only a 0–10 ms median change.
-Its extra unsafe syscall helper and kernel requirement were rejected. Original
-held-input path checks remain, together with the added regression tests.
-
-Debugger phase timing found 87 of 155 instrumented wall milliseconds in two
-supporting-input eligibility scans, versus 6 ms in final verification. Commit
-`d1fc4dd` skips those scans only when no loaded contract can pass the existing
-eligibility predicates. Eligible contracts still decode receipt detail and validate
-fingerprints; final evidence verification always runs. The current Forge corpus has
-no eligible Cargo contracts, so these gains do not predict the eligible-contract case.
-
-The final matched run used identical checkout inputs for all three arms and all six
-arm orders. All 90 observations completed with full JSON and exit-code parity;
-none failed, were censored or remained unstarted. Six timed fresh-process samples
-per arm produced these median wall times:
-
-| Actual Forge report | Existing Python CLI | Native `88a63ef` | Native `d1fc4dd` |
+| Actual Forge report | Python median | Native `88a63ef` | Native `d1fc4dd` |
 | --- | ---: | ---: | ---: |
 | Explicit evidence | 40 ms | 130 ms | 40 ms |
 | Changed evidence | 40 ms | 130 ms | 50 ms |
 | Coverage | 100 ms | 270 ms | 180 ms |
 | Canary | 100 ms | 270 ms | 180 ms |
 
-The accepted optimization reduces the native baseline; it does not establish a
-Python-to-Rust speedup. Coverage remains slower and uses more memory: median maximum
-RSS was 44,858 KiB for Python and 62,272 KiB for the final native binary. Native
-reports add held-input and inventory revalidation; these measurements do not isolate
-the cost of those guarantees. GNU time has 10 ms resolution, filesystem caches were
-uncontrolled, and five/six-sample empirical p95 values are simply the sample maximum.
-CPU, RSS, p95, exact commands, binary/source hashes and raw artifact hashes are indexed.
-The CPython 3.12.3 comparator's native extension is pinned at version 0.1.94; its
-build-source provenance is unavailable. No model cost or agent benefit was measured.
-Perf sampling was denied by host policy; gprofng timer warnings made its samples
-unreliable. Debugger phase timings include instrumentation overhead.
+All six arm orders completed with exact JSON/exit parity and no failures,
+censoring or unstarted observations. Coverage remains slower than Python;
+median maximum RSS was 44,858 versus 62,272 KiB. Native reports add input and
+inventory rechecks. Six fresh-process samples per arm, 10 ms clock resolution,
+uncontrolled filesystem caches and unknown Python-extension build provenance
+limit inference; empirical p95 is the sample maximum. CPU/RSS, source/binary
+pins and raw hashes are indexed. Debugger timings include instrumentation;
+perf was denied and gprofng samples were unreliable. No agent gain was measured.
 
-A separate real automatic Cargo control generated and killed both scoped mutants,
-then accepted the receipt only with the verified installed-runner pin. Missing identity
-produced debt and a wrong pin digest was refused. All 17 control checks and 22 commands
-completed; native snapshot and process cleanup were verified. This small fixture
-validates receipt/report behavior, not full Forge mutation coverage or issue #196.
-Make routes also ran with `UV=false`; execution traces contain Make, shell and native
-Forge only. Make returns 2 for a report's nonzero exit; the canary still tolerates debt.
+A separate automatic two-mutant fixture validated installed-runner receipt
+acceptance, missing-identity debt and wrong-pin refusal; all 17 controls and 22
+commands completed with verified cleanup. Make traces with `UV=false` contain
+Make, shell and native Forge. These controls do not establish full mutation
+coverage or completion of issue #196.
 
 ### Reproducible native timeout fixture — 2026-11-06
 
-The checked-in opt-in Rust test at `5f78e9b` reproduces the interrupted-engine
-control through automatic plan/write and the existing confined command owner.
-It uses explicit tool/configuration hashes, independently checks campaign and
-source/test bindings, and retains raw command logs and the unrestored snapshot.
-[Setup instructions](mutation.md#reproduce-the-real-engine-timeout-control) describe
-the required external tools and grants; the test does not bundle a toolchain.
+The opt-in Rust control at `5f78e9b` uses automatic plan/write, explicit pins and
+the confined owner; [setup](mutation.md#reproduce-the-real-engine-timeout-control)
+requires operator-supplied external tools and grants. Its [three-attempt index](../research/performance/forge-program-20261106-native-mutation-controls.json)
+retains two pre-payload admission failures (missing engine read grant, then a
+group-writable cargo-bin ancestor) and the successful private-copy control.
+Engine bytes and test assertions were unchanged across attempts.
 
-The [three-attempt index](../research/performance/forge-program-20261106-native-mutation-controls.json)
-retains two failed configuration attempts and the successful control. The first
-was refused because the pinned engine lacked a read grant; the second was refused
-because its existing cargo-bin ancestor was group-writable. Neither launched a
-recorded mutation payload or produced a receipt. The third used the identical
-engine bytes copied into a private directory and an explicit file read grant.
-The binary and test assertions were unchanged across attempts.
-
-The third test passed in 11.12 seconds. Its native receipt remains incomplete
-ERROR: two discovered mutants, zero completed outcomes and an unknown remainder.
-Native metadata, direct baseline and engine wall times were 21, 95 and 10,010 ms.
-Independent audit checked all 13 command ledgers and their streams, exact report
-hashes/digests, campaign/source/test pins and absence of the three owned cgroups.
-The baseline passed one test. The retained snapshot contains the automatic mutant
-and its marker. Either authored mutant triggers the timeout; no positive completed
-prefix is claimed.
-
-Outer GNU time recorded 11.21 seconds wall time, 0.91/0.28 seconds user/system CPU
-and a reported maximum RSS of 131,424 KiB for the test command. These are single
-outer-command observations, not aggregate concurrent memory, workload percentiles
-or matched speed measurements. Model tokens, cost and agent productivity remain
-unmeasured. Focused validation passed seven supporting-input tests, five ordinary
-CLI tests, ten explicitly enabled synthetic confined tests and strict Clippy.
-The two new admission tests cover the four previously observed predicate gaps;
-their automatic source campaign has not yet been rerun. The synthetic cases remain
-protocol tests, separate from the real automatic-engine control.
+The third test passed in 11.12 seconds, but its native receipt remains incomplete
+ERROR: two discovered mutants, zero completed outcomes and unknown remainder.
+Metadata, baseline and engine times were 21/95/10,010 ms. Independent audit checked
+all 13 command ledgers, report/source/test pins and absence of three owned cgroups;
+the unrestored snapshot and automatic-mutant marker remain. Either mutant times
+out; no positive completed prefix is claimed. Outer GNU time recorded 11.21 seconds,
+0.91/0.28 seconds user/system CPU and maximum RSS 131,424 KiB, not aggregate memory
+or matched speed evidence. Focused checks passed seven supporting-input tests,
+five CLI tests, ten synthetic controls and strict Clippy. The added predicate
+regressions have not been mutation-rerun; agent benefit remains unmeasured.
 
 ### Interrupted Cargo progress controls — 2026-11-06
 
-The clean native release build at `ad6f12f` preserves bounded partial engine progress
-after confirmed process cleanup. The unchanged automatic timeout control completed
-all 12 diagnostic checks: its receipt records two discovered mutants, zero
-completed mutant outcomes, and an unknown remainder. Raw report hashes, byte sizes
-and canonical identity digests match the retained files. The first mutant was
-interrupted, so this control does not demonstrate a nonzero completed-outcome
-capture; positive reconciliation and refusal cases have focused unit coverage.
+Clean native `ad6f12f` preserved bounded partial engine progress after confirmed
+cleanup. All 12 diagnostics matched retained raw hashes and canonical identities:
+two discovered mutants, zero completed outcomes, unknown remainder. The first
+mutant was interrupted; positive reconciliation has unit coverage, not a nonzero
+live completed-prefix demonstration. The [three-attempt index](../research/performance/forge-program-20261106-partial-progress.json)
+retains two failed predecessors, each with 10 completed checks and one unstarted
+final check. They exposed timeout-reason propagation and JSON key-order defects;
+the oracle and authored fixture stayed unchanged when producer fixes were tested.
 
-The [three-attempt index](../research/performance/forge-program-20261106-partial-progress.json)
-retains both preceding failed controls. Each completed 10 checks, failed validation,
-and left the final toolchain check unstarted. The first exposed a timeout reported
-as an actor error after source verification failed; the second exposed JSON
-key-order dependence in mutant identities. Both producer defects were corrected;
-the independent oracle and authored fixture stayed unchanged. No attempt was
-repeated merely to obtain a different completed-mutant count.
-
-For the corrected control, metadata, direct baseline and engine wall times were
-13, 155 and 10,004 ms under one CPU, 1 GiB and a ten-second engine bound. These
-single observations exclude preparation and are not matched speed measurements.
-CPU, RSS, allocations, model usage and agent-task benefit were not measured.
-Independent audit verified the retained streams, report identities and absence of
-all three owned process scopes. The unrestored automatic-mutant snapshot remains.
-All three native receipts are incomplete ERROR results; progress changes neither
-official mutant accounting nor scoring. Either diagnostic field prevents passing
-receipt admission. Focused tests, strict Clippy and the clean control do not
-replace full publication checks for the final committed tree.
-
-The final tree subsequently passed all 18 publication checks and exact-head/base
-verification at `6369de3`: 4,819 passing test executions, zero failures and 188
-ignored across 179 harnesses. [PR #206](https://github.com/mcpirate17/llm-forge/pull/206)
-merged the identical tree as `c95592a`. This verifies the source and isolated
-installation, without claiming a shared-host upgrade or client activation.
+Metadata/baseline/engine times were 13/155/10,004 ms under one CPU, 1 GiB and a
+10-second engine bound. Preparation, CPU/RSS, allocations and agent usage were
+not measured. All three receipts remain incomplete ERROR; diagnostics cannot
+change scoring or passing admission. Independent audit confirmed streams and
+absence of owned scopes; the unrestored snapshot remains. The final tree passed
+18 publication checks and verification at `6369de3` (4,819 passing executions,
+zero failures, 188 ignored); [PR #206](https://github.com/mcpirate17/llm-forge/pull/206)
+merged the identical tree as `c95592a`. No shared-host upgrade is implied.
 
 ### Compiler-header control and actual Forge timeout — 2026-11-06
 

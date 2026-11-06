@@ -80,6 +80,17 @@ pub fn catalog(policy: &Policy) -> Value {
     add_search(&mut tools, policy);
     add_context(&mut tools, policy);
     add_workspace(&mut tools, policy);
+    if let Some(capability) = &policy.test_report {
+        tools.push(tool(
+            "python_test_report",
+            "Advisory Python test import report for the operator-selected repository.",
+            vec![(
+                "max_output_bytes",
+                integer(512, capability.max_output_bytes as u64),
+            )],
+            &["max_output_bytes"],
+        ));
+    }
     if let Some(capability) = &policy.outbound_mcp {
         let schema: Value =
             serde_json::from_str(&capability.input_schema_json).expect("validated outbound schema");
