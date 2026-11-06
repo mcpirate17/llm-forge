@@ -105,10 +105,13 @@ be mistaken for that failed invocation's result.
 The input capture admits at most 100,000 files, 16 MiB per source and 1 GiB total;
 each reference corpus is limited to 32 MiB. Git index admission is 32 MiB. History
 has 100,000-commit/path limits, one million tree-entry/path-event limits, 128 MiB
-metadata admission, bounded rename work (65,536 pairs), and a cooperative
+metadata admission, bounded relevant rename work (65,536 pairs), and a cooperative
 30-second history deadline. These are not a hard whole-command time/RSS limit:
 libgit2 discovery/status and native parsing have additional work. Oversized or
 unsupported history refuses rather than silently dropping dates or rename matches.
+Rename scoring is skipped when no added/deleted path can affect a currently tracked
+Python path's date. Relevant diffs retain all competing candidates; full history,
+tree and path admission still run. This report does not verify unrelated blob contents.
 The ordinary `--max-bytes` output ceiling applies; no partial report is emitted.
 
 Source bytes, import existence observations, Git identities/settings/inventories

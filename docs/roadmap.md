@@ -46,8 +46,13 @@ strict Clippy and the optional Python binding compile passed. Six retained repor
 pairs cover authored merge/rename/shallow fixtures and the actual Forge checkout;
 the latter matched complete JSON and exits (123 modules, 17 tests, 35 advisory
 unreferenced sources). Independent review checked all 98 commands and the exact
-two intentional fixture differences. This is working-tree functional evidence;
-matched timing and final publication gates remain pending. See the
+two intentional fixture differences. Clean source `1195b04` also passed 22 report
+tests, two CLI tests and the stricter six-pair parity rerun. The matched three-arm
+benchmark completed 108 executions: median native latency fell from 510.75 to
+218.97 ms, while Python remained faster at 181.06 ms. Independent audit verified
+all 18 receipts and exact report comparisons. The original slower baseline and
+remaining gap are retained in the [performance report](performance.md#full-native-test-import-report--2026-11-06).
+Final publication gates remain pending. See the
 [command contract](native-analysis.md#python-test-import-report). MCP admission and
 cancellation remain a separate integration gap; no host adoption is claimed.
 

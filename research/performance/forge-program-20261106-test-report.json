@@ -1,0 +1,622 @@
+{
+  "schema": "forge.test-report.evidence.v1",
+  "status": "Scoped measurements and independent audits complete; final publication gate pending at index assembly.",
+  "scope": "Native static Python test-import reporting and removal of the Make interpreter path; no agent productivity, installation or full Rust migration claim.",
+  "historical_baseline": {
+    "summary": {
+      "path": ".git/forge-210-benchmark-2gxkx9si/summary.json",
+      "sha256": "23d787c096cf3fcfc103a9b2e18c5831da51c2a0f39102e192e1dabd300d9ba8"
+    },
+    "independent_audit": {
+      "path": ".git/forge-210-benchmark-first-independent.json",
+      "sha256": "582ff004e7b37a7a668fdbf1db06ea4ba62889464fceb2af7feb987fe4ca866d"
+    },
+    "metrics": {
+      "native": {
+        "cpu_p50_ms": 507.115,
+        "max_rss_bytes": 45084672,
+        "p50_ms": 510.596173,
+        "p95_ms": 519.546649,
+        "samples": 20
+      },
+      "python": {
+        "cpu_p50_ms": 180.82,
+        "max_rss_bytes": 32473088,
+        "p50_ms": 180.008071,
+        "p95_ms": 182.675465,
+        "samples": 20
+      }
+    },
+    "receipt_accounting": {
+      "censored": 0,
+      "completed": 8,
+      "failed": 0,
+      "planned": 8,
+      "running": 0,
+      "unstarted": 0
+    },
+    "measured_sample_accounting": {
+      "completed_including_warmups": 48,
+      "failure_detail": "No per-sample terminal state is invented when native benchmark emits no receipt.",
+      "planned_scored": 40,
+      "planned_warmups": 8,
+      "unknown_in_started_incomplete_receipts": 0,
+      "unstarted": 0
+    },
+    "command_accounting": {
+      "censored": 0,
+      "completed": 27,
+      "failed": 0,
+      "running": 0
+    },
+    "orders": [
+      [
+        "python",
+        "native"
+      ],
+      [
+        "native",
+        "python"
+      ],
+      [
+        "native",
+        "python"
+      ],
+      [
+        "python",
+        "native"
+      ]
+    ]
+  },
+  "optimized_comparison": {
+    "summary": {
+      "path": ".git/forge-210-benchmark-uhhmzvpf/summary.json",
+      "sha256": "dc7eede749bbcc69671f764e0a3225522a9406dd6b59117cdf22e5c1c1c49b5a"
+    },
+    "independent_audit": {
+      "path": ".git/forge-210-optimized-benchmark-independent.json",
+      "sha256": "809f7b506b0bb29017a6c549466f0936ffd9795fa15a4f2a67ab0d14e4f55f72"
+    },
+    "metrics": {
+      "candidate_native": {
+        "cpu_p50_ms": 217.165,
+        "max_rss_bytes": 34349056,
+        "p50_ms": 218.96997000000002,
+        "p95_ms": 231.66692799999998,
+        "samples": 30
+      },
+      "python": {
+        "cpu_p50_ms": 181.732,
+        "max_rss_bytes": 32509952,
+        "p50_ms": 181.058612,
+        "p95_ms": 189.876609,
+        "samples": 30
+      },
+      "reference_native": {
+        "cpu_p50_ms": 507.503,
+        "max_rss_bytes": 44965888,
+        "p50_ms": 510.752807,
+        "p95_ms": 523.7509930000001,
+        "samples": 30
+      }
+    },
+    "receipt_accounting": {
+      "censored": 0,
+      "completed": 18,
+      "failed": 0,
+      "planned": 18,
+      "running": 0,
+      "unstarted": 0
+    },
+    "measured_sample_accounting": {
+      "completed_including_warmups": 108,
+      "failure_detail": "Missing native receipt leaves sample attempt/completion states unknown; no prefix invented.",
+      "planned_scored": 90,
+      "planned_warmups": 18,
+      "unknown_in_started_incomplete_receipts": 0,
+      "unstarted": 0
+    },
+    "command_accounting": {
+      "censored": 0,
+      "completed": 58,
+      "failed": 0,
+      "running": 0
+    },
+    "orders": [
+      [
+        "python",
+        "reference_native",
+        "candidate_native"
+      ],
+      [
+        "python",
+        "candidate_native",
+        "reference_native"
+      ],
+      [
+        "reference_native",
+        "python",
+        "candidate_native"
+      ],
+      [
+        "reference_native",
+        "candidate_native",
+        "python"
+      ],
+      [
+        "candidate_native",
+        "python",
+        "reference_native"
+      ],
+      [
+        "candidate_native",
+        "reference_native",
+        "python"
+      ]
+    ]
+  },
+  "binaries": {
+    "reference": {
+      "scope": "clean committed source build, private copied binary; not execution attestation or install/adoption evidence",
+      "binary": "/tmp/forge-test-report-clean-6a29c89-6whehe06/bin/forge",
+      "sha256": "4a0d2aa6fb709e7e81439335df9b76be1227e2d8ec8b80074a2c14d266ab4684",
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "6a29c89564ff22b374cce76dccab9d64c773922d",
+        "compiled_source_sha256": "912232239b582cc3af80f66b7048ad923b69c339dac63e3f16e40c99876d0670",
+        "executable_sha256": "4a0d2aa6fb709e7e81439335df9b76be1227e2d8ec8b80074a2c14d266ab4684"
+      },
+      "head": "6a29c89564ff22b374cce76dccab9d64c773922d",
+      "tree": "1dea97623a88a5d0935e8fcd76b0c27c49038ff3",
+      "build_log_sha256": "88b19067e890ab0cfe23da8050502e2fb30a85b39026032dd27d03fa62330139",
+      "build_seconds_reported": 81,
+      "source_clean": true,
+      "nlink": 1
+    },
+    "candidate": {
+      "scope": "clean committed source build, private copied binary; not execution attestation or install/adoption evidence",
+      "binary": "/tmp/forge-test-report-clean-1195b04-_xqtbgtz/bin/forge",
+      "sha256": "74e6b2211ddc109006123370bbcab3610b2dfa8e0064cd7fa3c8846a6f0a62d0",
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "1195b04240deadb5219f18301d3bd5a78adff57d",
+        "compiled_source_sha256": "4117bb95e82d022c1f5aac6e9ea1ce99b36ecf3045fb7a3660f34d23dd176534",
+        "executable_sha256": "74e6b2211ddc109006123370bbcab3610b2dfa8e0064cd7fa3c8846a6f0a62d0"
+      },
+      "head": "1195b04240deadb5219f18301d3bd5a78adff57d",
+      "tree": "8dfd87b9af8868e046c308bf3c49dbb13f29337a",
+      "build_log_sha256": "a883ef043abda9b1a1e089c2993d141c02dcdfcfc9cf9c62864b73dcf150bdd4",
+      "build_seconds_reported": 159,
+      "source_clean": true,
+      "nlink": 1
+    }
+  },
+  "comparator": {
+    "python_version": "CPython 3.12.3",
+    "extension_version": "0.1.94",
+    "extension_build_source_provenance": "unknown; only observed binary identity is established",
+    "pins": {
+      "python": {
+        "bytes": 8020928,
+        "path": "/home/tim/Projects/llm-forge/.venv/bin/python",
+        "resolved_path": "/usr/bin/python3.12",
+        "sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f"
+      },
+      "git": {
+        "bytes": 4066232,
+        "path": "/usr/bin/git",
+        "resolved_path": "/usr/bin/git",
+        "sha256": "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"
+      },
+      "extension": {
+        "bytes": 19776472,
+        "path": "/home/tim/Projects/llm-forge/.venv/lib/python3.12/site-packages/conductor_native/conductor_native.cpython-312-x86_64-linux-gnu.so",
+        "resolved_path": "/home/tim/Projects/llm-forge/.venv/lib/python3.12/site-packages/conductor_native/conductor_native.cpython-312-x86_64-linux-gnu.so",
+        "sha256": "3b4859e3c335388003087fd37a0dfb791dbdcf2841b4ba360721bf2b33024dd7"
+      },
+      "rustc": {
+        "bytes": 645016,
+        "path": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "resolved_path": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+      },
+      "shell": {
+        "bytes": 129784,
+        "path": "/bin/sh",
+        "resolved_path": "/usr/bin/dash",
+        "sha256": "86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"
+      }
+    }
+  },
+  "workload": {
+    "root": "/home/tim/Projects/llm-forge",
+    "head": "1195b04240deadb5219f18301d3bd5a78adff57d",
+    "input_count": 2173,
+    "source_counts": {
+      "candidate_native": 1280,
+      "python": 124,
+      "reference_native": 1
+    },
+    "source_scope": {
+      "candidate_native": "Current captured Rust/Cargo files plus candidate executable; build identity is separately recorded.",
+      "inputs": "Same current captured workload files for every arm, including current source as input where applicable.",
+      "python": "Current captured Python files and imported extension bytes; extension build provenance remains unknown.",
+      "reference_native": "Held reference executable bytes only; compiled source digest/commit independently declared above."
+    },
+    "environment": {
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_SYSTEM": "/dev/null",
+      "HOME": "/home/tim/Projects/llm-forge/.git/forge-210-benchmark-uhhmzvpf/home",
+      "LANG": "C.UTF-8",
+      "PATH": "/home/tim/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONHASHSEED": "0",
+      "PYTHONNOUSERSITE": "1",
+      "PYTHONPATH": "/home/tim/Projects/llm-forge/src",
+      "XDG_CONFIG_HOME": "/home/tim/Projects/llm-forge/.git/forge-210-benchmark-uhhmzvpf/home"
+    },
+    "limits": {
+      "benchmark_command_wait_seconds": 90,
+      "sample_seconds": 10,
+      "samples_per_receipt": 5,
+      "warmups_per_receipt": 1
+    },
+    "commands": {
+      "python": [
+        "/home/tim/Projects/llm-forge/.venv/bin/python",
+        "-m",
+        "conductor.dead_tests",
+        "--root",
+        "/home/tim/Projects/llm-forge",
+        "--json-out",
+        "/home/tim/Projects/llm-forge/tasks/audit/forge-210-benchmark-uhhmzvpf.json"
+      ],
+      "reference_native": [
+        "/home/tim/Projects/llm-forge/.git/forge-210-benchmark-uhhmzvpf/forge-reference",
+        "analyze",
+        "--root",
+        "/home/tim/Projects/llm-forge",
+        "--max-bytes",
+        "4194304",
+        "tests",
+        "--json-out",
+        "/home/tim/Projects/llm-forge/tasks/audit/forge-210-benchmark-uhhmzvpf.json"
+      ],
+      "candidate_native": [
+        "/home/tim/Projects/llm-forge/.git/forge-210-benchmark-uhhmzvpf/forge",
+        "analyze",
+        "--root",
+        "/home/tim/Projects/llm-forge",
+        "--max-bytes",
+        "4194304",
+        "tests",
+        "--json-out",
+        "/home/tim/Projects/llm-forge/tasks/audit/forge-210-benchmark-uhhmzvpf.json"
+      ]
+    }
+  },
+  "parity": [
+    {
+      "summary": {
+        "path": "/tmp/forge-210-parity-ufn9tj40/summary.json",
+        "sha256": "9de6b642c1dc32c543ed3b21504d2e724c322bc615387dd0f826ce7ff9159af6"
+      },
+      "independent_audit": {
+        "path": ".git/forge-210-parity-independent.json",
+        "sha256": "d95cd02959f598dd0ea8e13cbd61fd87e2d396e4e032dc48783d9c1dcda749a8"
+      },
+      "states": {
+        "completed": 6,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "commands": 98,
+      "scope": "Full Forge JSON and exit equality; authored full/shallow fixtures with exact configured-registry exclusion and raw-Unicode-date differences only."
+    },
+    {
+      "summary": {
+        "path": "/tmp/forge-210-parity-059boipw/summary.json",
+        "sha256": "187d79277e2d8bbee4454dd5c9256c90f288205dbd1d6ce9567013a31f45c1d1"
+      },
+      "independent_audit": {
+        "path": ".git/forge-210-optimized-parity-independent.json",
+        "sha256": "0789431b15fcc2be2a69f320725d13d0c1a19b8643d516f4cfba74ccd3f31191"
+      },
+      "states": {
+        "completed": 6,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0
+      },
+      "commands": 98,
+      "scope": "Full Forge JSON and exit equality; authored full/shallow fixtures with exact configured-registry exclusion and raw-Unicode-date differences only."
+    }
+  ],
+  "make_control": {
+    "summary": {
+      "path": ".git/forge-210-make-control.json",
+      "sha256": "e46d26a4cd8160d361583c2fed08c72c069623e041d2869014d16ea2dbf7554f"
+    },
+    "trace": {
+      "path": ".git/forge-210-make-execve.log",
+      "sha256": "8d68c203a2c6a9ae13fdb4c1e9509d3066dda4513dca66e4313e5be45628910d"
+    },
+    "scope": "Earlier working-tree binary, before history optimization; UV=false/PYTHON=false, Make/shell/native Forge execve only; artifact bytes equal Python. No current installed runtime claim."
+  },
+  "profiles": [
+    {
+      "profile": {
+        "path": ".git/forge-210-phase-profile.json",
+        "sha256": "556fb7c656a7e26699c1631932ae58002fc8bcba1d8b3deb4b3322c4a29efdcc"
+      },
+      "script": {
+        "path": ".git/forge-210-phase-profile.gdb",
+        "sha256": "efd682a536d3b07868d6396c85288ae9128999476e13fed706335f455d0a0931"
+      },
+      "raw": [
+        {
+          "path": ".git/forge-210-phase-gdb.stdout",
+          "sha256": "66a91d118bab155c56ed0f4e132b9c023230debad300aa5db29eed4ad1f4d842"
+        },
+        {
+          "path": ".git/forge-210-phase-gdb.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "stats": {
+        "untracked": {
+          "calls": 3,
+          "wall_ms": 12.792743
+        },
+        "history": {
+          "calls": 1,
+          "wall_ms": 458.879737
+        },
+        "git_verify": {
+          "calls": 2,
+          "wall_ms": 11.751961000000001
+        },
+        "reference_inventory": {
+          "calls": 4,
+          "wall_ms": 0.656982
+        },
+        "modules": {
+          "calls": 1,
+          "wall_ms": 0.153801
+        },
+        "classifier": {
+          "calls": 1,
+          "wall_ms": 8.794963
+        },
+        "capture": {
+          "calls": 1,
+          "wall_ms": 499.526722
+        },
+        "source_verify": {
+          "calls": 1,
+          "wall_ms": 2.656277
+        }
+      },
+      "scope": "GDB instrumentation overhead included; history profile has many breakpoints and substantially distorted timings. No perf sampling; host perf_event_paranoid was 4."
+    },
+    {
+      "profile": {
+        "path": ".git/forge-210-history-profile.json",
+        "sha256": "0a6a042738facf4e41c34af64a6711df40042e767d99722247692fb074075d2d"
+      },
+      "script": {
+        "path": ".git/forge-210-history-profile.gdb",
+        "sha256": "afe2d7fb14b7dc73c4884c4cc8c9d56ae94d5e6fa280c8878a7519199e921ec3"
+      },
+      "raw": [
+        {
+          "path": ".git/forge-210-history-gdb.stdout",
+          "sha256": "021347bbb040d6535276efbadc37935392b1eeb607aa66b56394a2274cc8eebc"
+        },
+        {
+          "path": ".git/forge-210-history-gdb.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "stats": {
+        "tree": {
+          "calls": 970,
+          "wall_ms": 1147.270813000001
+        },
+        "rename": {
+          "calls": 486,
+          "wall_ms": 865.3731399999999
+        },
+        "history": {
+          "calls": 1,
+          "wall_ms": 3196.558849
+        }
+      },
+      "scope": "GDB instrumentation overhead included; history profile has many breakpoints and substantially distorted timings. No perf sampling; host perf_event_paranoid was 4."
+    },
+    {
+      "profile": {
+        "path": ".git/forge-210-rename-profile.json",
+        "sha256": "3c16beb4a51bf9bb160cd9bd040d506c66047676fd679915167c9ae0fe1150c6"
+      },
+      "script": {
+        "path": ".git/forge-210-rename-profile.gdb",
+        "sha256": "256d9f87b876c6ba0573fc7b7b56173974bd2d8d2d607c5ee87a3ae029607a97"
+      },
+      "raw": [
+        {
+          "path": ".git/forge-210-rename-gdb.stdout",
+          "sha256": "960c076df4a8dc75014819cfb7f926eedb2486eba771a15f91caf0b5280d980f"
+        },
+        {
+          "path": ".git/forge-210-rename-gdb.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "stats": {
+        "find_similar": {
+          "calls": 60,
+          "wall_ms": 308.8920580000001
+        },
+        "history": {
+          "calls": 1,
+          "wall_ms": 472.443413
+        }
+      },
+      "scope": "GDB instrumentation overhead included; history profile has many breakpoints and substantially distorted timings. No perf sampling; host perf_event_paranoid was 4."
+    }
+  ],
+  "decision": {
+    "accepted": "Skip rename scoring only when no current tracked Python path participates in raw added/deleted deltas; retain full competing set and bounds whenever relevant, all history/tree/path admission and final input checks.",
+    "native_median_reduction": 0.5712799479533746,
+    "candidate_over_python_median": 0.20938721213658695,
+    "limitation": "Native migration retains a measured latency and memory gap against Python. Extra input checks are included, but their isolated cost was not measured."
+  },
+  "verification": {
+    "optimized_focused": "22 release report tests, 2 CLI tests, strict all-target Clippy and formatting passed.",
+    "earlier_focused": "18 classifier/input tests, 9 project-path cases, 9 analysis CLI cases; core strict Clippy and optional Python binding compile passed.",
+    "failed_attempts": "Retained focused logs include index bound mismatch, fixture DAG setup, missing import, Clippy lint corrections, and optimization fixture Repository lifetime failure (21 pass/1 fail); final reruns passed.",
+    "logs": [
+      {
+        "path": ".git/forge-210-focused-core.log",
+        "sha256": "b3c62e2c0ca8f131a807feb0258539e4bd2d0b8a465bae54d75eeed118066cdc"
+      },
+      {
+        "path": ".git/forge-210-focused-paths.log",
+        "sha256": "c8dba8e87ff449e85d064a6b75543833e06bb97bdc275bb222e4fb24de7354d1"
+      },
+      {
+        "path": ".git/forge-210-second-core-clippy.log",
+        "sha256": "c627036f5004655a442670254c726f978054020a07a769aee2ba97cc57b37a63"
+      },
+      {
+        "path": ".git/forge-210-fourth-clippy.log",
+        "sha256": "53868b89037ffa62787e64c734c39c17ff4326d81b10dcd492298bbe9d43d049"
+      },
+      {
+        "path": ".git/forge-210-cli-tests.log",
+        "sha256": "e3ed19a7a9b9ef41cb418be5e02eb6606cc698d3e8dffc219c860e144cdc40c4"
+      },
+      {
+        "path": ".git/forge-210-python-compat-check.log",
+        "sha256": "28bae7b07030a1ca84f5e25573b4512e2c46bfbd54977010b6a1d4028a497b0a"
+      },
+      {
+        "path": ".git/forge-210-optimized-clippy.log",
+        "sha256": "0e9ef8e4ae325eaf75ec8e4be0332f0911ef00d5cd5a3c598031e6599712a81e"
+      },
+      {
+        "path": ".git/forge-210-optimized-tests.log",
+        "sha256": "a8ac18fcd7ef569b0e00fa39b5a46bd2d1b5def7005645beb16ee6a4f463305b"
+      },
+      {
+        "path": ".git/forge-210-optimized2-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": ".git/forge-210-optimized2-clippy.log",
+        "sha256": "2214811fdcb90e7995e6272c3a7c642e43a52bc47618d3f1e36e3c3d423f1ae0"
+      },
+      {
+        "path": ".git/forge-210-optimized2-tests.log",
+        "sha256": "1b8a4ae471fb15e7370951c82916c0a4faaa592a5910e34ca669c139d5d2340d"
+      },
+      {
+        "path": ".git/forge-210-optimized-cli-tests.log",
+        "sha256": "cbd70b0a00537d96ab2088e719206e0de777347a9c9be7fb253e79fadaed31e6"
+      },
+      {
+        "path": ".git/forge-210-git-optimized-function-audit.json",
+        "sha256": "9aac01548da5f61faf650732d3375d38fe37ed52e75d1fb3fbec3702feed7ea1"
+      },
+      {
+        "path": ".git/forge-210-core-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": ".git/forge-210-core-clippy.log",
+        "sha256": "c703aa51e9263a7a4d186dd2819f608f39296596329f8bb3062d7313ff746514"
+      },
+      {
+        "path": ".git/forge-210-core-tests.log",
+        "sha256": "ef32133b0362b6de7358f8019bc6d9974c75501ac8699bb5819286e573b4b90e"
+      },
+      {
+        "path": ".git/forge-210-focused-forge.log",
+        "sha256": "867cbd60880288254491dd0c8019504088c5855dd8ec4f4fc761b6b88091a9d7"
+      },
+      {
+        "path": ".git/forge-210-second-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": ".git/forge-210-second-forge.log",
+        "sha256": "31999765442cbe0958bc5963fa2390ed6380d3ae098e7b6763888badc5eb28ee"
+      },
+      {
+        "path": ".git/forge-210-third-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": ".git/forge-210-third-forge.log",
+        "sha256": "eecb41e8de053aaf65e8510d7117172fb439e434238e23da4a311ea21a983935"
+      },
+      {
+        "path": ".git/forge-210-third-forge-clippy.log",
+        "sha256": "552afe702a4257647b2dc163168d77f724318b8656a0dd86d6360462ebcd597c"
+      },
+      {
+        "path": ".git/forge-210-fourth-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": ".git/forge-210-fourth-forge.log",
+        "sha256": "f30ffbcd668e444b65e08beb05675a055c28ce8869e72044b720b6fb8e9107d6"
+      }
+    ]
+  },
+  "reproducibility": {
+    "build": [
+      "cargo +1.98.0 build --release --offline --locked --manifest-path native/forge/Cargo.toml -p forge-cli"
+    ],
+    "method": "Build/copy each recorded native commit; verify forge mutation identity and hashes. Run all three command arrays against identical frozen checkout inputs, using all six arm permutations; each arm/block uses forge performance benchmark --samples 5 --warmups 1 --timeout-seconds 10, binding source/input inventories. Compare complete artifact bytes with fresh pre/post oracles and recheck inputs. Original scripts/raw results remain host-local with hashes; paths must be substituted for an independently pinned reproduction.",
+    "drivers": [
+      {
+        "path": ".git/forge-210-benchmark.py",
+        "sha256": "dc87b6619aea13e150f5bcb7f9aaf658d60e15d557c69b7e714e39d1e201c7d1"
+      },
+      {
+        "path": ".git/forge-210-benchmark-three-arm.py",
+        "sha256": "cc6d2c7db0cc5adad368be6c082dd94d72eed36b005bd72f19adeddace8831d5"
+      },
+      {
+        "path": ".git/forge-210-parity.py",
+        "sha256": "195c671ca9b680edbe799b6b877507f5eecc36d4b724b4e28b262b654e331f97"
+      },
+      {
+        "path": ".git/forge-210-parity-strict.py",
+        "sha256": "834ff3e9ebbae817e2eb930dd390f4b67003563f06770d0cac97131b854796fe"
+      }
+    ]
+  },
+  "limitations": [
+    "Matched semantic workload, not performance compare-compatible CLI identities.",
+    "Fresh processes with shared/warming filesystem caches; no cold-host claim.",
+    "CPU/max RSS are native wait4 observations for the measured shell process, not aggregate process-tree peak memory.",
+    "Final measured artifact and block pre/post oracle bytes are checked; transient modify/restore is not attested.",
+    "Helper owns its direct process group; no hostile detached-descendant cleanup attestation.",
+    "Synchronous hashes/input capture have cooperative bounds, not a hard whole-driver deadline.",
+    "Python extension provenance is an observed file pin, not clean-build attestation.",
+    "Reference-native compiled commit/source identity is separately pinned; its Rust build source files are not claimed present.",
+    "All receipts are emitted by the candidate performance CLI; workload executable selection distinguishes the native arms.",
+    "Receipt HEAD identifies current workload checkout, not the reference-native compiled commit.",
+    "Python/native changes and candidate/reference-native changes are separate comparisons; no productivity claim.",
+    "Nearest-rank empirical p50/p95 across 30 scored samples per arm; warmups excluded from metrics.",
+    "Read-only syntax findings are advisory, not execution coverage or deletion authorization.",
+    "MCP integration still requires Git/configuration read admission, whole-operation cancellation and wrapped-output bounds.",
+    "No new source-scoped mutation campaign was run; Forge mutation evidence is optional.",
+    "Index and local build identity are cooperative provenance, not execution attestation; host-local raw evidence is not bundled in Git."
+  ]
+}

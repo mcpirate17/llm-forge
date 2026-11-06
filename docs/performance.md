@@ -10,6 +10,27 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Full native test-import report — 2026-11-06
+
+`forge analyze tests` shares the existing classifier and replaces the Make target's
+Python collector. The first matched run completed 48 executions: native median
+510.60 ms versus Python 180.01 ms. Profiling identified unnecessary rename scoring.
+The [evidence index](../research/performance/forge-program-20261106-test-report.json) retains that baseline, profiles, failures, commands and pins.
+
+| Actual Forge report | Median ms | p95 ms | CPU median ms | Maximum RSS MiB |
+| --- | ---: | ---: | ---: | ---: |
+| Python CLI | 181.06 | 189.88 | 181.73 | 31.0 |
+| Native `6a29c89` | 510.75 | 523.75 | 507.50 | 42.9 |
+| Native `1195b04` | 218.97 | 231.67 | 217.17 | 32.8 |
+
+All 108 executions completed across six arm orders, with 30 scored samples per arm
+and 18 warmups. Independent audits verified exact report bytes, inputs and receipts.
+Relevant rename competitors and input checks remain; median native latency fell 57%,
+but remained 21% above Python. Fresh processes shared filesystem caches; RSS is a
+wait4 observation, not aggregate process-tree memory. These are semantic comparisons
+across distinct command identities, not compatible receipt comparisons or agent gains.
+The pinned Python extension's build provenance is unknown. Full release status is in the roadmap.
+
 ### Native report migration baseline — 2026-11-06
 
 The native evidence, changed, coverage and canary commands preserve the existing
