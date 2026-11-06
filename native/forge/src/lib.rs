@@ -191,6 +191,8 @@ pub mod memory_ingest;
 pub mod memory_ingest_cli;
 #[cfg(target_os = "linux")]
 pub mod memory_store;
+#[cfg(target_os = "linux")]
+mod nofollow_path;
 pub mod notes_index;
 pub mod ownership;
 pub mod ownership_lifecycle;

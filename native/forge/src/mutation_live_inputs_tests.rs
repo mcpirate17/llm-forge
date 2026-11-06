@@ -165,3 +165,18 @@ fn ordinary_supporting_inventory_holds_live_inputs_and_additions() {
     fs::write(root.path().join("src/added.rs"), "fn added() {}\n").unwrap();
     assert!(live.verify().is_err());
 }
+
+#[test]
+fn missing_nested_input_is_held_and_symlinked_ancestor_is_refused() {
+    let root = tempfile::tempdir().unwrap();
+    let mut held = LiveInputs::open(root.path()).unwrap();
+    assert!(held.read("missing/nested/file.json").unwrap().is_none());
+    held.verify().unwrap();
+    fs::create_dir_all(root.path().join("missing/nested")).unwrap();
+    fs::write(root.path().join("missing/nested/file.json"), b"{}").unwrap();
+    assert!(held.verify().is_err());
+    fs::create_dir(root.path().join("actual")).unwrap();
+    symlink(root.path().join("actual"), root.path().join("link")).unwrap();
+    let mut held = LiveInputs::open(root.path()).unwrap();
+    assert!(held.read("link/missing/deep.json").is_err());
+}

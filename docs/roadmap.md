@@ -15,6 +15,19 @@ PR head `966ae9a128458a6cbc488bfcd51bc574c4b623eb`. The canonical measurement an
 Open defects live in the [issue tracker](https://github.com/mcpirate17/llm-forge/issues),
 not a parallel local defect ledger.
 
+### Native reporting increment — in verification, 2026-11-06
+
+Issue [#208](https://github.com/mcpirate17/llm-forge/issues/208) moves explicit,
+changed, coverage and canary reports to shared Rust validation and routes their
+Make targets through the native CLI. Commit `88a63ef` passed focused tests and
+strict Clippy; its full JSON/exit parity controls passed. It is not yet published.
+The first timing comparison found a native regression, recorded in the canonical
+[performance report](performance.md#native-report-migration-baseline--2026-11-06).
+The next candidate reduces repeated path resolution while preserving input checks.
+Remeasurement, a real installed-receipt control, and full publication validation
+remain before acceptance. Existing Python host APIs are retained compatibility
+surfaces; this increment does not establish host adoption or complete Rust migration.
+
 ### Architecture, evidence and disposition
 
 Paths below are relative to `native/forge/src/` unless qualified.

@@ -10,6 +10,35 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Native report migration baseline — 2026-11-06
+
+The first clean reporting implementation, `88a63ef`, matched the existing Python
+commands' complete JSON and exit codes across four actual Forge workloads and
+two fixture API controls. All 52 observations completed; none failed, were censored
+or remained unstarted. The fixture controls are excluded from timing comparisons.
+
+Five repeated fresh-process pairs produced these median wall times:
+
+| Actual Forge report | Existing Python CLI | Native `88a63ef` |
+| --- | ---: | ---: |
+| Explicit evidence | 40 ms | 130 ms |
+| Changed evidence | 40 ms | 130 ms |
+| Coverage | 100 ms | 270 ms |
+| Canary | 100 ms | 270 ms |
+
+The native path was slower and used more memory: median maximum RSS increased
+from 42,492 to 46,148 KiB for explicit evidence and from 45,228 to 62,396 KiB for
+coverage. GNU time has 10 ms resolution here; filesystem caches were uncontrolled.
+The comparator is the existing CPython 3.12.3 environment and its pinned native
+extension, version 0.1.94. That extension's build-source provenance is unavailable.
+This is an artifact comparison, not evidence that the same Rust source was built
+into both runtimes. Model costs and agent effectiveness were not measured.
+
+Instrumented profiling found 61,706 syscalls for explicit evidence and 254,019 for
+coverage, dominated by repeated path canonicalization. A subsequent candidate
+replaces those walks with a Linux no-symlink lookup while preserving held-input
+checks. Its performance remains pending measurement; this slower baseline is retained.
+
 ### Reproducible native timeout fixture — 2026-11-06
 
 The checked-in opt-in Rust test at `5f78e9b` reproduces the interrupted-engine

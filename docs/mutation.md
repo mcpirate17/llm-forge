@@ -666,6 +666,9 @@ Validator defects exit 5 and domain refusals exit 4. These commands never run
 mutants. Inventory uses libgit2 without invoking Git or its configured hooks;
 Rust source used for classification is held and rechecked. These are bounded
 observations with drift checks, not an atomic repository snapshot.
+Held-input path checks require Linux 5.6+ `openat2` and permission to call it;
+unsupported kernels or syscall filters are refused. The no-symlink lookup keeps
+the existing ownership, inode, metadata and content checks.
 
 Legacy Python-produced receipts need `--legacy-component-root /path/to/package-parent`
 containing `conductor/` and `tooling/`. This is observed identity, not execution

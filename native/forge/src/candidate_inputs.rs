@@ -69,10 +69,8 @@ fn canonical(path: &Path) -> Result<()> {
                 .all(|c| matches!(c, Component::RootDir | Component::Normal(_))),
         "input path must be bounded, absolute and normalized"
     );
-    ensure!(
-        path.canonicalize()? == path,
-        "input path contains a symlink or is not canonical"
-    );
+    crate::nofollow_path::check(path)
+        .context("input path contains a symlink or is not canonical")?;
     Ok(())
 }
 
