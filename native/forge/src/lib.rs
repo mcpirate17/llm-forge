@@ -297,6 +297,8 @@ pub(crate) mod mutation_fest_inputs;
 #[cfg(target_os = "linux")]
 pub mod mutation_mull_inventory_cli;
 #[cfg(target_os = "linux")]
+pub mod mutation_mull_refresh_cli;
+#[cfg(target_os = "linux")]
 pub(crate) mod mutation_mull_runtime;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_mull_toolchain;

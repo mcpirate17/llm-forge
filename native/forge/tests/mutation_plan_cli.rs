@@ -59,6 +59,85 @@ fn payload(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).expect("JSON on stdout")
 }
 
+#[test]
+fn native_mull_refresh_previews_then_applies_without_an_interpreter_or_git_on_path() {
+    let dir = branch_host();
+    fs::create_dir(dir.path().join("tests")).unwrap();
+    fs::write(
+        dir.path().join("src/add.cpp"),
+        "int add(int a,int b){return a+b;}\n",
+    )
+    .unwrap();
+    fs::write(dir.path().join("tests/add.cpp"), "int main(){return 0;}\n").unwrap();
+    let written = forge(
+        dir.path(),
+        &[
+            "write",
+            "cpp",
+            "--mull-confined",
+            "--jobs",
+            "1",
+            "--base",
+            "main",
+            "--only",
+            "src/add.cpp",
+            "--extra-test",
+            "src/add.cpp=tests/add.cpp",
+        ],
+    );
+    assert!(written.status.success(), "{written:?}");
+    let result = payload(&written);
+    let manifest = result["written"][0].as_str().unwrap();
+    let fragment = result["written"][1].as_str().unwrap();
+    let old = fs::read(dir.path().join(manifest)).unwrap();
+    let registry = fs::read(dir.path().join(fragment)).unwrap();
+    fs::write(
+        dir.path().join("src/add.cpp"),
+        "int add(int a,int b){return a-b;}\n",
+    )
+    .unwrap();
+    let refresh = |apply: bool| {
+        let mut command = Command::new(forge_binary::path());
+        command
+            .env_clear()
+            .env("PATH", "")
+            .current_dir(dir.path())
+            .args(["mutation", "refresh", manifest]);
+        if apply {
+            command.arg("--apply");
+        }
+        let output = command.output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        payload(&output)
+    };
+    let preview = refresh(false);
+    assert_eq!(preview["status"], "PREVIEW");
+    assert_eq!(preview["changed"], true);
+    assert_eq!(fs::read(dir.path().join(manifest)).unwrap(), old);
+    let applied = refresh(true);
+    assert_eq!(applied["status"], "APPLIED");
+    assert_eq!(
+        applied["proposed_manifest_sha256"],
+        preview["proposed_manifest_sha256"]
+    );
+    assert_eq!(applied["evidence_status"], "NOT_EVALUATED");
+    let new = fs::read(dir.path().join(manifest)).unwrap();
+    assert_ne!(new, old);
+    assert_eq!(refresh(true)["status"], "UNCHANGED");
+    assert_eq!(fs::read(dir.path().join(manifest)).unwrap(), new);
+    assert_eq!(fs::read(dir.path().join(fragment)).unwrap(), registry);
+    fs::write(dir.path().join(manifest), b"{}").unwrap();
+    let refused = Command::new(forge_binary::path())
+        .env_clear()
+        .env("PATH", "")
+        .current_dir(dir.path())
+        .args(["mutation", "refresh", manifest, "--apply"])
+        .output()
+        .unwrap();
+    assert_eq!(refused.status.code(), Some(4));
+    assert_eq!(fs::read(dir.path().join(manifest)).unwrap(), b"{}");
+}
+
 fn python_host() -> tempfile::TempDir {
     let dir = branch_host();
     fs::write(

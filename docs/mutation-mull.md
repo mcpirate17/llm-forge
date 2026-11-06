@@ -4,8 +4,8 @@
 unit and one distinct standalone test driver written in the same language. It
 does not infer a project build or test command. The generated campaign pins the
 source and driver bytes, uses one worker, and builds a fixed standalone target.
-Unmarked Mull campaigns remain refused. Native `mutation refresh` does not yet
-support C++ manifests; regenerate them through `write`.
+Unmarked Mull campaigns remain refused. The native refresh command below updates
+this profile's pins while preserving its recorded survivor baseline.
 
 ## Plan and write
 
@@ -21,6 +21,29 @@ forge mutation write cpp --repo-root /absolute/repository --owner my-lane \
   --base origin/main --only src/subject.cpp --mull-confined --jobs 1 \
   --run-timeout 60 --extra-test src/subject.cpp=tests/driver.cpp
 ```
+
+To update the same source and driver after an edit, use the exact manifest path
+returned by `write`, not a campaign ID:
+
+```sh
+forge mutation refresh campaigns/PATH-FROM-WRITE.json --repo-root /absolute/repository
+forge mutation refresh campaigns/PATH-FROM-WRITE.json --repo-root /absolute/repository --apply
+```
+
+Refresh previews by default. `--apply` replaces only changed source/driver hashes;
+all other manifest fields, including survivor-ratchet metadata, are preserved.
+Current pins are a no-op, leaving the existing bytes and inode unchanged.
+The JSON report includes old/proposed manifest hashes and both input pins;
+`--verbose` adds the complete proposed manifest. This command supports only
+`mull-confined-v1`. It does not check registration, change the registry, execute
+tests or Mull, or issue a receipt. Existing receipts still require fresh validation;
+the output's `NOT_EVALUATED` evidence status is not a passing result.
+
+The command captures bounded manifest/source/driver bytes, rejects symlinks and
+hard links, and rechecks their identities and hashes immediately before replacing
+the manifest. Cooperating publishers serialize on the parent-directory lock.
+This detects observed drift, not hostile same-UID changes between checks and
+rename. A directory-sync failure is reported even if replacement already occurred.
 
 Review the plan and exact hashes in the written manifest. C sources use C11;
 C++ sources use C++17, without compiler extensions. The generated test command is
@@ -157,8 +180,34 @@ controls. Subsequent publication heads require their own matching receipts.
 The next gate at `68caf0a` found an unrelated embedding HTTP fixture race.
 A test-only complete-request reader correction retained the exact error assertion;
 12 focused tests and 200 repeated duplicate-key cases passed. The failed gate is
-retained, and the corrected publication head still requires a full matching gate.
+retained. All 18 checks and fresh-base verification subsequently passed at
+`a154c27`, again with 5,000 passing executions, zero failures and 203 ignored.
+[PR #215](https://github.com/mcpirate17/llm-forge/pull/215) merged as `de687f5`,
+with exactly the checked tree. This is the runner's gate, not the later refresh
+increment's publication receipt.
 No global installation, host adoption, performance improvement, or agent-task benefit
 is established. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
 for run identities, receipts, limits, and publication status.
+
+## Refresh measurements
+
+Clean release `9c10c9f` was measured on two authored source/driver pairs, with two
+warmups and 20 scored fresh-process previews per case. All 44 JSON outputs matched
+expected pins and every fixture file remained unchanged. Final recorder and build
+both identify Rust 1.98.0; earlier setup and ambient-toolchain attempts remain in
+the evidence. These are warm-cache observations including shell startup.
+
+| Source / driver bytes | Wall p50 / p95 | CPU p50 | Maximum child RSS |
+|---|---:|---:|---:|
+| 4,098 / 4,086 | 1.858 / 2.459 ms | 1.387 ms | 17.44 MiB |
+| 65,058 / 65,046 | 2.044 / 2.217 ms | 1.559 ms | 17.50 MiB |
+
+The [refresh index](../research/performance/forge-program-20261106-mull-refresh.json)
+contains the fixture recipe, exact command provenance and links to both sealed
+receipts. Independent audit recomputed the observations. No cold-cache,
+allocation, matched speedup, model-cost or agent-task result is established.
+The later stale-receipt test addition changes no measured production file.
+The full 18-step check and fresh-base verification passed at `7d80f88`: 5,014
+passing test executions, zero failures and 203 ignored across 182 harnesses.
+Later publication heads require their own matching receipts.

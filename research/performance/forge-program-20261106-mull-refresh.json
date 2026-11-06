@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "kind": "native_mull_refresh_evidence",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/216",
+  "status": "implementation_release_and_full_gate_verified_at_7d80f88",
+  "base_commit": "de687f577edeea5f557790b865a656cddb54835b",
+  "scope": "Preview and optionally update only source/test pins of one explicit generated mull-confined-v1 manifest; preserve all other fields. No registration, payload execution or evidence production.",
+  "verification": {
+    "refresh_tests_passed": 6,
+    "core_tests_passed": 2,
+    "publisher_tests_passed": 7,
+    "existing_corpus_tests_passed": 18,
+    "actual_cli_tests_passed": 1,
+    "strict_clippy_forge": "PASS",
+    "strict_clippy_core": "PASS",
+    "independent_review": "No concrete production blocker. Corrected duplicate-key test to use an otherwise valid generated manifest.",
+    "full_local_check": {
+      "receipt": ".git/forge-checks/run-1793986655974966960-2591944/receipt.json",
+      "sha256": "f2b4e806c2cd4ab7519edbfefd18e09d7af433635e0fdbed0ed5f27520eacd0f",
+      "head": "7d80f88fd5ea7ad1bb6f7f2606176f274f27e344",
+      "tree": "1aefc3bda9e2ad9081b39804bd2a0c5fd97f9447",
+      "base": "de687f577edeea5f557790b865a656cddb54835b",
+      "steps_passed": 18,
+      "test_executions": {
+        "passed": 5014,
+        "failed": 0,
+        "ignored": 203
+      },
+      "test_harnesses": 182,
+      "counts_scope": "summed test-result lines, includes feature-matrix/repeated executions; not unique test cases"
+    },
+    "local_verify": "PASS at 7d80f88 against freshly fetched origin/main de687f5; subsequent heads require their own matching receipts",
+    "stale_receipt_regression": "Existing corpus fixture initially accepts; independently changed manifest/source/test pins each reject the old receipt. Unit contract test, not engine evidence.",
+    "independent_measurement_audit": "PASS: both receipts, 40 scored observations, four warmups, all preview JSON outputs, unchanged fixture files and source/build/input/workload digests verified."
+  },
+  "measurements": {
+    "scope": "Two authored byte-volume fixtures; fresh process with warmed caches; 2 warmups and 20 samples each; shell startup included; no cold-cache or matched speedup evidence.",
+    "toolchain": "release and final recorder rustc 1.98.0; exact binary/source recorded above",
+    "cases": [
+      {
+        "name": "small",
+        "source_bytes": 4098,
+        "driver_bytes": 4086,
+        "scored_samples": 20,
+        "warmups": 2,
+        "p50_ms": 1.857803,
+        "p95_ms": 2.459277,
+        "cpu_p50_ms": 1.387,
+        "max_rss_bytes": 18284544,
+        "receipt": "research/performance/forge-program-20261106-mull-refresh-small-receipt.json",
+        "receipt_file_sha256": "506916cdfbe40d235f53eb2a7d4c27573ad0a39fa85c4ea9676d0227a44a1951",
+        "receipt_sha256": "f7a6d0a22116675e48f21f393f2e480c5d4a65ea88b611528da7eed2cffe7071",
+        "verified_preview_outputs": 22
+      },
+      {
+        "name": "larger",
+        "source_bytes": 65058,
+        "driver_bytes": 65046,
+        "scored_samples": 20,
+        "warmups": 2,
+        "p50_ms": 2.043914,
+        "p95_ms": 2.216895,
+        "cpu_p50_ms": 1.559,
+        "max_rss_bytes": 18345984,
+        "receipt": "research/performance/forge-program-20261106-mull-refresh-larger-receipt.json",
+        "receipt_file_sha256": "432f31ab0a874668987c8c6cfc2883a0a1aa1916cf32ed32c415d571edc3324a",
+        "receipt_sha256": "a6b1f88227faeaa1e17db9ee520c5d15ac4de81cf32a98a9018b510efca4f2ec",
+        "verified_preview_outputs": 22
+      }
+    ],
+    "failures_in_final_44_preview_calls": 0,
+    "cold_cache_observations": null,
+    "allocation_measurements": null,
+    "matched_baseline": null,
+    "agent_tasks_or_model_usage": null,
+    "model_or_engine_execution": false
+  },
+  "limitations": [
+    "Only the exact confined Mull profile is supported; no native Python/Rust refresh parity.",
+    "Explicit file selection neither checks nor changes registry membership.",
+    "Cooperating writers use a parent lock; revalidation is not kernel compare-and-swap against hostile same-UID changes.",
+    "Refresh does not authenticate a producer, execute tests or validate existing receipts.",
+    "No matched speedup, model token reduction, task-success benefit or host adoption is claimed."
+  ],
+  "artifacts": {
+    "refresh_unit": {
+      "path": ".git/forge-mull-refresh-focused2.log",
+      "sha256": "5b1c060bab0113d7d5256f31ad083c54e6d2ecd4041550f9ff4917445808d19d"
+    },
+    "core_unit": {
+      "path": ".git/forge-mull-refresh-core1.log",
+      "sha256": "4a20dd1c9507be2c3cdab9b86412d4b42e5ce480a1236848210babc5bbea56bd"
+    },
+    "publisher_unit": {
+      "path": ".git/forge-mull-refresh-publisher1.log",
+      "sha256": "985e6a4b81a462fd86d6e9396b03ee843a81b73592dda5deaa35d629009d183b"
+    },
+    "corpus_regression": {
+      "path": ".git/forge-mull-refresh-corpus1.log",
+      "sha256": "46014d0e081a79ba2bf948a61dd552c8b2cd50d9d23ba3dc53a9cf2fb2d725a1"
+    },
+    "cli": {
+      "path": ".git/forge-mull-refresh-cli1.log",
+      "sha256": "526e6c01e2a5cc16168c52a7ee411c7de14983f0b848a169e8917e98cdbdb2cc"
+    },
+    "forge_clippy": {
+      "path": ".git/forge-mull-refresh-clippy1.log",
+      "sha256": "d20224ee1b83dfd0129bf18e1fb794e744538d410ab322f5294bb69598e165ff"
+    },
+    "core_clippy": {
+      "path": ".git/forge-mull-refresh-core-clippy1.log",
+      "sha256": "f81bbafae69bc0a2c62d738b6b207f87c3c162c4bd6e7ebf7b63b7fbeeaa1a1b"
+    },
+    "release_build": {
+      "path": ".git/forge-mull-refresh-release-binary.json",
+      "sha256": "4c3b51f316d779f8eb2ec80437d14dea1e27b2c549247a604aef36afeb9c7142"
+    },
+    "release_build_script": {
+      "path": ".git/forge-mull-refresh-release-build.py",
+      "sha256": "39c22189b5a65904c1974a99447c6883d792018a21029812c3d24d387075a491"
+    },
+    "measure_script_v3": {
+      "path": ".git/forge-mull-refresh-measure-v3.py",
+      "sha256": "a19e33259d0a02a04e5e962964ae7a6c17220ed118d3139f842f1cd2a4d5ba64"
+    },
+    "measure_summary_v3": {
+      "path": "/home/tim/Projects/llm-forge/.git/mull-refresh-measure-qg6t5n4p/summary.json",
+      "sha256": "4b9c1c0e19c29afb8f00f18bfb91dcdba4ef272a5c6b69876108dedcc7a9e6a9"
+    },
+    "measure_commands_v3": {
+      "path": "/home/tim/Projects/llm-forge/.git/mull-refresh-measure-qg6t5n4p/commands.json",
+      "sha256": "27caa62e06493be555da7f57e5e511ed87fdda5b7090f05df2b2c27cfae6a115"
+    },
+    "measure_audit_v3": {
+      "path": ".git/forge-mull-refresh-measure-v3-independent.json",
+      "sha256": "75dc633bc575a4da9c12631c6ff3d5deb3d87ea6c6374d92f41f985f8ed3a9fb"
+    },
+    "retained_measure_script_v1": {
+      "path": ".git/forge-mull-refresh-measure.py",
+      "sha256": "463164e2faec9baac59e7eb04ff51a805f5dadd79571131aaa0dd6bd89c7a2ba"
+    },
+    "retained_measure_failure_v1": {
+      "path": ".git/forge-mull-refresh-measure.log",
+      "sha256": "a970a699f50044248bb0306fea193a9cccf2b2f586153655c0af2547336a8877"
+    },
+    "retained_measure_commands_v1": {
+      "path": ".git/mull-refresh-measure-9bxhcdcr/commands.json",
+      "sha256": "618f6bf826179dd135f838bcb3c677152bbc98957dedf2f90b04b75a5935e5c7"
+    },
+    "retained_measure_summary_v2": {
+      "path": ".git/mull-refresh-measure-ctgx0e7z/summary.json",
+      "sha256": "367907bb6eea0d0a9888bb0049e4a966fe39a0998e0cb148e046cc8c676eca51"
+    },
+    "retained_measure_audit_v2": {
+      "path": ".git/forge-mull-refresh-measure-independent.json",
+      "sha256": "d69127aadd3d2a78288e09eccab92c31a6352aab4f0aa5371d170f3a506e4088"
+    },
+    "retained_corpus_test_failure": {
+      "path": ".git/forge-mull-refresh-corpus2.log",
+      "sha256": "8fc399308d8145018c411a47034046100a259627b81ffea87081e5d8ebb26a24"
+    },
+    "corpus_regression_final": {
+      "path": ".git/forge-mull-refresh-corpus3.log",
+      "sha256": "d8490e9d7e7f08992839ea6c1a8129bad9a9afe3e729d15b0b0a8c7a1fbfa7d3"
+    },
+    "full_gate1": {
+      "path": ".git/forge-checks/run-1793986655974966960-2591944/receipt.json",
+      "sha256": "f2b4e806c2cd4ab7519edbfefd18e09d7af433635e0fdbed0ed5f27520eacd0f"
+    },
+    "full_gate1_counts": {
+      "path": ".git/forge-mull-refresh-gate1-summary.json",
+      "sha256": "9a6090d5301909228c7ea4748a650f2c38300ed34907994881cbf31f47997cfd"
+    },
+    "local_verify1": {
+      "path": ".git/forge-mull-refresh-local-verify1.log",
+      "sha256": "7f5f3c06f8e4a7aedf5c745eee693833fc5d27bdbb5ce7c401c58c0af92b1fca"
+    }
+  },
+  "implementation_commit": "9c10c9fac1ae909a58fadeb31674ffe14b60e4ca",
+  "compiled_source_sha256": "c6d973a860c9670a2e751e4a85002840ddcdb949b9cc8beddd26c0df70f2f1f3",
+  "release_executable_sha256": "53acd25867d542197b13fcc3a92d80eaafa3d97181fca3747af3e4769d57a880",
+  "fixture_recipe": {
+    "source_initial": "int add(int a,int b){return a+b;}\n",
+    "driver_initial": "int main(){return 0;}\n",
+    "comment_line": "// followed by 124 ASCII x characters and LF",
+    "comment_lines_per_input": {
+      "small": 32,
+      "larger": 512
+    },
+    "setup": "Author fixture Git baseline, change source a+b to a-b, invoke native mutation write cpp with --mull-confined --jobs 1 and exact source/driver pair, then change source to a*b and driver return to 1. Keep generated manifest unchanged during previews. Full argv retained in commands artifacts.",
+    "measurement": "forge performance benchmark --samples 20 --warmups 2 --timeout-seconds 10; command PATH= exec <pinned-release> mutation refresh <manifest> --repo-root <fixture>; source/input files bound by receipt."
+  },
+  "retained_attempts": [
+    {
+      "kind": "measurement setup",
+      "result": "Initial benchmark refused before first sample because --env PATH= prevented the measurement launcher from finding sh; five preceding setup/CLI calls passed, benchmark invocation failed, later case unstarted, no receipt.",
+      "correction": "Set PATH empty inside the measured shell command, retaining launcher PATH. No product change."
+    },
+    {
+      "kind": "measurement identity",
+      "result": "V2 completed all 44 calls; recorder identified ambient rustc 1.93.1 while release build used +1.98.0. Receipts retained with that distinction.",
+      "correction": "Final V3 pins recorder RUSTUP_TOOLCHAIN=1.98.0; same release and same bounded fixture recipe, no performance comparison across environments."
+    },
+    {
+      "kind": "new unit test oracle",
+      "result": "First stale-receipt test run: 17 passed, 1 failed because a source-pin mismatch returned a broader Mull error. Independent review also found the chosen test digest unchanged.",
+      "correction": "Use distinct digests and assert each field changes; preserve positive initial acceptance and require rejection for each independent pin change. All 18 then passed."
+    }
+  ]
+}

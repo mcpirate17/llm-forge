@@ -98,6 +98,8 @@ pub mod mutation_generated_identity;
 mod mutation_manifest;
 pub mod mutation_mull_outcome;
 pub mod mutation_mull_receipt;
+#[cfg(feature = "source-analysis")]
+pub mod mutation_mull_refresh;
 pub mod mutation_mull_report;
 pub mod mutation_native_runner;
 pub mod mutation_patch_anchor;

@@ -1,0 +1,133 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1793986284,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "9c10c9fac1ae909a58fadeb31674ffe14b60e4ca",
+    "source_files": {
+      "native/conductor-native/Cargo.lock": "27d3a57fa08329b59aff2b06c72a1a2b11e4a23317d4238ad571ec75d6b9e2a6",
+      "native/conductor-native/src/mutation_mull_refresh.rs": "d664b6a9d9161d1c1690419dd1d31eaaa213410ca7bcc4710a2fe3b7a0917878",
+      "native/forge/Cargo.lock": "a40a856c4603e78fa2dcce537202bbcf17a87bc02978450a1e41df1cb91e1a4d",
+      "native/forge/src/candidate_inputs.rs": "b9f8d69b6df21de2c6e7d718836563a173106b5f3925995cb71ad2ec9376958f",
+      "native/forge/src/candidate_report_store.rs": "abc8f2273464f0248dc8165913f9d9330d5fcb550b88b62ac60239a588dcd18d",
+      "native/forge/src/main.rs": "97bc101f55f8a37358107b4a81d072673a65d0d5291addeab42451b12eaccd84",
+      "native/forge/src/mutation_mull_refresh_cli.rs": "08b0385c8741b2cbad298db50c69376c2fc52d0d040feaa5d4faece323d4faa1"
+    },
+    "command": "PATH= exec /tmp/forge-mull-refresh-release-9c10c9f-lzrpssg7/bin/forge mutation refresh campaigns/measure_subject_mull_20261106.json --repo-root /home/tim/Projects/llm-forge/.git/mull-refresh-measure-qg6t5n4p/larger",
+    "workload_sha256": "b09e3176eb2b140b19c3f33f86a66c42c7c921b79f2f356ca7b4454144f00f61",
+    "environment_sha256": "ecefe48613b2fd34dffab1e052fa9589a9afcb2f6ff394a1cbb68e42407498a1",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "warmups": 2,
+    "timeout_seconds": 10
+  },
+  "samples": [
+    {
+      "wall_ms": 2.491177,
+      "cpu_ms": 2.008,
+      "max_rss_bytes": 17809408
+    },
+    {
+      "wall_ms": 2.164895,
+      "cpu_ms": 1.685,
+      "max_rss_bytes": 17870848
+    },
+    {
+      "wall_ms": 2.112275,
+      "cpu_ms": 1.633,
+      "max_rss_bytes": 18010112
+    },
+    {
+      "wall_ms": 2.039384,
+      "cpu_ms": 1.559,
+      "max_rss_bytes": 17985536
+    },
+    {
+      "wall_ms": 2.036834,
+      "cpu_ms": 1.548,
+      "max_rss_bytes": 17850368
+    },
+    {
+      "wall_ms": 2.057815,
+      "cpu_ms": 1.556,
+      "max_rss_bytes": 18214912
+    },
+    {
+      "wall_ms": 2.216895,
+      "cpu_ms": 1.726,
+      "max_rss_bytes": 17518592
+    },
+    {
+      "wall_ms": 2.173905,
+      "cpu_ms": 1.689,
+      "max_rss_bytes": 18190336
+    },
+    {
+      "wall_ms": 2.043914,
+      "cpu_ms": 1.518,
+      "max_rss_bytes": 18141184
+    },
+    {
+      "wall_ms": 2.002643,
+      "cpu_ms": 1.512,
+      "max_rss_bytes": 17969152
+    },
+    {
+      "wall_ms": 1.9725340000000002,
+      "cpu_ms": 1.511,
+      "max_rss_bytes": 18006016
+    },
+    {
+      "wall_ms": 2.078154,
+      "cpu_ms": 1.612,
+      "max_rss_bytes": 17932288
+    },
+    {
+      "wall_ms": 2.2165850000000002,
+      "cpu_ms": 1.757,
+      "max_rss_bytes": 18120704
+    },
+    {
+      "wall_ms": 2.023564,
+      "cpu_ms": 1.562,
+      "max_rss_bytes": 17375232
+    },
+    {
+      "wall_ms": 2.010554,
+      "cpu_ms": 1.549,
+      "max_rss_bytes": 17645568
+    },
+    {
+      "wall_ms": 2.164655,
+      "cpu_ms": 1.686,
+      "max_rss_bytes": 18067456
+    },
+    {
+      "wall_ms": 2.214936,
+      "cpu_ms": 1.742,
+      "max_rss_bytes": 17985536
+    },
+    {
+      "wall_ms": 2.001444,
+      "cpu_ms": 1.534,
+      "max_rss_bytes": 18022400
+    },
+    {
+      "wall_ms": 2.003114,
+      "cpu_ms": 1.527,
+      "max_rss_bytes": 18030592
+    },
+    {
+      "wall_ms": 1.9783629999999999,
+      "cpu_ms": 1.529,
+      "max_rss_bytes": 18345984
+    }
+  ],
+  "summary": {
+    "p50_ms": 2.043914,
+    "p95_ms": 2.216895,
+    "cpu_p50_ms": 1.559,
+    "max_rss_bytes": 18345984
+  },
+  "receipt_sha256": "a6b1f88227faeaa1e17db9ee520c5d15ac4de81cf32a98a9018b510efca4f2ec"
+}

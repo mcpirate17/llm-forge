@@ -318,6 +318,9 @@ enum MutationCommand {
     /// Observe a bounded Mull runtime directory digest without granting execution.
     #[cfg(target_os = "linux")]
     MullInventory(forge::mutation_mull_inventory_cli::MullInventoryArgs),
+    /// Preview refreshed pins for one confined Mull manifest; --apply publishes them.
+    #[cfg(target_os = "linux")]
+    Refresh(forge::mutation_mull_refresh_cli::RefreshArgs),
     /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
     /// Write one manifest and registry fragment per planned subject.
@@ -579,6 +582,10 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
             forge::mutation_mull_inventory_cli::run(args),
             1,
         ),
+        #[cfg(target_os = "linux")]
+        MutationCommand::Refresh(args) => {
+            command_exit("mutation refresh", run_mutation_refresh(args), 4)
+        }
         MutationCommand::Results(args) => {
             command_exit("mutation results", mutation_results::run(args), 2)
         }
@@ -603,6 +610,12 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
             1,
         ),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn run_mutation_refresh(args: forge::mutation_mull_refresh_cli::RefreshArgs) -> anyhow::Result<u8> {
+    let root = mutation_plan::resolve_repo_root(args.repo_root.clone())?;
+    forge::mutation_mull_refresh_cli::run(&root, &args)
 }
 
 fn build_stamp() -> forge::candidate_engine_identity::BuildStamp {
