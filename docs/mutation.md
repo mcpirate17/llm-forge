@@ -373,6 +373,9 @@ root: cargo-mutants treats slashless file patterns as recursive basename globs,
 which could include unselected files. Subjects such as `src/changed.rs` remain
 supported. This refusal occurs after metadata validation and before testing or
 mutation; Forge does not silently broaden the requested source scope.
+The [selected workspace controls](performance.md#selected-workspace-test-controls--2026-11-06)
+exercise real automatic mutants with both killed and surviving outcomes,
+including an unselected target that cannot compile.
 
 Add an operator-selected repository-relative lockfile to the grant:
 

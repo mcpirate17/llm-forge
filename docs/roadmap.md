@@ -104,13 +104,27 @@ checks and exact-head/current-base verification passed, with 4,755 passing
 executions, zero failures and 188 ignored across 179 harnesses. The earlier
 `0522270` gate and intermediate focused results remain historical observations.
 
-Active #196 increment: explicit library/integration-target selection with a
-bounded libtest substring filter, matched direct/engine test inventories and
-campaign-bound admission. Validation is pending; this is not a delivered result.
-Then validate explicit compiler-header and test-fixture grants for an actual
-Forge test scope and restore Fest/Mull through the same command owner. Read
-grants, test executables and environment are separate operator decisions; a seed
-grants none.
+The next #196 slice at `4cba4eb` adds explicit library/integration-target selection,
+a bounded libtest substring filter, matched direct/engine test inventories and
+campaign-bound native admission. Selected test pins are partial anchors, not
+complete test-file coverage. Both workspace profiles now refuse slashless
+mutation subjects before testing or mutation: cargo-mutants interprets these as
+recursive basename globs and could mutate unselected files.
+
+Focused verification passed 575 test executions with zero failures and 28 ignored,
+plus strict Clippy for both native packages. The initial malformed-selector test
+failed because serde ignored an extra field on a unit enum variant; the struct
+variant correction and direct-deserialization regression passed on rerun. Four
+clean-release automatic controls each completed 31 checks: strong or whole-target
+selection killed both mutants, while weak integration/library selection preserved
+both survivors as RATCHET_HELD. Independent raw audits verified scope, corpus
+drift/restoration and cleanup. [Results and limitations](performance.md#selected-workspace-test-controls--2026-11-06)
+remain distinct from the required full publication checks.
+
+Next for #196: validate explicit compiler-header and test-fixture grants for an
+actual Forge test scope, then restore Fest/Mull through the same command owner.
+Read grants, test executables and environment are separate operator decisions;
+a seed grants none. Broader platform priorities below remain open.
 
 1. Validate and measure the implemented outbound MCP slice through the existing
    inbound service. It reuses the confined process owner, registers the endpoint
