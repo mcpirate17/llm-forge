@@ -489,9 +489,9 @@ separately in the [engineering status](roadmap.md).
 The [machine-generated observations](../research/performance/forge-program-20261105-installed-native-identity.json)
 record a real automatically generated cargo-mutants 27.1.0 campaign on a tiny
 external-host fixture with no vendored Forge sources or Python on the child PATH.
-Clean build commit: `3f65b1ee03ed493c1402c5c1e663a30cdd20f831`; executable SHA-256:
-`2e63e55b2d2303db8a4014770752790a83b6dca018bd93cb5b23a8930308111a`.
-The operator pin came from that binary's identity command before receipt generation.
+Clean build commit: `3f65b1ee03ed493c1402c5c1e663a30cdd20f831`; the linked artifact
+records the executable SHA-256. Its identity command supplied the operator pin
+before receipt generation.
 
 The engine killed two mutants, one in each selected source, and removed its snapshot.
 Both live and commit corpus audits were `CLEAN` without a Python bundle or `uv.lock`.
@@ -595,8 +595,7 @@ The comparison files contain both complete sealed receipts; separate copies are
 not committed. All 404 measured samples succeeded, with zero failed, censored or
 unstarted samples. Scope binds the executed binary, plus the symbol input where
 applicable; it does not rebind the old binary to today's source files. Binary
-SHA-256 values are `5839e685955891abdd5d888fd039212b2ae456f5530f7a8527f7b060bf23ba36`
-and `b87c81950eb293fb60fff90787904866b4cd5df95cab1ce02e90bdd7c2caa35e`.
+identities are retained in the linked comparison receipts.
 Both ELF compiler comments report Rust 1.98.0; the receipt's ambient `rustc`
 probe reports 1.93.1 and is not a build attestation. The host remains shared,
 the filesystem warm and the process newly launched. These observations support
@@ -723,12 +722,9 @@ measured samples successful and zero failed/censored/unstarted.
 | CLI help | 1.604428 / 1.600538 | 2.129920 / 1.764979 | 1.160 / 1.155 | 12,378,112 / 12,460,032 | [comparison](../research/performance/forge-program-20261104-prompt-help-comparison.json) |
 | Symbol context | 2.190680 / 2.113460 | 2.613433 / 2.341541 | 1.737 / 1.697 | 16,891,904 / 17,059,840 | [comparison](../research/performance/forge-program-20261104-prompt-symbol-comparison.json) |
 
-Executable SHA-256 values are
-`0a38cfac0effa07a4ff4cf796eda4608f358b42e0ac950778852dc2fd2050042`
-(checked pre-prompt build) and
-`25e516118bcc460302b853b5659c9add262911151481269fae2ec96887de3a49`
-(working prompt build). Shared-host distributions support no material regression
-in these two commands, not a general speedup. The new operation's output is larger
+Executable hashes are retained in the linked comparisons. Shared-host distributions
+support no material regression in these two commands, not a general speedup.
+The new operation's output is larger
 than its input; shorter responses and improved wording are not the success metric.
 No current measurement establishes better completed coding tasks, provider token
 usage, cost per successful task or time per successful task.

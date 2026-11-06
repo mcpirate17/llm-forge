@@ -223,6 +223,25 @@ pub fn resolve_key(root: &Path, key: &str) -> Result<(String, bool), String> {
     configured(root, &mut None, *spec)
 }
 
+/// Resolve one declared choice from captured configuration, preserving process
+/// overrides and defaults without reopening the manifest or unrelated keys.
+pub fn resolve_key_from_config(
+    config: Option<&ProjectConfig>,
+    key: &str,
+) -> Result<(String, bool), String> {
+    let spec = *PATHS
+        .iter()
+        .find(|spec| spec.key == key)
+        .ok_or_else(|| format!("unknown project path key: {key}"))?;
+    if let Some(selected) = environment_path(spec)? {
+        return Ok(selected);
+    }
+    match config {
+        Some(config) => configured_value(config, spec),
+        None => Ok((spec.default.into(), false)),
+    }
+}
+
 /// Values are in ProjectPaths dataclass field order, followed by matching flags.
 pub fn resolve(root: &Path) -> Result<Vec<(String, bool)>, String> {
     let mut config = None;

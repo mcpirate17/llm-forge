@@ -35,6 +35,9 @@ enum Action {
     Scan(ScanArgs),
     /// Generate automatic source edits for inspection; does not execute or apply mutants.
     Ablations(AblationArgs),
+    /// Report Python test import closure and unused-source signals without executing code.
+    #[cfg(target_os = "linux")]
+    Tests(crate::test_report::TestArgs),
 }
 
 #[derive(Args)]
@@ -200,15 +203,26 @@ pub fn run(args: AnalysisArgs) -> Result<u8> {
         Action::Ablations(ablation_args) => {
             (ablations(&SourceRoot::open(&args.root)?, ablation_args)?, 0)
         }
+        #[cfg(target_os = "linux")]
+        Action::Tests(test_args) => {
+            return crate::test_report::run(&args.root, args.max_bytes, test_args);
+        }
     };
+    write_output(&encode(&value, args.max_bytes)?)?;
+    Ok(code)
+}
+
+pub(crate) fn encode(value: &Value, max_bytes: usize) -> Result<Vec<u8>> {
+    crate::json_canon::encoded_size(value, max_bytes)
+        .context("analysis exceeds output budget; reduce max-results or raise max-bytes")?;
     let output = serde_json::to_vec(&value)?;
-    ensure!(
-        output.len() <= args.max_bytes,
-        "analysis exceeds output budget; reduce max-results or raise max-bytes"
-    );
+    Ok(output)
+}
+
+pub(crate) fn write_output(output: &[u8]) -> Result<()> {
     use std::io::Write;
     let mut stdout = std::io::stdout().lock();
-    stdout.write_all(&output)?;
+    stdout.write_all(output)?;
     stdout.write_all(b"\n")?;
-    Ok(code)
+    Ok(())
 }

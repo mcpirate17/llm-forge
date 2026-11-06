@@ -205,6 +205,12 @@ pub mod session_status;
 pub mod source_fingerprint;
 pub mod state_publish;
 #[cfg(target_os = "linux")]
+pub(crate) mod test_report;
+#[cfg(target_os = "linux")]
+mod test_report_git;
+#[cfg(target_os = "linux")]
+mod test_report_references;
+#[cfg(target_os = "linux")]
 pub(crate) use conductor_native::native_id;
 #[cfg(target_os = "linux")]
 pub use native_id::new as resource_id;
