@@ -147,11 +147,15 @@ exact-head/current-base verification passed: 4,819 passing executions, zero
 failures and 188 ignored across 179 harnesses. This is source and isolated-install
 verification; no shared-host installation or actual-client activation is implied.
 
-Active test work for #196 adds independent negative receipt-admission cases for
-four observed predicate survivors and an opt-in Rust real-engine timeout control.
-The existing controls are host-local; a checked-in fixture must use explicitly
-pinned tools and grants, automatic generation, and the existing process owner.
-Then obtain useful bounded actual-package campaign evidence. Three other survivors
+Implemented test work for #196 adds independent negative receipt-admission cases
+for four observed predicate survivors and a reproducible opt-in Rust real-engine
+timeout control. Focused tests and strict Clippy passed. The real test at `5f78e9b`
+passed after two retained pre-payload configuration refusals; its native receipt
+remains incomplete ERROR with two discovered and zero completed outcomes. The
+fixture uses explicitly pinned tools and grants, automatic generation and the
+existing process owner. [Measurements and limitations](performance.md#reproducible-native-timeout-fixture--2026-11-06)
+remain separate from full publication validation and actual-package campaign PASS.
+Next obtain useful bounded actual-package campaign evidence. Three other survivors
 do not yet establish that their guards are redundant; retain them pending proof. Restore
 Fest/Mull through the same command owner. A shared native coordinator for mutation
 evidence, coverage and canary remains queued; migration must preserve legacy

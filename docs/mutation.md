@@ -527,7 +527,7 @@ path and digest with the intended canonical executable and its SHA-256:
     "cc": {"path": "/usr/bin/x86_64-linux-gnu-gcc-13", "sha256": "<64 hex digits>"}
   },
   "setup_git": {"path": "/usr/bin/git", "sha256": "<64 hex digits>"},
-  "read_only": ["/opt/test-toolchain", "/usr/bin", "/usr/lib", "/usr/libexec/gcc", "/etc/ld.so.cache"],
+  "read_only": ["/opt/test-toolchain", "/opt/test-tools/cargo-mutants", "/usr/bin", "/usr/lib", "/usr/libexec/gcc", "/etc/ld.so.cache"],
   "cgroup_parent": "/sys/fs/cgroup/<operator-delegated-parent>"
 }
 ```
@@ -537,7 +537,10 @@ the same pinned-program shape. The listed read roots are an example for a GNU
 Linux toolchain; select the actual loader, library and toolchain inputs. The test
 does not discover additional read authority. Program paths must be regular,
 singly linked canonical files; rustup launcher symlinks are not substitutes for
-the provisioned Cargo/rustc/rustdoc binaries. Setup Git is separate from payload
+the provisioned Cargo/rustc/rustdoc binaries. Each payload executable needs an
+explicit read grant, and its ancestors must satisfy the grant ownership/mode
+checks. A private copy of an already verified tool can preserve its digest when
+its shared installation has unsuitable directory permissions. Setup Git is separate from payload
 programs, with isolated configuration, hooks and templates. The test supplies its
 own private source/scratch roots and fixes native limits at one CPU, 1 GiB and
 64 processes. No registry dependency seed is needed.
