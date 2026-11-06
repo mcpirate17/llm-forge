@@ -259,6 +259,7 @@ fn engine_file_arguments_bind_the_complete_verified_source_set() {
     assert!(engine_prefix(&argv, &base, 0, &json!({"b.rs":"a"})).is_err());
 }
 
+#[cfg(feature = "source-analysis")]
 fn generated_fixture() -> (
     crate::mutation_manifest::CampaignContract,
     crate::mutation_receipt::RunnerState,
@@ -302,6 +303,7 @@ fn generated_fixture() -> (
 }
 
 #[test]
+#[cfg(feature = "source-analysis")]
 fn generated_receipt_seam_accepts_v3_and_refuses_changed_selected_observation() {
     let (campaign, mut runner, supporting, mut payload) = generated_fixture();
     runner.components = Some(json!({"legacy":"a"}));
@@ -333,6 +335,7 @@ fn generated_receipt_seam_accepts_v3_and_refuses_changed_selected_observation() 
 }
 
 #[test]
+#[cfg(feature = "source-analysis")]
 fn generated_receipt_seam_requires_confined_fest_snapshot_and_native_runner() {
     let (mut campaign, runner, supporting, mut payload) = generated_fixture();
     campaign.language = "python".into();

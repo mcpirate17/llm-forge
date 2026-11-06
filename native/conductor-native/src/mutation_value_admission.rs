@@ -1,6 +1,8 @@
 //! Shared pure value admission; no interpreter, filesystem or execution proof.
 use serde_json::Value;
+#[cfg(feature = "source-analysis")]
 use std::collections::HashMap;
+#[cfg(feature = "source-analysis")]
 const VALUE_SCHEMA: &str = "llm.mutation-testing.test-value.v1";
 pub(crate) fn python_repr(value: Option<&Value>) -> String {
     match value.unwrap_or(&Value::Null) {
@@ -13,6 +15,7 @@ pub(crate) fn python_repr(value: Option<&Value>) -> String {
     }
 }
 
+#[cfg(feature = "source-analysis")]
 pub fn admission_errors(value: &Value, required_nodeids: &[String]) -> Result<Vec<String>, String> {
     if required_nodeids.len() > 4096 || required_nodeids.iter().any(|node| node.len() > 4096) {
         return Err("value admission nodeid bounds exceeded".into());

@@ -99,7 +99,8 @@ absent before supervisor retirement. Native export matched all 1,302 guest entri
 Live and committed consumers accepted the strong receipt, rejected an admitted
 supporting-input addition, and accepted exact restoration. An initial excluded
 untracked `.txt` probe and all earlier debug/observer failures remain recorded.
-Full publication checks are next. Unmarked Fest and Mull execution remain refused;
+The first publication gate exposed fixture/API and minimal-feature build errors;
+focused repairs passed, and the full rerun is next. Unmarked Fest and Mull remain refused;
 this does not establish general Python compatibility or agent productivity gains.
 See the [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 

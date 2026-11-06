@@ -447,5 +447,109 @@
     "restored_tree": "0f16d344c971dbe7c60f13103ae7b91f7170ac28",
     "independent_review": "NO_DISCREPANCY_FOUND: 45 command records across failed excluded-input probe and completed admitted-input control",
     "collector_correction": "Auditor initially treated prior_failed_probe_sha256 as a summary pin; it binds the unchanged prior location ledger. Explicit links attachment and new audit verify both separately; original failed audit preserved."
-  }
+  },
+  "publication_validation": {
+    "first_gate": {
+      "head": "8bbe049c4cd97ab53861d52dfaada0d0a3e14e62",
+      "passed": false,
+      "receipt": ".git/forge-checks/run-1793975461266695097-2303360/receipt.json",
+      "sha256": "92578475b54a1aac2f71fb7150b2d6190e598867a09912b4f232db0b586fb1fb",
+      "failed_steps": [
+        "rust-conductor-clippy",
+        "rust-conductor-tests",
+        "rust-product-value-clippy",
+        "rust-product-value-tests"
+      ]
+    },
+    "corrections": [
+      "Explicit false fest_confined fields in three legacy planner contract fixtures.",
+      "Pure mutation value analysis remains available without source-analysis; receipt recomputation is never skipped.",
+      "Generated-receipt seam tests require their existing source-analysis modules; pure minimal-feature tests remain enabled."
+    ],
+    "second_gate": "pending"
+  },
+  "feature_validation": [
+    {
+      "path": ".git/forge-fest-feature-core-clippy.log",
+      "sha256": "c76e99dd33cb8b0e86b756c23c2291852447120bdaf4c01ed54c46c220f007e1",
+      "test_summary": [],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    },
+    {
+      "path": ".git/forge-fest-feature-plan-tests.log",
+      "sha256": "4545b650df132396aca1823eb883d0baf34654d3620aac4c097e663cf399ddb8",
+      "test_summary": [
+        [
+          "ok",
+          "41",
+          "0",
+          "1"
+        ]
+      ],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    },
+    {
+      "path": ".git/forge-fest-feature-minimal-tests.log",
+      "sha256": "8e0888111faf130174d0719ba99ed0dd2d4f5467fc8cde93c88fe9d5fa1f60ff",
+      "test_summary": [],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    },
+    {
+      "path": ".git/forge-fest-feature2-minimal-tests.log",
+      "sha256": "c2c9ff7e52515a39340ea36f6d08949caaac91d52b3b3fa975d5b31d229a843a",
+      "test_summary": [
+        [
+          "ok",
+          "77",
+          "0",
+          "0"
+        ]
+      ],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    },
+    {
+      "path": ".git/forge-fest-feature2-default-tests.log",
+      "sha256": "c3e389d981e8d1677fc3ec6947070aa743a1b2e96643bd10fb5f84c4836fc049",
+      "test_summary": [
+        [
+          "ok",
+          "2",
+          "0",
+          "0"
+        ]
+      ],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    },
+    {
+      "path": ".git/forge-fest-feature2-product-clippy.log",
+      "sha256": "d975494fcc65e4e50ddb3e3bb50dd2289ee1e40f7a43711045ec719f7485c02d",
+      "test_summary": [],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    },
+    {
+      "path": ".git/forge-fest-feature2-product-tests.log",
+      "sha256": "80a7fb14ea99f141de3286657b3ad7cefb0305a76a40a3fe611588403f6f2300",
+      "test_summary": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "4",
+          "0",
+          "0"
+        ]
+      ],
+      "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
+    }
+  ]
 }
