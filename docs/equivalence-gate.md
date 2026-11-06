@@ -1,7 +1,7 @@
-# Native committed-module equivalence gate
+# Native named-module equivalence gate
 
 `forge equivalence gate` probes one whole Python module from an explicit Git
-commit using the existing confined native execution owner. Forge orchestration
+commit or captured live inputs using the existing confined native execution owner. Forge orchestration
 is Rust; the operator grants the interpreter, external Slop Core guest and host
 dependencies needed to execute the Python workload.
 
@@ -20,7 +20,7 @@ same sandbox/resource prerequisites as [candidate review](native-candidate-revie
 
 ## Source and input contract
 
-The required commit is a full lowercase object identity resolving to a commit;
+Select exactly one of `--commit` and `--live`. A commit is a full lowercase object identity resolving to a commit;
 branch names, tags, abbreviations and tree objects are refused. The module is one
 literal relative regular `.py` blob. Selection covers the whole module, including
 units outside any changed lines. Configuration, waivers and test discovery use
@@ -37,6 +37,48 @@ depths over 256. Existing snapshot limits remain 64 MiB per blob, 2 GiB per tree
 and bounded path inventory; selected Python inputs have their smaller existing
 capture limits.
 
+### Explicit live inputs
+
+```sh
+forge equivalence gate --root /path/to/repository \
+  --live --input src --input tests --input data --module src/model.py \
+  --grants /operator/execution-grants.json \
+  --guest-path /operator/slop_core.so --guest-sha256 GUEST_SHA256 \
+  --json --enforce
+```
+
+Each `--input` names an existing relative regular file or directory. Supply one
+to 256 distinct, nonoverlapping roots; `.` explicitly selects the repository
+root. Capture includes every tracked HEAD/index path with its current working
+bytes, every file under the declared roots, and root `pyproject.toml` when
+present. Staged contents never override working bytes and deleted files are not
+restored from Git. Declared roots include ignored, untracked, binary and
+extensionless files. The Git metadata directory is excluded. Empty selected
+directories, unsupported file types, hardlinks and unsafe paths refuse before
+launch; they are not silently omitted. Live capture limits are 32 MiB per blob,
+2 GiB total, 100,000 scanned entries, depth 256 and 16 MiB of selected path names.
+
+The live snapshot uses a private synthetic Git tree and does not write objects,
+refs or the index into the host repository. A retained candidate capture and a
+separate mutable Stage workspace are derived from that tree. The Stage owns its
+reachable Git objects without alternates to the live capture. Original host
+HEAD/index, applicable Git/configuration controls, selected inventory and bytes,
+and the private capture are checked before execution and after owned cleanup.
+Observed drift refuses publication. All three temporary roots must be cleaned
+before a successful result is published. Configured output paths must remain
+outside the declared roots, tracked inputs and scratch; selected inputs cannot
+be excluded to make an output path admissible.
+
+**Declared inputs are not the complete execution dependency set.** The existing
+operator read grants still make the original source/Git directories and other
+granted dependencies accessible to guest code. An absolute read of an unselected
+host file can affect a probe without changing the captured identity. Normal
+relative source reads start in the private workspace, but this is not a hermetic
+execution claim. JSON records `execution_read_scope.policy="operator_grants"`,
+`original_source_readable=true` and `captured_inputs_are_dependency_closure=false`.
+An input digest proves the captured preimage under the checks described here;
+it does not authenticate every byte a guest may read.
+
 These are cooperative point-in-time checks under trusted, stable operator-owned
 parents. They do not authenticate guest observations or prevent a hostile
 same-UID process from racing a verified file. Explicit read grants still admit
@@ -45,7 +87,7 @@ the selected tree and synthetic history; it does not reproduce original history.
 
 ## Configuration and authority
 
-The command reads `[tool.forge.equivalence_probe]` from the captured
+Both modes read `[tool.forge.equivalence_probe]` from the captured
 `pyproject.toml`. Supported fields are the existing `waivers`, `ledger`, `report`,
 `run_artifacts`, `per_module_timeout` and `jobs`. Ledger/report paths are used by
 the separate backlog command. The module timeout defaults to 180 seconds and
@@ -75,9 +117,12 @@ Without enabled records, supplying a record grant is an error.
 
 ## Results and publication
 
-Default output identifies commit/tree/module and renders the native report.
+Default output identifies the source mode, tree/module and renders the native report.
 `--json` returns a versioned envelope containing those identities, captured-input
-evidence, Stage/resource/cleanup observations and the native summary. A valid
+evidence, Stage/resource/cleanup observations and the native summary. Live mode
+also records selected roots, compact inventory/control identities, original HEAD
+and index identity, and `live_capture_cleanup_complete`; `commit_oid` is null and
+`scope` is `live-whole-module-declared-inputs`. A valid
 result has exit 0; `--enforce` changes this to exit 1 when blocking findings exist.
 Admission, execution, cleanup and publication failures return exit 4. Argument
 syntax errors return exit 2. Incomplete measurements remain visible in the
@@ -89,11 +134,14 @@ is published there only after owned execution and capture cleanup. The envelope
 identifies its path and summary digest. Publication failure is an error.
 Use [native backlog folding](equivalence-backlog.md) to consume summaries.
 
-This command does not replace the Python gate's live-worktree, default-changed or
-`--all` selection. Existing Make gate callers retain their current contract.
+The declared-input live mode does not implement the Python gate's unrestricted
+live-worktree, default-changed or `--all` selection. Existing Make gate callers
+retain their current contract.
 See the [engineering evidence](../research/performance/forge-program-20261106-committed-equivalence.json)
 for completed checks, retained failures and remaining validation. No matched
 speedup, model-cost reduction or agent-task benefit is established by unit tests.
+Live-input validation is tracked separately in its
+[evidence index](../research/performance/forge-program-20261106-live-equivalence.json).
 
 ## Reproducing validation
 

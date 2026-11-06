@@ -13,7 +13,7 @@ use std::{
     fs,
     io::Read,
     mem::ManuallyDrop,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     thread,
@@ -181,6 +181,38 @@ impl Harness {
             .env_remove("GIT_INDEX_FILE");
         cmd
     }
+    fn live_command(&self, wall: u64) -> Command {
+        let mut command = Command::new(&self.forge);
+        command
+            .args(["equivalence", "gate", "--root"])
+            .arg(&self.repo)
+            .args([
+                "--live",
+                "--input",
+                "src",
+                "--input",
+                "tests",
+                "--input",
+                "data",
+                "--module",
+                "src/probe_target.py",
+                "--grants",
+            ])
+            .arg(&self.grants)
+            .arg("--guest-path")
+            .arg(&self.guest)
+            .args(["--guest-sha256", &self.guest_hash])
+            .arg("--artifacts")
+            .arg(&self.artifacts)
+            .args(["--json", "--enforce", "--wall-seconds", &wall.to_string()])
+            .env("PATH", "")
+            .env("HOME", &self.fixture.root)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE");
+        command
+    }
     fn assert_no_scratch(&self) {
         assert_eq!(fs::read_dir(&self.scratch).unwrap().count(), 0);
     }
@@ -192,9 +224,14 @@ struct OwnedChild {
 }
 impl OwnedChild {
     fn spawn(h: &Harness, wall: u64) -> Self {
+        Self::spawn_command(h, h.command(wall))
+    }
+    fn spawn_live(h: &Harness, wall: u64) -> Self {
+        Self::spawn_command(h, h.live_command(wall))
+    }
+    fn spawn_command(h: &Harness, mut cmd: Command) -> Self {
         let stdout = h.fixture.root.join("stdout.json");
         let stderr = h.fixture.root.join("stderr.log");
-        let mut cmd = h.command(wall);
         cmd.stdout(Stdio::from(fs::File::create(&stdout).unwrap()))
             .stderr(Stdio::from(fs::File::create(&stderr).unwrap()));
         Self {
@@ -274,6 +311,38 @@ fn marker_files(root: &Path, depth: usize, budget: &mut usize, out: &mut Vec<Pat
         }
     }
 }
+fn read_marker(path: &Path) -> Option<Vec<u8>> {
+    let stamp = |meta: &fs::Metadata| {
+        (
+            meta.dev(),
+            meta.ino(),
+            meta.mode(),
+            meta.len(),
+            meta.mtime(),
+            meta.mtime_nsec(),
+            meta.ctime(),
+            meta.ctime_nsec(),
+        )
+    };
+    let before = fs::symlink_metadata(path).ok()?;
+    if !before.is_file() || before.len() > 8192 {
+        return None;
+    }
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .ok()?;
+    if stamp(&before) != stamp(&file.metadata().ok()?) {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    file.take(8193).read_to_end(&mut bytes).ok()?;
+    if bytes.len() > 8192 || stamp(&before) != stamp(&fs::symlink_metadata(path).ok()?) {
+        return None;
+    }
+    Some(bytes)
+}
 fn proc_identity(pid: u32) -> (String, String) {
     let stat = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
     let rest = stat.rsplit_once(')').unwrap().1.trim();
@@ -337,21 +406,9 @@ fn ready(h: &Harness, child: &mut OwnedChild) -> (Value, PathBuf) {
         let mut paths = Vec::new();
         marker_files(&h.scratch, 0, &mut 0, &mut paths);
         for path in paths {
-            let meta = fs::symlink_metadata(&path).unwrap();
-            if !meta.is_file() || meta.len() > 8192 {
-                continue;
-            }
-            let Ok(file) = fs::OpenOptions::new()
-                .read(true)
-                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-                .open(&path)
-            else {
+            let Some(bytes) = read_marker(&path) else {
                 continue;
             };
-            let mut bytes = Vec::new();
-            if file.take(8193).read_to_end(&mut bytes).is_err() || bytes.len() > 8192 {
-                continue;
-            }
             let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
                 continue;
             };
@@ -538,4 +595,340 @@ fn stage_wall_timeout_kills_observed_detached_descendant() {
 #[ignore = "requires fresh owned delegated unit with 900-second backstop"]
 fn sigterm_kills_observed_detached_descendant() {
     interrupted_control(true);
+}
+
+const LIVE_DATA_CHECKS: &str = r#"    assert Path('data/threshold').read_bytes() == b'-2.0\n'
+    assert Path('data/opaque').read_bytes() == b'\x00\xffignored data'
+    assert not Path('tests/test_probe_target.py').exists()
+"#;
+const LIVE_DRIVER: &str = r#"from pathlib import Path
+import torch
+from src.probe_target import clamp
+
+def test_live_clamp():
+__DATA_CHECKS__    value = float(Path('data/threshold').read_text())
+    assert clamp(torch.tensor([value])).item() == 0.0
+"#;
+const LIVE_READY_DRIVER: &str = r#"from pathlib import Path
+import json, os, time, torch
+from src.probe_target import clamp
+
+def test_live_clamp():
+__DATA_CHECKS__    stat = Path('/proc/self/stat').read_text()
+    witness = {'pid': os.getpid(), 'start': stat[stat.rfind(')')+2:].split()[19],
+               'cgroup': Path('/proc/self/cgroup').read_text().strip(),
+               'snapshot_root': str(Path(__file__).resolve().parents[1])}
+    marker = Path(os.environ['TMPDIR']) / ('gate-ready-live-%d.json' % os.getpid())
+    temporary = marker.with_suffix('.new')
+    temporary.write_text(json.dumps(witness))
+    temporary.rename(marker)
+    release = Path(__RELEASE_PATH__)
+    deadline = time.monotonic() + 30
+    while release.read_text() == 'pending':
+        assert time.monotonic() < deadline, 'host release not observed'
+        time.sleep(0.02)
+    value = float(release.read_text())
+    assert value == -3.0
+    assert clamp(torch.tensor([value])).item() == 0.0
+"#;
+
+fn live_harness(driver: &str, timeout: f64) -> Harness {
+    let deleted_driver = "from src.probe_target import clamp\nraise RuntimeError('deleted tracked driver resurrected')\n";
+    let mut h = Harness::new(deleted_driver, timeout);
+    h.fixture.stage(
+        "src/probe_target.py",
+        "raise RuntimeError('committed decoy')\n",
+    );
+    let repository = git2::Repository::open(&h.repo).unwrap();
+    let parent = repository.head().unwrap().peel_to_commit().unwrap();
+    let tree = repository
+        .find_tree(repository.index().unwrap().write_tree().unwrap())
+        .unwrap();
+    let signature = git2::Signature::now("fixture", "fixture@example.invalid").unwrap();
+    h.commit = repository
+        .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "committed live decoy",
+            &tree,
+            &[&parent],
+        )
+        .unwrap()
+        .to_string();
+    h.fixture.stage(
+        "src/probe_target.py",
+        "raise RuntimeError('staged decoy')\n",
+    );
+    private_file(&h.repo.join("src/probe_target.py"), SUBJECT.as_bytes());
+    fs::remove_file(h.repo.join("tests/test_probe_target.py")).unwrap();
+    h.fixture.stage(
+        ".gitignore",
+        "ignored.py\ndata/\noutside/\ntests/test_live_ignored.py\n",
+    );
+    for name in ["data", "outside"] {
+        let path = h.repo.join(name);
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    private_file(&h.repo.join("data/threshold"), b"-2.0\n");
+    private_file(&h.repo.join("data/opaque"), b"\0\xffignored data");
+    private_file(&h.repo.join("outside/release"), b"pending");
+    let driver = driver.replace("__DATA_CHECKS__", LIVE_DATA_CHECKS).replace(
+        "__RELEASE_PATH__",
+        &serde_json::to_string(&h.repo.join("outside/release")).unwrap(),
+    );
+    private_file(
+        &h.repo.join("tests/test_live_ignored.py"),
+        driver.as_bytes(),
+    );
+    for name in [
+        "data/threshold",
+        "data/opaque",
+        "tests/test_live_ignored.py",
+        "outside/release",
+    ] {
+        assert!(repository
+            .status_file(Path::new(name))
+            .unwrap()
+            .contains(git2::Status::IGNORED));
+    }
+    h
+}
+
+fn release_live(h: &Harness) {
+    let next = h.repo.join("outside/release.next");
+    private_file(&next, b"-3.0\n");
+    fs::rename(next, h.repo.join("outside/release")).unwrap();
+}
+fn live_ready(h: &Harness, child: &mut OwnedChild) -> (Value, PathBuf, Vec<PathBuf>) {
+    let deadline = Instant::now() + Duration::from_secs(75);
+    loop {
+        assert!(
+            child.child.try_wait().unwrap().is_none(),
+            "Forge exited before witness: {}",
+            child.diagnostic()
+        );
+        let mut paths = Vec::new();
+        marker_files(&h.scratch, 0, &mut 0, &mut paths);
+        for path in paths {
+            if !path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("gate-ready-live-")
+            {
+                continue;
+            }
+            let Some(bytes) = read_marker(&path) else {
+                continue;
+            };
+            let witness: Value = serde_json::from_slice(&bytes).unwrap();
+            let pid = witness["pid"].as_u64().unwrap() as u32;
+            assert!(descends_from(pid, child.child.id()));
+            let (start, group) = proc_identity(pid);
+            assert_eq!(witness["start"], start);
+            assert_eq!(witness["cgroup"], group);
+            let group = Path::new("/sys/fs/cgroup").join(group.strip_prefix("0::/").unwrap());
+            let parent = env_path("FORGE_TEST_CGROUP_PARENT");
+            assert!(group.starts_with(&parent) && group != parent && group.is_dir());
+            let stage_tree = Path::new(witness["snapshot_root"].as_str().unwrap());
+            assert!(stage_tree.starts_with(&h.scratch) && stage_tree.is_dir());
+            assert!(!stage_tree.join("outside/release").exists());
+            assert_eq!(
+                fs::read(stage_tree.join("data/threshold")).unwrap(),
+                b"-2.0\n"
+            );
+            assert!(!stage_tree.join("tests/test_probe_target.py").exists());
+            let roots: Vec<_> = fs::read_dir(&h.scratch)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert!(
+                roots.len() >= 3,
+                "live capture, candidate capture and Stage owners not observed: {roots:?}"
+            );
+            private_file(&h.fixture.root.join("observed-live-witness.json"), &bytes);
+            return (witness, group, roots);
+        }
+        assert!(
+            Instant::now() < deadline,
+            "live readiness watchdog expired: {}",
+            child.diagnostic()
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn assert_live_result(h: &Harness, value: &Value, index_hash: &str) {
+    assert_eq!(value["scope"], "live-whole-module-declared-inputs");
+    assert_eq!(value["working_tree_evaluated"], true);
+    assert!(value["commit_oid"].is_null());
+    assert_eq!(value["inputs"]["source_kind"], "live_snapshot_tree");
+    assert_eq!(value["live_inputs"]["profile"], "explicit-live-inputs-v1");
+    assert_eq!(
+        value["live_inputs"]["roots"],
+        json!({"data":true,"src":true,"tests":true})
+    );
+    assert_eq!(value["live_inputs"]["host_head"], h.commit);
+    assert_eq!(value["live_inputs"]["host_index_sha256"], index_hash);
+    assert_eq!(value["live_inputs"]["snapshot_tree"], value["tree_oid"]);
+    assert_eq!(
+        value["live_inputs"]["inputs"]["digest"]
+            .as_str()
+            .unwrap()
+            .len(),
+        64
+    );
+    assert_eq!(value["live_capture_cleanup_complete"], true);
+    assert_eq!(value["execution_read_scope"]["policy"], "operator_grants");
+    assert_eq!(
+        value["execution_read_scope"]["original_source_readable"],
+        true
+    );
+    assert_eq!(
+        value["execution_read_scope"]["captured_inputs_are_dependency_closure"],
+        false
+    );
+    assert_eq!(value["guest_output_authenticated"], false);
+    assert_clean_result(h, value);
+}
+
+#[test]
+#[ignore = "requires explicit real guest/interpreter pins and fresh delegated unit; sequential live control"]
+fn live_gate_reads_ignored_extensionless_data_and_live_bytes_over_staged_and_committed_decoys() {
+    let h = live_harness(LIVE_DRIVER, 90.0);
+    let index = fs::read(h.repo.join(".git/index")).unwrap();
+    let index_hash = format!("{:x}", Sha256::digest(&index));
+    let mut child = OwnedChild::spawn_live(&h, 120);
+    assert_eq!(child.wait(150).code(), Some(0), "{}", child.diagnostic());
+    let value: Value = serde_json::from_slice(&fs::read(&child.stdout).unwrap()).unwrap();
+    assert_live_result(&h, &value, &index_hash);
+    assert_eq!(value["summary"]["modules_probed"], 1);
+    assert!(value["summary"]["live"].as_u64().unwrap() > 0);
+    assert!(value["summary"]["blocking"].as_array().unwrap().is_empty());
+    assert!(value["summary"]["incomplete"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(fs::read(h.repo.join(".git/index")).unwrap(), index);
+    assert_eq!(
+        fs::read(h.repo.join("src/probe_target.py")).unwrap(),
+        SUBJECT.as_bytes()
+    );
+    assert_eq!(fs::read(h.repo.join("data/threshold")).unwrap(), b"-2.0\n");
+    assert!(!h.repo.join("tests/test_probe_target.py").exists());
+}
+
+#[test]
+#[ignore = "requires explicit real guest/interpreter pins and fresh delegated unit; sequential live control"]
+fn live_gate_refuses_post_readiness_selected_data_drift_before_publication() {
+    let h = live_harness(LIVE_READY_DRIVER, 90.0);
+    let mut child = OwnedChild::spawn_live(&h, 120);
+    let (witness, group, roots) = live_ready(&h, &mut child);
+    private_file(&h.repo.join("data/threshold"), b"-3.0\n");
+    release_live(&h);
+    assert!(!child.wait(150).success(), "{}", child.diagnostic());
+    let error = fs::read_to_string(&child.stderr).unwrap();
+    assert!(
+        error.contains("live host input selection changed"),
+        "{error}"
+    );
+    assert_eq!(fs::read_dir(&h.artifacts).unwrap().count(), 0);
+    assert_removed(&group);
+    for root in roots {
+        assert_removed(&root);
+    }
+    h.assert_no_scratch();
+    assert_gone_or_reused(
+        witness["pid"].as_u64().unwrap() as u32,
+        witness["start"].as_str().unwrap(),
+    );
+    assert_eq!(fs::read(h.repo.join("data/threshold")).unwrap(), b"-3.0\n");
+}
+
+#[test]
+#[ignore = "requires explicit real guest/interpreter pins and fresh delegated unit; sequential live boundary control"]
+fn live_gate_exposes_authorized_absolute_unselected_host_reads_outside_captured_identity() {
+    let h = live_harness(LIVE_READY_DRIVER, 90.0);
+    let index = fs::read(h.repo.join(".git/index")).unwrap();
+    let index_hash = format!("{:x}", Sha256::digest(&index));
+    let mut child = OwnedChild::spawn_live(&h, 120);
+    let (witness, group, roots) = live_ready(&h, &mut child);
+    // Original source read access already exists in the operator grants. No grant is widened.
+    release_live(&h);
+    assert_eq!(child.wait(150).code(), Some(0), "{}", child.diagnostic());
+    let value: Value = serde_json::from_slice(&fs::read(&child.stdout).unwrap()).unwrap();
+    assert_live_result(&h, &value, &index_hash);
+    assert!(value["summary"]["live"].as_u64().unwrap() > 0);
+    assert!(value["summary"]["incomplete"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(fs::read(h.repo.join(".git/index")).unwrap(), index);
+    assert_removed(&group);
+    for root in roots {
+        assert_removed(&root);
+    }
+    assert_gone_or_reused(
+        witness["pid"].as_u64().unwrap() as u32,
+        witness["start"].as_str().unwrap(),
+    );
+    assert_eq!(fs::read(h.repo.join("outside/release")).unwrap(), b"-3.0\n");
+}
+
+fn live_interrupted_control(signal: bool) {
+    let driver = STALL_DRIVER
+        .replace(
+            "import json, os, time",
+            "from pathlib import Path\nimport json, os, time",
+        )
+        .replace(
+            "    read_fd, write_fd = os.pipe()",
+            &(LIVE_DATA_CHECKS.to_owned() + "    read_fd, write_fd = os.pipe()"),
+        );
+    let h = live_harness(&driver, 120.0);
+    let mut child = OwnedChild::spawn_live(&h, if signal { 120 } else { 90 });
+    let (witness, group) = ready(&h, &mut child);
+    let roots: Vec<_> = fs::read_dir(&h.scratch)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    assert!(roots.len() >= 3);
+    if signal {
+        child.signal();
+    }
+    assert!(!child.wait(145).success(), "{}", child.diagnostic());
+    let error = fs::read_to_string(&child.stderr).unwrap();
+    assert!(
+        error.contains(if signal {
+            "equivalence interrupted after cleanup"
+        } else {
+            "equivalence Stage did not complete with verified cleanup/resources"
+        }),
+        "{error}"
+    );
+    assert_removed(&group);
+    for root in roots {
+        assert_removed(&root);
+    }
+    h.assert_no_scratch();
+    assert_eq!(fs::read_dir(&h.artifacts).unwrap().count(), 0);
+    for name in ["parent", "child"] {
+        assert_gone_or_reused(
+            witness[name]["pid"].as_u64().unwrap() as u32,
+            witness[name]["start"].as_str().unwrap(),
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires fresh owned delegated unit with 900-second backstop; sequential live control"]
+fn live_stage_wall_timeout_cleans_capture_candidate_stage_and_observed_detached_descendant() {
+    live_interrupted_control(false);
+}
+#[test]
+#[ignore = "requires fresh owned delegated unit with 900-second backstop; sequential live control"]
+fn live_sigterm_cleans_capture_candidate_stage_and_observed_detached_descendant() {
+    live_interrupted_control(true);
 }

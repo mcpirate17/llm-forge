@@ -4,7 +4,7 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/224",
   "base_commit": "551a506b49190059cb63d491340a73842b1a3119",
-  "status": "runtime_and_capture_verified_publication_pending",
+  "status": "merged_verified_bounded_profile",
   "scope": "One explicit full commit and one whole Python module; native orchestration shares candidate input capture, record parser and confined Stage owner. No live-worktree or Make gate migration.",
   "validation": {
     "equivalence": {
@@ -205,9 +205,7 @@
     }
   ],
   "independent_review": "Static cross-review of CLI/verifier/shared inputs/Stage cleared known blockers; live-control audit independently checked retained inputs/outputs and fresh cleanup. Capture comparison independently reconstructed all480rows, four receipt seals and quantiles. No unreviewed allocation clone retained; borrowed existing input map and shared record parser preserve behavior.",
-  "pending": [
-    "Full18-step local-check and fresh-head/base local-verify before publication"
-  ],
+  "pending": [],
   "limitations": [
     "No host adoption, model token/cost or agent-task benefit established.",
     "Exact committed workspace preimage does not authenticate guest results or external read-granted dependencies.",
@@ -566,5 +564,42 @@
     "capture": "cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --lib candidate_equivalence_inputs::capture_tests::benchmark_no_record_capture_small_and_large -- --exact --ignored --nocapture --test-threads=1",
     "live": "With explicit owned FORGE_TEST_BIN, FORGE_TEST_PYTHON, FORGE_TEST_SLOP_EXTENSION, FORGE_TEST_SLOP_SHA256 and delegated FORGE_TEST_CGROUP_PARENT: cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --test equivalence_gate_live -- --ignored --nocapture --test-threads=1",
     "live_prerequisites": "Private operator-owned roots, CPU torch+pytest, Linux cgroup/Landlock/seccomp prerequisites; read native/forge/tests/equivalence_gate_live.rs for exact fixture contract and cleanup observations."
+  },
+  "publication": {
+    "pr": 225,
+    "issue": 224,
+    "head": "24a1079ed7a34320e32a029b65b20062fb1699d8",
+    "merge": "2d0564ea15abc7d78affa1dfa6e2d8f52ec1b673",
+    "tree": "34781c44a137f9aff99f88e3310549a450924e44",
+    "identical_tree": true,
+    "source_entries_preserved": 1490,
+    "agent_trailer": true,
+    "receipt": ".git/forge-checks/run-1793998613741668712-2898189/receipt.json",
+    "receipt_sha256": "1fa964ddb100ca54cb6ee406b858402edcabedf62e7859649d7e78c50125cab3",
+    "publication_audit_sha256": "44d21fc19d41e7298674ab4d9bd1c281e6085bcd9b583a40ffd948c2edceaf5f",
+    "full_check_steps": 18,
+    "test_executions": {
+      "passed": 5073,
+      "failed": 0,
+      "ignored": 209
+    },
+    "harnesses": 185,
+    "scope": "Summed test-result lines, includes repeated feature-matrix executions, not unique tests.",
+    "independent_audit": {
+      "path": ".git/forge-native-gate-publication-audit.json",
+      "sha256": "44d21fc19d41e7298674ab4d9bd1c281e6085bcd9b583a40ffd948c2edceaf5f"
+    },
+    "fresh_base_verification": [
+      {
+        "path": ".git/forge-native-gate-local-verify1.log",
+        "sha256": "71958aed676a6f792dc972d852800c443bb45c45abc27617b418a4b85b761866"
+      },
+      {
+        "path": ".git/forge-native-gate-local-verify2.log",
+        "sha256": "71958aed676a6f792dc972d852800c443bb45c45abc27617b418a4b85b761866"
+      }
+    ],
+    "dependency_warning": "Existing informational unmaintained paste1.0.15 RUSTSEC-2024-0436 warning retained; no advisory policy change.",
+    "later_heads": "Full check and verification bind24a1079 and its base. Merge2d0564e has the identical checkedtree; later heads require fresh publication checks."
   }
 }

@@ -257,6 +257,14 @@ fn capture(
 }
 
 impl BoundFile {
+    /// Captured provenance, not a fresh verification or an authorization receipt.
+    pub(crate) fn sha256_identity(&self) -> Result<(&Path, &str, &[u8; 32])> {
+        let Expected::Sha256(digest) = &self.expected else {
+            anyhow::bail!("held input does not have a SHA-256 content identity");
+        };
+        Ok((&self.parent.path, &self.name, digest))
+    }
+
     /// Mutating an observed leaf requires exclusive operator ownership, even
     /// when read-only repository observation originally permitted group writes.
     pub(crate) fn verify_mutation(&self) -> Result<()> {

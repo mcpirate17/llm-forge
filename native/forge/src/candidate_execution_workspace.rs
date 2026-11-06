@@ -112,6 +112,19 @@ pub(crate) struct Workspace {
 }
 impl Workspace {
     pub(crate) fn new(source: &Source, tree: &str, grants: &Grants) -> Result<Self> {
+        Self::new_with_objects(source, tree, grants, private_git::Objects::Borrowed)
+    }
+    /// Live synthetic trees are copied into Stage-owned Git storage, without
+    /// granting payloads access to the upstream private snapshot.
+    pub(crate) fn new_live(source: &Source, tree: &str, grants: &Grants) -> Result<Self> {
+        Self::new_with_objects(source, tree, grants, private_git::Objects::Private)
+    }
+    fn new_with_objects(
+        source: &Source,
+        tree: &str,
+        grants: &Grants,
+        objects: private_git::Objects,
+    ) -> Result<Self> {
         let scratch = Scratch::new(&grants.scratch_parent)?;
         let sandbox = Sandbox::prepare(Policy {
             read_only: grants.read_only.clone(),
@@ -133,7 +146,8 @@ impl Workspace {
         for name in ["home", "tmp", "cache"] {
             runtime_dir.create_dir_with(name, DirBuilder::new().mode(0o700))?;
         }
-        let (git_dir, index) = private_git::prepare(source, tree, &runtime, &snapshot.path())?;
+        let (git_dir, index) =
+            private_git::prepare(source, tree, &runtime, &snapshot.path(), objects)?;
         Ok(Self {
             scratch,
             snapshot: Some(snapshot),

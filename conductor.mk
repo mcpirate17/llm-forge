@@ -182,13 +182,9 @@ complexity-refresh-baseline:  ## Refresh the legacy D-F complexity baseline
 	$(FORGE) complexity refresh-baseline --repo "$(CONDUCTOR_HOST_ROOT)" $(COMPLEXITY_ARGS)
 
 # ── Duplicate code detectors ─────────────────────────────────────────────
-# conductor.run_duplicate_audit scans conductor.duplicate_audit_config.DEFAULT_SOURCE_DIRS
-# (research/aria_core/aria_designer/component_fab/conductor), a monorepo directory
-# list with no CLI override and no src/conductor entry. In this repo's src layout
-# every one of those names is absent at the root, so these targets run without
-# error but scan zero files until that module gains a src-aware default or a
-# --source flag. Ported anyway: the plumbing (tool selection, --check exit code)
-# is correct, and a host laid out like the monorepo gets real results today.
+# Legacy Python orchestration reads [tool.forge.duplicate_audit] source_dirs,
+# defaulting to src/ and native/. Empty source selections fail explicitly.
+# Detector execution and baseline semantics remain separate from native AST advice.
 
 dupes:  ## Duplicate code detector (jscpd + pmd-python)
 	$(PYTHON) -m conductor.run_duplicate_audit --root "$(CONDUCTOR_HOST_ROOT)"

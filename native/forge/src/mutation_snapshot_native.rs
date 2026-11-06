@@ -10,6 +10,9 @@ use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
+#[path = "mutation_snapshot_live.rs"]
+pub(super) mod live;
+
 const MAX_FILES: usize = 100_000;
 const MAX_BLOB: u64 = 32 * 1024 * 1024;
 const MAX_TOTAL: u64 = 2 * 1024 * 1024 * 1024;
@@ -279,11 +282,14 @@ struct Scan<'a> {
     dirs: Vec<(String, Stamp)>,
     paths: Vec<String>,
     count: usize,
+    live_roots: Option<&'a live::Roots>,
+    live_path_bytes: usize,
 }
 impl Scan<'_> {
     fn walk(&mut self, dir: &Dir, prefix: &str, depth: usize) -> Result<()> {
         ensure!(depth <= 256, "worktree depth exceeds 256");
         let before = dir.dir_metadata()?;
+        let initial_paths = self.paths.len();
         let named = self.root.join(prefix);
         self.inputs.require_absent(&named.join(".gitattributes"))?;
         let rules = self.inputs.read(&named.join(".gitignore"))?;
@@ -311,9 +317,27 @@ impl Scan<'_> {
                 format!("{prefix}/{component}")
             };
             crate::candidate_source::safe_path(path.as_bytes())?;
+            if self.live_roots.is_some() {
+                self.live_path_bytes = self
+                    .live_path_bytes
+                    .checked_add(path.len())
+                    .context("live path byte overflow")?;
+                ensure!(
+                    self.live_path_bytes <= 16 * 1024 * 1024,
+                    "live scanned path bytes exceed 16 MiB"
+                );
+            }
             let meta = dir.symlink_metadata(&name)?;
             let is_dir = meta.is_dir() && !meta.is_symlink();
-            if super::ignore_rules::ignored(&self.rules, &self.root.join(&path), is_dir) {
+            if self
+                .live_roots
+                .is_some_and(|roots| !roots.admits(&path, is_dir))
+            {
+                continue;
+            }
+            if self.live_roots.is_none()
+                && super::ignore_rules::ignored(&self.rules, &self.root.join(&path), is_dir)
+            {
                 continue;
             }
             if is_dir {
@@ -332,9 +356,20 @@ impl Scan<'_> {
                     "worktree directory replaced: {path}"
                 );
                 self.walk(&child, &path, depth + 1)?;
-            } else if !self.indexed.contains(&path) && permitted(&path, self.excluded, self.extra) {
+            } else if self.live_roots.is_some()
+                || (!self.indexed.contains(&path) && permitted(&path, self.excluded, self.extra))
+            {
                 self.paths.push(path);
             }
+        }
+        if self
+            .live_roots
+            .is_some_and(|roots| roots.selected_directory(prefix))
+        {
+            ensure!(
+                self.paths.len() > initial_paths,
+                "selected empty directory cannot be represented by Git: {prefix}"
+            );
         }
         self.rules.pop();
         let after = dir.dir_metadata()?;
@@ -376,6 +411,8 @@ fn enumerate(
         dirs: Vec::new(),
         paths: Vec::new(),
         count: 0,
+        live_roots: None,
+        live_path_bytes: 0,
     };
     scan.walk(&root_dir, "", 0)?;
     scan.paths.sort();

@@ -1,4 +1,4 @@
-//! Real CLI admission and committed-input controls; no guest execution.
+//! Real CLI admission and committed/live input controls; no guest execution.
 #![cfg(target_os = "linux")]
 #[path = "support/forge_binary.rs"]
 mod forge_binary;
@@ -71,8 +71,9 @@ impl Fixture {
             grants,
         }
     }
-    fn invoke(&self, commit: &str, module: &str, extra: &[&str]) -> Output {
-        Command::new(forge_binary::path())
+    fn command(&self, module: &str) -> Command {
+        let mut command = Command::new(forge_binary::path());
+        command
             .env("PATH", "")
             .env("HOME", self.root.path())
             .env("GIT_CONFIG_NOSYSTEM", "1")
@@ -81,14 +82,27 @@ impl Fixture {
             .env_remove("GIT_INDEX_FILE")
             .args(["equivalence", "gate", "--root"])
             .arg(self.repository.workdir().unwrap())
-            .args(["--commit", commit, "--module", module, "--grants"])
+            .args(["--module", module, "--grants"])
             .arg(&self.grants)
             .arg("--guest-path")
             .arg(&self.guest)
-            .args(["--guest-sha256", &"0".repeat(64), "--json"])
+            .args(["--guest-sha256", &"0".repeat(64), "--json"]);
+        command
+    }
+    fn invoke(&self, commit: &str, module: &str, extra: &[&str]) -> Output {
+        self.command(module)
+            .args(["--commit", commit])
             .args(extra)
             .output()
             .unwrap()
+    }
+    fn invoke_live(&self, inputs: &[&str]) -> Output {
+        let mut command = self.command("probe.py");
+        command.arg("--live");
+        for input in inputs {
+            command.args(["--input", input]);
+        }
+        command.output().unwrap()
     }
     fn preserved(&self, head: &[u8], index: &[u8], live_config: &[u8]) {
         assert_eq!(fs::read(self.repository.path().join("HEAD")).unwrap(), head);
@@ -171,4 +185,64 @@ fn invalid_commit_module_limits_and_partial_record_grants_refuse_without_publica
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("--store-sha256"));
     f.preserved(&head, &index, &config);
+}
+
+#[test]
+fn live_selection_uses_dirty_configuration_and_preserves_host_on_refusal() {
+    let f = Fixture::new();
+    let repo = f.repository.workdir().unwrap();
+    let config = b"[invalid and deliberately unparseable live TOML";
+    fs::write(repo.join("pyproject.toml"), config).unwrap();
+    let head = fs::read(f.repository.path().join("HEAD")).unwrap();
+    let index = fs::read(f.repository.path().join("index")).unwrap();
+    let output = f.invoke_live(&["probe.py"]);
+    assert_eq!(output.status.code(), Some(4), "{output:?}");
+    let error = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        error.contains("TOML") || error.contains("table header"),
+        "{error}"
+    );
+    assert!(!error.contains("guest SHA-256"), "{error}");
+    assert!(output.stdout.is_empty());
+    f.preserved(&head, &index, config);
+}
+
+#[test]
+fn live_ignored_binary_data_reaches_guest_pin_but_empty_inputs_refuse() {
+    let f = Fixture::new();
+    let repo = f.repository.workdir().unwrap();
+    fs::write(repo.join("probe.py"), "def value(x):\n    return x + 71\n").unwrap();
+    fs::write(repo.join(".gitignore"), "private-data/\n").unwrap();
+    fs::create_dir(repo.join("private-data")).unwrap();
+    fs::write(repo.join("private-data/input"), [0, 255, 17, 34]).unwrap();
+    let head = fs::read(f.repository.path().join("HEAD")).unwrap();
+    let index = fs::read(f.repository.path().join("index")).unwrap();
+    let config = fs::read(repo.join("pyproject.toml")).unwrap();
+    let output = f.invoke_live(&["probe.py", "private-data"]);
+    assert_eq!(output.status.code(), Some(4), "{output:?}");
+    let error = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        error.contains("digest") || error.contains("SHA-256"),
+        "{error}"
+    );
+    assert!(output.stdout.is_empty());
+    f.preserved(&head, &index, &config);
+
+    fs::create_dir(repo.join("empty-input")).unwrap();
+    let refused = f.invoke_live(&["probe.py", "empty-input"]);
+    assert_eq!(refused.status.code(), Some(4), "{refused:?}");
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("empty"),
+        "{refused:?}"
+    );
+    assert!(refused.stdout.is_empty());
+    f.preserved(&head, &index, &config);
+    assert_eq!(
+        fs::read(repo.join("private-data/input")).unwrap(),
+        [0, 255, 17, 34]
+    );
+    assert_eq!(
+        fs::read_to_string(repo.join("probe.py")).unwrap(),
+        "def value(x):\n    return x + 71\n"
+    );
 }
