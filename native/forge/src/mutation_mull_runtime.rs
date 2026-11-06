@@ -87,6 +87,7 @@ fn definition(inputs: &Inputs, worktree: &Path, grants: &Grants) -> Result<Strin
     let ninja = literal(grants.program("ninja")?)?;
     let linker = literal(grants.program("ld")?)?;
     let plugin = literal(grants.mull_toolchain()?.plugin())?;
+    let gcc_install = literal(grants.mull_toolchain()?.gcc_install_dir())?;
     let (language, standard, mode) = if inputs.source.ends_with(".c") {
         ("C", 11, "--driver-mode=gcc")
     } else {
@@ -96,7 +97,7 @@ fn definition(inputs: &Inputs, worktree: &Path, grants: &Grants) -> Result<Strin
         "cmake_minimum_required(VERSION 3.28)\n\
          set(CMAKE_MAKE_PROGRAM \"{ninja}\" CACHE FILEPATH \"\" FORCE)\n\
          set(CMAKE_{language}_COMPILER \"{clang}\" CACHE FILEPATH \"\" FORCE)\n\
-         set(CMAKE_{language}_COMPILER_ARG1 \"{mode} --no-default-config\" CACHE STRING \"\" FORCE)\n\
+         set(CMAKE_{language}_COMPILER_ARG1 \"{mode} --no-default-config --gcc-install-dir={gcc_install}\" CACHE STRING \"\" FORCE)\n\
          set(CMAKE_EXE_LINKER_FLAGS \"--ld-path={linker}\" CACHE STRING \"\" FORCE)\n\
          set(CMAKE_EXPORT_NO_PACKAGE_REGISTRY ON)\n\
          set(CMAKE_FIND_USE_PACKAGE_REGISTRY OFF)\n\

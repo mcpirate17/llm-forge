@@ -45,13 +45,25 @@ fn setup() -> (
     for p in programs.values() {
         put(p, b"tool").unwrap();
     }
+    let gcc_install_dir = dir.path().join("gcc");
+    directory(&gcc_install_dir).unwrap();
+    let mut files = BTreeMap::from([(plugin.clone(), digest(b"plugin"))]);
+    for name in ["crtbeginS.o", "crtendS.o", "libgcc.a"] {
+        let path = gcc_install_dir.join(name);
+        put(&path, b"gcc").unwrap();
+        files.insert(path, digest(b"gcc"));
+    }
     let config = Config {
         llvm_major: 18,
         plugin: plugin.clone(),
-        files: BTreeMap::from([(plugin.clone(), digest(b"plugin"))]),
+        gcc_install_dir,
+        files,
         directories: BTreeMap::new(),
     };
-    let reads = std::iter::once(plugin)
+    let reads = config
+        .files
+        .keys()
+        .cloned()
         .chain(programs.values().cloned())
         .collect();
     (dir, config, reads, programs)
@@ -68,9 +80,33 @@ fn exact_grants_and_pins_are_required() {
     config.llvm_major = 19;
     assert!(validate_paths(&config, &reads, &programs).is_err());
     assert!(serde_json::from_str::<Config>(
-        r#"{"llvm_major":18,"plugin":"/x","files":{},"directories":{},"extra":true}"#
+        r#"{"llvm_major":18,"plugin":"/x","gcc_install_dir":"/gcc","files":{},"directories":{},"extra":true}"#
     )
     .is_err());
+}
+#[test]
+fn gcc_selection_requires_safe_canonical_directory_and_exact_file_pins() {
+    let (dir, config, _, _) = setup();
+    let held = gcc_binding(&config).unwrap();
+    for name in ["crtbeginS.o", "crtendS.o", "libgcc.a"] {
+        let mut missing = config.clone();
+        missing.files.remove(&config.gcc_install_dir.join(name));
+        assert!(gcc_binding(&missing).is_err(), "{name}");
+    }
+    let alias = dir.path().join("alias");
+    std::os::unix::fs::symlink(&config.gcc_install_dir, &alias).unwrap();
+    let mut aliased = config.clone();
+    aliased.gcc_install_dir = alias.clone();
+    for name in ["crtbeginS.o", "crtendS.o", "libgcc.a"] {
+        aliased.files.insert(alias.join(name), digest(b"gcc"));
+    }
+    assert!(gcc_binding(&aliased).is_err());
+    fs::set_permissions(&config.gcc_install_dir, fs::Permissions::from_mode(0o777)).unwrap();
+    assert!(gcc_binding(&config).is_err());
+    fs::set_permissions(&config.gcc_install_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::rename(&config.gcc_install_dir, dir.path().join("old-gcc")).unwrap();
+    directory(&config.gcc_install_dir).unwrap();
+    assert!(held.verify().is_err());
 }
 #[test]
 fn file_pin_rejects_wrong_digest_mutation_and_replacement() {

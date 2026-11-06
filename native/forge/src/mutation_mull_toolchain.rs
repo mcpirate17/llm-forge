@@ -38,6 +38,7 @@ const ALIASES: [&str; 8] = [
 pub(crate) struct Config {
     pub llvm_major: u32,
     pub plugin: PathBuf,
+    pub gcc_install_dir: PathBuf,
     pub files: BTreeMap<PathBuf, String>,
     pub directories: BTreeMap<PathBuf, String>,
 }
@@ -47,6 +48,17 @@ fn valid_hash(hash: &str) -> bool {
         && hash
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+fn gcc_binding(config: &Config) -> Result<DirectoryBinding> {
+    for name in ["crtbeginS.o", "crtendS.o", "libgcc.a"] {
+        ensure!(
+            config
+                .files
+                .contains_key(&config.gcc_install_dir.join(name)),
+            "Mull GCC selection requires exact pinned file: {name}"
+        );
+    }
+    DirectoryBinding::open(&config.gcc_install_dir, None)
 }
 fn validate_paths(
     config: &Config,
@@ -65,6 +77,7 @@ fn validate_paths(
         config.files.contains_key(&config.plugin),
         "Mull plugin requires an exact file pin"
     );
+    gcc_binding(config)?;
     ensure!(
         config
             .files
@@ -290,6 +303,8 @@ impl HeldDirectory {
 
 pub(crate) struct Held {
     plugin: PathBuf,
+    gcc_install_dir: PathBuf,
+    gcc_directory: DirectoryBinding,
     files: Vec<HeldFile>,
     directories: Vec<HeldDirectory>,
 }
@@ -297,6 +312,7 @@ impl Held {
     pub(crate) fn capture(config: &Config, grants: &Grants) -> Result<Self> {
         let programs = grants.programs();
         validate_paths(config, &grants.read_only, &programs)?;
+        let gcc_directory = gcc_binding(config)?;
         for alias in ALIASES {
             ensure!(
                 valid_hash(grants.program_sha256(alias)?),
@@ -318,6 +334,8 @@ impl Held {
             .collect::<Result<Vec<_>>>()?;
         let held = Self {
             plugin: config.plugin.clone(),
+            gcc_install_dir: config.gcc_install_dir.clone(),
+            gcc_directory,
             files,
             directories,
         };
@@ -326,6 +344,9 @@ impl Held {
     }
     pub(crate) fn plugin(&self) -> &Path {
         &self.plugin
+    }
+    pub(crate) fn gcc_install_dir(&self) -> &Path {
+        &self.gcc_install_dir
     }
     pub(crate) fn identity(&self) -> Result<serde_json::Value> {
         let files: BTreeMap<_, _> = self
@@ -341,12 +362,14 @@ impl Held {
         Ok(serde_json::json!({
             "llvm_major": 18,
             "plugin": serde_json::to_value(&self.plugin)?,
+            "gcc_install_dir": serde_json::to_value(&self.gcc_install_dir)?,
             "files": serde_json::to_value(files)?,
             "directories": serde_json::to_value(directories)?,
             "scope": "point-in-time content binding, not producer attestation"
         }))
     }
     pub(crate) fn verify(&self) -> Result<()> {
+        self.gcc_directory.verify()?;
         let mut bytes = 0u64;
         for file in &self.files {
             file.verify()?;
@@ -364,7 +387,7 @@ impl Held {
             }
         }
         ensure!(bytes <= MAX_BYTES, "Mull total byte budget exceeded");
-        Ok(())
+        self.gcc_directory.verify()
     }
 }
 #[cfg(test)]
