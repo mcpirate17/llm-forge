@@ -33,6 +33,11 @@ fn array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
         .with_context(|| format!("Cargo metadata missing {key}"))
 }
 fn inside(root: &Path, value: &str) -> Result<PathBuf> {
+    inside_optional(root, value, false)
+}
+
+/// Only unused dependency dev targets may have an absent suffix.
+fn inside_optional(root: &Path, value: &str, allow_missing: bool) -> Result<PathBuf> {
     let path = Path::new(value);
     ensure!(
         root.is_absolute() && root.canonicalize()? == root,
@@ -47,17 +52,32 @@ fn inside(root: &Path, value: &str) -> Result<PathBuf> {
         "metadata path outside admitted root: {value}"
     );
     let mut normalized = root.to_owned();
+    let mut missing = false;
     for component in path.strip_prefix(root)?.components() {
         match component {
             Component::Normal(name) => {
                 normalized.push(name);
-                let meta = std::fs::symlink_metadata(&normalized)?;
-                ensure!(
-                    !meta.file_type().is_symlink(),
-                    "metadata path traverses symlink: {value}"
-                );
+                if !missing {
+                    match std::fs::symlink_metadata(&normalized) {
+                        Ok(meta) => ensure!(
+                            !meta.file_type().is_symlink(),
+                            "metadata path traverses symlink: {value}"
+                        ),
+                        Err(error)
+                            if allow_missing && error.kind() == std::io::ErrorKind::NotFound =>
+                        {
+                            missing = true
+                        }
+                        Err(error) => {
+                            return Err(error).with_context(|| {
+                                format!("metadata path component {}", normalized.display())
+                            })
+                        }
+                    }
+                }
             }
             Component::ParentDir => {
+                ensure!(!missing, "metadata parent after absent component: {value}");
                 ensure!(
                     normalized != root,
                     "metadata path escapes admitted root: {value}"
@@ -68,9 +88,17 @@ fn inside(root: &Path, value: &str) -> Result<PathBuf> {
         }
     }
     ensure!(
-        normalized.starts_with(root) && path.canonicalize()? == normalized,
-        "metadata path is aliased: {value}"
+        normalized.starts_with(root),
+        "metadata path escapes admitted root: {value}"
     );
+    if !missing {
+        ensure!(
+            path.canonicalize()
+                .with_context(|| format!("canonicalizing metadata path {value}"))?
+                == normalized,
+            "metadata path is aliased: {value}"
+        );
+    }
     Ok(normalized)
 }
 
@@ -203,11 +231,22 @@ fn selected_package<'a>(
             }
             _ => anyhow::bail!("unsupported Cargo package source"),
         };
-        let normalized_manifest = inside(&admitted, path)?;
+        let normalized_manifest = inside(&admitted, path)
+            .with_context(|| format!("Cargo package {name} ({id}) manifest {path}"))?;
+        let is_selected = name == package && members.contains(id);
         for target in array(item, "targets")? {
-            inside(&admitted, text(target, "src_path")?)?;
+            let target_name = text(target, "name")?;
+            let target_path = text(target, "src_path")?;
+            let kinds = array(target, "kind")?;
+            let dev_only = !kinds.is_empty()
+                && kinds
+                    .iter()
+                    .all(|kind| matches!(kind.as_str(), Some("example" | "test" | "bench")));
+            inside_optional(&admitted, target_path, !is_selected && dev_only).with_context(|| {
+                format!("Cargo package {name} ({id}) target {target_name} kinds {kinds:?} path {target_path}")
+            })?;
         }
-        if name == package && members.contains(id) {
+        if is_selected {
             ensure!(selected.is_none(), "ambiguous Cargo workspace package name");
             ensure!(
                 normalized_manifest == selected_manifest,

@@ -162,3 +162,64 @@ fn metadata_rejects_escape_reentry_and_every_symlink_component() {
         );
     }
 }
+
+fn with_dependency(root: &Path, data: &mut Value, kind: &str, target: &Path) {
+    let dependency = root.join("dependency");
+    fs::create_dir_all(&dependency).unwrap();
+    fs::write(
+        dependency.join("Cargo.toml"),
+        "[package]\nname='dep'\nversion='0.1.0'\n",
+    )
+    .unwrap();
+    data["packages"].as_array_mut().unwrap().push(json!({
+        "id":"dep-id", "name":"dep", "version":"0.1.0", "source":null,
+        "manifest_path":dependency.join("Cargo.toml"),
+        "targets":[{"name":"sample", "kind":[kind], "src_path":target}]
+    }));
+    data["resolve"]["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":"dep-id", "deps":[]}));
+}
+
+#[test]
+fn missing_unused_dependency_example_is_allowed_but_build_and_selected_targets_are_required() {
+    let (_temp, root, home, mut data, sources, tests) = fixture();
+    let missing = root.join("dependency/examples/omitted.rs");
+    with_dependency(&root, &mut data, "example", &missing);
+    assert!(run(&root, &home, &data, &sources, &tests).is_ok());
+    for kind in ["lib", "bin", "proc-macro", "custom-build", "unknown"] {
+        data["packages"][1]["targets"][0]["kind"] = json!([kind]);
+        let error = run(&root, &home, &data, &sources, &tests).unwrap_err();
+        let text = format!("{error:#}");
+        assert!(
+            text.contains("dep-id") && text.contains("sample") && text.contains("omitted.rs"),
+            "{text}"
+        );
+    }
+    data["packages"][1]["targets"][0]["kind"] = json!(["example"]);
+    data["packages"][0]["targets"][0]["src_path"] = json!(root.join("src/missing.rs"));
+    assert!(run(&root, &home, &data, &sources, &tests).is_err());
+}
+
+#[test]
+fn missing_dependency_dev_target_still_refuses_escape_alias_and_parent_after_missing() {
+    use std::os::unix::fs::symlink;
+    let (temp, root, home, mut data, sources, tests) = fixture();
+    let dependency = root.join("dependency");
+    let initial = dependency.join("examples/absent.rs");
+    with_dependency(&root, &mut data, "example", &initial);
+    symlink("missing-dir", dependency.join("alias")).unwrap();
+    for path in [
+        temp.path().join("outside/not-found.rs"),
+        dependency.join("alias/not-found.rs"),
+        dependency.join("missing/../not-found.rs"),
+        root.join("../repo/dependency/examples/not-found.rs"),
+    ] {
+        data["packages"][1]["targets"][0]["src_path"] = json!(path);
+        assert!(
+            run(&root, &home, &data, &sources, &tests).is_err(),
+            "accepted {path:?}"
+        );
+    }
+}
