@@ -218,6 +218,7 @@ impl Delegated {
             scratch: self.path(),
             max_wall_seconds: 60,
             cargo_value: false,
+            private_files: false,
         }
     }
     pub(crate) fn with_run<T>(

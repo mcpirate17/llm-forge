@@ -279,7 +279,10 @@ impl State {
                 && meta.mode() & 0o7022 == 0
                 && meta.uid() == unsafe { libc::geteuid() }
                 && meta.nlink() == 1,
-            "Mull build did not produce a private regular executable"
+            "Mull build did not produce a private regular executable: mode={:o}, uid={}, links={}",
+            meta.mode(),
+            meta.uid(),
+            meta.nlink()
         );
         let (held, bytes) = crate::candidate_inputs::repository_live(&path, 32 * 1024 * 1024)?;
         let hash = crate::mutation_campaign::sha256_hex(&bytes);

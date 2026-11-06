@@ -237,6 +237,7 @@ fn exercise(mode: &str, cancel: bool) {
         scratch: &root,
         max_wall_seconds: 30,
         cargo_value: false,
+        private_files: false,
     };
     let mut run = EngineRun {
         campaign: &mut campaign,
@@ -337,6 +338,7 @@ fn pending_receipt_write_failure_refuses_launch_and_retains_snapshot() {
         scratch: &root,
         max_wall_seconds: 30,
         cargo_value: false,
+        private_files: false,
     };
     fs::write(host.path().join("not-a-directory"), b"blocked").unwrap();
     let output = host.path().join("not-a-directory/receipt.json");
@@ -425,6 +427,7 @@ fn unresolved_prior_owner_refuses_next_command_and_retains_snapshot() {
         scratch: &root,
         max_wall_seconds: 30,
         cargo_value: false,
+        private_files: false,
     };
     let output = host.path().join("receipt.json");
     let mut run = EngineRun {

@@ -15,7 +15,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
     fs,
-    os::unix::fs::{symlink, PermissionsExt},
+    os::unix::fs::{symlink, DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
 };
 fn error(value: impl std::fmt::Display) -> String {
@@ -367,7 +367,9 @@ impl Inputs {
                 Ok(None)
             }
             Self::Mull(_) => {
-                fs::create_dir(root.join("mull-output"))?;
+                fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(root.join("mull-output"))?;
                 Ok(None)
             }
             Self::Root(_) | Self::Workspace(_) => {
@@ -991,6 +993,7 @@ impl<'a> Runtime<'a> {
             scratch: &self.root,
             max_wall_seconds: self.grants.max_wall_seconds,
             cargo_value: false,
+            private_files: self.mull.is_some(),
         };
         let result = session.command(run, argv, cwd, timeout, capture);
         if let Err(failure) = self.verify(Some(run.worktree)) {

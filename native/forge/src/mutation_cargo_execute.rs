@@ -545,6 +545,7 @@ impl Runtime {
             scratch: &cwd,
             max_wall_seconds: 86400,
             cargo_value: true,
+            private_files: false,
         };
         session.command(run, argv, &cwd, seconds, Capture::Strict)
     }

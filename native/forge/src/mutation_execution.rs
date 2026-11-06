@@ -8,6 +8,7 @@ use crate::{
     sandbox::Sandbox,
 };
 use serde_json::{json, Value};
+use std::os::unix::process::CommandExt;
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -32,6 +33,18 @@ pub(crate) struct CommandSession<'a> {
     pub scratch: &'a Path,
     pub max_wall_seconds: u64,
     pub cargo_value: bool,
+    pub private_files: bool,
+}
+fn private_child_files(command: &mut std::process::Command, enabled: bool) {
+    if enabled {
+        // SAFETY: umask is async-signal-safe and runs only in the forked child.
+        unsafe {
+            command.pre_exec(|| {
+                libc::umask(0o077);
+                Ok(())
+            });
+        }
+    }
 }
 struct NoResources;
 impl Resources for NoResources {
@@ -169,6 +182,7 @@ impl CommandSession<'_> {
         let program = self.program(argv.first().ok_or("empty mutation command")?)?;
         let mut plan = self.sandbox.command(&program).map_err(error)?;
         plan.command().args(&argv[1..]).current_dir(&cwd);
+        private_child_files(plan.command(), self.private_files);
         run.supervisor
             .interrupts
             .child_mask()
@@ -210,5 +224,45 @@ impl CommandSession<'_> {
             stderr_tail: crate::mutation_run::last_chars(&observed.stderr, 4000),
         };
         Ok((result, observed.stdout, provenance))
+    }
+}
+
+#[cfg(test)]
+mod private_file_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn parent_umask() -> String {
+        std::fs::read_to_string("/proc/self/status")
+            .unwrap()
+            .lines()
+            .find(|line| line.starts_with("Umask:"))
+            .unwrap()
+            .to_owned()
+    }
+
+    #[test]
+    fn child_mask_overrides_insecure_initial_mask_without_changing_parent() {
+        let parent = parent_umask();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("artifact");
+        let mut command = std::process::Command::new("/bin/sh");
+        command.args(["-c", "umask; : > \"$1\"", "sh"]).arg(&file);
+        // SAFETY: the inherited mask is changed only in this test child.
+        unsafe {
+            command.pre_exec(|| {
+                libc::umask(0);
+                Ok(())
+            });
+        }
+        private_child_files(&mut command, true);
+        let output = command.output().unwrap();
+        assert!(output.status.success());
+        assert_eq!(std::str::from_utf8(&output.stdout).unwrap().trim(), "0077");
+        assert_eq!(
+            std::fs::metadata(file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(parent_umask(), parent);
     }
 }

@@ -7,7 +7,39 @@ const DRIVER: &str = "tests/driver.cpp";
 const SUBJECT: &str = "int answer(int value) { return value + 1; }\n";
 const STRONG: &str = "extern int answer(int); int main() { return answer(0) != 1 || answer(1) != 2 || answer(-1) != 0; }\n";
 const WEAK: &str = "extern int answer(int); int main() { volatile int result = answer(1); (void)result; return 0; }\n";
-const RED: &str = "extern int answer(int); int main() { (void)answer(1); return 1; }\n";
+const RED: &str = r#"extern int answer(int);
+extern "C" {
+int pipe(int*); int fork(); int setsid(); int close(int);
+long read(int, void*, unsigned long); long write(int, const void*, unsigned long);
+int waitpid(int, int*, int); unsigned int sleep(unsigned int); void _exit(int);
+}
+int main() {
+    (void)answer(1);
+    int ready[2];
+    if (pipe(ready) != 0) return 10;
+    int child = fork();
+    if (child < 0) return 11;
+    if (child == 0) {
+        close(ready[0]);
+        if (setsid() < 0) _exit(12);
+        const char marker[] = "FORGE_MULL_DETACHED_READY\n";
+        if (write(1, marker, sizeof(marker) - 1) != sizeof(marker) - 1) _exit(13);
+        close(1); close(2);
+        const char byte = 'R';
+        if (write(ready[1], &byte, 1) != 1) _exit(14);
+        close(ready[1]);
+        sleep(30);
+        _exit(0);
+    }
+    close(ready[1]);
+    char byte = 0;
+    if (read(ready[0], &byte, 1) != 1 || byte != 'R') return 15;
+    close(ready[0]);
+    int status = 0;
+    if (waitpid(child, &status, 1) != 0) return 16;
+    return 1;
+}
+"#;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -389,10 +421,18 @@ fn manifest_check(host: &CargoFixture, path: &Path, before: &Value, receipt: &Va
     );
 }
 fn verify_outcome(receipt: &Value, manifest: &Value, strong: bool, code: std::process::ExitStatus) {
+    let expected = if strong { "PASS" } else { "RATCHET_HELD" };
+    assert_eq!(
+        receipt["status"], expected,
+        "unexpected Mull verdict: {receipt}"
+    );
     let rows = receipt["mutants"]
         .as_array()
-        .expect("automatic Elements outcomes");
-    assert!(!rows.is_empty());
+        .unwrap_or_else(|| panic!("automatic Elements outcomes missing: {receipt}"));
+    assert!(
+        !rows.is_empty(),
+        "automatic Elements outcomes empty: {receipt}"
+    );
     assert!(rows.iter().all(|row| row["path"] == SOURCE));
     assert_eq!(receipt["complete_campaign"], true);
     assert_eq!(receipt["accounting"]["planned"], rows.len());
@@ -445,6 +485,18 @@ fn verify_failed_baseline(receipt: &Value, cfg: &Config) {
     assert_eq!(receipt["baseline_argv"], json!(["forge-mull-test"]));
     assert_eq!(receipt["baseline"]["returncode"], 1);
     assert_eq!(receipt["baseline"]["timed_out"], false);
+    assert!(
+        receipt["baseline"]["stdout_tail"]
+            .as_str()
+            .is_some_and(|text| text.contains("FORGE_MULL_DETACHED_READY\n")),
+        "detached child did not report readiness: {receipt}"
+    );
+    assert!(
+        receipt["baseline"]["duration_seconds"]
+            .as_f64()
+            .is_some_and(|seconds| seconds < 15.0),
+        "baseline did not complete before the child backstop: {receipt}"
+    );
     let commands = receipt["process_commands"]
         .as_array()
         .expect("owned commands");
