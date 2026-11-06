@@ -11,6 +11,15 @@ pub fn declared(payload: &Map<String, Value>) -> bool {
     payload.get("runner_kind").and_then(Value::as_str) == Some(RUNNER_KIND)
 }
 
+/// Partial engine observations are diagnostic data, never completed evidence.
+/// Presence is sufficient: null or malformed values must not waive this guard.
+pub fn partial_progress_error(payload: &Map<String, Value>) -> Option<&'static str> {
+    ["engine_partial_progress", "engine_partial_progress_error"]
+        .iter()
+        .any(|key| payload.contains_key(*key))
+        .then_some("partial engine diagnostics cannot establish completed mutation evidence")
+}
+
 fn hex(value: Option<&str>, length: usize) -> bool {
     value.is_some_and(|s| {
         s.len() == length

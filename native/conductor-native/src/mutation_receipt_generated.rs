@@ -83,6 +83,9 @@ pub(crate) fn generated_errors_with_installed(
             )];
         }
     }
+    if let Some(detail) = native_runner::partial_progress_error(payload) {
+        errors.push(reject(RejectionKind::SchemaError, detail));
+    }
     errors.extend(identity_errors(payload, campaign));
     if campaign.execution_profile.as_deref() == Some("cargo-workspace-v3")
         && !native_runner::declared(payload)

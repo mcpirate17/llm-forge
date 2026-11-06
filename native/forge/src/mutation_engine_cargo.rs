@@ -3,6 +3,8 @@
 //! mutants survived, the ordinary reading of an uncurated corpus, so the
 //! survivor set decides the verdict rather than the exit code.
 
+#[path = "mutation_cargo_partial.rs"]
+mod partial;
 #[path = "mutation_cargo_execute.rs"]
 mod value;
 
@@ -290,6 +292,63 @@ fn read_report(output: &Path) -> Result<(crate::candidate_inputs::BoundFile, Val
     Ok((held, report))
 }
 
+fn record_partial(
+    run: &mut EngineRun<'_>,
+    output: &Path,
+    selected: &Campaign,
+    argv: &[String],
+    reason: &str,
+) {
+    let cleanup = run
+        .receipt
+        .get("process_cleanup")
+        .and_then(Value::as_object);
+    let last = run
+        .receipt
+        .get("process_commands")
+        .and_then(Value::as_array)
+        .and_then(|rows| rows.last());
+    let safe = cleanup.and_then(|v| v.get("complete")) == Some(&Value::Bool(true))
+        && last.and_then(|v| v.get("state")).and_then(Value::as_str) == Some("observed")
+        && last.and_then(|v| v.get("argv")) == Some(&json!(argv))
+        && last
+            .and_then(|v| v.get("confinement"))
+            .and_then(|v| v.get("cleanup_complete"))
+            == Some(&Value::Bool(true));
+    let result = if safe {
+        let reason = if last
+            .and_then(|v| v.get("confinement"))
+            .and_then(|v| v.get("outcome"))
+            .and_then(Value::as_str)
+            == Some("timed_out")
+        {
+            "timeout"
+        } else {
+            reason
+        };
+        partial::collect(output, selected, reason)
+    } else {
+        Err("owned engine cleanup is not verified; progress was not read".into())
+    };
+    match result {
+        Ok(value) => {
+            run.receipt.insert("engine_partial_progress".into(), value);
+        }
+        Err(error) => {
+            let bounded: String = error.chars().take(1024).collect();
+            let suffix = if bounded.len() < error.len() {
+                " [truncated]"
+            } else {
+                ""
+            };
+            run.receipt.insert(
+                "engine_partial_progress_error".into(),
+                json!(format!("{bounded}{suffix}")),
+            );
+        }
+    }
+}
+
 fn require_package(rows: &[Value], expected: Option<&str>) -> Result<(), String> {
     if let Some(expected) = expected {
         if rows
@@ -367,11 +426,24 @@ pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
         "--cargo-arg=--offline".into(),
     ]);
     argv.extend(test_arguments);
-    let (result, _) = run.run(&argv, &worktree, timeout, &bound, &[])?;
+    let (result, _) = match run.run(&argv, &worktree, timeout, &bound, &[]) {
+        Ok(result) => result,
+        Err(stop) => {
+            record_partial(run, &output, &selected, &argv, "actor_error");
+            return Err(stop);
+        }
+    };
     run.receipt
         .insert("engine_result".into(), result.as_value());
     if result.timed_out {
+        record_partial(run, &output, &selected, &argv, "timeout");
         return Err(format!("cargo-mutants timed out after {timeout}s").into());
+    }
+    if !result
+        .returncode
+        .is_some_and(|code| VERDICT_EXITS.contains(&code))
+    {
+        record_partial(run, &output, &selected, &argv, "nonverdict_exit");
     }
     let (held_report, report) = read_report(&output)?;
     run.planned = report.get("total_mutants").and_then(Value::as_u64);

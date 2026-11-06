@@ -160,6 +160,15 @@ fn ordinary_supporting_error(
     .err()
 }
 
+fn requires_native_workspace(campaign: &Campaign<'_>) -> bool {
+    campaign.ordinary_cargo
+        && campaign
+            .ordinary_contract
+            .and_then(|value| value.get("execution_profile"))
+            .and_then(Value::as_str)
+            == Some("cargo-workspace-v3")
+}
+
 pub fn rejection_with_supporting(
     campaign: &Campaign<'_>,
     receipt: &Value,
@@ -183,14 +192,10 @@ pub fn rejection_with_supporting(
     if !matches!(status.as_str(), Some("PASS" | "RATCHET_HELD")) {
         return Ok(Some(format!("status={}", python_status(status))));
     }
-    if campaign.ordinary_cargo
-        && campaign
-            .ordinary_contract
-            .and_then(|v| v.get("execution_profile"))
-            .and_then(Value::as_str)
-            == Some("cargo-workspace-v3")
-        && !native_runner::declared(object)
-    {
+    if let Some(reason) = native_runner::partial_progress_error(object) {
+        return Ok(Some(reason.into()));
+    }
+    if requires_native_workspace(campaign) && !native_runner::declared(object) {
         return Ok(Some("workspace v3 requires a native runner receipt".into()));
     }
     if native_runner::declared(object) {

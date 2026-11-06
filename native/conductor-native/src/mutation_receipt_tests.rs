@@ -1,3 +1,5 @@
+#[path = "mutation_receipt_partial_tests.rs"]
+mod partial_progress;
 use std::path::Path;
 use std::path::PathBuf;
 

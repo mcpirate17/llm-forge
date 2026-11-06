@@ -10,6 +10,76 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Interrupted Cargo progress controls — 2026-11-06
+
+The clean native release build at `ad6f12f` preserves bounded partial engine progress
+after confirmed process cleanup. The unchanged automatic timeout control completed
+all 12 diagnostic checks: its receipt records two discovered mutants, zero
+completed mutant outcomes, and an unknown remainder. Raw report hashes, byte sizes
+and canonical identity digests match the retained files. The first mutant was
+interrupted, so this control does not demonstrate a nonzero completed-outcome
+capture; positive reconciliation and refusal cases have focused unit coverage.
+
+The [three-attempt index](../research/performance/forge-program-20261106-partial-progress.json)
+retains both preceding failed controls. Each completed 10 checks, failed validation,
+and left the final toolchain check unstarted. The first exposed a timeout reported
+as an actor error after source verification failed; the second exposed JSON
+key-order dependence in mutant identities. Both producer defects were corrected;
+the independent oracle and authored fixture stayed unchanged. No attempt was
+repeated merely to obtain a different completed-mutant count.
+
+For the corrected control, metadata, direct baseline and engine wall times were
+13, 155 and 10,004 ms under one CPU, 1 GiB and a ten-second engine bound. These
+single observations exclude preparation and are not matched speed measurements.
+CPU, RSS, allocations, model usage and agent-task benefit were not measured.
+Independent audit verified the retained streams, report identities and absence of
+all three owned process scopes. The unrestored automatic-mutant snapshot remains.
+All three native receipts are incomplete ERROR results; progress changes neither
+official mutant accounting nor scoring. Either diagnostic field prevents passing
+receipt admission. Focused tests, strict Clippy and the clean control do not
+replace full publication checks for the final committed tree.
+
+### Compiler-header control and actual Forge timeout — 2026-11-06
+
+A small authored workspace passed its C-header build probe with `/usr/include`
+explicitly added to the existing read grants. The support crate's build script
+compiled C containing `#include <stdio.h>` and required a nonempty regular object;
+the retained baseline log records 1,240 bytes. Both automatic Rust mutants were
+killed, all 31 driver checks completed, and corpus drift/restoration checks passed.
+Independent audit verified all 146 retained command streams and positive absence
+of the three owned cgroups and snapshot. The object itself was removed with the
+snapshot. This is a cooperative compile-only probe, not full compiler closure.
+
+The subsequent actual Forge attempt used source `83990e2`, the same clean native
+runner at `4cba4eb`, the 338-package offline seed, and only
+`mutation_cargo_supporting.rs` as mutation source. It selected the library filter
+`mutation_cargo_supporting::tests::`. Its fresh baseline passed five tests, with
+1,153 filtered out. The engine then exceeded its separate 300-second bound.
+The [evidence index](../research/performance/forge-program-20261106-compiler-and-timeout.json)
+binds both attempts and their independent audits.
+
+| Workload | Native metadata / baseline / engine wall time | Outcome |
+| --- | --- | --- |
+| Tiny header workspace, one CPU / 1 GiB / 60 seconds per command | 24 / 236 / 318 ms | Two mutants killed, PASS |
+| Actual selected Forge library, two CPUs / 8 GiB / 300 seconds per baseline or engine | 104 / 156,996 / 300,101 ms | Baseline passed; engine timed out, ERROR |
+
+Cargo used one build worker in both attempts. These are different workloads and
+resource limits, not a matched speed comparison. Command timings exclude seed
+staging, snapshot creation, input hashing and driver overhead. CPU, RSS,
+allocation and model-token measurements are unavailable; grants are limits, not
+observed usage. Neither attempt measures agent productivity.
+
+The actual engine's retained discovery file lists 55 mutants. Its partial report
+contains 44 completed mutant scenarios: 34 caught, seven missed and three
+unviable. The other 11 have unknown states; they must not all be called unstarted.
+The native ERROR receipt imported no mutant rows and reports unknown planned and
+unstarted counts, because timeout handling returned before importing progress.
+This gap is tracked in [#205](https://github.com/mcpirate17/llm-forge/issues/205).
+The 13 completed driver checks establish diagnostic collection, not campaign PASS.
+All three owned cgroups were absent after the run; its snapshot remains with an
+unrestored automatic mutation. The three owned repository outputs were moved
+unchanged into private evidence storage with device, inode and hash verification.
+
 ### Selected workspace test controls — 2026-11-06
 
 The clean release at `4cba4eb` exercised four automatic cargo-mutants controls

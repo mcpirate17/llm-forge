@@ -1,0 +1,1246 @@
+{
+  "schema": "forge.program.compiler-timeout-evidence.v1",
+  "scope": "one tiny authored C-header control and one interrupted actual Forge selected-library campaign; not a matched speed comparison or agent-productivity study",
+  "limitations": [
+    "Single native command wall-time observations exclude preparation, source hashing, seed staging and driver overhead.",
+    "CPU, RSS, allocation and model-token measurements are unavailable; resource grants are limits, not measured usage.",
+    "An optional in-flight resource read found the baseline process already absent before collecting counters.",
+    "The header object and its complete child output were removed with the successful snapshot; the retained baseline tail records object_bytes=1240.",
+    "Actual engine discovery lists 55 mutants and the stopped outcomes file records 44 completed mutant scenarios; the other 11 have unknown states.",
+    "The actual driver completed 13 diagnostic checks while the native engine timed out; it did not pass the campaign.",
+    "The retained actual snapshot contains an unrestored automatic mutation and is not a reusable clean checkout.",
+    "Private drivers, tools, grants and raw evidence remain host-local; this index is not a portable replay bundle or execution attestation."
+  ],
+  "trials": [
+    {
+      "kind": "header",
+      "summary": "/tmp/forge-196-selected-k43ndxt3/summary.json",
+      "summary_sha256": "0734ccf720c737fd25cda477529564cd4e5c127387a492bfb1713ba4418c2313",
+      "driver_checks": {
+        "completed": 31,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0,
+        "running": 0
+      },
+      "driver_decision": "CONTROL_EXPECTATIONS_MET_AND_SCOPED_CORPUS_CHECKED",
+      "driver_completion_scope": "check orchestration only; independent of native campaign outcome",
+      "native_status": "PASS",
+      "native_accounting": {
+        "censored": 0,
+        "completed": 2,
+        "failed": 0,
+        "planned": 2,
+        "unstarted": 0
+      },
+      "native_runner": {
+        "compiled_git_commit": "4cba4ebfe75f9b334a2cdcea41b95226cd871f3b",
+        "compiled_source_sha256": "e44c86b4dfa97710734be4de55860dce6a9222144b17acf3ac754a6feb9ec551",
+        "executable_sha256": "1ffc3f180929b0a18fed65c0f9e74894170b44dd07e5f95275d05c4328421779",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": true
+      },
+      "bounds": {
+        "native_command_wall_seconds": 60,
+        "outer_run_normal_wait": 75,
+        "cooperative_cancel_allowance": 45,
+        "whole_cooperative_budget_seconds": 900,
+        "retries": 0
+      },
+      "toolchain": {
+        "root": "/tmp/forge-192-toolchain-fdiy923q",
+        "inventory_path": "/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json",
+        "inventory_sha256": "68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b",
+        "files": 114,
+        "bytes": 818699248,
+        "content_digest": "3187224bc12dea4b6d70799e826bc0a81ab64414dee324477f9596de503d230a",
+        "scope": "before/after file observations, not immutable compiler attestation"
+      },
+      "tools": {
+        "cargo": {
+          "path": "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "rustc": {
+          "path": "/tmp/forge-192-toolchain-fdiy923q/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "rustdoc": {
+          "path": "/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc",
+          "sha256": "20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"
+        },
+        "cargo-mutants": {
+          "path": "/tmp/forge-196-selected-k43ndxt3/engine/cargo-mutants",
+          "sha256": "5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"
+        },
+        "git": {
+          "path": "/usr/bin/git",
+          "sha256": "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"
+        },
+        "cc": {
+          "path": "/usr/bin/x86_64-linux-gnu-gcc-13",
+          "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"
+        },
+        "ld": {
+          "path": "/usr/bin/x86_64-linux-gnu-ld.bfd",
+          "sha256": "e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"
+        },
+        "as": {
+          "path": "/usr/bin/x86_64-linux-gnu-as",
+          "sha256": "21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"
+        },
+        "ar": {
+          "path": "/usr/bin/x86_64-linux-gnu-ar",
+          "sha256": "6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"
+        },
+        "ranlib": {
+          "path": "/usr/bin/x86_64-linux-gnu-ranlib",
+          "sha256": "60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"
+        },
+        "strip": {
+          "path": "/usr/bin/x86_64-linux-gnu-strip",
+          "sha256": "0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"
+        },
+        "nm": {
+          "path": "/usr/bin/x86_64-linux-gnu-nm",
+          "sha256": "3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"
+        },
+        "objcopy": {
+          "path": "/usr/bin/x86_64-linux-gnu-objcopy",
+          "sha256": "9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"
+        },
+        "sh": {
+          "path": "/usr/bin/dash",
+          "sha256": "86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"
+        }
+      },
+      "read_roots": [
+        {
+          "path": "/usr/bin",
+          "identity": [
+            66309,
+            91881474,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/usr/lib",
+          "identity": [
+            66309,
+            91881477,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/usr/libexec/gcc",
+          "identity": [
+            66309,
+            91896443,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/etc/ld.so.cache",
+          "identity": [
+            66309,
+            24773043,
+            0,
+            33188
+          ]
+        },
+        {
+          "path": "/tmp/forge-192-toolchain-fdiy923q",
+          "identity": [
+            66309,
+            74877504,
+            1000,
+            16832
+          ]
+        },
+        {
+          "path": "/usr/include",
+          "identity": [
+            66309,
+            91881476,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/tmp/forge-196-selected-k43ndxt3/engine/cargo-mutants",
+          "identity": [
+            66309,
+            74998857,
+            1000,
+            33088
+          ]
+        }
+      ],
+      "baseline": {
+        "direct": {
+          "filtered": 1,
+          "frames": 1,
+          "ignored": 0,
+          "inventory_sha256": "9440f0a574e3e8e87f8a3a393092734d018523a54f93bbe0bb8628bc5e99c160",
+          "passed": 1,
+          "scope": "observed selected libtest output, not producer attestation"
+        },
+        "engine": {
+          "filtered": 1,
+          "frames": 1,
+          "ignored": 0,
+          "inventory_sha256": "9440f0a574e3e8e87f8a3a393092734d018523a54f93bbe0bb8628bc5e99c160",
+          "passed": 1,
+          "scope": "observed selected libtest output, not producer attestation"
+        },
+        "engine_log_sha256": "ad5242ca02313f572d371b8b5f723b37a23ab4b8c503d2a40e4db50fec79370c"
+      },
+      "native_commands": [
+        {
+          "argv": [
+            "cargo",
+            "metadata",
+            "--manifest-path",
+            "crates/workspace/member/Cargo.toml",
+            "--format-version=1",
+            "--locked",
+            "--offline"
+          ],
+          "confinement": {
+            "cleanup_complete": true,
+            "duration_ms": 24,
+            "errors": [],
+            "exit_code": 0,
+            "outcome": "exited",
+            "resources": {
+              "backend": "delegated-cgroup-v2",
+              "cpu_period_us": 100000,
+              "cpu_quota_us": 100000,
+              "memory_max_bytes": 1073741824,
+              "memory_swap_max_bytes": 0,
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1730761-f154b2feeb56d47c4fad14da612f035d",
+              "processes_max": 64,
+              "verified": true
+            },
+            "signal": null,
+            "stderr_bytes": 0,
+            "stdout_bytes": 4660
+          },
+          "cwd": "/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree",
+          "state": "observed"
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--manifest-path",
+            "crates/workspace/member/Cargo.toml",
+            "--package",
+            "workspace_subject",
+            "--locked",
+            "--offline",
+            "--test=contract",
+            "--",
+            "chosen::strong"
+          ],
+          "confinement": {
+            "cleanup_complete": true,
+            "duration_ms": 236,
+            "errors": [],
+            "exit_code": 0,
+            "outcome": "exited",
+            "resources": {
+              "backend": "delegated-cgroup-v2",
+              "cpu_period_us": 100000,
+              "cpu_quota_us": 100000,
+              "memory_max_bytes": 1073741824,
+              "memory_swap_max_bytes": 0,
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1730761-edf6e7123dd414a798178f40cdb6fbcf",
+              "processes_max": 64,
+              "verified": true
+            },
+            "signal": null,
+            "stderr_bytes": 1316,
+            "stdout_bytes": 139
+          },
+          "cwd": "/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree",
+          "state": "observed"
+        },
+        {
+          "argv": [
+            "/tmp/forge-196-selected-k43ndxt3/engine/cargo-mutants",
+            "mutants",
+            "--manifest-path",
+            "crates/workspace/member/Cargo.toml",
+            "--in-place",
+            "--timeout",
+            "60",
+            "--output",
+            "/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/mutants-output",
+            "--package",
+            "workspace_subject",
+            "--file",
+            "member/src/selected.rs",
+            "--no-config",
+            "--cargo-arg=--locked",
+            "--cargo-arg=--offline",
+            "--test-package",
+            "workspace_subject",
+            "--cargo-arg=--test=contract",
+            "--cargo-test-arg=--",
+            "--cargo-test-arg=chosen::strong"
+          ],
+          "confinement": {
+            "cleanup_complete": true,
+            "duration_ms": 318,
+            "errors": [],
+            "exit_code": 0,
+            "outcome": "exited",
+            "resources": {
+              "backend": "delegated-cgroup-v2",
+              "cpu_period_us": 100000,
+              "cpu_quota_us": 100000,
+              "memory_max_bytes": 1073741824,
+              "memory_swap_max_bytes": 0,
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1730761-36de0fa92e1a051042e752cfb68b0a40",
+              "processes_max": 64,
+              "verified": true
+            },
+            "signal": null,
+            "stderr_bytes": 0,
+            "stdout_bytes": 107
+          },
+          "cwd": "/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree",
+          "state": "observed"
+        }
+      ],
+      "snapshot": {
+        "commit": "b5f4ba40ed5e22957dbc1df84e7e06854bd4bd1b",
+        "git_history": "private Git metadata removed; history unavailable",
+        "included_untracked": [],
+        "removed": true,
+        "root": "/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg"
+      },
+      "streams": [
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0000-identity.stdout", "sha256": "2246b9f810f407f6dfbfcd1ca40d1c43359268f743f1001b0d94a1b563bb5946", "bytes": 307}, "stderr": {"file": "0000-identity.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0001-cargo-version.stdout", "sha256": "fb3f25aefd6d5441842d285f5a9b125b3f0f0b0bf2013d9a32677f9e99c6c854", "bytes": 36}, "stderr": {"file": "0001-cargo-version.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0002-rustc-version.stdout", "sha256": "785f1364c0d5bf077f7bfb885fd4bde99899dfd80ce0fb6226a4527d9b27724c", "bytes": 36}, "stderr": {"file": "0002-rustc-version.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0003-cargo-mutants-version.stdout", "sha256": "ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5", "bytes": 21}, "stderr": {"file": "0003-cargo-mutants-version.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0004-fixture-lock.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0004-fixture-lock.stderr", "sha256": "ad264a7d7c14ee137c35c236654f60a5f1b2b4462fbfee2157ba33d442769c57", "bytes": 52}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0005-fixture-git.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0005-fixture-git.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0006-fixture-git.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0006-fixture-git.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0007-fixture-git.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0007-fixture-git.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0008-fixture-git.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0008-fixture-git.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0009-select two boolean functions-add.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0009-select two boolean functions-add.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0010-select two boolean functions-staged.stdout", "sha256": "48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c", "bytes": 40}, "stderr": {"file": "0010-select two boolean functions-staged.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0011-select two boolean functions-commit.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0011-select two boolean functions-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0012-select two boolean functions-refs.stdout", "sha256": "9f07331026c27d5095132cfb2a8a6c85e323e43d4a5fe77498e6b49f5756c90f", "bytes": 164}, "stderr": {"file": "0012-select two boolean functions-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0013-select two boolean functions-selection.stdout", "sha256": "48fc1532285b47dd71697de82e2113d4de1275de9fed962e95e8b0befc7ab79c", "bytes": 40}, "stderr": {"file": "0013-select two boolean functions-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0014-plan.stdout", "sha256": "5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299", "bytes": 223}, "stderr": {"file": "0014-plan.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0015-write.stdout", "sha256": "8371c0f20e760f6bc3c858860c82e185589440453d7d6dc010233ebd586e713a", "bytes": 373}, "stderr": {"file": "0015-write.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0016-run.stdout", "sha256": "9697e981dd03e1d022e742856894232d58dd960f28ec5ea78f55448672661b4f", "bytes": 11985}, "stderr": {"file": "0016-run.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0017-receipt.stdout", "sha256": "bbc48bef7d481a3184283c4c6364c9a2355c0071533643fa4e9d8f2889cf8392", "bytes": 11985}, "stderr": {"file": "0017-receipt.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0018-record automatic evidence-add.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0018-record automatic evidence-add.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0019-record automatic evidence-staged.stdout", "sha256": "f36a0315fd9242e53c7a1eaac11f36ba4ab088ac7c4306e562597434512f4fba", "bytes": 138}, "stderr": {"file": "0019-record automatic evidence-staged.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0020-record automatic evidence-commit.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0020-record automatic evidence-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0021-record automatic evidence-refs.stdout", "sha256": "79363377b442271fa8632f66e6bd4292140f816184c0d6de8b4344b6f245df41", "bytes": 164}, "stderr": {"file": "0021-record automatic evidence-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0022-record automatic evidence-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0022-record automatic evidence-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0023-corpus_live.stdout", "sha256": "fad7fe08e2f0f01506c7a65fd5cee6a3e3b180a642939c4e1520a4807a55047d", "bytes": 1792}, "stderr": {"file": "0023-corpus_live.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0024-corpus_live-refs.stdout", "sha256": "79363377b442271fa8632f66e6bd4292140f816184c0d6de8b4344b6f245df41", "bytes": 164}, "stderr": {"file": "0024-corpus_live-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0025-corpus_live-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0025-corpus_live-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0026-corpus_commit.stdout", "sha256": "fad7fe08e2f0f01506c7a65fd5cee6a3e3b180a642939c4e1520a4807a55047d", "bytes": 1792}, "stderr": {"file": "0026-corpus_commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0027-corpus_commit-refs.stdout", "sha256": "79363377b442271fa8632f66e6bd4292140f816184c0d6de8b4344b6f245df41", "bytes": 164}, "stderr": {"file": "0027-corpus_commit-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0028-corpus_commit-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0028-corpus_commit-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 7, "stdout": {"file": "0029-support_source-live.stdout", "sha256": "9e8e160d3d19dcd34fc1d4cd7b6f1d104bc9e082d94ed2f4ab3ff2cfa5f4be2b", "bytes": 2058}, "stderr": {"file": "0029-support_source-live.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0030-support_source-live-refs.stdout", "sha256": "79363377b442271fa8632f66e6bd4292140f816184c0d6de8b4344b6f245df41", "bytes": 164}, "stderr": {"file": "0030-support_source-live-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0031-support_source-live-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0031-support_source-live-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0032-support_source-drift-add.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0032-support_source-drift-add.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0033-support_source-drift-staged.stdout", "sha256": "80fc2031d48f5c1275ddffa9e7f0446e934c8ca7ebc2e6169b3adf45dc49a460", "bytes": 26}, "stderr": {"file": "0033-support_source-drift-staged.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0034-support_source-drift-commit.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0034-support_source-drift-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0035-support_source-drift-refs.stdout", "sha256": "751cec71a485c3c1d0e0033fef14576a1897884bd5a519ee498d1d2f6bf53e71", "bytes": 164}, "stderr": {"file": "0035-support_source-drift-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0036-support_source-drift-selection.stdout", "sha256": "fd408af52ce1cdf97567fcca0cdafc01433763f26189f965b124fa55c51040c2", "bytes": 204}, "stderr": {"file": "0036-support_source-drift-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 7, "stdout": {"file": "0037-support_source-commit.stdout", "sha256": "9e8e160d3d19dcd34fc1d4cd7b6f1d104bc9e082d94ed2f4ab3ff2cfa5f4be2b", "bytes": 2058}, "stderr": {"file": "0037-support_source-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0038-support_source-commit-refs.stdout", "sha256": "751cec71a485c3c1d0e0033fef14576a1897884bd5a519ee498d1d2f6bf53e71", "bytes": 164}, "stderr": {"file": "0038-support_source-commit-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0039-support_source-commit-selection.stdout", "sha256": "fd408af52ce1cdf97567fcca0cdafc01433763f26189f965b124fa55c51040c2", "bytes": 204}, "stderr": {"file": "0039-support_source-commit-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0040-support_source-exact-restore-add.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0040-support_source-exact-restore-add.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0041-support_source-exact-restore-staged.stdout", "sha256": "80fc2031d48f5c1275ddffa9e7f0446e934c8ca7ebc2e6169b3adf45dc49a460", "bytes": 26}, "stderr": {"file": "0041-support_source-exact-restore-staged.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0042-support_source-exact-restore-commit.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0042-support_source-exact-restore-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0043-support_source-exact-restore-refs.stdout", "sha256": "7a8cbc4b1ac1ee462bf57574d48e677f9d78b061e22410e1dcc3f230db04d09c", "bytes": 164}, "stderr": {"file": "0043-support_source-exact-restore-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0044-support_source-exact-restore-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0044-support_source-exact-restore-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0045-support_source-restored_live.stdout", "sha256": "fad7fe08e2f0f01506c7a65fd5cee6a3e3b180a642939c4e1520a4807a55047d", "bytes": 1792}, "stderr": {"file": "0045-support_source-restored_live.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0046-support_source-restored_live-refs.stdout", "sha256": "7a8cbc4b1ac1ee462bf57574d48e677f9d78b061e22410e1dcc3f230db04d09c", "bytes": 164}, "stderr": {"file": "0046-support_source-restored_live-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0047-support_source-restored_live-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0047-support_source-restored_live-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0048-support_source-restored_commit.stdout", "sha256": "fad7fe08e2f0f01506c7a65fd5cee6a3e3b180a642939c4e1520a4807a55047d", "bytes": 1792}, "stderr": {"file": "0048-support_source-restored_commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0049-support_source-restored_commit-refs.stdout", "sha256": "7a8cbc4b1ac1ee462bf57574d48e677f9d78b061e22410e1dcc3f230db04d09c", "bytes": 164}, "stderr": {"file": "0049-support_source-restored_commit-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0050-support_source-restored_commit-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0050-support_source-restored_commit-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 7, "stdout": {"file": "0051-test_data-live.stdout", "sha256": "9e8e160d3d19dcd34fc1d4cd7b6f1d104bc9e082d94ed2f4ab3ff2cfa5f4be2b", "bytes": 2058}, "stderr": {"file": "0051-test_data-live.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0052-test_data-live-refs.stdout", "sha256": "7a8cbc4b1ac1ee462bf57574d48e677f9d78b061e22410e1dcc3f230db04d09c", "bytes": 164}, "stderr": {"file": "0052-test_data-live-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0053-test_data-live-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0053-test_data-live-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0054-test_data-drift-add.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0054-test_data-drift-add.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0055-test_data-drift-staged.stdout", "sha256": "ec97c69ab002b6230af129edbcb2922f9677afe6f91a7427aa4e7b1f28b5b990", "bytes": 46}, "stderr": {"file": "0055-test_data-drift-staged.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0056-test_data-drift-commit.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0056-test_data-drift-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0057-test_data-drift-refs.stdout", "sha256": "9508e5c3c282090c5bec23ea045ceeb7a4049b17c9a85d9bd2de038652658a5c", "bytes": 164}, "stderr": {"file": "0057-test_data-drift-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0058-test_data-drift-selection.stdout", "sha256": "9a9de542b2d53f3c6b80b95e851fdb62b950cdf028df55e6d253d418f669ed5f", "bytes": 224}, "stderr": {"file": "0058-test_data-drift-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 7, "stdout": {"file": "0059-test_data-commit.stdout", "sha256": "9e8e160d3d19dcd34fc1d4cd7b6f1d104bc9e082d94ed2f4ab3ff2cfa5f4be2b", "bytes": 2058}, "stderr": {"file": "0059-test_data-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0060-test_data-commit-refs.stdout", "sha256": "9508e5c3c282090c5bec23ea045ceeb7a4049b17c9a85d9bd2de038652658a5c", "bytes": 164}, "stderr": {"file": "0060-test_data-commit-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0061-test_data-commit-selection.stdout", "sha256": "9a9de542b2d53f3c6b80b95e851fdb62b950cdf028df55e6d253d418f669ed5f", "bytes": 224}, "stderr": {"file": "0061-test_data-commit-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0062-test_data-exact-restore-add.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0062-test_data-exact-restore-add.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0063-test_data-exact-restore-staged.stdout", "sha256": "ec97c69ab002b6230af129edbcb2922f9677afe6f91a7427aa4e7b1f28b5b990", "bytes": 46}, "stderr": {"file": "0063-test_data-exact-restore-staged.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0064-test_data-exact-restore-commit.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0064-test_data-exact-restore-commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0065-test_data-exact-restore-refs.stdout", "sha256": "69745376a8a888fc5c91bef9d5ca0464d0bd3d25f1ee877d1d67485110c5dc62", "bytes": 164}, "stderr": {"file": "0065-test_data-exact-restore-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0066-test_data-exact-restore-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0066-test_data-exact-restore-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0067-test_data-restored_live.stdout", "sha256": "fad7fe08e2f0f01506c7a65fd5cee6a3e3b180a642939c4e1520a4807a55047d", "bytes": 1792}, "stderr": {"file": "0067-test_data-restored_live.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0068-test_data-restored_live-refs.stdout", "sha256": "69745376a8a888fc5c91bef9d5ca0464d0bd3d25f1ee877d1d67485110c5dc62", "bytes": 164}, "stderr": {"file": "0068-test_data-restored_live-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0069-test_data-restored_live-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0069-test_data-restored_live-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0070-test_data-restored_commit.stdout", "sha256": "fad7fe08e2f0f01506c7a65fd5cee6a3e3b180a642939c4e1520a4807a55047d", "bytes": 1792}, "stderr": {"file": "0070-test_data-restored_commit.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0071-test_data-restored_commit-refs.stdout", "sha256": "69745376a8a888fc5c91bef9d5ca0464d0bd3d25f1ee877d1d67485110c5dc62", "bytes": 164}, "stderr": {"file": "0071-test_data-restored_commit-refs.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0072-test_data-restored_commit-selection.stdout", "sha256": "f807d6063b3799732934178e63cba55ea33e1cfd48f1d6ad1ab0b7ff134c5441", "bytes": 178}, "stderr": {"file": "0072-test_data-restored_commit-selection.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}}
+    ],
+      "raw_log_root": "/tmp/forge-196-selected-k43ndxt3/logs",
+      "independent_audit": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-196-header-independent.json",
+        "sha256": "d59de994d560867370c7f767c278b4672feca9701a9e5f34a3de37f45e02f17c",
+        "findings": {
+          "schema": "forge.header-independent-audit.v1",
+          "audited_at_utc": "2026-11-06T04:28:10.784513+00:00",
+          "summary": "/tmp/forge-196-selected-k43ndxt3/summary.json",
+          "summary_sha256": "0734ccf720c737fd25cda477529564cd4e5c127387a492bfb1713ba4418c2313",
+          "checks": {
+            "completed": 31,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0,
+            "running": 0
+          },
+          "streams_checked": 146,
+          "stream_mismatches": [],
+          "receipt_raw_matches_expanded": true,
+          "manifest_before_reserialized_sha256": "de2f38d8ff170f4ceb748d2f9e0393ff95cf1b786bf26348b5a20a0587ab65a7",
+          "manifest_before_matches": true,
+          "manifest_after_matches": true,
+          "nonbaseline_manifest_fields_unchanged": true,
+          "grants_matches": true,
+          "receipt_matches": true,
+          "read_only_grants": [
+            "/usr/bin",
+            "/usr/lib",
+            "/usr/libexec/gcc",
+            "/etc/ld.so.cache",
+            "/tmp/forge-192-toolchain-fdiy923q",
+            "/usr/include",
+            "/tmp/forge-196-selected-k43ndxt3/engine/cargo-mutants"
+          ],
+          "authored_pin_mismatches": [],
+          "support_manifest": "[package]\nbuild=\"src/lib.rs\"\nname=\"support_fixture\"\nversion=\"0.1.0\"\nedition=\"2021\"\n",
+          "support_source": "pub fn answer() -> usize { 7 }\n\n// The same held source is the support library and its explicit Cargo build script.\nfn main() {\n    let out = std::path::PathBuf::from(std::env::var_os(\"OUT_DIR\").expect(\"Cargo OUT_DIR\"));\n    let source = out.join(\"header-smoke.c\");\n    let object = out.join(\"header-smoke.o\");\n    std::fs::write(&source, b\"#include <stdio.h>\\nint header_smoke(void) { return EOF; }\\n\")\n        .expect(\"write private C header probe\");\n    let status = std::process::Command::new(\"cc\")\n        .args([\"-c\", \"-O0\"]).arg(&source).arg(\"-o\").arg(&object)\n        .status().expect(\"launch explicitly granted cc alias\");\n    assert!(status.success(), \"C-header compiler probe failed: {status}\");\n    let metadata = std::fs::symlink_metadata(&object).expect(\"C-header object missing\");\n    assert!(metadata.is_file() && metadata.len() > 0, \"C-header object empty or not regular\");\n    println!(\"cargo:rerun-if-changed=src/lib.rs\");\n    println!(\"cargo:warning=forge-header-smoke object_bytes={}\", metadata.len());\n}\n",
+          "status": "PASS",
+          "mutants": [
+            {
+              "function": "alpha",
+              "outcome": "KILLED",
+              "path": "crates/workspace/member/src/selected.rs"
+            },
+            {
+              "function": "beta",
+              "outcome": "KILLED",
+              "path": "crates/workspace/member/src/selected.rs"
+            }
+          ],
+          "baseline": {
+            "duration_seconds": 0.236,
+            "returncode": 0,
+            "stderr_tail": "warning: /tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree/crates/support/Cargo.toml: file `/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree/crates/support/src/lib.rs` found to be present in multiple build targets:\n  * `lib` target `support_fixture`\n  * `build-script` target `build-script-lib`\nwarning: `support_fixture` (manifest) generated 1 warning\n   Compiling support_fixture v0.1.0 (/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree/crates/support)\nwarning: support_fixture@0.1.0: forge-header-smoke object_bytes=1240\nwarning: function `main` is never used\n --> /tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree/crates/support/src/lib.rs:4:4\n  |\n4 | fn main() {\n  |    ^^^^\n  |\n  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `support_fixture` (lib) generated 1 warning\n   Compiling workspace_subject v0.1.0 (/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/worktree/crates/workspace/member)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s\n     Running tests/contract.rs (/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/target/debug/deps/contract-aae62494adef15ac)\n",
+            "stdout_tail": "\nrunning 1 test\ntest chosen::strong ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s\n\n",
+            "timed_out": false
+          },
+          "baseline_observations": {
+            "direct": {
+              "filtered": 1,
+              "frames": 1,
+              "ignored": 0,
+              "inventory_sha256": "9440f0a574e3e8e87f8a3a393092734d018523a54f93bbe0bb8628bc5e99c160",
+              "passed": 1,
+              "scope": "observed selected libtest output, not producer attestation"
+            },
+            "engine": {
+              "filtered": 1,
+              "frames": 1,
+              "ignored": 0,
+              "inventory_sha256": "9440f0a574e3e8e87f8a3a393092734d018523a54f93bbe0bb8628bc5e99c160",
+              "passed": 1,
+              "scope": "observed selected libtest output, not producer attestation"
+            },
+            "engine_log_sha256": "ad5242ca02313f572d371b8b5f723b37a23ab4b8c503d2a40e4db50fec79370c"
+          },
+          "process_argv": [
+            [
+              "cargo",
+              "metadata",
+              "--manifest-path",
+              "crates/workspace/member/Cargo.toml",
+              "--format-version=1",
+              "--locked",
+              "--offline"
+            ],
+            [
+              "cargo",
+              "test",
+              "--manifest-path",
+              "crates/workspace/member/Cargo.toml",
+              "--package",
+              "workspace_subject",
+              "--locked",
+              "--offline",
+              "--test=contract",
+              "--",
+              "chosen::strong"
+            ],
+            [
+              "/tmp/forge-196-selected-k43ndxt3/engine/cargo-mutants",
+              "mutants",
+              "--manifest-path",
+              "crates/workspace/member/Cargo.toml",
+              "--in-place",
+              "--timeout",
+              "60",
+              "--output",
+              "/tmp/forge-196-selected-k43ndxt3/scratch/llm-orchestrator-snapshot-lx7IMg/mutants-output",
+              "--package",
+              "workspace_subject",
+              "--file",
+              "member/src/selected.rs",
+              "--no-config",
+              "--cargo-arg=--locked",
+              "--cargo-arg=--offline",
+              "--test-package",
+              "workspace_subject",
+              "--cargo-arg=--test=contract",
+              "--cargo-test-arg=--",
+              "--cargo-test-arg=chosen::strong"
+            ]
+          ],
+          "cgroup_positive_enoent": [
+            true,
+            true,
+            true
+          ],
+          "snapshot_positive_enoent": true,
+          "corpus": {
+            "corpus_live": {
+              "clean": true,
+              "receipt_accepted": true,
+              "raw_repro_matches": true
+            },
+            "corpus_commit": {
+              "clean": true,
+              "receipt_accepted": true,
+              "raw_repro_matches": true
+            }
+          },
+          "probes": {
+            "support_source": {
+              "live": {
+                "returncode": 7,
+                "clean": false,
+                "receipt_accepted": false,
+                "raw_repro_matches": true
+              },
+              "commit": {
+                "returncode": 7,
+                "clean": false,
+                "receipt_accepted": false,
+                "raw_repro_matches": true
+              },
+              "restored_live": {
+                "returncode": 0,
+                "clean": true,
+                "receipt_accepted": true,
+                "raw_repro_matches": true
+              },
+              "restored_commit": {
+                "returncode": 0,
+                "clean": true,
+                "receipt_accepted": true,
+                "raw_repro_matches": true
+              }
+            },
+            "test_data": {
+              "live": {
+                "returncode": 7,
+                "clean": false,
+                "receipt_accepted": false,
+                "raw_repro_matches": true
+              },
+              "commit": {
+                "returncode": 7,
+                "clean": false,
+                "receipt_accepted": false,
+                "raw_repro_matches": true
+              },
+              "restored_live": {
+                "returncode": 0,
+                "clean": true,
+                "receipt_accepted": true,
+                "raw_repro_matches": true
+              },
+              "restored_commit": {
+                "returncode": 0,
+                "clean": true,
+                "receipt_accepted": true,
+                "raw_repro_matches": true
+              }
+            }
+          },
+          "limits": [
+            "The bounded receipt baseline tail records the Cargo warning object_bytes=1240; the raw process stream and object were removed with the snapshot.",
+            "Cooperative output does not attest producer or complete compiler closure; this fixture is not actual Forge.",
+            "Reserialized original manifest matches the recorded before hash; original bytes were not retained.",
+            "No payloads or production files were modified for this audit."
+          ]
+        }
+      },
+      "authored_header_control": {
+        "scope": "tiny support-crate C-header compile only; not actual Forge baseline or complete compiler closure",
+        "observation_state": "unobserved before native execution; inspect retained baseline/engine and control outcomes",
+        "case": "integration-strong",
+        "support_source": "crates/support/src/lib.rs",
+        "build_script": "crates/support/src/lib.rs",
+        "additional_read_grant": "/usr/include",
+        "authored_build_main_sha256": "94a761f647b0df9389b64d18934423fae3d5b2c722ef9d16576603c1200a35f6",
+        "requires": "cc exit0 plus a nonempty regular object under Cargo OUT_DIR; object is not executed",
+        "ownership": "unchanged frozen driver and existing native command/cancel owner",
+        "resource_scope": "60s command cap, 1CPU, 1GiB aggregate memory, 64processes; not measured usage",
+        "authored_pins": {
+          "crates/support/Cargo.toml": "3bc30d22aabea09c37164f2b582dac38b31d4f0e3a8347df093590ef86364280",
+          "crates/support/src/lib.rs": "1bf3549c86d6a76998ab296306d8a3900c011166e4ffd82da82e0c2ecdb14f4c"
+        }
+      },
+      "mutation_pass": true,
+      "scoped_corpus_acceptance_complete": true
+    },
+    {
+      "kind": "actual-selected",
+      "summary": "/tmp/forge-196-actual-lczb4mmb/summary.json",
+      "summary_sha256": "10a9a3b0fd3cf0c2e022fb85fe2fd3f8f706a2d47b8a520285ddb7e64430be1f",
+      "driver_checks": {
+        "completed": 13,
+        "failed": 0,
+        "censored": 0,
+        "unstarted": 0,
+        "running": 0
+      },
+      "driver_decision": "ACTUAL_FORGE_DIAGNOSTIC_RECORDED_NOT_ADMISSION",
+      "driver_completion_scope": "check orchestration only; independent of native campaign outcome",
+      "native_status": "ERROR",
+      "native_accounting": {
+        "censored": 0,
+        "completed": 0,
+        "failed": 0,
+        "planned": null,
+        "unstarted": null
+      },
+      "native_runner": {
+        "compiled_git_commit": "4cba4ebfe75f9b334a2cdcea41b95226cd871f3b",
+        "compiled_source_sha256": "e44c86b4dfa97710734be4de55860dce6a9222144b17acf3ac754a6feb9ec551",
+        "executable_sha256": "1ffc3f180929b0a18fed65c0f9e74894170b44dd07e5f95275d05c4328421779",
+        "forge_version": "0.8.21",
+        "schema_version": "llm.mutation-testing.native-runner.v2",
+        "source_matches_git": true
+      },
+      "bounds": {
+        "metadata_max_seconds": 60,
+        "baseline_and_engine_max_seconds_each": 300,
+        "run_normal_wait_seconds": 720,
+        "cooperative_cancel_seconds": 45,
+        "driver_cooperative_command_budget_seconds": 1100,
+        "additional_cooperative_cancel_seconds": 45,
+        "scope": "selected libtest substring only; no hard whole-driver watchdog; synchronous hashing/filesystem work is cooperative and may overrun; resource bounds are not observed RSS/CPU measurements"
+      },
+      "toolchain": {
+        "root": "/tmp/forge-192-toolchain-fdiy923q",
+        "inventory_path": "/home/tim/Projects/llm-forge/.git/forge-program-192-private-toolchain.json",
+        "inventory_sha256": "68461c407b12d63e87d72c453677bef85d16f7328a13deb367ba88462e1f448b",
+        "files": 114,
+        "bytes": 818699248,
+        "content_digest": "3187224bc12dea4b6d70799e826bc0a81ab64414dee324477f9596de503d230a",
+        "scope": "before/after file observations, not immutable compiler attestation"
+      },
+      "tools": {
+        "cargo": {
+          "path": "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "rustc": {
+          "path": "/tmp/forge-192-toolchain-fdiy923q/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "rustdoc": {
+          "path": "/tmp/forge-192-toolchain-fdiy923q/bin/rustdoc",
+          "sha256": "20cd7cc9f165bf75caa8d9e8dd06b0cfdad17550eb27a0cdfeba105e9bab618a"
+        },
+        "cargo-mutants": {
+          "path": "/tmp/forge-196-actual-lczb4mmb/engine/cargo-mutants",
+          "sha256": "5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2"
+        },
+        "git": {
+          "path": "/usr/bin/git",
+          "sha256": "eb54b535467e0975c1284d4c4d08eea779aeb248a5d34b02e2ee171382e22201"
+        },
+        "cc": {
+          "path": "/usr/bin/x86_64-linux-gnu-gcc-13",
+          "sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26"
+        },
+        "ld": {
+          "path": "/usr/bin/x86_64-linux-gnu-ld.bfd",
+          "sha256": "e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b"
+        },
+        "as": {
+          "path": "/usr/bin/x86_64-linux-gnu-as",
+          "sha256": "21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0"
+        },
+        "ar": {
+          "path": "/usr/bin/x86_64-linux-gnu-ar",
+          "sha256": "6452af2eea333b8c65e1adb92964fc8f97863ab003fa13f9d12bff5345cd7dbe"
+        },
+        "ranlib": {
+          "path": "/usr/bin/x86_64-linux-gnu-ranlib",
+          "sha256": "60254978b8ee2c1b21b41d16a18a621dbbcc72e43eb2fa9f916818256c77e9ee"
+        },
+        "strip": {
+          "path": "/usr/bin/x86_64-linux-gnu-strip",
+          "sha256": "0d980587ada7ab12193f39271f060d5663aa2f289b0e80d2a0274ce7306e4e42"
+        },
+        "nm": {
+          "path": "/usr/bin/x86_64-linux-gnu-nm",
+          "sha256": "3708df3d7ce16e2c1dcdcd722784ae382d4d582276a71ab7bbe2d542f5621202"
+        },
+        "objcopy": {
+          "path": "/usr/bin/x86_64-linux-gnu-objcopy",
+          "sha256": "9276e918e3c26d3aa7ef9dd2232cd8ac692f03d3c1f270bfa5144a2b5492b713"
+        },
+        "sh": {
+          "path": "/usr/bin/dash",
+          "sha256": "86d31f6fb799e91fa21bad341484564510ca287703a16e9e46c53338776f4f42"
+        }
+      },
+      "read_roots": [
+        {
+          "path": "/usr/bin",
+          "identity": [
+            66309,
+            91881474,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/usr/lib",
+          "identity": [
+            66309,
+            91881477,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/usr/libexec/gcc",
+          "identity": [
+            66309,
+            91896443,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/etc/ld.so.cache",
+          "identity": [
+            66309,
+            24773043,
+            0,
+            33188
+          ]
+        },
+        {
+          "path": "/tmp/forge-192-toolchain-fdiy923q",
+          "identity": [
+            66309,
+            74877504,
+            1000,
+            16832
+          ]
+        },
+        {
+          "path": "/usr/include",
+          "identity": [
+            66309,
+            91881476,
+            0,
+            16877
+          ]
+        },
+        {
+          "path": "/tmp/forge-196-actual-lczb4mmb/engine/cargo-mutants",
+          "identity": [
+            66309,
+            75628586,
+            1000,
+            33088
+          ]
+        }
+      ],
+      "baseline": {
+        "direct": {
+          "filtered": 1153,
+          "frames": 1,
+          "ignored": 0,
+          "inventory_sha256": "ae2aa7bf177c9e8a4ab450f25a8b5df2eaaca3a37cc2c3c578277e1b46672636",
+          "passed": 5,
+          "scope": "observed selected libtest output, not producer attestation"
+        }
+      },
+      "native_commands": [
+        {
+          "argv": [
+            "cargo",
+            "metadata",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--format-version=1",
+            "--locked",
+            "--offline"
+          ],
+          "confinement": {
+            "cleanup_complete": true,
+            "duration_ms": 104,
+            "errors": [],
+            "exit_code": 0,
+            "outcome": "exited",
+            "resources": {
+              "backend": "delegated-cgroup-v2",
+              "cpu_period_us": 100000,
+              "cpu_quota_us": 200000,
+              "memory_max_bytes": 8589934592,
+              "memory_swap_max_bytes": 0,
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1732128-78d7a1ae2bdff833c0ddbee8d0c6d287",
+              "processes_max": 64,
+              "verified": true
+            },
+            "signal": null,
+            "stderr_bytes": 0,
+            "stdout_bytes": 1720304
+          },
+          "cwd": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X/worktree",
+          "state": "observed"
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--package",
+            "forge",
+            "--locked",
+            "--offline",
+            "--lib",
+            "--",
+            "mutation_cargo_supporting::tests::"
+          ],
+          "confinement": {
+            "cleanup_complete": true,
+            "duration_ms": 156996,
+            "errors": [],
+            "exit_code": 0,
+            "outcome": "exited",
+            "resources": {
+              "backend": "delegated-cgroup-v2",
+              "cpu_period_us": 100000,
+              "cpu_quota_us": 200000,
+              "memory_max_bytes": 8589934592,
+              "memory_swap_max_bytes": 0,
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1732128-1b8042bbabe6dfd188d4fe95a88a63e3",
+              "processes_max": 64,
+              "verified": true
+            },
+            "signal": null,
+            "stderr_bytes": 10250,
+            "stdout_bytes": 682
+          },
+          "cwd": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X/worktree",
+          "state": "observed"
+        },
+        {
+          "argv": [
+            "/tmp/forge-196-actual-lczb4mmb/engine/cargo-mutants",
+            "mutants",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--in-place",
+            "--timeout",
+            "471",
+            "--output",
+            "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X/mutants-output",
+            "--package",
+            "forge",
+            "--file",
+            "src/mutation_cargo_supporting.rs",
+            "--no-config",
+            "--cargo-arg=--locked",
+            "--cargo-arg=--offline",
+            "--test-package",
+            "forge",
+            "--cargo-arg=--lib",
+            "--cargo-test-arg=--",
+            "--cargo-test-arg=mutation_cargo_supporting::tests::"
+          ],
+          "confinement": {
+            "cleanup_complete": true,
+            "duration_ms": 300101,
+            "errors": [],
+            "exit_code": null,
+            "outcome": "timed_out",
+            "resources": {
+              "backend": "delegated-cgroup-v2",
+              "cpu_period_us": 100000,
+              "cpu_quota_us": 200000,
+              "memory_max_bytes": 8589934592,
+              "memory_swap_max_bytes": 0,
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1732128-7983edeb3fef1ccbc325ce95033b9c9c",
+              "processes_max": 64,
+              "verified": true
+            },
+            "signal": 9,
+            "stderr_bytes": 325,
+            "stdout_bytes": 836
+          },
+          "cwd": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X/worktree",
+          "state": "observed"
+        }
+      ],
+      "snapshot": {
+        "commit": "54d388beb9b7446be46571c284ab4b88d0d66103",
+        "git_history": "private Git metadata removed; history unavailable",
+        "included_untracked": [
+          "campaigns/actual-forge-196-7da3bc5240/forge196-7da3bc5240_forge_cargo_20261106.json",
+          "campaigns/registry.d/forge196-7da3bc5240_forge_cargo_20261106.json"
+        ],
+        "removed": false,
+        "retained_reason": "process cleanup or execution input verification is incomplete",
+        "root": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X"
+      },
+      "streams": [
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0000-git-state.stdout", "sha256": "c53af52b30526d1cefad83463ada0db5e67225b65828886e269ad8a882eeaf6f", "bytes": 41}, "stderr": {"file": "0000-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0001-git-state.stdout", "sha256": "2df65b67c49061327697416a94cc21ff1554c5dc82552453b116bd18be26dcac", "bytes": 41}, "stderr": {"file": "0001-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0002-git-state.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0002-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0003-git-state.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0003-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0004-git-state.stdout", "sha256": "32a28d1bffdc08994b0e9f90674ff89a6f22583efe03c02b814f4d50ded801bb", "bytes": 41}, "stderr": {"file": "0004-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0005-git-state.stdout", "sha256": "32a28d1bffdc08994b0e9f90674ff89a6f22583efe03c02b814f4d50ded801bb", "bytes": 41}, "stderr": {"file": "0005-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0006-git-state.stdout", "sha256": "7218ea2263a805182bb5613bd10c882deffcf5f27395230aac9a9fb197cee280", "bytes": 1559}, "stderr": {"file": "0006-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0007-identity.stdout", "sha256": "2246b9f810f407f6dfbfcd1ca40d1c43359268f743f1001b0d94a1b563bb5946", "bytes": 307}, "stderr": {"file": "0007-identity.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0008-cargo-version.stdout", "sha256": "fb3f25aefd6d5441842d285f5a9b125b3f0f0b0bf2013d9a32677f9e99c6c854", "bytes": 36}, "stderr": {"file": "0008-cargo-version.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0009-rustc-version.stdout", "sha256": "785f1364c0d5bf077f7bfb885fd4bde99899dfd80ce0fb6226a4527d9b27724c", "bytes": 36}, "stderr": {"file": "0009-rustc-version.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0010-cargo-mutants-version.stdout", "sha256": "ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5", "bytes": 21}, "stderr": {"file": "0010-cargo-mutants-version.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0011-plan.stdout", "sha256": "364925dca17dd43badcbe7084c62e8af947e06deea5467f24cec1b5765e62588", "bytes": 63565}, "stderr": {"file": "0011-plan.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0012-git-state.stdout", "sha256": "c53af52b30526d1cefad83463ada0db5e67225b65828886e269ad8a882eeaf6f", "bytes": 41}, "stderr": {"file": "0012-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0013-git-state.stdout", "sha256": "2df65b67c49061327697416a94cc21ff1554c5dc82552453b116bd18be26dcac", "bytes": 41}, "stderr": {"file": "0013-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0014-git-state.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0014-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0015-git-state.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0015-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0016-git-state.stdout", "sha256": "32a28d1bffdc08994b0e9f90674ff89a6f22583efe03c02b814f4d50ded801bb", "bytes": 41}, "stderr": {"file": "0016-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0017-write.stdout", "sha256": "0cd9081db63ca54206fd7172fbf67985f13d25b305b9ddf0d9923aef19aff903", "bytes": 407}, "stderr": {"file": "0017-write.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0018-git-state.stdout", "sha256": "c53af52b30526d1cefad83463ada0db5e67225b65828886e269ad8a882eeaf6f", "bytes": 41}, "stderr": {"file": "0018-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0019-git-state.stdout", "sha256": "2df65b67c49061327697416a94cc21ff1554c5dc82552453b116bd18be26dcac", "bytes": 41}, "stderr": {"file": "0019-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0020-git-state.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0020-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0021-git-state.stdout", "sha256": "7d2d4506914a61a6645e9c8d9cc1f965cfcfa6e3193fc38307f3598bed18d1b3", "bytes": 151}, "stderr": {"file": "0021-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0022-git-state.stdout", "sha256": "32a28d1bffdc08994b0e9f90674ff89a6f22583efe03c02b814f4d50ded801bb", "bytes": 41}, "stderr": {"file": "0022-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 4, "stdout": {"file": "0023-run.stdout", "sha256": "76f0e8345927c9bb2560a934d92b2371d1d41f2291ce10801ed04fccb05d2320", "bytes": 74}, "stderr": {"file": "0023-run.stderr", "sha256": "c76130bf8d77c2f9437a9068e3af5556cfcd1b325da188b4ef7ad1115e3cda89", "bytes": 107}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0024-receipt.stdout", "sha256": "ec7b89e838a582fd6283bd7c21348fa4ad1d13cc09810c9fcd61b22210eff20f", "bytes": 79992}, "stderr": {"file": "0024-receipt.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0025-git-state.stdout", "sha256": "c53af52b30526d1cefad83463ada0db5e67225b65828886e269ad8a882eeaf6f", "bytes": 41}, "stderr": {"file": "0025-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0026-git-state.stdout", "sha256": "2df65b67c49061327697416a94cc21ff1554c5dc82552453b116bd18be26dcac", "bytes": 41}, "stderr": {"file": "0026-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0027-git-state.stdout", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}, "stderr": {"file": "0027-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0028-git-state.stdout", "sha256": "7d2d4506914a61a6645e9c8d9cc1f965cfcfa6e3193fc38307f3598bed18d1b3", "bytes": 151}, "stderr": {"file": "0028-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}},
+      {"state": "completed", "returncode": 0, "stdout": {"file": "0029-git-state.stdout", "sha256": "32a28d1bffdc08994b0e9f90674ff89a6f22583efe03c02b814f4d50ded801bb", "bytes": 41}, "stderr": {"file": "0029-git-state.stderr", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "bytes": 0}}
+    ],
+      "raw_log_root": "/tmp/forge-196-actual-lczb4mmb/logs",
+      "independent_audit": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-196-actual-selected-independent.json",
+        "sha256": "aceec3ca3e975efa71ea0ba0e0a5aaf2e88f580a9b5937487b463d035d2eeff5",
+        "findings": {
+          "schema": "forge.actual-selected-independent-audit.v1",
+          "audited_at_utc": "2026-11-06T04:41:49.031605+00:00",
+          "summary": "/tmp/forge-196-actual-lczb4mmb/summary.json",
+          "summary_sha256": "10a9a3b0fd3cf0c2e022fb85fe2fd3f8f706a2d47b8a520285ddb7e64430be1f",
+          "driver_checks": {
+            "completed": 13,
+            "failed": 0,
+            "censored": 0,
+            "unstarted": 0,
+            "running": 0
+          },
+          "raw_streams_checked": 60,
+          "raw_stream_mismatches": [],
+          "expanded_receipt_matches_raw_show": true,
+          "native_status": "ERROR",
+          "complete_campaign": false,
+          "native_accounting": {
+            "censored": 0,
+            "completed": 0,
+            "failed": 0,
+            "planned": null,
+            "unstarted": null
+          },
+          "selected_target": {
+            "kind": "lib",
+            "name": "forge",
+            "source": "native/forge/src/lib.rs"
+          },
+          "selected_filter": {
+            "filter": "mutation_cargo_supporting::tests::",
+            "schema_version": 1,
+            "target": {
+              "kind": "lib"
+            }
+          },
+          "direct_baseline": {
+            "filtered": 1153,
+            "frames": 1,
+            "ignored": 0,
+            "inventory_sha256": "ae2aa7bf177c9e8a4ab450f25a8b5df2eaaca3a37cc2c3c578277e1b46672636",
+            "passed": 5,
+            "scope": "observed selected libtest output, not producer attestation"
+          },
+          "direct_baseline_duration_seconds": 156.996,
+          "engine_baseline_log": {
+            "path": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X/mutants-output/mutants.out/log/baseline.log",
+            "sha256": "043c2acd7d67a68db239ab3f43d1b70f99901fd13ca9d253dfd98eba01789fce",
+            "selected_lines": [
+              "running 5 tests",
+              "test mutation_cargo_supporting::tests::workspace_capture_errors_are_per_campaign_and_do_not_discard_other_profiles ... ok",
+              "test mutation_cargo_supporting::tests::inventory_is_only_requested_for_admissible_native_ordinary_receipts ... ok",
+              "test mutation_cargo_supporting::tests::independent_snapshot_must_match_and_all_targets_be_included ... ok",
+              "test mutation_cargo_supporting::tests::held_supporting_inventory_rejects_bytes_and_file_additions ... ok",
+              "test mutation_cargo_supporting::tests::removing_a_required_host_or_snapshot_file_invalidates_the_held_inventory ... ok",
+              "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1153 filtered out; finished in 0.00s"
+            ],
+            "phase_argv": [
+              {
+                "phase": "Build",
+                "status": "Success",
+                "argv": [
+                  "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+                  "test",
+                  "--no-run",
+                  "--verbose",
+                  "--package=forge@0.8.21",
+                  "--locked",
+                  "--offline",
+                  "--lib"
+                ]
+              },
+              {
+                "phase": "Test",
+                "status": "Success",
+                "argv": [
+                  "/tmp/forge-192-toolchain-fdiy923q/bin/cargo",
+                  "test",
+                  "--verbose",
+                  "--package=forge@0.8.21",
+                  "--locked",
+                  "--offline",
+                  "--lib",
+                  "--",
+                  "mutation_cargo_supporting::tests::"
+                ]
+              }
+            ]
+          },
+          "engine": {
+            "outcome": "timed_out",
+            "duration_ms": 300101,
+            "mutants_file_sha256": "dc82c6854034479292eb27be5ea48fc61d58744c4480259e1b51018e3590cd22",
+            "listed": 55,
+            "outcomes_file_sha256": "67ac26effbd0a19f917b96458d0235ff80367021ac675ddbec2cf952ce9356e4",
+            "recorded_scenarios": 45,
+            "recorded_summaries": {
+              "Success": 1,
+              "Unviable": 3,
+              "CaughtMutant": 34,
+              "MissedMutant": 7
+            },
+            "aggregate": {
+              "total_mutants": 44,
+              "caught": 34,
+              "missed": 7,
+              "timeout": 0,
+              "unviable": 3,
+              "success": 0
+            },
+            "remaining_scope": "difference between listed and recorded is not classified as unstarted or completed"
+          },
+          "snapshot": {
+            "path": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X",
+            "still_present": true,
+            "receipt": {
+              "commit": "54d388beb9b7446be46571c284ab4b88d0d66103",
+              "git_history": "private Git metadata removed; history unavailable",
+              "included_untracked": [
+                "campaigns/actual-forge-196-7da3bc5240/forge196-7da3bc5240_forge_cargo_20261106.json",
+                "campaigns/registry.d/forge196-7da3bc5240_forge_cargo_20261106.json"
+              ],
+              "removed": false,
+              "retained_reason": "process cleanup or execution input verification is incomplete",
+              "root": "/tmp/forge-196-actual-lczb4mmb/scratch/llm-orchestrator-snapshot-ePOI3X"
+            },
+            "input_verification_error": "workspace snapshot inputs changed",
+            "pins": {
+              "source_sha256": {
+                "count": 1,
+                "mismatches": [
+                  {
+                    "path": "native/forge/src/mutation_cargo_supporting.rs",
+                    "expected": "810edd3fa6ea186e814f7319716a2c0caf2167ac17278512d83d09b4ac251f03",
+                    "host": "810edd3fa6ea186e814f7319716a2c0caf2167ac17278512d83d09b4ac251f03",
+                    "snapshot": "3f559eab86a9a32fd7a757c44eb4114d7b328dfbdd2a5acddca275c631841d26"
+                  }
+                ]
+              },
+              "test_sha256": {
+                "count": 503,
+                "mismatches": [
+                  {
+                    "path": "native/forge/src/mutation_cargo_supporting.rs",
+                    "expected": "810edd3fa6ea186e814f7319716a2c0caf2167ac17278512d83d09b4ac251f03",
+                    "host": "810edd3fa6ea186e814f7319716a2c0caf2167ac17278512d83d09b4ac251f03",
+                    "snapshot": "3f559eab86a9a32fd7a757c44eb4114d7b328dfbdd2a5acddca275c631841d26"
+                  }
+                ]
+              }
+            }
+          },
+          "owned_cgroups": [
+            {
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1732128-78d7a1ae2bdff833c0ddbee8d0c6d287",
+              "recorded_cleanup_complete": true,
+              "positive_enoent": true
+            },
+            {
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1732128-1b8042bbabe6dfd188d4fe95a88a63e3",
+              "recorded_cleanup_complete": true,
+              "positive_enoent": true
+            },
+            {
+              "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1732128-7983edeb3fef1ccbc325ce95033b9c9c",
+              "recorded_cleanup_complete": true,
+              "positive_enoent": true
+            }
+          ],
+          "grants": {
+            "path": "/tmp/forge-196-actual-lczb4mmb/llm-forge-execution-grants.json",
+            "recorded_sha256": "9ba29b020fc34fb36bc8c0d9ef9d71bc866f9291afd06b4de467bde41633933a",
+            "matches": true,
+            "resource_bounds": {
+              "cpu_millis": 2000,
+              "memory_mib": 8192,
+              "processes": 64
+            }
+          },
+          "repository_outputs": {
+            "campaigns/actual-forge-196-7da3bc5240/forge196-7da3bc5240_forge_cargo_20261106.json": {
+              "device": 66309,
+              "inode": 52309008,
+              "bytes": 60984,
+              "sha256": "48a3a5bea5f9525ea28ec6bd47ee9f037937eba33c6886c483dedaa123813003",
+              "matches_recorded": true
+            },
+            "campaigns/registry.d/forge196-7da3bc5240_forge_cargo_20261106.json": {
+              "device": 66309,
+              "inode": 46414057,
+              "bytes": 104,
+              "sha256": "a35ec960dc409c745d288a92a09da450d9b0831888f9d3381c749f2792aa3db3",
+              "matches_recorded": true
+            },
+            "campaigns/receipts/.iterations/actual-forge-196-7da3bc5240/receipt.json": {
+              "device": 66309,
+              "inode": 52309014,
+              "bytes": 80038,
+              "sha256": "9e8142a8d565e2d7cdb38e935bdb96c4c2731b74c3d14b309a998e8954d4b610",
+              "matches_recorded": true
+            }
+          },
+          "manifest_before": "48a3a5bea5f9525ea28ec6bd47ee9f037937eba33c6886c483dedaa123813003",
+          "manifest_after": "48a3a5bea5f9525ea28ec6bd47ee9f037937eba33c6886c483dedaa123813003",
+          "manifest_unchanged": true,
+          "native_runner": {
+            "compiled_git_commit": "4cba4ebfe75f9b334a2cdcea41b95226cd871f3b",
+            "compiled_source_sha256": "e44c86b4dfa97710734be4de55860dce6a9222144b17acf3ac754a6feb9ec551",
+            "executable_sha256": "1ffc3f180929b0a18fed65c0f9e74894170b44dd07e5f95275d05c4328421779",
+            "forge_version": "0.8.21",
+            "schema_version": "llm.mutation-testing.native-runner.v2",
+            "source_matches_git": true
+          },
+          "limits": [
+            "Internal incomplete engine outcomes are retained observations, not native scoring or PASS.",
+            "The 11 listed without recorded outcomes have unknown state; no unstarted count is inferred.",
+            "Receipt, test log and runner are cooperative producer evidence, not execution attestation.",
+            "Snapshot/source hash comparisons cover listed source and test pins; full input identity was not independently reconstructed.",
+            "No payload, production edit, relocation, process stop or snapshot cleanup performed."
+          ]
+        }
+      },
+      "output_relocation": {
+        "path": "/tmp/forge-196-actual-lczb4mmb/output-relocation.json",
+        "sha256": "fa5f1cc562c7756fb2f90cc186abf5ebd60809c1ffa15669e3c1eae6689f7a9d",
+        "record": {
+          "schema": "forge.diagnostic-output-relocation.v1",
+          "utc": "2026-11-06T04:43:13.285606+00:00",
+          "scope": "only three completed owned diagnostic outputs renamed unchanged; snapshot and all other evidence preserved; historical receipts not current admission evidence",
+          "files": [
+            {
+              "original": "/home/tim/Projects/llm-forge/campaigns/actual-forge-196-7da3bc5240/forge196-7da3bc5240_forge_cargo_20261106.json",
+              "retained": "/tmp/forge-196-actual-lczb4mmb/retained-repository-outputs/campaigns/actual-forge-196-7da3bc5240/forge196-7da3bc5240_forge_cargo_20261106.json",
+              "device": 66309,
+              "inode": 52309008,
+              "bytes": 60984,
+              "sha256": "48a3a5bea5f9525ea28ec6bd47ee9f037937eba33c6886c483dedaa123813003"
+            },
+            {
+              "original": "/home/tim/Projects/llm-forge/campaigns/registry.d/forge196-7da3bc5240_forge_cargo_20261106.json",
+              "retained": "/tmp/forge-196-actual-lczb4mmb/retained-repository-outputs/campaigns/registry.d/forge196-7da3bc5240_forge_cargo_20261106.json",
+              "device": 66309,
+              "inode": 46414057,
+              "bytes": 104,
+              "sha256": "a35ec960dc409c745d288a92a09da450d9b0831888f9d3381c749f2792aa3db3"
+            },
+            {
+              "original": "/home/tim/Projects/llm-forge/campaigns/receipts/.iterations/actual-forge-196-7da3bc5240/receipt.json",
+              "retained": "/tmp/forge-196-actual-lczb4mmb/retained-repository-outputs/campaigns/receipts/.iterations/actual-forge-196-7da3bc5240/receipt.json",
+              "device": 66309,
+              "inode": 52309014,
+              "bytes": 80038,
+              "sha256": "9e8142a8d565e2d7cdb38e935bdb96c4c2731b74c3d14b309a998e8954d4b610"
+            }
+          ]
+        }
+      },
+      "mutation_pass": false,
+      "selected_source_head": "83990e2113c98f9735f4f715328b16a218616c39",
+      "selected_source_tree": "1ec49ea259bcb5c96d6d34eab1b696312216b54b",
+      "selected_source_sha256": {
+        "native/forge/src/mutation_cargo_supporting.rs": "810edd3fa6ea186e814f7319716a2c0caf2167ac17278512d83d09b4ac251f03"
+      },
+      "test_anchor_inventory": {
+        "count": 503,
+        "algorithm": "sha256 of UTF-8 sorted compact JSON object",
+        "sha256": "2c182079d46edb056ccc0da811d4e58c3af8b6a04d06dc976647c39875599967",
+        "selected_module_anchors": {
+          "native/forge/src/mutation_cargo_supporting_tests.rs": "ee1bd0734a2c86bbee966d43c12ab7275207ba5dbdcc4b97efaedd795308427c"
+        },
+        "scope": "complete anchor map is retained in the unchanged generated manifest; anchors do not imply full test-file coverage"
+      },
+      "observability_limit": "ERROR receipt did not import partial outcomes; retained engine observations are separate, incomplete and not admission evidence"
+    }
+  ]
+}
