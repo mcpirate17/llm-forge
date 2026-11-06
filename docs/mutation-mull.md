@@ -154,6 +154,10 @@ The full 18-step gate and exact-head/current-base verification passed at `b09b5d
 5,000 passing executions, zero failures and 203 ignored across 182 harnesses.
 Its installed source fingerprint matches the implementation used for the real
 controls. Subsequent publication heads require their own matching receipts.
+The next gate at `68caf0a` found an unrelated embedding HTTP fixture race.
+A test-only complete-request reader correction retained the exact error assertion;
+12 focused tests and 200 repeated duplicate-key cases passed. The failed gate is
+retained, and the corrected publication head still requires a full matching gate.
 No global installation, host adoption, performance improvement, or agent-task benefit
 is established. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)

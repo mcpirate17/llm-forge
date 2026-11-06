@@ -3,7 +3,7 @@
   "kind": "forge-engineering-evidence-index",
   "date": "2026-11-06",
   "issue": 196,
-  "status": "runtime_freshness_and_full_gate_verified_at_b09b5d8",
+  "status": "runtime_freshness_verified_historical_gate_pass_final_head_revalidation_required",
   "implementation_commit": "f443a20f3211f3b6d05eac41765f22558c0a9290",
   "base_commit": "edb99898aec9d884389895867957dc1cdfd47e4a",
   "compiled_source_sha256": "1be8bcc84722f8991e205708ac209385684dc85fd4e8fed3d16ad8a16aeaf780",
@@ -236,6 +236,15 @@
       "kind": "unit fixtures",
       "result": "first run 6 unsafe fixture permission failures and 1 missing JSON map key panic",
       "fix": "private test files/directories and explicit map insertion; production gate unchanged"
+    },
+    {
+      "source": "68caf0aaaabf57a935734086b233d963c7bd0f42",
+      "kind": "full publication gate",
+      "result": "17 steps passed; Forge unit tests failed in duplicate_response_keys_are_rejected_without_echoing_payload with response-read error instead of invalid JSON",
+      "reproduction": "same focused case failed on attempt 61 before fix; no pre-fix executable digest was captured",
+      "fix": "test-only reuse of bounded complete HTTP request reader; exact duplicate-key assertion retained; 8192-byte request body verified",
+      "focused_validation": "12 embedding backend tests passed; repaired exact case passed 200 consecutive runs",
+      "independent_review": "native_review found no concrete blocker; production behavior unchanged"
     }
   ],
   "limitations": [
@@ -357,6 +366,22 @@
       "path": ".git/forge-mull-local-verify1.log",
       "sha256": "19e38fdb3b6e08ac413e8ceaa72fa47255e8d69c1e266ae6e5bee56641599faa",
       "bytes": 377
+    },
+    "full_gate2_failed_receipt": {
+      "path": ".git/forge-checks/run-1793984317482342374-2554710/receipt.json",
+      "sha256": "ad43db98963c6f68be7908d5cf101941ad26ac29e0e7fa97ba2f68fbbf811e04"
+    },
+    "embedding_fixture_before": {
+      "path": ".git/forge-embedding-fixture-before.json",
+      "sha256": "217d13a8110d8b268a22d7e50627906cb602a6ff7f85ad47f36476560d7f72a6"
+    },
+    "embedding_fixture_after": {
+      "path": ".git/forge-embedding-fixture-after.json",
+      "sha256": "d3ca2044b76af8fa0bdf9d693a9751c3851ccc6c6f538599ed4a005dcebd8c88"
+    },
+    "embedding_fixture_focused": {
+      "path": ".git/forge-embedding-fixture-focused.log",
+      "sha256": "67e552668829e9f1fe17391b9502e17d3c7d40370f314c7904e0e87d1f9050f5"
     }
   }
 }

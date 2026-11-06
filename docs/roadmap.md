@@ -127,8 +127,11 @@ source-bound receipts. Focused tests passed 421 Forge and 90 minimal
 core cases, with strict Clippy and 41 planner contract tests passing. See the
 [Mull evidence index](../research/performance/forge-program-20261106-confined-mull.json)
 for raw provenance and observational cost. Unmarked Mull and arbitrary project
-builds remain refused; C++ refresh is still absent. Next publish through the normal
-PR path, then reassess the native migration and agent-workflow backlog.
+builds remain refused; C++ refresh is still absent. The subsequent gate at `68caf0a`
+found an unrelated HTTP test-fixture race; the bounded request-reader correction
+passed 12 focused tests and 200 repetitions without changing production behavior.
+That failed gate remains in the evidence; rerun all publication checks on the
+corrected head, publish through the normal PR path, then reassess the backlog.
 Actual-client adoption and matched agent-task benefit still require separate evidence.
 
 ### Architecture, evidence and disposition
