@@ -60,6 +60,39 @@ entry named `forge` causes a conflict instead of being overwritten. Plans expose
 hashes, byte lengths, the desired command and live tool names, not unrelated
 configuration values or credentials.
 
+## Codex CLI
+
+Codex uses TOML MCP configuration rather than Claude's project `.mcp.json`.
+For an already-running service, use the emitted absolute command and arguments:
+
+```toml
+[mcp_servers.forge]
+command = "/absolute/path/to/forge"
+args = ["harness", "stdio", "--socket", "/returned/state/socket", "--source-root", "/absolute/project"]
+required = true
+enabled_tools = ["code_inspect", "code_fold"]
+```
+
+Tool exposure and client approval are separate decisions. Codex's documented
+server-wide and per-tool approval settings remain operator-controlled; Forge
+does not change them. MCP annotations describe behavior and confer no authority.
+See the [official Codex MCP configuration reference](https://developers.openai.com/codex/mcp).
+
+Forge marks `code_inspect` and `code_fold` read-only, non-destructive, idempotent
+and limited to the local workspace. Idempotence describes their effects; source
+bytes and parse results can still change. Other tools, including the generic
+outbound capability, do not inherit those hints. The native catalog validator
+accepts only the four optional boolean MCP hints and rejects unsupported or
+malformed annotation fields. Hints do not alter argument validation or grants.
+
+A bounded Codex CLI 0.166.0 diagnostic discovered and attempted Forge calls but
+refused them under its effective approval policy. Its zero process exit code
+did not mean successful tool execution. Validate actual tool events and results,
+not just client startup, discovery or process status. The
+[recorded observation](performance.md#actual-codex-approval-diagnostic--2026-11-05)
+does not establish successful client adoption. Do not weaken a client policy to
+turn a refused probe into a passing result.
+
 ## Operator-configured outbound tool
 
 The optional outbound capability is configured on the **harness policy**, not

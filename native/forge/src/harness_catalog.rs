@@ -7,7 +7,7 @@ pub fn catalog(policy: &Policy) -> Value {
     let hash = string(64, 64);
     let id = string(1, 128);
     let mut tools = vec![
-        tool(
+        source_read_tool(
             "code_inspect",
             "Native definitions, lexical references and scopes; bounded output with source hash.",
             vec![
@@ -19,7 +19,7 @@ pub fn catalog(policy: &Policy) -> Value {
             ],
             &["path"],
         ),
-        tool(
+        source_read_tool(
             "code_fold",
             "Fold function bodies for context without changing source.",
             vec![
@@ -230,6 +230,21 @@ fn string(min: u64, max: u64) -> Value {
 fn integer(min: u64, max: u64) -> Value {
     json!({"type":"integer","minimum":min,"maximum":max})
 }
+// These two source projections only read bounded local bytes and construct
+// results. Idempotence describes their effects, not unchanged source/freshness
+// or guaranteed parse success. No other tool inherits this classification.
+fn source_read_tool(
+    name: &str,
+    description: &str,
+    fields: Vec<(&str, Value)>,
+    required: &[&str],
+) -> Value {
+    let mut declaration = tool(name, description, fields, required);
+    declaration["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,
+        "openWorldHint":false,"idempotentHint":true});
+    declaration
+}
+
 fn tool(name: &str, description: &str, fields: Vec<(&str, Value)>, required: &[&str]) -> Value {
     let properties: serde_json::Map<String, Value> =
         fields.into_iter().map(|(k, v)| (k.into(), v)).collect();
