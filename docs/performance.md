@@ -1228,20 +1228,21 @@ Baseline/final result JSON SHA-256:
 | `native/conductor-native/src/candidate_checks_scan.rs` (baseline) | `461d82a167d3b89b17d71bea35898ef2ac0b661ab4e8ee0fb9391482796ed019` |
 | `native/conductor-native/src/candidate_checks_scan.rs` (final) | `838ea3e828e0ff99acce13101f70e307e6d15e6ae51aba78a38d96eec164c312` |
 
-## Confined Fest validation — active, 2026-11-06
+## Confined Fest validation — 2026-11-06
 
-Clean release `234b60f` passed both observer tests: strong/weak in 16.36 seconds
-and collection-error in 8.21 seconds. These single functional-control timings
-include a debug harness and are not benchmark comparisons. Strong produced
+Implementation release `c8722ce` passed both observer tests: strong/weak in 16.31
+seconds and collection-error in 8.20 seconds. These single functional-control
+timings include a debug harness and are not benchmark comparisons. Strong produced
 `PASS` (3/3 kills attributed), weak `RATCHET_HELD` (2 kills, 1 survivor), and
 collection `ERROR` (3 engine-classified kills, none attributed). Independent audit
 confirmed all 20 command cgroups, three snapshots and three caches absent before
-supervisor retirement. Native guest export matched 1,302 entries and refused overwrite.
+supervisor retirement. Native export matched 1,302 entries and refused overwrite.
 
-Freshness controls accepted the original receipt, rejected an admitted `.json`
-addition live and committed, and accepted restoration. The earlier excluded `.txt`
-probe and six failed mutation observer runs remain recorded. Same-size mutant
-bytes were witnessed at an imposed mtime; the changed-return mutant differed in size.
+A 31-command freshness probe accepted the original receipt, rejected an admitted
+`.json` addition live and committed, and accepted restoration. The earlier excluded
+`.txt` probe, six failed mutation observer runs and failed first gate remain recorded.
+The same-size mutant was witnessed at an imposed mtime; its default return stayed 7.
+The full 18-step gate passed at `c8722ce`: 4,956 successful executions, zero failures,
+200 ignored across 182 harnesses, followed by exact-head/current-base verification.
 The [evidence index](../research/performance/forge-program-20261106-confined-fest.json)
-retains identities, raw-artifact references and limits. Full publication gates remain
-pending; no task-success, token-cost, clean-host or installation benefit is inferred.
+retains identities and limits; no agent-task, token-cost or installation benefit is inferred.

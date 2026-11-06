@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "status": "RELEASE_CONTROLS_VALIDATED_PUBLICATION_PENDING",
-  "scope": "narrow confined Fest profile; release functional controls and supporting-input freshness, no speedup or whole-profile restoration claim",
+  "status": "NARROW_FEST_PROFILE_VALIDATED",
+  "scope": "native confined Fest standalone controls and captured-input freshness; no general Python compatibility, speedup or agent-task benefit claim",
   "attempts": {
-    "observer_tests_passed": 2,
+    "observer_tests_passed": 4,
     "observer_tests_failed": 6,
     "pre_payload_refusals": 2,
     "partial_baseline_only_runs": 1,
-    "engine_runs_completed": 6,
+    "engine_runs_completed": 9,
     "weak_controls_unstarted": 4,
     "collection_error_control": "RELEASE_EXPECTED_ERROR_AND_OBSERVER_PASS",
     "engine_startup_failures": 1,
@@ -279,6 +279,62 @@
     {
       "path": ".git/forge-fest-freshness-provenance-links.json",
       "sha256": "7a9efb186dbf4dd322b8780c57e27c38851d28f0a1799142f02fc60c025fd46b"
+    },
+    {
+      "path": ".git/forge-fest-full-gate-summary.json",
+      "sha256": "34756c5c914110535af0765135168a1924d5ce4f3c7cef77d6167be79f26ecdd"
+    },
+    {
+      "path": ".git/forge-fest-final-binary.json",
+      "sha256": "7d256c2dd812a2e247b2fd1b005c166aff0591c48116759e58254144ad2fd773"
+    },
+    {
+      "path": ".git/forge-fest-final-test-binary.json",
+      "sha256": "8e8cc3bd3bf30d1faaa95c483eef270eeaed1679290fa915d4995ec201a6ef86"
+    },
+    {
+      "path": ".git/forge-fest-final-native-export.json",
+      "sha256": "922987a4b24af27dc45fba31be097e60eb9194e9cfa5638c3aaa2b330e7f7db0"
+    },
+    {
+      "path": ".git/forge-fest-final-controls.json",
+      "sha256": "e5a7c1695b9fb0da233b354cf3da4728f69aa8ca687ba04433e6657f3981d3fb"
+    },
+    {
+      "path": ".git/forge-fest-final-strong-independent.json",
+      "sha256": "f19d370292bcf4db30beb50b3240f0a0ba5cf6ea36d5a1b7d2483cf788b613d6"
+    },
+    {
+      "path": ".git/forge-fest-final-weak-independent.json",
+      "sha256": "05752ca57c423035dccccf678409319ef521292c7e578699236bf2a3eeff0d09"
+    },
+    {
+      "path": ".git/forge-fest-final-collection-independent.json",
+      "sha256": "95f925beba63e5df803b508deb80202c3c687fc3fb5c0f186e1694d6a409e97c"
+    },
+    {
+      "path": ".git/forge-fest-final-all-fresh-absence.json",
+      "sha256": "54a58a9c783fbad5293d20e96d50e462ff42b055f8a25a5d95975c6dd6841c9a"
+    },
+    {
+      "path": ".git/forge-fest-final-unit-stop.json",
+      "sha256": "e1dc17faff03fc65248f885ea1efdaeca9c3cec138aa416d821a6fece4e3453f"
+    },
+    {
+      "path": ".git/forge-fest-final-freshness-location.json",
+      "sha256": "34bfaccb4cbea6944411f2e153e6e47fade5f9f8c15e9d1cbd8e348139b2f6f2"
+    },
+    {
+      "path": ".git/forge-fest-final-freshness-independent.json",
+      "sha256": "a2d2d41eaa908fbc797f85cd5480e6a51ae21022b876d03955bed6811fd4b010"
+    },
+    {
+      "path": ".git/forge-fest-local-verify.log",
+      "sha256": "c0fff5f6678dc0666980ca2a35953de2b5c915484a191489cd4586ee6431b311"
+    },
+    {
+      "path": "/tmp/forge-fest-final-freshness-a8cd784fceff/summary.json",
+      "sha256": "f0c7ef67accbbfd7e18a0fb716dcbba4c544d04b71719e5e1105b71e7922466a"
     }
   ],
   "limitations": [
@@ -293,8 +349,8 @@
     "Complete original engine JSON survived inside retained stdout tails for all three release controls; original JUnit XML was disposed, and normalized observations were audited."
   ],
   "next": [
-    "Run exact committed full local-check/local-verify, publish related to issue196 through normal PR process.",
-    "Continue the broader native agent platform program; this increment does not complete the mission."
+    "Continue issue196 with a narrowly scoped native Mull profile and real automatic controls.",
+    "Retain the rejected recommendation experiment; prospective controlled agent-task evaluation and actual client adoption remain separate gaps."
   ],
   "debug_outcomes": {
     "strong": {
@@ -466,7 +522,21 @@
       "Pure mutation value analysis remains available without source-analysis; receipt recomputation is never skipped.",
       "Generated-receipt seam tests require their existing source-analysis modules; pure minimal-feature tests remain enabled."
     ],
-    "second_gate": "pending"
+    "second_gate": {
+      "scope": "full local-check executions, repeated feature matrices included; not unique tests",
+      "head": "c8722cea5051eea11e8d3fa4d2fd65ce0a15e29a",
+      "tree": "cf6abd93f3d6823d9cb673fbc391277d78c71802",
+      "base_sha": "9299baae5672ed748aeb2c81ffe7014f76ddf6ba",
+      "receipt": "/home/tim/Projects/llm-forge/.git/forge-checks/run-1793976698012283400-2363649/receipt.json",
+      "receipt_sha256": "3d8ebf89184dd24615190579ebc3836e5f89e72e5722dfa03b6cdd067f8f4b2d",
+      "steps": 18,
+      "passed": 4956,
+      "failed": 0,
+      "ignored": 200,
+      "harnesses": 182
+    },
+    "verification": "make local-verify PASS at implementation head c8722ce and freshly fetched base9299baa",
+    "policy": "Every publication head and base require their own full local-check/local-verify receipt; this report records the implementation gate rather than predicting a later receipt."
   },
   "feature_validation": [
     {
@@ -551,5 +621,90 @@
       ],
       "scope": "first minimal test build failed on feature-dependent seam fixtures; corrected minimal/default and consumer checks passed"
     }
-  ]
+  ],
+  "final_implementation_validation": {
+    "head": "c8722cea5051eea11e8d3fa4d2fd65ce0a15e29a",
+    "tree": "cf6abd93f3d6823d9cb673fbc391277d78c71802",
+    "compiled_source_sha256": "fee747216a3a6af36fbd6c7081f3f5bf9a4277e56eeabd4bc6406d48d2468e85",
+    "binary_sha256": "24da5f939c7e44654fd267f504ac14d7f32e7ec77b1a6b47576703328a0f15d5",
+    "controls": {
+      "strong": {
+        "fixture": "/tmp/.tmpoqDNYh",
+        "native_status": "PASS",
+        "killed": 3,
+        "attributed": 3
+      },
+      "weak": {
+        "fixture": "/tmp/.tmpgBDT0p",
+        "native_status": "RATCHET_HELD",
+        "killed": 2,
+        "survived": 1,
+        "attributed": 2
+      },
+      "collection": {
+        "fixture": "/tmp/.tmpyX17MY",
+        "native_status": "ERROR",
+        "engine_killed": 3,
+        "attributed": 0
+      }
+    },
+    "observer_tests": {
+      "passed": 2,
+      "failed": 0,
+      "strong_weak_seconds": 16.31,
+      "collection_seconds": 8.2,
+      "timing_scope": "single functional test observations, not matched benchmarks"
+    },
+    "independent_audits": "NO_DISCREPANCY_FOUND",
+    "freshness": {
+      "decision": "FRESHNESS_EXPECTATIONS_MET",
+      "phases_completed": 15,
+      "commands_completed": 31,
+      "cases": {
+        "baseline_live": {
+          "status": "CLEAN",
+          "returncode": 0
+        },
+        "baseline_commit": {
+          "status": "CLEAN",
+          "returncode": 0
+        },
+        "baseline_evidence": {
+          "status": "PASS",
+          "returncode": 0
+        },
+        "drift_live": {
+          "status": "REGRESSED",
+          "returncode": 7
+        },
+        "drift_commit": {
+          "status": "REGRESSED",
+          "returncode": 7
+        },
+        "drift_evidence": {
+          "status": "FAIL",
+          "returncode": 5
+        },
+        "restored_live": {
+          "status": "CLEAN",
+          "returncode": 0
+        },
+        "restored_commit": {
+          "status": "CLEAN",
+          "returncode": 0
+        },
+        "restored_evidence": {
+          "status": "PASS",
+          "returncode": 0
+        }
+      },
+      "restored_tree": "427ed91d1741a6c4d48c822e1739fdc9148ba30a"
+    },
+    "cleanup": {
+      "command_cgroups_absent_before_parent_stop": 20,
+      "snapshots_absent": 3,
+      "caches_absent": 3,
+      "parent_stop": "only owned sleep supervisor remained; parent then positively absent"
+    }
+  }
 }

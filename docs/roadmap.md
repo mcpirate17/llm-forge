@@ -87,22 +87,24 @@ and [evidence index](../research/performance/forge-program-20261106-mcp-test-rep
 Filesystem preparation remains cooperative; the child deadline is not a hard
 whole-operation deadline. No external-client or host adoption is claimed.
 
-The active increment returns to [#196](https://github.com/mcpirate17/llm-forge/issues/196):
-the explicit [confined Fest profile](mutation-fest.md) uses a pinned private guest
-and the existing native command owner. It adds captured-snapshot bindings,
-read-only empty bytecode caches, guest-first imports, complete kill attribution
-and native guest inventory export. Clean release `234b60f` passed all three real
-controls: strong `PASS` (three attributed kills), weak `RATCHET_HELD` (one survivor),
-and collection-error `ERROR` (zero attributed kills). Independent audit matched
-all outcomes and confirmed 20 child cgroups, three snapshots and three caches
-absent before supervisor retirement. Native export matched all 1,302 guest entries.
-Live and committed consumers accepted the strong receipt, rejected an admitted
-supporting-input addition, and accepted exact restoration. An initial excluded
-untracked `.txt` probe and all earlier debug/observer failures remain recorded.
-The first publication gate exposed fixture/API and minimal-feature build errors;
-focused repairs passed, and the full rerun is next. Unmarked Fest and Mull remain refused;
-this does not establish general Python compatibility or agent productivity gains.
-See the [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
+The validated Fest increment addresses part of [#196](https://github.com/mcpirate17/llm-forge/issues/196).
+The explicit [confined profile](mutation-fest.md) uses a pinned private guest and
+the existing native command owner. It adds captured-snapshot bindings, read-only
+empty bytecode caches, guest-first imports, complete kill attribution and native
+inventory export. Implementation release `c8722ce` passed three real controls:
+strong `PASS` (three attributed kills), weak `RATCHET_HELD` (one survivor), and
+collection-error `ERROR` (zero attributed kills). Independent audit confirmed all
+20 child cgroups, three snapshots and three caches absent before supervisor retirement.
+Native export matched all 1,302 entries. A 31-command probe verified live/committed
+receipt acceptance, admitted supporting-input rejection and exact restoration.
+
+The full 18-step gate and exact-head/current-base verification passed at `c8722ce`:
+4,956 test executions passed, zero failed and 200 were ignored across 182 harnesses.
+The first gate's fixture/API and minimal-feature errors were repaired; all failed
+controls and probes remain recorded. Later publication heads require their own
+source-bound receipts. Unmarked Fest and Mull remain refused. Next implement the
+bounded Mull prerequisites; agent-task value and actual-client adoption still need
+separate evidence. See the [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
 ### Architecture, evidence and disposition
 
