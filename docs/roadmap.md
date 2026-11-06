@@ -205,11 +205,18 @@ harnesses. Fresh-base verification passed; merge `551a506` has the identical tre
 input capture and Stage owner. It selects one whole committed Python module,
 verifies both materialized preimages and keeps external authority explicit.
 Focused input/tree/candidate/corpus checks, two actual CLI refusal controls and
-strict Clippy pass; real guest lifecycle controls, performance observations and
-full publication checks remain pending. Initial missed field callers and a
-fixture permission failure are retained in the
+strict Clippy pass. Release `16b5445` passed five real standalone lifecycle controls
+and four existing candidate Stage controls. Three authored committed fixtures
+matched the preserved Python wrapper's complete summaries, reports and enforcement
+exits without normalization; actual confined child imports used the pinned guest.
+Independent audits verified retained evidence and cleanup. All 480 shared-capture
+observations preserved inputs/targets and zero scratch activity, with similar cost
+before/after the refactor. Full publication checks remain pending; initial compile
+and fixture failures are retained in the
 [evidence index](../research/performance/forge-program-20261106-committed-equivalence.json).
 The Make gate's live-worktree/default-changed/all contract remains unmigrated.
+Its next prerequisite is explicit live-input selection: mutation snapshots exclude
+files the legacy named gate can read, so they cannot silently supply that contract.
 
 ### Architecture, evidence and disposition
 

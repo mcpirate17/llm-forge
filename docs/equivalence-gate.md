@@ -94,3 +94,14 @@ This command does not replace the Python gate's live-worktree, default-changed o
 See the [engineering evidence](../research/performance/forge-program-20261106-committed-equivalence.json)
 for completed checks, retained failures and remaining validation. No matched
 speedup, model-cost reduction or agent-task benefit is established by unit tests.
+
+## Reproducing validation
+
+The ignored `native/forge/tests/equivalence_gate_live.rs` controls require explicit
+`FORGE_TEST_BIN`, `FORGE_TEST_PYTHON`, `FORGE_TEST_SLOP_EXTENSION`,
+`FORGE_TEST_SLOP_SHA256` and `FORGE_TEST_CGROUP_PARENT`, plus CPU Torch/pytest.
+Supply an owned bounded delegation and inspect the fixture's read-grant contract;
+these controls intentionally retain evidence directories for review.
+Run `cargo +1.98.0 test --release --offline --locked --manifest-path native/forge/Cargo.toml --test equivalence_gate_live -- --ignored --nocapture --test-threads=1`.
+The evidence index records exact builds, comparator provenance and separate capture
+measurements. Similar capture cost does not establish full-workload acceleration.
