@@ -89,9 +89,10 @@ pub(crate) fn generated_errors_with_installed(
         && campaign.mutation_engine == "cargo-mutants"
     {
         let checked = match supporting {
-            Ok(identity) => crate::mutation_cargo_supporting_binding::compare(
+            Ok(identity) => crate::mutation_cargo_supporting_binding::compare_profile(
                 payload.get("supporting_inputs"),
                 identity,
+                campaign.execution_profile.as_deref(),
             ),
             Err(error) => Err(format!(
                 "independently captured Cargo supporting inputs unavailable: {error}"

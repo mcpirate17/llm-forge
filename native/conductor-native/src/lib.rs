@@ -101,6 +101,7 @@ pub mod mutation_plan;
 mod mutation_receipt;
 #[cfg(feature = "source-analysis")]
 pub mod mutation_rust_value_contract;
+pub mod mutation_snapshot_inputs;
 pub mod mutation_source_coverage;
 #[cfg(feature = "source-analysis")]
 #[cfg_attr(not(feature = "python"), allow(dead_code))]

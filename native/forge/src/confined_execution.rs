@@ -266,6 +266,29 @@ struct PreparedInput {
     duplex: Option<duplex::Seed>,
 }
 
+/// Run a bounded UTF-8 metadata producer under the existing confined owner.
+/// Stdout is limited to 16 MiB and stderr to 1 MiB independently; invalid
+/// UTF-8 or overflow fails the owner. No input is delivered to the child.
+pub(crate) fn start_metadata_with_resources(
+    plan: CommandPlan,
+    group: Cgroup,
+    limits: Limits,
+    resources: Box<dyn Resources>,
+) -> Result<Execution> {
+    start_inner(
+        plan,
+        group,
+        limits,
+        resources,
+        None,
+        CapturePolicy::StrictSeparate {
+            stdout: 16 * 1024 * 1024,
+            stderr: 1024 * 1024,
+        },
+        None,
+    )
+}
+
 fn start_inner(
     mut plan: CommandPlan,
     mut group: Cgroup,
@@ -700,6 +723,22 @@ mod capture_decoding_tests {
         let text = decode_lossy(bytes);
         assert_eq!(text, "valid json");
         assert_eq!(text.as_ptr(), pointer);
+    }
+    #[test]
+    fn strict_metadata_rejects_invalid_utf8_in_either_stream() {
+        for (stdout, stderr) in [
+            (b"bad\xff".as_slice(), b"good".as_slice()),
+            (b"good".as_slice(), b"bad\xfe".as_slice()),
+        ] {
+            let value = readiness::Captured {
+                stdout: stdout.to_vec(),
+                stderr: stderr.to_vec(),
+                stdout_bytes: stdout.len() as u64,
+                stderr_bytes: stderr.len() as u64,
+                lossy_utf8: false,
+            };
+            assert!(decode_capture(value).is_err());
+        }
     }
     #[test]
     fn complete_capture_decodes_lossily_but_strict_capture_rejects_invalid_utf8() {

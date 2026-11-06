@@ -15,6 +15,7 @@ const QUANTUM: usize = 64 * 1024;
 #[derive(Clone, Copy)]
 pub(crate) enum CapturePolicy {
     StrictCombined(usize),
+    StrictSeparate { stdout: usize, stderr: usize },
     CompleteSeparate { stdout: usize, stderr: usize },
     TailChars(usize),
 }
@@ -25,7 +26,7 @@ impl CapturePolicy {
                 (1..=1024 * 1024).contains(&limit),
                 "probe output limit must be 1..1048576 bytes"
             ),
-            Self::CompleteSeparate { stdout, stderr } => {
+            Self::StrictSeparate { stdout, stderr } | Self::CompleteSeparate { stdout, stderr } => {
                 ensure!(
                     (1..=16 * 1024 * 1024).contains(&stdout),
                     "stdout capture limit must be 1..16777216 bytes"
@@ -52,9 +53,9 @@ enum Capture {
 impl Capture {
     fn new(policy: CapturePolicy) -> Result<Self> {
         Ok(match policy {
-            CapturePolicy::StrictCombined(_) | CapturePolicy::CompleteSeparate { .. } => {
-                Self::Bytes(Vec::new())
-            }
+            CapturePolicy::StrictCombined(_)
+            | CapturePolicy::StrictSeparate { .. }
+            | CapturePolicy::CompleteSeparate { .. } => Self::Bytes(Vec::new()),
             CapturePolicy::TailChars(n) => Self::Tail(TailBuffer::new(n)?),
         })
     }
@@ -208,6 +209,10 @@ impl Stream {
                         );
                     }
                     if let CapturePolicy::CompleteSeparate {
+                        stdout: out_limit,
+                        stderr: err_limit,
+                    }
+                    | CapturePolicy::StrictSeparate {
                         stdout: out_limit,
                         stderr: err_limit,
                     } = policy

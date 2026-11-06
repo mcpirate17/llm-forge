@@ -28,11 +28,20 @@ struct Runtime {
     binding_sha256: BTreeMap<String, String>,
     lineage: Option<Value>,
 }
+/// Independently captured workspace identities and configured receipt namespace.
+pub struct WorkspaceBindings<'a> {
+    pub identities: &'a BTreeMap<
+        String,
+        Result<crate::mutation_cargo_supporting_binding::SupportingInputs, String>,
+    >,
+    pub receipt_root: Option<&'a str>,
+}
 struct NativeBindings<'a> {
     fingerprint: Option<&'a str>,
     supporting:
         Result<Option<&'a crate::mutation_cargo_supporting_binding::SupportingInputs>, &'a str>,
     installed: Option<&'a crate::mutation_native_runner::InstalledIdentity>,
+    workspace: Option<&'a WorkspaceBindings<'a>>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -76,10 +85,31 @@ pub fn verify_captured_native(
 pub fn verify_captured_native_with_supporting(
     request: &Value,
     raw: &[CapturedReceipt],
+    anchor: impl FnMut(&str, &[u8], &Value) -> Result<(), String>,
+    native_fingerprint: Option<&str>,
+    installed: Option<&crate::mutation_native_runner::InstalledIdentity>,
+    supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
+) -> Result<CapturedVerification, String> {
+    verify_captured_native_with_supporting_profiles(
+        request,
+        raw,
+        anchor,
+        native_fingerprint,
+        installed,
+        supporting,
+        None,
+    )
+}
+
+/// Workspace identities come from independently captured inputs, keyed by verified campaign ID.
+pub fn verify_captured_native_with_supporting_profiles(
+    request: &Value,
+    raw: &[CapturedReceipt],
     mut anchor: impl FnMut(&str, &[u8], &Value) -> Result<(), String>,
     native_fingerprint: Option<&str>,
     installed: Option<&crate::mutation_native_runner::InstalledIdentity>,
     supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
+    workspace: Option<&WorkspaceBindings<'_>>,
 ) -> Result<CapturedVerification, String> {
     admit(request)?;
     let request: Request =
@@ -95,6 +125,7 @@ pub fn verify_captured_native_with_supporting(
         fingerprint: native_fingerprint,
         supporting,
         installed,
+        workspace,
     };
     let (receipts, mut malformed) = receipts(raw)?;
     malformed.extend(request.malformed_receipts.iter().cloned());
@@ -229,6 +260,20 @@ fn validate(
         if runtime.is_none() && !is_native {
             return Ok(vec![missing_runner()]);
         }
+        if is_native && campaign.execution_profile.as_deref() == Some("cargo-workspace-v2") {
+            let authorized = native.workspace.is_some_and(|bindings| {
+                bindings.receipt_root.is_some_and(|root| {
+                    crate::mutation_snapshot_inputs::within_namespace(&receipt.relative, root)
+                })
+            });
+            if !authorized {
+                return Ok(vec![Rejection {
+                    kind: crate::mutation_receipt::RejectionKind::ScopeError,
+                    detail: "workspace receipt root unavailable or receipt outside configured root"
+                        .into(),
+                }]);
+            }
+        }
         let empty = RunnerState {
             components: None,
             error: None,
@@ -254,7 +299,18 @@ fn validate(
                     .is_some_and(|lineage| rules::lineage_payload_accepts(recorded, lineage))
             },
             native.installed,
-            native.supporting,
+            if campaign.execution_profile.as_deref() == Some("cargo-workspace-v2") {
+                match native
+                    .workspace
+                    .and_then(|items| items.identities.get(&campaign.campaign_id))
+                {
+                    Some(Ok(identity)) => Ok(Some(identity)),
+                    Some(Err(error)) => Err(error.as_str()),
+                    None => Err("independently captured workspace inputs unavailable"),
+                }
+            } else {
+                native.supporting
+            },
         ));
     }
     let anchored = if payload["schema_version"] == "llm.mutation-testing.receipt.v2" {

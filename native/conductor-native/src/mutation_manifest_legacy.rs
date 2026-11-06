@@ -445,6 +445,16 @@ impl<R: CampaignReader> Builder<'_, R> {
         })
     }
     fn finish(self) -> Result<CampaignContract, String> {
+        if self
+            .payload
+            .get("generator")
+            .and_then(Value::as_object)
+            .and_then(|generator| generator.get("options"))
+            .and_then(Value::as_object)
+            .is_some_and(|options| options.contains_key("execution_profile"))
+        {
+            return Err("execution profile requires a generated Cargo campaign".into());
+        }
         let value_analysis = validate_value_analysis(
             self.payload.get("value_analysis"),
             &self.ranked_nodeids,
@@ -471,6 +481,7 @@ impl<R: CampaignReader> Builder<'_, R> {
             poll_seconds: self.poll_seconds,
             environment: self.environment,
             host_read_dependencies: self.host_read_dependencies,
+            execution_profile: None,
             generated_value: None,
             value_analysis_payload: self.payload.get("value_analysis").cloned(),
             value_analysis,
@@ -592,6 +603,9 @@ fn generated<R: CampaignReader>(
         |path| reader.hash(&root.join(path)),
     )?;
     if generated_value.is_some() {
+        if contract.execution_profile.is_some() {
+            return Err("workspace execution profile is incompatible with generated_value".into());
+        }
         let inventory = reader
             .cargo_inventory()
             .ok_or("generated_value requires independently captured Cargo inventory")?;

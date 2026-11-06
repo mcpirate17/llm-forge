@@ -1,5 +1,6 @@
 use super::*;
 use crate::mutation_run_test_support::campaign;
+use std::fs;
 
 const CRATE: &str = "tools/snapshot-retention";
 
@@ -248,6 +249,39 @@ fn the_invocation_pins_every_bound_from_the_manifest() {
 }
 
 #[test]
+fn workspace_invocation_is_serial_without_conflicting_jobs_flag() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut subject = bounded(
+        dir.path(),
+        json!({"language":"rust", "mutation_engine":"cargo-mutants",
+            "generator": cargo_generator(json!({"execution_profile":"cargo-workspace-v2"}))}),
+    );
+    assert!(
+        engine_argv(&subject, "/bin/cargo-mutants", Path::new("/out"))
+            .unwrap_err()
+            .contains("exactly one worker")
+    );
+    subject.jobs = 1;
+    let argv = engine_argv(&subject, "/bin/cargo-mutants", Path::new("/out")).unwrap();
+    assert!(argv.iter().any(|arg| arg == "--in-place"));
+    assert!(!argv.iter().any(|arg| arg == "--jobs"));
+}
+
+#[test]
+fn workspace_report_refuses_other_package_or_missing_identity() {
+    let good = report_rows(vec![mutant("CaughtMutant", 3, "false")]).unwrap();
+    require_package(&good, Some("snapshot-retention")).unwrap();
+    assert!(require_package(&good, Some("another-package")).is_err());
+    for bad in [
+        json!({}),
+        json!({"package":null}),
+        json!({"package": {"name":"snapshot-retention"}}),
+    ] {
+        assert!(require_package(&[bad], Some("snapshot-retention")).is_err());
+    }
+}
+
+#[test]
 fn a_crate_without_a_package_is_not_narrowed_to_one() {
     let dir = tempfile::tempdir().unwrap();
     let subject = bounded(dir.path(), json!({"generator": cargo_generator(json!({}))}));
@@ -307,18 +341,27 @@ fn parallel_workers_may_not_share_one_build_directory() {
 #[test]
 fn an_absent_or_malformed_report_is_refused() {
     let dir = tempfile::tempdir().unwrap();
-    let error = read_report(dir.path()).unwrap_err();
-    assert!(error.contains("wrote no outcomes.json"), "{error}");
+    let error = read_report(dir.path()).err().unwrap();
+    assert!(
+        error.contains("cannot capture") && error.contains("outcomes.json"),
+        "{error}"
+    );
     let outcomes = dir.path().join("mutants.out/outcomes.json");
     fs::create_dir_all(outcomes.parent().unwrap()).unwrap();
     fs::write(&outcomes, "not json").unwrap();
-    assert!(read_report(dir.path()).unwrap_err().contains("is not JSON"));
+    assert!(read_report(dir.path())
+        .err()
+        .unwrap()
+        .contains("is not JSON"));
     fs::write(&outcomes, "[]").unwrap();
     assert!(read_report(dir.path())
-        .unwrap_err()
+        .err()
+        .unwrap()
         .contains("root must be a JSON object"));
     fs::write(&outcomes, "{\"outcomes\": []}").unwrap();
-    assert_eq!(read_report(dir.path()).unwrap(), json!({"outcomes": []}));
+    let (held, report) = read_report(dir.path()).unwrap();
+    assert_eq!(report, json!({"outcomes": []}));
+    held.verify().unwrap();
 }
 
 #[test]
@@ -358,4 +401,26 @@ fn cargo_environment_exports_only_the_selected_optional_guest() {
             },
         );
     }
+}
+
+#[test]
+fn report_capture_rejects_symlink_and_overlimit_and_detects_drift() {
+    use std::os::unix::fs::symlink;
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("output");
+    std::fs::create_dir_all(output.join("mutants.out")).unwrap();
+    let report = output.join("mutants.out/outcomes.json");
+    let outside = root.path().join("outside.json");
+    std::fs::write(&outside, b"{}").unwrap();
+    symlink(&outside, &report).unwrap();
+    assert!(read_report(&output).is_err());
+    std::fs::remove_file(&report).unwrap();
+    let file = std::fs::File::create(&report).unwrap();
+    file.set_len(MAX_OUTCOMES_BYTES as u64 + 1).unwrap();
+    assert!(read_report(&output).is_err());
+    std::fs::write(&report, b"{}").unwrap();
+    let (held, value) = read_report(&output).unwrap();
+    assert!(value.is_object());
+    std::fs::write(&report, b"{\"changed\":true}").unwrap();
+    assert!(held.verify().is_err());
 }

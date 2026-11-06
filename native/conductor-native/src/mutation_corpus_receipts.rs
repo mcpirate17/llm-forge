@@ -105,6 +105,30 @@ fn ordinary_binding_error(
     None
 }
 
+fn ordinary_supporting_error(
+    object: &serde_json::Map<String, Value>,
+    campaign: &Campaign<'_>,
+    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
+) -> Option<String> {
+    if let Some(reason) = ordinary_binding_error(object, campaign) {
+        return Some(reason);
+    }
+    let profile = match campaign
+        .ordinary_contract
+        .and_then(|value| value.get("execution_profile"))
+    {
+        None | Some(Value::Null) => None,
+        Some(Value::String(value)) => Some(value.as_str()),
+        Some(_) => return Some("invalid verified execution profile".into()),
+    };
+    crate::mutation_cargo_supporting_binding::compare_profile(
+        object.get("supporting_inputs"),
+        supporting,
+        profile,
+    )
+    .err()
+}
+
 pub fn rejection_with_supporting(
     campaign: &Campaign<'_>,
     receipt: &Value,
@@ -130,13 +154,7 @@ pub fn rejection_with_supporting(
     }
     if native_runner::declared(object) {
         if campaign.ordinary_cargo {
-            if let Some(reason) = ordinary_binding_error(object, campaign) {
-                return Ok(Some(reason));
-            }
-            if let Err(reason) = crate::mutation_cargo_supporting_binding::compare(
-                object.get("supporting_inputs"),
-                supporting,
-            ) {
+            if let Some(reason) = ordinary_supporting_error(object, campaign, supporting) {
                 return Ok(Some(reason));
             }
         }

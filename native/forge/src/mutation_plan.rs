@@ -98,6 +98,10 @@ pub struct ScopeArgs {
     #[arg(long = "extra-test", value_name = "SOURCE=TEST")]
     pub extra_test: Vec<String>,
 
+    /// Select the confined workspace Cargo execution profile for generated Rust campaigns.
+    #[arg(long)]
+    pub cargo_workspace: bool,
+
     /// Explicit source/test-value declaration for one supported Rust package.
     #[arg(long, requires = "rust_value_contract_sha256")]
     pub rust_value_contract: Option<String>,
@@ -184,7 +188,38 @@ fn priority_options(args: &ScopeArgs) -> Option<PriorityOptions> {
         })
 }
 
+fn attach_workspace_profile(result: &mut Value) -> Result<(), String> {
+    let manifests = result
+        .get_mut("manifests")
+        .and_then(Value::as_array_mut)
+        .ok_or("planner did not return generated manifests")?;
+    for manifest in manifests {
+        if manifest["language"] != "rust" || manifest["mutation_engine"] != "cargo-mutants" {
+            return Err("workspace profile requires a generated Rust Cargo campaign".into());
+        }
+        let options = manifest
+            .get_mut("generator")
+            .and_then(Value::as_object_mut)
+            .and_then(|generator| generator.get_mut("options"))
+            .and_then(Value::as_object_mut)
+            .ok_or("generated Cargo options are missing")?;
+        if options.contains_key("execution_profile") {
+            return Err("generated Cargo execution profile already exists".into());
+        }
+        options.insert("execution_profile".into(), json!("cargo-workspace-v2"));
+    }
+    Ok(())
+}
+
 fn plan(args: ScopeArgs) -> Result<Planned, String> {
+    if args.cargo_workspace && args.language != "rust" {
+        return Err("--cargo-workspace requires Rust planning".into());
+    }
+    if args.cargo_workspace
+        && (args.rust_value_contract.is_some() || args.rust_value_contract_sha256.is_some())
+    {
+        return Err("--cargo-workspace cannot be combined with a Rust value contract".into());
+    }
     let repo_root = resolve_repo_root(args.repo_root.clone()).map_err(|error| error.to_string())?;
     let owner = resolve_lane(args.owner.clone(), &repo_root)?;
     let (only_sources, scope) = select_scope(&args, &repo_root, &owner)?;
@@ -209,6 +244,9 @@ fn plan(args: ScopeArgs) -> Result<Planned, String> {
         extra_tests,
     };
     let mut result = compute_plan(&request)?;
+    if args.cargo_workspace {
+        attach_workspace_profile(&mut result)?;
+    }
     let cargo_value = match (args.rust_value_contract, args.rust_value_contract_sha256) {
         (Some(path), Some(hash)) => Some(
             crate::mutation_cargo_plan::attach(&mut result, &repo_root, &path, &hash)

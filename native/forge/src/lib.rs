@@ -261,6 +261,10 @@ pub(crate) mod mutation_cargo_capture;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_cargo_plan;
 #[cfg(target_os = "linux")]
+pub mod mutation_cargo_seed;
+#[cfg(target_os = "linux")]
+pub mod mutation_cargo_seed_cli;
+#[cfg(target_os = "linux")]
 pub(crate) mod mutation_cargo_supporting;
 #[cfg(target_os = "linux")]
 pub mod mutation_engine_cargo;
@@ -291,6 +295,12 @@ pub mod mutation_score;
 #[cfg(target_os = "linux")]
 pub mod mutation_snapshot;
 pub mod mutation_source_coverage;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_workspace_inputs;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_workspace_metadata;
+#[cfg(target_os = "linux")]
+pub(crate) mod mutation_workspace_policy;
 #[cfg(target_os = "linux")]
 pub mod mutation_write;
 

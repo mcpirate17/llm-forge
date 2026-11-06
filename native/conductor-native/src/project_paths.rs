@@ -188,6 +188,14 @@ pub fn mutation_registry_from_config(config: Option<&ProjectConfig>) -> Result<S
     }
 }
 
+/// Captured receipt-root choice without ambient environment overrides.
+pub fn mutation_receipt_root_from_config(config: Option<&ProjectConfig>) -> Result<String, String> {
+    match config {
+        Some(config) => configured_value(config, PATHS[3]).map(|(path, _)| path),
+        None => Ok(PATHS[3].default.into()),
+    }
+}
+
 /// Captured package-root choice, sharing ordinary validation/defaults without
 /// consulting environment overrides or reopening the manifest.
 pub fn package_root_from_config(config: Option<&ProjectConfig>) -> Result<String, String> {

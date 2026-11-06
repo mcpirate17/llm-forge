@@ -322,6 +322,9 @@ fn test_section<'a>(
     Ok(body)
 }
 fn summary(line: &str, passed: usize, failed: usize) -> Result<(), String> {
+    summary_counts(line, passed, failed, 0)
+}
+fn summary_counts(line: &str, passed: usize, failed: usize, ignored: usize) -> Result<(), String> {
     let prefix = if failed == 0 {
         "test result: ok. "
     } else {
@@ -335,7 +338,7 @@ fn summary(line: &str, passed: usize, failed: usize) -> Result<(), String> {
     for (piece, expected) in pieces[..5].iter().zip([
         format!("{passed} passed"),
         format!("{failed} failed"),
-        "0 ignored".into(),
+        format!("{ignored} ignored"),
         "0 measured".into(),
         "0 filtered out".into(),
     ]) {
@@ -450,6 +453,11 @@ fn libtest(body: &str, names: &BTreeMap<String, String>, killed: bool) -> Result
     bounded_json(&parsed, MAX_REPORT_BYTES)?;
     Ok(parsed)
 }
+
+#[path = "mutation_cargo_package_observations.rs"]
+mod package_observations;
+pub use package_observations::{parse_package_baseline, parse_package_engine_baseline};
+
 /// Strict direct-baseline stdout only. Caller checks command, ordinary exit,
 /// independently executed repetitions and source binding before invoking collect.
 pub fn parse_baseline(stdout: &str, target: &Target, ranked: &[String]) -> Result<Value, String> {

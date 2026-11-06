@@ -17,6 +17,7 @@ use std::{
 
 pub(crate) enum Capture {
     Strict,
+    Metadata,
     Complete,
 }
 /// Borrow the owning runtime's sandbox and cleanup state for one command.
@@ -111,6 +112,12 @@ impl CommandSession<'_> {
                 Box::new(NoResources),
                 Vec::new(),
                 1024 * 1024,
+            ),
+            Capture::Metadata => confined_execution::start_metadata_with_resources(
+                plan,
+                group,
+                limits,
+                Box::new(NoResources),
             ),
             Capture::Complete => confined_execution::start_capture_with_resources(
                 plan,

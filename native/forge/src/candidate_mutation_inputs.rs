@@ -17,6 +17,11 @@ pub(crate) struct Capture<'a> {
     native_inventory: Option<Vec<PathBuf>>,
     cargo_inventories: Vec<crate::mutation_cargo_capture::Held>,
     supporting: Option<crate::mutation_cargo_supporting::Held>,
+    workspace: Option<(
+        crate::mutation_snapshot::SnapshotSelection,
+        conductor_native::mutation_cargo_supporting_binding::SupportingInputs,
+    )>,
+    source_root: PathBuf,
     snapshot: &'a Snapshot,
     pub failed: bool,
 }
@@ -122,6 +127,8 @@ impl<'a> Capture<'a> {
             native_inventory: None,
             cargo_inventories: Vec::new(),
             supporting: None,
+            workspace: None,
+            source_root: source.root().to_owned(),
             snapshot,
             failed: false,
         })
@@ -322,6 +329,41 @@ impl<'a> Capture<'a> {
         self.supporting = Some(held);
         Ok(expected)
     }
+    pub fn workspace_inventory(
+        &mut self,
+        required: &crate::mutation_cargo_supporting::WorkspaceRequired,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        let config = self.config()?;
+        crate::mutation_workspace_policy::manifest_in_namespace(
+            config.as_ref(),
+            &required.manifest,
+        )?;
+        let protected = required.pins.keys().cloned().collect::<Vec<_>>();
+        let selection = crate::mutation_workspace_policy::selection(config.as_ref(), &protected)?;
+        if let Some((existing, identity)) = &self.workspace {
+            ensure!(*existing == selection, "workspace output selection changed");
+            return Ok(identity.clone());
+        }
+        let source = Source::open(&self.source_root)?;
+        let git = crate::mutation_snapshot::git_input_identity(
+            &source,
+            &self.snapshot.report().tree_oid,
+            &selection,
+        )
+        .map_err(anyhow::Error::msg)?;
+        let materialized = crate::mutation_snapshot::materialized_input_identity(
+            &self.snapshot.path(),
+            &selection,
+        )
+        .map_err(anyhow::Error::msg)?;
+        ensure!(
+            git == materialized,
+            "candidate workspace materialization differs from Git inputs"
+        );
+        self.workspace = Some((selection, git.clone()));
+        Ok(git)
+    }
+
     pub fn verify(&self) -> Result<()> {
         ensure!(
             !self.failed,
@@ -331,6 +373,17 @@ impl<'a> Capture<'a> {
             ensure!(
                 &conductor_native::source_fingerprint::files(&self.snapshot.path())? == expected,
                 "materialized native source inventory changed"
+            );
+        }
+        if let Some((selection, identity)) = &self.workspace {
+            let current = crate::mutation_snapshot::materialized_input_identity(
+                &self.snapshot.path(),
+                selection,
+            )
+            .map_err(anyhow::Error::msg)?;
+            ensure!(
+                &current == identity,
+                "candidate workspace materialization changed"
             );
         }
         for held in &self.cargo_inventories {

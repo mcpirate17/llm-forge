@@ -155,3 +155,79 @@ fn write_publishes_manifest_and_fragment_then_refuses_to_replace_them() {
         .contains("refusing to replace a recorded survivor"));
     assert_eq!(fs::read_to_string(root.join(manifest)).expect("kept"), text);
 }
+
+#[test]
+fn workspace_profile_is_explicit_and_preserves_generated_scope() {
+    let dir = branch_host();
+    let plain = forge(dir.path(), &["plan", "rust", "--base", "main", "--verbose"]);
+    let workspace = forge(
+        dir.path(),
+        &[
+            "plan",
+            "rust",
+            "--base",
+            "main",
+            "--verbose",
+            "--cargo-workspace",
+        ],
+    );
+    assert_eq!(plain.status.code(), Some(0), "{plain:?}");
+    assert_eq!(workspace.status.code(), Some(0), "{workspace:?}");
+    let expected = payload(&plain)["manifests"].clone();
+    let mut selected = payload(&workspace)["manifests"].clone();
+    let options = selected[0]["generator"]["options"].as_object_mut().unwrap();
+    assert_eq!(
+        options.remove("execution_profile"),
+        Some(serde_json::json!("cargo-workspace-v2"))
+    );
+    assert_eq!(
+        selected, expected,
+        "profile must not broaden generated source or test scope"
+    );
+    assert!(!dir.path().join("campaigns").exists());
+}
+
+#[test]
+fn workspace_write_publishes_the_verified_profile_in_the_generated_manifest() {
+    let dir = branch_host();
+    let result = forge(
+        dir.path(),
+        &["write", "rust", "--base", "main", "--cargo-workspace"],
+    );
+    assert_eq!(result.status.code(), Some(0), "{result:?}");
+    let body = payload(&result);
+    let manifest = dir.path().join(body["written"][0].as_str().unwrap());
+    let parsed: Value = serde_json::from_slice(&fs::read(manifest).unwrap()).unwrap();
+    assert_eq!(
+        parsed["generator"]["options"]["execution_profile"],
+        "cargo-workspace-v2"
+    );
+    assert_eq!(
+        parsed["generator"]["source"],
+        serde_json::json!(["src/changed.rs"])
+    );
+}
+
+#[test]
+fn workspace_profile_refuses_python_and_rust_value_declarations() {
+    let dir = branch_host();
+    for args in [
+        vec!["plan", "python", "--base", "main", "--cargo-workspace"],
+        vec![
+            "write",
+            "rust",
+            "--base",
+            "main",
+            "--cargo-workspace",
+            "--rust-value-contract",
+            "decl.json",
+            "--rust-value-contract-sha256",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ],
+    ] {
+        let result = forge(dir.path(), &args);
+        assert_eq!(result.status.code(), Some(4), "{result:?}");
+        assert_eq!(payload(&result)["status"], "REFUSED");
+        assert!(!dir.path().join("campaigns").exists());
+    }
+}

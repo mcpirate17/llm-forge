@@ -122,6 +122,8 @@ rusqlite = { version = "0.32", features = ["bundled", "hooks", "limits"] }
 # Share the native plan, receipt and shell-argument algorithms without building
 # Python bindings or requiring interpreter discovery during a Forge build.
 conductor-native = { path = "../conductor-native", default-features = false, features = ["source-analysis", "vector-search", "bundled-sqlite"] }
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+tar = { version = "0.4.46", default-features = false }
 
 [profile.release]
 opt-level = 3

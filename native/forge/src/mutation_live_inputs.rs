@@ -30,6 +30,10 @@ pub(crate) struct LiveInputs {
     native_inventory: Option<Vec<PathBuf>>,
     cargo_inventories: Vec<crate::mutation_cargo_capture::Held>,
     supporting: Option<crate::mutation_cargo_supporting::Held>,
+    workspace: Option<(
+        crate::mutation_snapshot::SnapshotSelection,
+        conductor_native::mutation_cargo_supporting_binding::SupportingInputs,
+    )>,
     native_fingerprint: Option<String>,
     total: usize,
 }
@@ -49,6 +53,7 @@ impl LiveInputs {
             native_inventory: None,
             cargo_inventories: Vec::new(),
             supporting: None,
+            workspace: None,
             native_fingerprint: None,
             total: 0,
         };
@@ -301,6 +306,53 @@ impl LiveInputs {
         self.supporting = Some(held);
         Ok(value)
     }
+    pub(crate) fn workspace_config(
+        &mut self,
+    ) -> Result<Option<conductor_native::project_config::ProjectConfig>> {
+        let native = self.read("forge.toml")?.map(|bytes| bytes.to_vec());
+        let config = if let Some(bytes) = native {
+            Some(
+                conductor_native::project_config::parse_native(
+                    Path::new("forge.toml"),
+                    std::str::from_utf8(&bytes)?,
+                )
+                .map_err(anyhow::Error::msg)?,
+            )
+        } else if let Some(bytes) = self.read("pyproject.toml")?.map(|bytes| bytes.to_vec()) {
+            Some(
+                conductor_native::project_config::parse_legacy(
+                    Path::new("pyproject.toml"),
+                    std::str::from_utf8(&bytes)?,
+                )
+                .map_err(anyhow::Error::msg)?,
+            )
+        } else {
+            None
+        };
+        Ok(config)
+    }
+
+    pub(crate) fn workspace_inventory(
+        &mut self,
+        required: &crate::mutation_cargo_supporting::WorkspaceRequired,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        let config = self.workspace_config()?;
+        crate::mutation_workspace_policy::manifest_in_namespace(
+            config.as_ref(),
+            &required.manifest,
+        )?;
+        let protected = required.pins.keys().cloned().collect::<Vec<_>>();
+        let selection = crate::mutation_workspace_policy::selection(config.as_ref(), &protected)?;
+        if let Some((existing, identity)) = &self.workspace {
+            ensure!(*existing == selection, "workspace output selection changed");
+            return Ok(identity.clone());
+        }
+        let identity = crate::mutation_snapshot::live_input_identity(&self.canonical, &selection)
+            .map_err(anyhow::Error::msg)?;
+        self.workspace = Some((selection, identity.clone()));
+        Ok(identity)
+    }
+
     pub(crate) fn verify(&self) -> Result<()> {
         self.verify_root()?;
         if let Some(paths) = &self.native_inventory {
@@ -324,6 +376,11 @@ impl LiveInputs {
                 &self.directory(path)? == expected,
                 "corpus inventory changed: {path}"
             );
+        }
+        if let Some((selection, identity)) = &self.workspace {
+            let current = crate::mutation_snapshot::live_input_identity(&self.canonical, selection)
+                .map_err(anyhow::Error::msg)?;
+            ensure!(&current == identity, "live workspace inputs changed");
         }
         for held in &self.cargo_inventories {
             held.verify()?;

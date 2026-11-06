@@ -12,6 +12,9 @@ use std::ffi::CString;
 use std::fs;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
+#[path = "mutation_snapshot_inputs.rs"]
+mod inputs;
+pub(crate) use inputs::Selection as SnapshotSelection;
 #[path = "mutation_snapshot_ignore.rs"]
 mod ignore_rules;
 #[path = "mutation_snapshot_native.rs"]
@@ -151,6 +154,33 @@ fn private_root(parent: &Path) -> Result<PathBuf, String> {
     Ok(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
 }
 
+/// Independently observe the same live inputs used by snapshot construction.
+pub(crate) fn live_input_identity(
+    repo: &Path,
+    selection: &SnapshotSelection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String> {
+    native::live_identity(repo, selection).map_err(|e| format!("snapshot live identity: {e:#}"))
+}
+
+/// Independently observe an immutable candidate Git tree.
+pub(crate) fn git_input_identity(
+    source: &crate::candidate_source::Source,
+    tree: &str,
+    selection: &SnapshotSelection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String> {
+    native::git_identity(source, tree, selection)
+        .map_err(|e| format!("snapshot Git identity: {e:#}"))
+}
+
+/// Recompute the materialized snapshot independently of its synthetic Git metadata.
+pub(crate) fn materialized_input_identity(
+    root: &Path,
+    selection: &SnapshotSelection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String> {
+    native::materialized_identity(root, selection)
+        .map_err(|e| format!("snapshot materialized identity: {e:#}"))
+}
+
 /// One disposable checkout of the host's current state.
 #[derive(Debug)]
 pub struct Snapshot {
@@ -188,6 +218,35 @@ impl Snapshot {
         let (commit, untracked) = native::populate(repo, &self.root, &self.worktree)?;
         self.commit = commit;
         self.included_untracked = untracked;
+        Ok(())
+    }
+
+    /// Populate with coordinator-derived output exclusions and return captured input identity.
+    pub(crate) fn populate_bound(
+        &mut self,
+        repo: &Path,
+        selection: &SnapshotSelection,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String> {
+        let (commit, untracked, identity) =
+            native::populate_bound(repo, &self.root, &self.worktree, selection)?;
+        self.commit = commit;
+        self.included_untracked = untracked;
+        Ok(identity)
+    }
+
+    /// Recheck the current host and materialized snapshot against the captured identity.
+    pub(crate) fn verify_bound(
+        &self,
+        repo: &Path,
+        selection: &SnapshotSelection,
+        expected: &conductor_native::mutation_cargo_supporting_binding::SupportingInputs,
+    ) -> Result<(), String> {
+        if live_input_identity(repo, selection)? != *expected {
+            return Err("host snapshot inputs changed".into());
+        }
+        if materialized_input_identity(&self.worktree, selection)? != *expected {
+            return Err("materialized snapshot inputs changed".into());
+        }
         Ok(())
     }
 
@@ -252,6 +311,10 @@ impl Drop for Snapshot {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mutation_snapshot_inputs_tests.rs"]
+mod input_tests;
 
 #[cfg(test)]
 #[path = "mutation_snapshot_tests.rs"]

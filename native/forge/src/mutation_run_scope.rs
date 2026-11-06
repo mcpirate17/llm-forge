@@ -3,7 +3,7 @@
 //! `--only` narrows the owned diff; neither can authorize another lane's work.
 
 use crate::mutation_campaign::{py_list, py_repr, Campaign};
-use crate::mutation_scope::changed_sources;
+use crate::mutation_scope::changed_sources_narrow;
 use conductor_native::candidate_policy::glob_match;
 use std::collections::BTreeSet;
 use std::fs;
@@ -154,20 +154,21 @@ pub fn validate_run_scope(
     if pins != selected {
         return Err("extra source_sha256 supporting pins are unsupported: every source pin must be a selected mutation target".into());
     }
-    let mut changed = changed_sources(base, repo_root, owner)?;
+    let selected_only: BTreeSet<String> = only
+        .iter()
+        .map(|source| exact_file(repo_root, source))
+        .collect::<Result<_, _>>()?;
+    let narrowed = (!only.is_empty()).then_some(&selected_only);
+    let mut changed = changed_sources_narrow(base, repo_root, owner, narrowed)?;
     if !only.is_empty() {
-        let selected: BTreeSet<String> = only
-            .iter()
-            .map(|source| exact_file(repo_root, source))
-            .collect::<Result<_, _>>()?;
-        let foreign: Vec<&String> = selected.difference(&changed).collect();
+        let foreign: Vec<&String> = selected_only.difference(&changed).collect();
         if !foreign.is_empty() {
             return Err(format!(
                 "--only names files outside this agent's changes: {}",
                 py_list(foreign)
             ));
         }
-        changed = changed.intersection(&selected).cloned().collect();
+        changed = changed.intersection(&selected_only).cloned().collect();
     }
     let mut allowed = changed.clone();
     for test in campaign.test_sha256.keys().filter(|t| changed.contains(*t)) {

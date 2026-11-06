@@ -139,6 +139,19 @@ impl HostBinding {
         Ok(())
     }
 }
+fn reject_workspace_path_overrides() -> Result<()> {
+    for name in [
+        "CONDUCTOR_MUTATION_REGISTRY",
+        "CONDUCTOR_MUTATION_RECEIPT_ROOT",
+        "CONDUCTOR_NOTES_ROOT",
+    ] {
+        ensure!(
+            std::env::var_os(name).is_none(),
+            "workspace snapshot refuses ambient path override {name}"
+        );
+    }
+    Ok(())
+}
 fn host(
     root: &Path,
     inputs: &mut super::ignore_rules::Inputs,
@@ -551,14 +564,40 @@ fn materialize(
     paths: &[String],
     untracked: &[String],
     parent_oid: Oid,
-) -> Result<String> {
+    selection: Option<&super::inputs::Selection>,
+) -> Result<(
+    String,
+    Option<conductor_native::mutation_cargo_supporting_binding::SupportingInputs>,
+)> {
     let repo = prepare_private(root, source)?;
     let parent = repo.find_commit(parent_oid)?;
     let root_dir = open_absolute_directory(source.root())?;
+    if let Some(selection) = selection {
+        validate_outputs(&root_dir, selection)?;
+    }
     let mut index = Index::new()?;
     let mut total = 0u64;
-    for path in paths.iter().chain(untracked) {
+    let mut selected: Vec<_> = paths.iter().chain(untracked).collect();
+    selected.sort();
+    selected.dedup();
+    let mut identity = selection
+        .map(|s| conductor_native::mutation_snapshot_inputs::Builder::new(s.excluded()))
+        .transpose()
+        .map_err(anyhow::Error::msg)?;
+    for path in selected {
+        if selection.is_some_and(|s| s.contains(path)) {
+            ensure!(
+                !super::inputs::forbidden_output_input(path),
+                "workspace output namespace hides Cargo control or Rust source: {path}"
+            );
+            continue;
+        }
         if let Some((mode, bytes)) = capture(&root_dir, path)? {
+            if let Some(builder) = identity.as_mut() {
+                builder
+                    .add(path, mode, &bytes)
+                    .map_err(anyhow::Error::msg)?;
+            }
             total = total
                 .checked_add(bytes.len() as u64)
                 .context("snapshot byte count overflow")?;
@@ -588,14 +627,60 @@ fn materialize(
     snapshot.publish()?;
     std::fs::rename(root.join("git-source/.git"), worktree.join(".git"))?;
     std::fs::remove_dir(root.join("git-source"))?;
-    Ok(commit.to_string())
+    if let Some(selection) = selection {
+        validate_outputs(&root_dir, selection)?;
+    }
+    Ok((
+        commit.to_string(),
+        identity
+            .map(|builder| builder.finish())
+            .transpose()
+            .map_err(anyhow::Error::msg)?,
+    ))
 }
 pub(super) fn populate(
     repo: &Path,
     root: &Path,
     worktree: &Path,
 ) -> Result<(String, Vec<String>), String> {
+    let (commit, paths, _) = populate_inner(repo, root, worktree, None)?;
+    Ok((commit, paths))
+}
+
+pub(super) fn populate_bound(
+    repo: &Path,
+    root: &Path,
+    worktree: &Path,
+    selection: &super::inputs::Selection,
+) -> Result<
+    (
+        String,
+        Vec<String>,
+        conductor_native::mutation_cargo_supporting_binding::SupportingInputs,
+    ),
+    String,
+> {
+    let (commit, paths, identity) = populate_inner(repo, root, worktree, Some(selection))?;
+    Ok((commit, paths, identity.ok_or("missing snapshot identity")?))
+}
+
+fn populate_inner(
+    repo: &Path,
+    root: &Path,
+    worktree: &Path,
+    selection: Option<&super::inputs::Selection>,
+) -> Result<
+    (
+        String,
+        Vec<String>,
+        Option<conductor_native::mutation_cargo_supporting_binding::SupportingInputs>,
+    ),
+    String,
+> {
     (|| -> Result<_> {
+        if selection.is_some() {
+            reject_workspace_path_overrides()?;
+        }
         let mut inputs = super::ignore_rules::Inputs::new();
         let (source, indexed, index_binding) = host(repo, &mut inputs)?;
         let head = source.repository().head()?.peel_to_commit()?;
@@ -624,6 +709,11 @@ pub(super) fn populate(
             );
             paths.push(entry.path);
         }
+        if selection.is_some() {
+            let mut union: BTreeSet<String> = paths.into_iter().collect();
+            union.extend(indexed.iter().cloned());
+            paths = union.into_iter().collect();
+        }
         tracked_attributes(source.root(), &paths, &mut inputs)?;
         let (untracked, dirs) = enumerate(
             &source,
@@ -639,15 +729,307 @@ pub(super) fn populate(
             .filter(|path| !tracked.contains(path.as_str()))
             .cloned()
             .collect();
-        let commit = materialize(&source, root, worktree, &paths, &added, parent_oid)?;
+        let (commit, identity) = materialize(
+            &source, root, worktree, &paths, &added, parent_oid, selection,
+        )?;
         inputs.verify()?;
+        if selection.is_some() {
+            reject_workspace_path_overrides()?;
+        }
         verify_directories(source.root(), &dirs)?;
         index_binding.verify(&source)?;
         ensure!(
             source.repository().head()?.peel_to_commit()?.id() == parent_oid,
             "host HEAD changed during snapshot capture"
         );
-        Ok((commit, untracked))
+        Ok((commit, untracked, identity))
     })()
     .map_err(|error| format!("snapshot preparation: {error:#}"))
+}
+
+/// Recompute the snapshot input identity from the same live tracked/untracked rules.
+pub(super) fn live_identity(
+    repo: &Path,
+    selection: &super::inputs::Selection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+    reject_workspace_path_overrides()?;
+    let mut inputs = super::ignore_rules::Inputs::new();
+    let (source, indexed, binding) = host(repo, &mut inputs)?;
+    let head = source.repository().head()?.peel_to_commit()?;
+    let parent_oid = head.id();
+    let entries = source.list_tree(&head.tree_id().to_string())?;
+    let mut paths = BTreeSet::new();
+    for entry in entries {
+        ensure!(
+            entry.object_type == "blob"
+                && matches!(entry.mode.as_str(), "100644" | "100755" | "120000"),
+            "unsupported tracked snapshot input"
+        );
+        ensure!(
+            Path::new(&entry.path)
+                .file_name()
+                .is_none_or(|n| n != ".gitattributes"),
+            "tracked attributes are unsupported"
+        );
+        paths.insert(entry.path);
+    }
+    paths.extend(indexed.iter().cloned());
+    let tracked: Vec<_> = paths.iter().cloned().collect();
+    tracked_attributes(source.root(), &tracked, &mut inputs)?;
+    let (untracked, dirs) = enumerate(
+        &source,
+        &indexed,
+        &excluded_prefixes(source.root()).map_err(anyhow::Error::msg)?,
+        &configured_extra_suffixes(source.root()).map_err(anyhow::Error::msg)?,
+        &mut inputs,
+    )?;
+    paths.extend(untracked);
+    let root = open_absolute_directory(source.root())?;
+    validate_outputs(&root, selection)?;
+    let identity = hash_paths(&root, &paths, selection)?;
+    validate_outputs(&root, selection)?;
+    inputs.verify()?;
+    reject_workspace_path_overrides()?;
+    verify_directories(source.root(), &dirs)?;
+    binding.verify(&source)?;
+    ensure!(
+        source.repository().head()?.peel_to_commit()?.id() == parent_oid,
+        "host HEAD changed during input capture"
+    );
+    Ok(identity)
+}
+
+fn hash_paths(
+    root: &Dir,
+    paths: &BTreeSet<String>,
+    selection: &super::inputs::Selection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+    let mut builder =
+        conductor_native::mutation_snapshot_inputs::Builder::new(selection.excluded())
+            .map_err(anyhow::Error::msg)?;
+    let mut total = 0u64;
+    for path in paths {
+        if selection.contains(path) {
+            continue;
+        }
+        if let Some((mode, bytes)) = capture(root, path)? {
+            total = total
+                .checked_add(bytes.len() as u64)
+                .context("snapshot input size overflow")?;
+            ensure!(total <= MAX_TOTAL, "snapshot inputs exceed 2 GiB");
+            builder
+                .add(path, mode, &bytes)
+                .map_err(anyhow::Error::msg)?;
+        }
+    }
+    builder.finish().map_err(anyhow::Error::msg)
+}
+
+/// Recompute from an immutable Git tree, using the same path/mode/content framing.
+pub(super) fn git_identity(
+    source: &Source,
+    tree: &str,
+    selection: &super::inputs::Selection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+    let mut entries = source.list_tree(tree)?;
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    let mut builder =
+        conductor_native::mutation_snapshot_inputs::Builder::new(selection.excluded())
+            .map_err(anyhow::Error::msg)?;
+    let mut total = 0u64;
+    for entry in entries {
+        ensure!(
+            entry.object_type == "blob",
+            "unsupported Git snapshot input type"
+        );
+        if selection.contains(&entry.path) {
+            ensure!(
+                !super::inputs::forbidden_output_input(&entry.path),
+                "workspace output namespace hides Cargo control or Rust source: {}",
+                entry.path
+            );
+            ensure!(
+                entry.mode != "120000",
+                "excluded Git output must not be a symlink"
+            );
+            ensure!(
+                matches!(entry.mode.as_str(), "100644" | "100755"),
+                "unsupported Git output mode"
+            );
+            continue;
+        }
+        let mode = u32::from_str_radix(&entry.mode, 8)?;
+        ensure!(
+            matches!(mode, 0o100644 | 0o100755 | 0o120000),
+            "unsupported Git snapshot input mode"
+        );
+        let blob = source.repository().find_blob(Oid::from_str(&entry.oid)?)?;
+        ensure!(
+            blob.size() as u64 <= MAX_BLOB,
+            "Git snapshot input exceeds 32 MiB"
+        );
+        total = total
+            .checked_add(blob.size() as u64)
+            .context("Git input size overflow")?;
+        ensure!(total <= MAX_TOTAL, "Git snapshot inputs exceed 2 GiB");
+        builder
+            .add(&entry.path, mode, blob.content())
+            .map_err(anyhow::Error::msg)?;
+    }
+    builder.finish().map_err(anyhow::Error::msg)
+}
+
+struct SnapshotScan<'a> {
+    selection: &'a super::inputs::Selection,
+    paths: BTreeSet<String>,
+    dirs: DirectoryStamps,
+    entries: usize,
+}
+impl SnapshotScan<'_> {
+    fn walk(&mut self, dir: &Dir, prefix: &str, depth: usize) -> Result<()> {
+        ensure!(depth <= 256, "snapshot depth exceeds 256");
+        let before = dir.dir_metadata()?;
+        for item in dir.entries()? {
+            self.entries += 1;
+            ensure!(self.entries <= MAX_FILES, "snapshot entries exceed bound");
+            let item = item?;
+            let name = item.file_name();
+            if prefix.is_empty() && name == ".git" {
+                continue;
+            }
+            let name = name.to_str().context("snapshot path must be UTF-8")?;
+            let path = if prefix.is_empty() {
+                name.to_owned()
+            } else {
+                format!("{prefix}/{name}")
+            };
+            crate::candidate_source::safe_path(path.as_bytes())?;
+            if self.selection.contains(&path) {
+                continue;
+            }
+            let meta = dir.symlink_metadata(name)?;
+            if meta.is_dir() && !meta.is_symlink() {
+                let child = Dir::from_std_file(
+                    dir.open_with(
+                        name,
+                        OpenOptions::new()
+                            .read(true)
+                            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW),
+                    )?
+                    .into_std(),
+                );
+                let opened = child.dir_metadata()?;
+                ensure!(
+                    meta.dev() == opened.dev() && meta.ino() == opened.ino(),
+                    "snapshot directory replaced: {path}"
+                );
+                self.walk(&child, &path, depth + 1)?;
+            } else {
+                self.paths.insert(path);
+            }
+        }
+        let after = dir.dir_metadata()?;
+        ensure!(
+            stamp(&before) == stamp(&after),
+            "snapshot directory changed: {prefix}"
+        );
+        self.dirs.push((prefix.to_owned(), stamp(&after)));
+        Ok(())
+    }
+}
+
+/// Recompute complete materialized input identity after no-Git cleanup or execution.
+pub(super) fn materialized_identity(
+    root: &Path,
+    selection: &super::inputs::Selection,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+    let root = root.canonicalize()?;
+    let dir = open_absolute_directory(&root)?;
+    validate_outputs(&dir, selection)?;
+    let mut scan = SnapshotScan {
+        selection,
+        paths: BTreeSet::new(),
+        dirs: Vec::new(),
+        entries: 0,
+    };
+    scan.walk(&dir, "", 0)?;
+    let identity = hash_paths(&dir, &scan.paths, selection)?;
+    verify_directories(&root, &scan.dirs)?;
+    validate_outputs(&dir, selection)?;
+    Ok(identity)
+}
+
+/// Refuse physical aliases in existing coordinator-owned output roots.
+/// Rechecked at capture and final verification; output publication must also use
+/// the coordinator's confined, alias-safe writer.
+fn validate_output_entry(
+    dir: &Dir,
+    name: &std::ffi::OsStr,
+    depth: usize,
+    count: &mut usize,
+) -> Result<()> {
+    ensure!(depth <= 256, "snapshot output depth exceeds bound");
+    *count = count
+        .checked_add(1)
+        .context("snapshot output count overflow")?;
+    ensure!(*count <= MAX_FILES, "snapshot output entries exceed bound");
+    let meta = match dir.symlink_metadata(name) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    let component = name
+        .to_str()
+        .context("snapshot output path must be UTF-8")?;
+    ensure!(
+        !super::inputs::forbidden_output_input(component),
+        "workspace output namespace hides Cargo control or Rust source: {component}"
+    );
+    ensure!(!meta.is_symlink(), "snapshot output must not be a symlink");
+    if meta.is_file() {
+        ensure!(meta.nlink() == 1, "snapshot output must not be hardlinked");
+    } else if meta.is_dir() {
+        let child = Dir::from_std_file(
+            dir.open_with(
+                name,
+                OpenOptions::new()
+                    .read(true)
+                    .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW),
+            )?
+            .into_std(),
+        );
+        let opened = child.dir_metadata()?;
+        ensure!(
+            meta.dev() == opened.dev() && meta.ino() == opened.ino(),
+            "snapshot output directory replaced"
+        );
+        for item in child.entries()? {
+            validate_output_entry(&child, &item?.file_name(), depth + 1, count)?;
+        }
+        ensure!(
+            stamp(&opened) == stamp(&child.dir_metadata()?),
+            "snapshot output directory changed"
+        );
+    } else {
+        anyhow::bail!("snapshot output must be a regular file or directory");
+    }
+    Ok(())
+}
+fn validate_outputs(root: &Dir, selection: &super::inputs::Selection) -> Result<()> {
+    let mut count = 0;
+    for path in selection.excluded() {
+        let (dir, name) = match parent(root, path) {
+            Ok(pair) => pair,
+            Err(error)
+                if error
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
+            {
+                continue
+            }
+            Err(error) => return Err(error),
+        };
+        validate_output_entry(&dir, std::ffi::OsStr::new(&name), 0, &mut count)?;
+    }
+    Ok(())
 }

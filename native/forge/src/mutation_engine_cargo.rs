@@ -16,7 +16,6 @@ use crate::mutation_snapshot::on_path;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::env;
-use std::fs;
 use std::path::Path;
 
 const SUMMARY_KEYS: [&str; 5] = ["total_mutants", "caught", "missed", "timeout", "unviable"];
@@ -245,13 +244,23 @@ pub(crate) fn engine_argv(
         "mutants".to_string(),
         "--manifest-path".to_string(),
         manifest,
-        "--jobs".to_string(),
-        campaign.jobs.to_string(),
+    ];
+    if campaign.option_text("execution_profile").as_deref() == Some("cargo-workspace-v2") {
+        if campaign.jobs != 1 {
+            return Err("in-place workspace mutation requires exactly one worker".into());
+        }
+        // cargo-mutants 27.1 rejects --jobs with --in-place; its omitted-jobs
+        // default is one worker. The admitted workspace already requires jobs=1.
+        argv.push("--in-place".into());
+    } else {
+        argv.extend(["--jobs".into(), campaign.jobs.to_string()]);
+    }
+    argv.extend([
         "--timeout".to_string(),
         campaign.mutant_timeout()?.to_string(),
         "--output".to_string(),
         output.to_string_lossy().into_owned(),
-    ];
+    ]);
     if let Some(package) = campaign.option_text("package") {
         argv.extend(["--package".to_string(), package]);
     }
@@ -264,22 +273,31 @@ pub(crate) fn engine_argv(
     Ok(argv)
 }
 
-fn read_report(output: &Path) -> Result<Value, String> {
+// Outcomes are payload-controlled; cap the complete JSON before parsing and hold
+// the no-follow path/bytes until all receipt observations have been derived.
+const MAX_OUTCOMES_BYTES: usize = 16 * 1024 * 1024;
+fn read_report(output: &Path) -> Result<(crate::candidate_inputs::BoundFile, Value), String> {
     let outcomes = output.join("mutants.out").join("outcomes.json");
-    if !outcomes.is_file() {
-        return Err(format!(
-            "cargo-mutants wrote no outcomes.json at {}",
-            outcomes.display()
-        ));
-    }
-    let text = fs::read_to_string(&outcomes)
-        .map_err(|error| format!("cannot read {}: {error}", outcomes.display()))?;
-    let report: Value = serde_json::from_str(&text)
+    let (held, bytes) = crate::candidate_inputs::repository_live(&outcomes, MAX_OUTCOMES_BYTES)
+        .map_err(|error| format!("cannot capture {}: {error:#}", outcomes.display()))?;
+    let report: Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("cargo-mutants outcomes.json is not JSON: {error}"))?;
     if !report.is_object() {
         return Err("cargo-mutants outcomes.json root must be a JSON object".into());
     }
-    Ok(report)
+    Ok((held, report))
+}
+
+fn require_package(rows: &[Value], expected: Option<&str>) -> Result<(), String> {
+    if let Some(expected) = expected {
+        if rows
+            .iter()
+            .any(|row| row["package"].as_str() != Some(expected))
+        {
+            return Err("cargo-mutants package differs from admitted workspace package".into());
+        }
+    }
+    Ok(())
 }
 
 /// What every cargo run in a snapshot inherits, and nothing it shouldn't.
@@ -322,46 +340,56 @@ pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
     let worktree = run.worktree.to_path_buf();
     let timeout = run.campaign.run_timeout_seconds;
     let bound = environment(run);
-    let mut baseline_argv = run.campaign.test_argv.clone();
-    let test_name = run
+    let (baseline_argv, test_arguments) = run
         .runtime
         .ok_or("mutation payload requires an admitted confined execution session")?
-        .test_name()
-        .to_owned();
-    baseline_argv.extend([
-        "--test".into(),
-        test_name.clone(),
-        "--locked".into(),
-        "--offline".into(),
-    ]);
-    let (baseline, _) = run.run(&baseline_argv, &worktree, timeout, &bound, &[])?;
+        .test_arguments(run.campaign)
+        .map_err(|e| e.to_string())?;
+    let (baseline, baseline_stdout) = run.run(&baseline_argv, &worktree, timeout, &bound, &[])?;
     run.note_baseline(&baseline, &baseline_argv)?;
+    run.runtime
+        .ok_or("confined runtime missing")?
+        .observe_baseline(run, &baseline_stdout)?;
     let output = run
         .runtime
         .ok_or("mutation payload requires an admitted confined execution session")?
         .output();
-    let mut argv = engine_argv(run.campaign, binary, &output)?;
+    let runtime = run.runtime.ok_or("confined runtime missing")?;
+    let selected = runtime
+        .engine_campaign(run.campaign)
+        .map_err(|e| e.to_string())?;
+    let mut argv = engine_argv(&selected, binary, &output)?;
     argv.extend([
         "--no-config".into(),
         "--cargo-arg=--locked".into(),
         "--cargo-arg=--offline".into(),
-        format!("--cargo-test-arg=--test={test_name}"),
     ]);
+    argv.extend(test_arguments);
     let (result, _) = run.run(&argv, &worktree, timeout, &bound, &[])?;
     run.receipt
         .insert("engine_result".into(), result.as_value());
     if result.timed_out {
         return Err(format!("cargo-mutants timed out after {timeout}s").into());
     }
-    let report = read_report(&output)?;
+    let (held_report, report) = read_report(&output)?;
     run.planned = report.get("total_mutants").and_then(Value::as_u64);
     require_baseline(&report)?;
     require_verdict_exit(&result)?;
+    runtime.observe_engine_baseline(run, &report)?;
     let version = report.get("cargo_mutants_version").cloned();
     run.receipt
         .insert("engine_version".into(), version.unwrap_or(Value::Null));
-    let package_root = run.campaign.option_text("package_root").unwrap_or_default();
+    let package_root = runtime
+        .report_root(run.campaign)
+        .map_err(|e| e.to_string())?;
     let mutants = rows(&report, &package_root)?;
+    require_package(
+        &mutants,
+        runtime.report_package().map_err(|e| e.to_string())?,
+    )?;
+    held_report
+        .verify()
+        .map_err(|error| format!("engine outcomes changed during observation: {error:#}"))?;
     run.receipt
         .insert("engine_summary".into(), summary(&report, &mutants));
     run.receipt.insert("mutants".into(), Value::Array(mutants));

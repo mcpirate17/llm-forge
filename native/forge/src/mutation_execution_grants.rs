@@ -21,6 +21,30 @@ const MAX_READ_FILE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_TOTAL_READ_FILE_BYTES: usize = 128 * 1024 * 1024;
 const MAX_PROGRAM_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_TOTAL_PROGRAM_BYTES: u64 = 1024 * 1024 * 1024;
+
+/// Describe the actual aggregate cgroup limit without implying RLIMIT_DATA is set.
+pub(crate) fn memory_enforcement(
+    resources: &cgroup::Limits,
+    legacy_cap: Option<crate::mutation_process::MemoryCap>,
+    explicitly_requested: bool,
+) -> Result<serde_json::Value> {
+    ensure!(
+        !explicitly_requested || legacy_cap.is_none(),
+        "explicit MUTATION_MEMORY_CAP_GIB cannot be enforced by confined mutation execution"
+    );
+    let bytes = resources
+        .memory_mib
+        .checked_mul(1024 * 1024)
+        .context("execution cgroup memory limit overflows bytes")?;
+    Ok(serde_json::json!({
+        "mode": "aggregate_cgroup",
+        "bytes": bytes,
+        "legacy_requested_per_process_data_bytes": legacy_cap.map(|cap| cap.limit),
+        "legacy_request_explicit": explicitly_requested,
+        "scope": "aggregate memory budget, not per-process RLIMIT_DATA enforcement"
+    }))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Document {
@@ -32,6 +56,29 @@ struct Document {
     programs: BTreeMap<String, Program>,
     resources: cgroup::Limits,
     max_wall_seconds: u64,
+    #[serde(default)]
+    cargo_workspace: Option<CargoWorkspaceGrant>,
+}
+
+/// The operator selects the lockfile independently of the seed's own metadata.
+/// Confined Cargo discovery must agree before any build or mutation starts.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CargoWorkspaceGrant {
+    pub(crate) lockfile: String,
+    #[serde(default)]
+    pub(crate) seed: Option<crate::mutation_cargo_seed::SeedConfig>,
+}
+impl CargoWorkspaceGrant {
+    fn validate(&self) -> Result<()> {
+        conductor_native::mutation_snapshot_inputs::validate_path(&self.lockfile)
+            .map_err(anyhow::Error::msg)?;
+        ensure!(
+            Path::new(&self.lockfile).file_name() == Some(std::ffi::OsStr::new("Cargo.lock")),
+            "Cargo seed requires a repository-relative Cargo.lock path"
+        );
+        Ok(())
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,6 +94,7 @@ pub(crate) struct Grants {
     pub(crate) read_only: Vec<PathBuf>,
     pub(crate) resources: cgroup::Limits,
     pub(crate) max_wall_seconds: u64,
+    pub(crate) cargo_workspace: Option<CargoWorkspaceGrant>,
     common_git: PathBuf,
     git_dir: PathBuf,
     environment: EnvironmentSelection,
@@ -281,6 +329,9 @@ impl Grants {
         let text = std::str::from_utf8(&bytes)?;
         let value = crate::tool_schema::parse_document_with_limit(text, MAX_DOCUMENT)?;
         let document: Document = serde_json::from_value(value)?;
+        if let Some(workspace) = &document.cargo_workspace {
+            workspace.validate()?;
+        }
         Self::bind(
             document,
             path,
@@ -351,6 +402,7 @@ impl Grants {
             read_only: document.read_only,
             resources: limits,
             max_wall_seconds: document.max_wall_seconds,
+            cargo_workspace: document.cargo_workspace,
             control_path: path.into(),
             digest: pin.into(),
             control,
@@ -439,6 +491,12 @@ impl Grants {
         self.tools
             .get(alias)
             .map(|tool| tool.path.as_path())
+            .with_context(|| format!("execution program alias is not granted: {alias}"))
+    }
+    pub(crate) fn program_sha256(&self, alias: &str) -> Result<&str> {
+        self.tools
+            .get(alias)
+            .map(|tool| tool.identity.sha256.as_str())
             .with_context(|| format!("execution program alias is not granted: {alias}"))
     }
     pub(crate) fn programs(&self) -> BTreeMap<String, PathBuf> {

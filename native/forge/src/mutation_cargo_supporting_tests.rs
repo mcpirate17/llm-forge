@@ -129,3 +129,35 @@ fn removing_a_required_host_or_snapshot_file_invalidates_the_held_inventory() {
         assert!(host_held.verify().is_err(), "host {removed}");
     }
 }
+
+#[test]
+fn workspace_capture_errors_are_per_campaign_and_do_not_discard_other_profiles() {
+    use conductor_native::mutation_cargo_supporting_binding::SupportingInputs;
+    let required = BTreeMap::from([
+        ("bad".to_owned(), Err("conflicting source pins".to_owned())),
+        (
+            "good".to_owned(),
+            Ok(WorkspaceRequired {
+                pins: BTreeMap::new(),
+                manifest: "campaigns/good.json".into(),
+            }),
+        ),
+    ]);
+    let results = capture_workspace_profiles(required, |_| {
+        Ok(SupportingInputs {
+            schema_version: 2,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "complete-snapshot-inputs-v2".into(),
+            digest: "a".repeat(64),
+            files: 3,
+        })
+    });
+    assert_eq!(
+        results["bad"].as_ref().unwrap_err(),
+        "conflicting source pins"
+    );
+    assert_eq!(
+        results["good"].as_ref().unwrap().scope,
+        "complete-snapshot-inputs-v2"
+    );
+}

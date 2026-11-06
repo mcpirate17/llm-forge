@@ -779,3 +779,41 @@ fn committed_candidate_and_live_supporting_inventories_use_their_own_tree() {
     captured.verify().unwrap();
     live.verify().unwrap();
 }
+
+#[test]
+fn workspace_identity_binds_candidate_tree_and_detects_materialized_additions() {
+    let f = Fixture::new();
+    f.write("Cargo.toml", "[package]\nname='demo'\nversion='0.1.0'\n");
+    f.write("Cargo.lock", "version=4\n");
+    f.write("src/lib.rs", "pub fn a() {}\n");
+    f.write("assets/input.txt", "original\n");
+    f.commit();
+    let source = Source::open(&f.root.join("repo")).unwrap();
+    let candidate = source.resolve(Kind::Commit, "HEAD", None).unwrap();
+    let snapshot = Snapshot::create(
+        &source,
+        &candidate.tree_oid,
+        &f.root.join("workspace-candidate"),
+        Limits::default(),
+    )
+    .unwrap();
+    let policy =
+        crate::candidate_policy::load(&snapshot.path(), Some("policy.toml"), TODAY).unwrap();
+    let mut capture = inputs::Capture::new(&source, &snapshot, &candidate, &policy, TODAY).unwrap();
+    let required = crate::mutation_cargo_supporting::WorkspaceRequired {
+        pins: BTreeMap::from([(
+            "src/lib.rs".into(),
+            crate::mutation_campaign::sha256_path(&snapshot.path().join("src/lib.rs")).unwrap(),
+        )]),
+        manifest: "conductor/mutation_campaigns/example.json".into(),
+    };
+    let git = capture.workspace_inventory(&required).unwrap();
+    assert_eq!(git.scope, "complete-snapshot-inputs-v2");
+    fs::write(f.root.join("repo/assets/input.txt"), "changed\n").unwrap();
+    let mut live = crate::mutation_live_inputs::LiveInputs::open(&f.root.join("repo")).unwrap();
+    let current = live.workspace_inventory(&required).unwrap();
+    assert_ne!(git, current);
+    capture.verify().unwrap();
+    fs::write(snapshot.path().join("assets/new.txt"), "added\n").unwrap();
+    assert!(capture.verify().is_err());
+}

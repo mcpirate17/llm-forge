@@ -69,7 +69,43 @@ ordinary Cargo discovery-input freshness now passes the real automatic-engine
 drift experiment and full source-bound gate below. Restoring the
 broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
 requires independently bound dependency manifests as well as confined execution.
-The existing root-only profile cannot yet execute Forge's own workspace campaigns.
+**Implemented #196 Cargo workspace slice:** the explicit native-generated
+`cargo-workspace-v2` profile reuses the confined command owner, complete snapshot
+freshness, package metadata admission and a lock-verified offline seed. Native
+archive staging avoids timestamp restoration without expanding syscall access.
+Candidate and live/committed corpus validators independently select the expected
+binding from the verified campaign. Package baseline observations require passing
+tests; they are neither per-test attribution nor authenticated output.
+
+The clean release at `fee612b` passed both authored workspace trials: 31 checks
+for an excluded local path dependency and 34 with a registry dependency. Each
+killed two automatic mutants, matched nonzero direct/engine baselines and removed
+its three owned cgroups and snapshot. Supporting-source and test-data changes
+caused receipt refusal in both live and committed views; exact restoration
+restored scoped acceptance. A separate real-mutant timeout confirmed cleanup
+and retention of the unrestored snapshot, with an incomplete ERROR receipt.
+The [17-trial evidence index](../research/performance/forge-program-20261106-workspace-mutation.json)
+retains failed attempts, earlier code versions, repeated fixtures and unstarted
+checks; its statuses do not approve an entire candidate or demonstrate task benefit.
+
+Actual Forge trials exposed three repaired integration defects: unrelated writer
+outputs blocked exact source scope; Cargo's confined `../` shared-source paths
+were rejected; and omitted dependency examples were treated as required inputs.
+Selected dirty sources still require ownership. Symlinks and escaping paths
+remain refused; only unselected dependency example/test/bench targets may be absent.
+The last actual trial admitted all 338 registry packages and started the package
+baseline, which failed because the C compiler could not read an ungranted system
+header. It produced BASELINE_FAILED, with both owned scopes and snapshot removed.
+Forge's complete package suite and engine remain unproven under these grants.
+
+The initial implementation at `0522270` passed all 18 local checks and verification
+(4,749 passing executions, zero failures, 188 ignored, 179 harnesses). Subsequent
+integration fixes passed 342 focused Forge tests, with zero failures and 28
+ignored, plus strict Clippy and independent review. Publication requires fresh
+full checks for the final committed head and current `origin/main`.
+Next for #196: validate an explicit compiler-header and test-fixture profile for
+Forge's package, then restore Fest/Mull through the same command owner. Read grants,
+test executables and environment are separate operator decisions; a seed grants none.
 
 1. Validate and measure the implemented outbound MCP slice through the existing
    inbound service. It reuses the confined process owner, registers the endpoint
@@ -322,9 +358,9 @@ in [mutation testing](mutation.md#opt-in-cargo-per-test-value-evidence).
 [#195](https://github.com/mcpirate17/llm-forge/issues/195), [PR #198](https://github.com/mcpirate17/llm-forge/pull/198):** ordinary native
 execution now requires pinned operator grants and the shared sandbox/cgroup
 command owner. The initial supported profile is a dependency-free root Cargo
-package with one explicit integration target. Unsupported Fest, Mull, workspace
-and dependency profiles refuse before payload launch; restoring those profiles
-under the same guarantees is tracked in
+package with one explicit integration target. At that delivery, Fest, Mull,
+workspace and dependency profiles were refused before payload launch. The
+workspace extension and remaining unsupported profiles are tracked in
 [#196](https://github.com/mcpirate17/llm-forge/issues/196). Current native PASS
 admission requires consistent owned cleanup and snapshot removal. Historical
 process-group-only receipts remain readable but do not meet that admission.
