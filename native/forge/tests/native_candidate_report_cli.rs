@@ -5,13 +5,19 @@ mod forge_binary;
 use forge::candidate_receipt;
 use quick_xml::{events::Event, Reader, XmlVersion};
 use serde_json::{json, Value};
-use std::{fs, os::unix::fs::symlink, path::PathBuf, process::Command};
+use std::{
+    fs,
+    os::unix::fs::{symlink, PermissionsExt},
+    path::PathBuf,
+    process::Command,
+};
 
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
         let path = std::env::temp_dir().join(forge::resource_id("candidate-report-cli").unwrap());
         fs::create_dir(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
         Self(path)
     }
     fn command(&self) -> Command {
@@ -148,6 +154,7 @@ fn invalid_receipts_and_unsafe_destinations_never_clobber_outputs() {
     let root = Fixture::new();
     root.write(&payload());
     fs::write(root.0.join("sentinel"), b"keep").unwrap();
+    fs::set_permissions(root.0.join("sentinel"), fs::Permissions::from_mode(0o600)).unwrap();
     symlink(root.0.join("sentinel"), root.0.join("link")).unwrap();
     let bad_target = root
         .command()
@@ -187,6 +194,7 @@ fn xml_invalid_text_fails_before_publication_and_pass_record_is_not_a_gate() {
     data["checks"][0]["stdout_tail"] = json!("bad\u{1b}[2J");
     root.write(&data);
     fs::write(root.0.join("output"), b"keep").unwrap();
+    fs::set_permissions(root.0.join("output"), fs::Permissions::from_mode(0o600)).unwrap();
     let output = root
         .command()
         .args(["receipt.json", "--format", "junit", "--output", "output"])

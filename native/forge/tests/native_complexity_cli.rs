@@ -17,7 +17,7 @@ mod forge_binary;
 use serde_json::Value;
 use std::ffi::CString;
 use std::fs;
-use std::os::unix::fs::{symlink, FileTypeExt};
+use std::os::unix::fs::{symlink, FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -35,6 +35,8 @@ impl Case {
         ));
         fs::create_dir_all(root.join(".git")).unwrap();
         fs::create_dir(root.join("conductor")).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(root.join("conductor"), fs::Permissions::from_mode(0o700)).unwrap();
         Self(root)
     }
 
@@ -42,6 +44,8 @@ impl Case {
         let path = self.0.join(path);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, contents).unwrap();
+        fs::set_permissions(path.parent().unwrap(), fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
         path
     }
 
@@ -420,6 +424,7 @@ fn relative_and_absolute_baseline_flags_are_resolved_from_host_root() {
     let case = Case::new();
     case.write("conductor/example.py", function("widget", 20));
     fs::create_dir(case.0.join("ratchet")).unwrap();
+    fs::set_permissions(case.0.join("ratchet"), fs::Permissions::from_mode(0o700)).unwrap();
     fs::create_dir(case.0.join("nested")).unwrap();
     let mut command = case.command();
     command.current_dir(case.0.join("nested")).args([

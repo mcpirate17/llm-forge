@@ -6,7 +6,7 @@ mod candidate_execution_fixture;
 mod support;
 use candidate_execution_fixture::{value, Case};
 use serde_json::{json, Value};
-use std::{path::Path, time::Duration};
+use std::{os::unix::fs::PermissionsExt, path::Path, time::Duration};
 
 fn fixture() -> Case {
     let mut case = Case::new(Path::new("/bin/true"));
@@ -167,6 +167,7 @@ fn failed_fresh_review_exports_its_own_sealed_json_sarif_and_junit() {
     let junit = case.fixture.root.join("review.xml");
     // A prior artifact must not supply the newly requested exports.
     std::fs::write(&receipt, b"stale receipt bytes").unwrap();
+    std::fs::set_permissions(&receipt, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut command = case.command_for("review", "index", &[]);
     command
         .args(["--surface", "manual", "--execute", "--receipt"])
@@ -208,6 +209,7 @@ fn review_exports_require_execution_and_refuse_colliding_destinations_before_wri
     let case = fixture();
     let output = case.fixture.root.join("review.json");
     std::fs::write(&output, b"preserve this old artifact").unwrap();
+    std::fs::set_permissions(&output, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut command = case.command_for("review", "index", &[]);
     command
         .args(["--surface", "manual", "--sarif-out"])
@@ -248,6 +250,7 @@ fn admission_refusal_does_not_publish_or_replace_review_artifacts() {
     let sarif = case.fixture.root.join("review.sarif");
     let junit = case.fixture.root.join("review.xml");
     std::fs::write(&receipt, b"previous artifact").unwrap();
+    std::fs::set_permissions(&receipt, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mut command = case.command_for("review", "index", &[]);
     command
         .args(["--surface", "manual", "--execute", "--receipt"])

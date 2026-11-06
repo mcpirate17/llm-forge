@@ -5,6 +5,7 @@
 mod forge_binary;
 use serde_json::Value;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -59,6 +60,27 @@ fn payload(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).expect("JSON on stdout")
 }
 
+fn shared_refresh_refusals(root: &Path, manifest: &str) {
+    let path = root.join(manifest);
+    let original = fs::read(&path).unwrap();
+    for (target, unsafe_mode, safe_mode) in [
+        (path.as_path(), 0o664, 0o600),
+        (path.parent().unwrap(), 0o775, 0o700),
+    ] {
+        fs::set_permissions(target, fs::Permissions::from_mode(unsafe_mode)).unwrap();
+        let result = Command::new(forge_binary::path())
+            .env_clear()
+            .env("PATH", "")
+            .current_dir(root)
+            .args(["mutation", "refresh", manifest, "--apply"])
+            .output()
+            .unwrap();
+        assert_eq!(result.status.code(), Some(4), "{result:?}");
+        assert_eq!(fs::read(&path).unwrap(), original);
+        fs::set_permissions(target, fs::Permissions::from_mode(safe_mode)).unwrap();
+    }
+}
+
 #[test]
 fn native_mull_refresh_previews_then_applies_without_an_interpreter_or_git_on_path() {
     let dir = branch_host();
@@ -88,6 +110,11 @@ fn native_mull_refresh_previews_then_applies_without_an_interpreter_or_git_on_pa
     assert!(written.status.success(), "{written:?}");
     let result = payload(&written);
     let manifest = result["written"][0].as_str().unwrap();
+    fs::set_permissions(
+        dir.path().join(manifest).parent().unwrap(),
+        fs::Permissions::from_mode(0o700),
+    )
+    .unwrap();
     let fragment = result["written"][1].as_str().unwrap();
     let old = fs::read(dir.path().join(manifest)).unwrap();
     let registry = fs::read(dir.path().join(fragment)).unwrap();
@@ -114,6 +141,7 @@ fn native_mull_refresh_previews_then_applies_without_an_interpreter_or_git_on_pa
     assert_eq!(preview["status"], "PREVIEW");
     assert_eq!(preview["changed"], true);
     assert_eq!(fs::read(dir.path().join(manifest)).unwrap(), old);
+    shared_refresh_refusals(dir.path(), manifest);
     let applied = refresh(true);
     assert_eq!(applied["status"], "APPLIED");
     assert_eq!(

@@ -33,6 +33,10 @@ forge mutation refresh campaigns/PATH-FROM-WRITE.json --repo-root /absolute/repo
 Refresh previews by default. `--apply` replaces only changed source/driver hashes;
 all other manifest fields, including survivor-ratchet metadata, are preserved.
 Current pins are a no-op, leaving the existing bytes and inode unchanged.
+Preview and unchanged apply can read group-writable metadata. A changed apply
+requires the manifest and its existing parent to belong to the current user and
+deny group/world writes; Forge refuses unsafe permissions rather than changing
+them. This mutation check runs before staging and immediately before replacement.
 The JSON report includes old/proposed manifest hashes and both input pins;
 `--verbose` adds the complete proposed manifest. This command supports only
 `mull-confined-v1`. It does not check registration, change the registry, execute
@@ -43,7 +47,9 @@ The command captures bounded manifest/source/driver bytes, rejects symlinks and
 hard links, and rechecks their identities and hashes immediately before replacing
 the manifest. Cooperating publishers serialize on the parent-directory lock.
 This detects observed drift, not hostile same-UID changes between checks and
-rename. A directory-sync failure is reported even if replacement already occurred.
+rename. The [shared publisher contract](native-candidate-review.md) requires
+trusted, stable ancestors and reports retained staging names if cleanup becomes
+unsafe. A directory-sync failure is reported even if replacement already occurred.
 
 Review the plan and exact hashes in the written manifest. C sources use C11;
 C++ sources use C++17, without compiler extensions. The generated test command is

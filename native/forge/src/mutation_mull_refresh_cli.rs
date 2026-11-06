@@ -125,8 +125,10 @@ impl Prepared {
     fn finish(mut self, apply: bool, verbose: bool) -> Result<Value> {
         self.verify()?;
         if apply && self.changed {
+            self.manifest.verify_mutation()?;
             candidate_report_store::publish_checked(&self.destination, &self.bytes, || {
-                self.verify()
+                self.verify()?;
+                self.manifest.verify_mutation()
             })?;
         }
         if apply {

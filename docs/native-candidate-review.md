@@ -619,13 +619,18 @@ export cannot serve as independent gate evidence.
 Receipt input and each rendered output are capped at 16 MiB. Rendering also
 limits nesting to 32 levels, nodes to one million, checks to 20,000 and combined
 top-level/check findings to 100,000. The full output is prepared before writing.
-An output file's parent must already exist. Publication walks and pins each
-parent without following symlinks, rejects traversal and unsafe existing leaves,
+An output file's parent must already exist, belong to the current user and deny
+group/world writes. An existing output must meet the same ownership and permission
+rule. Publication opens parent components without following symlinks and holds
+the final parent, rejects traversal and unsafe existing leaves,
 uses a random exclusive mode-0600 staging inode, and synchronizes the file and
 directory around atomic replacement. Symlinks, special files, hardlinks and
 foreign-owned destinations are refused. Cooperating concurrent writers leave
-one complete report. Same-UID hostile directory moves or entry swaps are outside
-the trusted-parent contract; rename does not follow or truncate a target inode.
+one complete report. Permissions are rechecked after caller validation and before
+replacement. Cleanup also refuses an unsafe parent, retains the staging file and
+reports its exact name. Ancestors must remain trusted and stable. Same-UID hostile
+directory moves or entry swaps are outside this contract; this is not a general
+filesystem sandbox. Rename does not follow or truncate a target inode.
 A directory-sync error after replacement explicitly says publication occurred.
 
 The Rust `candidate_receipt::seal` API produces the same canonical checksum and

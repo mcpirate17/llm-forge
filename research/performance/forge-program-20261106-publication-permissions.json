@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "kind": "report_publication_permission_boundary",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/219",
+  "base_commit": "4a55be6e540402f6284ebdc039192dc4cda908c0",
+  "status": "clean_release_controls_passed_full_gate_pending",
+  "scope": "Shared atomic report publisher and changed Mull refresh apply refuse foreign-owned or group/world-writable final parents and existing leaves. Read-only preview and unchanged apply retain their previous admission. No engine payload or external model execution.",
+  "changes": [
+    "Recheck parent/leaf and staged identity after caller guard before replacement; preserve ordered locks and explicit pair partial-disposition diagnostics.",
+    "Cleanup rechecks parent permissions before inode verification/unlink; unsafe cleanup retains and names staging entries.",
+    "Canonical attestation directories use the same 022 exclusion; new benchmark snapshots initialize private Git metadata without reinitializing existing developer repositories.",
+    "Owned fixtures explicitly set admitted modes; deliberate unsafe-path tests remain."
+  ],
+  "verification": {
+    "focused_logs": {
+      "publisher": {
+        "path": ".git/forge-publisher-store3.log",
+        "sha256": "e94c58fa890d2a2b52d2c946e286fdbfa6ed705c780eeaebf9c184b3974bea01",
+        "test_executions": {
+          "passed": 16,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "refresh": {
+        "path": ".git/forge-publisher-refresh1.log",
+        "sha256": "80dabca62e20d36f221b3b7b7e20fbb00343f34ae181768259d73674c1fc5084",
+        "test_executions": {
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "backlog": {
+        "path": ".git/forge-publisher-backlog3.log",
+        "sha256": "0c99f0fd975951dfe0522c657ab06372a062b9549f3c0140b5f38b92cd5ba869",
+        "test_executions": {
+          "passed": 17,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "callers": {
+        "path": ".git/forge-publisher-callers1.log",
+        "sha256": "773d3fc90af08c49f2b59165eed3225c9d9c5739cbb9b117f4590b44bf66cbf8",
+        "test_executions": {
+          "passed": 66,
+          "failed": 0,
+          "ignored": 5
+        },
+        "scope": "Six actual CLI harnesses before cleanup-only follow-up; later full gate required."
+      },
+      "artifacts": {
+        "path": ".git/forge-publisher-artifacts1.log",
+        "sha256": "90c9c8a5a1b0bfda9c328a6ffb62706f7d9771658989970e1f808d0360ea354f",
+        "test_executions": {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "clippy": {
+        "path": ".git/forge-publisher-clippy3.log",
+        "sha256": "b91da33c7f408d9736ff802da20462cc55d3805e9b30b035271c6d6d0292fd7f"
+      }
+    },
+    "format": "PASS",
+    "independent_review": "Shared publisher implementation and cleanup independently reviewed by runtime_inventory. Cleanup permission gap fixed; final review found no concrete production blocker. Trusted stable ancestors and same-UID race exclusion remain explicit.",
+    "full_local_check": "PENDING",
+    "local_verify": "PENDING",
+    "independent_controls": {
+      "path": ".git/forge-publisher-controls-independent.json",
+      "sha256": "c168e3443fdc4ff80d920719a47964a106c9abe8e3bfcc50db2c1d160be3e27b",
+      "result": "Verified 48 transcript commands across eight arm/case combinations, both binary/source identities, old/new status and recoverable manifest byte hashes, unchanged source/driver/fragment pins, no stages remaining. Historical inode equality is driver-asserted only; original inode numbers were not retained for independent reconstruction."
+    }
+  },
+  "controls": {
+    "driver": {
+      "path": ".git/forge-publisher-boundary-controls.py",
+      "sha256": "588962c8061ee1d85e7e00771338208d1d5a8ec5c373c5792a8d405154760919"
+    },
+    "before": {
+      "summary": "/home/tim/Projects/llm-forge/.git/publisher-before-zkhy78lw/summary.json",
+      "sha256": "e34fc75f6972ee3f435f75e21f8574f640a4d2deb3c60b6b428ce01fc33854fc"
+    },
+    "before_results": {
+      "shared_parent_0775": "APPLIED",
+      "existing_leaf_0664": "APPLIED",
+      "private_changed": "APPLIED",
+      "shared_unchanged": "UNCHANGED"
+    },
+    "after": {
+      "summary": "/home/tim/Projects/llm-forge/.git/publisher-after-tnbj3a5v/summary.json",
+      "sha256": "e6323ef51be37c8acfc7080fc39849c09c490a10fde1efbf6b2b064a0451f4fb"
+    },
+    "baseline_source_equivalence": "Native compiled source paths unchanged from release 018b148 through base 4a55be6; git diff verified before edits.",
+    "after_results": {
+      "shared_parent_0775": "REFUSED exit 4; unchanged manifest bytes and inode",
+      "existing_leaf_0664": "REFUSED exit 4; unchanged manifest bytes and inode",
+      "private_changed": "APPLIED",
+      "shared_unchanged": "UNCHANGED; unchanged manifest bytes and inode"
+    },
+    "scope": "Four authored repositories per arm, native manifest generation, read-only preview and empty-PATH apply. Source/driver/registry fragment hashes preserved; driver assertions verify unchanged bytes/inode in refusals/no-op. No payload executed."
+  },
+  "retained_attempts": [
+    {
+      "log": {
+        "path": ".git/forge-publisher-store2.log",
+        "sha256": "e87abbff23c84703123ae8b6b87ae41a83669b201f535dbe6e21f1b2c109ad94"
+      },
+      "result": "15 passed, 1 failed; paired diagnostic escaped quotes differently from the test expectation. Both stages correctly retained/named. Corrected assertion to exact ASCII resource basename; production error formatting unchanged. Chained backlog/Clippy unstarted."
+    }
+  ],
+  "limitations": [
+    "No cross-UID exploit execution; owned permission fixtures establish admission behavior.",
+    "Ancestors must remain trusted and stable; checks are not a general filesystem sandbox or atomic compare-and-swap against hostile same-UID races.",
+    "Paired outputs are not transactional; errors preserve each replacement/durability state.",
+    "No performance, model token, task-success or shared-host adoption improvement is claimed.",
+    "No mutation campaign executed in this increment."
+  ],
+  "release": {
+    "scope": "clean release build/private install; no shared installation or adoption",
+    "binary": "/tmp/forge-publisher-release-9484974-zfpklpzn/bin/forge",
+    "sha256": "c2414d9aacff4e29c2d5c2f59c29dd540ef118dd6297c3fbc996b5ea276379f4",
+    "identity": {
+      "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+      "compiled_git_commit": "9484974103e3024d7749d6767ad58c3bdf6561fe",
+      "compiled_source_sha256": "7b679aca0c3c91ec35023e4c6a73bd5dbecb17c769af507581e0026c80da516d",
+      "executable_sha256": "c2414d9aacff4e29c2d5c2f59c29dd540ef118dd6297c3fbc996b5ea276379f4"
+    },
+    "head": "9484974103e3024d7749d6767ad58c3bdf6561fe",
+    "tree": "233404975a05f90c9681422b42e97c8457ab5e0f",
+    "source_clean": true,
+    "bytes": 54973328,
+    "nlink": 1,
+    "elapsed_seconds": 229.62248873710632,
+    "build_log_sha256": "349b73302f0a22f5af760ed3d6b08782527e5eefe8bc691ed44407ea14c4fc96",
+    "argv": [
+      "cargo",
+      "+1.98.0",
+      "install",
+      "--jobs",
+      "2",
+      "--offline",
+      "--locked",
+      "--path",
+      "native/forge-cli",
+      "--root",
+      "/tmp/forge-publisher-release-9484974-zfpklpzn",
+      "--target-dir",
+      "/home/tim/Projects/llm-forge/native/forge/target"
+    ]
+  },
+  "reproduce_focused_checks": [
+    "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --lib candidate_report_store",
+    "cargo +1.98.0 test --offline --locked --jobs 2 --manifest-path native/forge/Cargo.toml --lib mutation_mull_refresh_cli",
+    "FORGE_TEST_BIN=/absolute/release/forge cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml --test mutation_plan_cli"
+  ]
+}

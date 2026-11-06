@@ -73,6 +73,14 @@ fn prepare(case: &Case, scenarios: &[&str]) -> (PathBuf, Value) {
         cmd.args(["--scenario", scenario]);
     }
     let value = output(cmd, 0);
+    assert_eq!(
+        fs::metadata(root.join(".git"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
     (root, value["manifest"].clone())
 }
 fn run(root: &Path, report: &Path) -> Command {

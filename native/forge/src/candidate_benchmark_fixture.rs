@@ -5,7 +5,10 @@ use crate::{
 };
 use anyhow::{ensure, Context, Result};
 use conductor_native::candidate_benchmark as data;
-use git2::{Index, IndexEntry, IndexTime, ObjectType, Oid, Repository, Signature};
+use git2::{
+    Index, IndexEntry, IndexTime, ObjectType, Oid, Repository, RepositoryInitMode,
+    RepositoryInitOptions, Signature,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -438,7 +441,14 @@ pub(crate) fn prepare(
         "benchmark refuses gitlinks"
     );
     let root = snapshot.path();
-    let repository = Repository::init(&root)?;
+    // This is a newly owned snapshot, never an existing developer repository.
+    // Its metadata will hold publisher outputs; do not inherit a shared umask.
+    let repository = Repository::init_opts(
+        &root,
+        RepositoryInitOptions::new()
+            .mode(RepositoryInitMode::from_bits_retain(0o700))
+            .no_reinit(true),
+    )?;
     import(&repository, source.repository(), &[parent, tree])?;
     let config = conductor_native::project_config::load(&root).map_err(anyhow::Error::msg)?;
     let package = conductor_native::project_paths::package_root_from_config(Some(&config))
