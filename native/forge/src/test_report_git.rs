@@ -164,10 +164,10 @@ fn head(repo: &Repository) -> Result<(String, Oid)> {
     );
     Ok((std::str::from_utf8(reference.name_bytes())?.to_owned(), id))
 }
-fn path(raw: &[u8]) -> Result<String> {
+fn path(raw: &[u8]) -> Result<&str> {
     let value = crate::candidate_source::safe_path(raw)?;
     ensure!(value.len() <= 4096, "Git path exceeds report bound");
-    Ok(value.to_owned())
+    Ok(value)
 }
 fn untracked(source: &Source, index: &FileInput) -> Result<Vec<String>> {
     let repo = repository(source)?;
@@ -195,8 +195,8 @@ fn untracked(source: &Source, index: &FileInput) -> Result<Vec<String>> {
         .filter(|entry| entry.status().contains(Status::WT_NEW))
     {
         let value = path(entry.path_bytes())?;
-        if conductor_native::dead_tests::report::is_test_file(&value) {
-            result.insert(value);
+        if conductor_native::dead_tests::report::is_test_file(value) {
+            result.insert(value.to_owned());
         }
     }
     Ok(result.into_iter().collect())
@@ -240,6 +240,7 @@ struct Budget {
     trees: BTreeSet<Oid>,
     events: usize,
     path_bytes: usize,
+    paths: BTreeSet<String>,
 }
 impl Budget {
     fn new() -> Self {
@@ -250,6 +251,7 @@ impl Budget {
             trees: BTreeSet::new(),
             events: 0,
             path_bytes: 0,
+            paths: BTreeSet::new(),
         }
     }
     fn poll(&self) -> Result<()> {
@@ -257,6 +259,22 @@ impl Budget {
             self.started.elapsed() <= Duration::from_secs(30),
             "Git history cooperative deadline exceeded"
         );
+        Ok(())
+    }
+    fn path(&mut self, name: &str) -> Result<()> {
+        self.events += 1;
+        ensure!(
+            self.events <= MAX_EVENTS,
+            "Git history path events exceed bound"
+        );
+        if !self.paths.contains(name) {
+            self.path_bytes += name.len();
+            ensure!(
+                self.paths.len() < MAX_PATHS && self.path_bytes <= 32 * 1024 * 1024,
+                "Git history path inventory exceeds bound"
+            );
+            self.paths.insert(name.to_owned());
+        }
         Ok(())
     }
     fn header(
@@ -338,16 +356,27 @@ fn rename(
     repo: &Repository,
     settings: &Settings,
     budget: &Budget,
+    wanted: &BTreeSet<&str>,
 ) -> Result<()> {
-    let deleted = diff
-        .deltas()
-        .filter(|delta| delta.status() == Delta::Deleted)
-        .count();
-    let added = diff
-        .deltas()
-        .filter(|delta| delta.status() == Delta::Added)
-        .count();
-    if !settings.renames || deleted == 0 || added == 0 {
+    let (mut deleted, mut added, mut relevant) = (0usize, 0usize, false);
+    for delta in diff.deltas() {
+        let file = match delta.status() {
+            Delta::Deleted => {
+                deleted += 1;
+                delta.old_file()
+            }
+            Delta::Added => {
+                added += 1;
+                delta.new_file()
+            }
+            _ => continue,
+        };
+        let name = path(file.path_bytes().context("rename candidate path missing")?)?;
+        relevant |= wanted.contains(name);
+    }
+    // Renames-only matching changes Added/Deleted deltas, never an unrelated
+    // Modified/Typechange path. Keep every competing candidate if any matters.
+    if !settings.renames || deleted == 0 || added == 0 || !relevant {
         return Ok(());
     }
     ensure!(
@@ -392,6 +421,7 @@ fn history(
     start: Oid,
     shallow: &BTreeSet<Oid>,
     settings: &Settings,
+    wanted: &BTreeSet<&str>,
 ) -> Result<BTreeMap<String, String>> {
     let owned = repository(source)?;
     let repo = &owned;
@@ -437,7 +467,7 @@ fn history(
             diff.deltas().len() <= MAX_PATHS,
             "Git history diff path count exceeds bound"
         );
-        rename(&mut diff, repo, settings, &budget)?;
+        rename(&mut diff, repo, settings, &budget, wanted)?;
         let day = date(&commit)?;
         for delta in diff.deltas() {
             let file = if delta.status() == Delta::Deleted {
@@ -446,19 +476,11 @@ fn history(
                 delta.new_file()
             };
             let name = path(file.path_bytes().context("history delta path missing")?)?;
-            budget.events += 1;
-            ensure!(
-                budget.events <= MAX_EVENTS,
-                "Git history path events exceed bound"
-            );
+            // Admit every historical path even when the classifier needs no date.
+            budget.path(name)?;
             // Raw Unicode paths intentionally fix the legacy Git-text quoting bug.
-            if !dates.contains_key(&name) {
-                budget.path_bytes += name.len();
-                ensure!(
-                    dates.len() < MAX_PATHS && budget.path_bytes <= 32 * 1024 * 1024,
-                    "Git history path inventory exceeds bound"
-                );
-                dates.insert(name, day.clone());
+            if wanted.contains(name) && !dates.contains_key(name) {
+                dates.insert(name.to_owned(), day.clone());
             }
         }
     }
@@ -527,7 +549,14 @@ impl Inventory {
         let settings = settings(&repo)?;
         let tracked = source.tracked_index_paths()?;
         let untracked_tests = untracked(source, &index)?;
-        let last_commit_dates = history(source, head, &roots, &settings)?;
+        // Analysis uses exactly tracked paths ending in .py, including missing
+        // working-tree files; dates for other historical paths have no caller.
+        let wanted = tracked
+            .iter()
+            .filter(|path| path.ends_with(".py"))
+            .map(String::as_str)
+            .collect();
+        let last_commit_dates = history(source, head, &roots, &settings, &wanted)?;
         let result = Self {
             tracked,
             untracked_tests,

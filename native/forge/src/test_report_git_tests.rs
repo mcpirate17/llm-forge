@@ -230,6 +230,12 @@ fn rename_dates_follow_name_only_semantics_and_disabled_detection_is_explicit() 
         Time::new(day(2, 1), 0),
         day(2, 1),
     );
+    // The classifier requests current index paths, including restored old names.
+    f.write("old.py", "value=42\n");
+    let repo = f.repo();
+    let mut index = repo.index().unwrap();
+    index.add_path(Path::new("old.py")).unwrap();
+    index.write().unwrap();
     let source = f.source();
     let inventory = Inventory::capture(&source).unwrap();
     assert_eq!(inventory.last_commit_dates["old.py"], "2026-01-01");
@@ -529,4 +535,71 @@ fn configuration_isolation(f: &Fixture) {
         .unwrap()
         .to_string()
         .contains("XDG"));
+}
+
+#[test]
+fn deleted_wanted_python_on_another_branch_can_rename_to_non_python() {
+    let f = Fixture::new(false);
+    let root = f.commit(
+        &[
+            ("wanted.py", Some("value=42\n")),
+            ("keep.py", Some("keep=1\n")),
+        ],
+        &[],
+        Time::new(day(1, 1), 0),
+        day(1, 1),
+    );
+    let renamed = f.commit(
+        &[("wanted.py", None), ("archive.txt", Some("value=42\n"))],
+        &[root],
+        Time::new(day(2, 1), 0),
+        day(2, 1),
+    );
+    let main = f.commit(
+        &[("keep.py", Some("keep=2\n"))],
+        &[root],
+        Time::new(day(3, 1), 0),
+        day(3, 1),
+    );
+    // The merge keeps main's Python path, while the other history branch renames it.
+    f.commit(&[], &[main, renamed], Time::new(day(4, 1), 0), day(4, 1));
+    f.write("wanted.py", "value=42\n");
+    let source = f.source();
+    let enabled = Inventory::capture(&source).unwrap();
+    assert_eq!(enabled.last_commit_dates["wanted.py"], "2026-01-01");
+    assert!(!enabled.last_commit_dates.contains_key("archive.txt"));
+    f.repo()
+        .config()
+        .unwrap()
+        .set_bool("diff.renames", false)
+        .unwrap();
+    let disabled = Inventory::capture(&source).unwrap();
+    assert_eq!(disabled.last_commit_dates["wanted.py"], "2026-02-01");
+}
+
+#[test]
+fn irrelevant_excessive_rename_work_does_not_open_unneeded_blobs() {
+    let f = Fixture::new(false);
+    let old: Vec<_> = (0..257).map(|n| format!("old{n}.txt")).collect();
+    let mut create: Vec<_> = old
+        .iter()
+        .map(|name| (name.as_str(), Some("old=1\n")))
+        .collect();
+    create.push(("wanted.py", Some("wanted=1\n")));
+    let first = f.commit(&create, &[], Time::new(day(1, 1), 0), day(1, 1));
+    let new: Vec<_> = (0..257).map(|n| format!("new{n}.txt")).collect();
+    let mut replace: Vec<_> = old.iter().map(|name| (name.as_str(), None)).collect();
+    replace.extend(new.iter().map(|name| (name.as_str(), Some("new=2\n"))));
+    f.commit(&replace, &[first], Time::new(day(2, 1), 0), day(2, 1));
+    // Tree/path admission needs no blob contents. Removing an irrelevant loose
+    // object proves this path neither preflights nor matches those blob bytes.
+    let repo = f.repo();
+    let tree = repo.find_commit(first).unwrap().tree().unwrap();
+    let id = tree.get_name("old0.txt").unwrap().id().to_string();
+    fs::remove_file(f.git.join("objects").join(&id[..2]).join(&id[2..])).unwrap();
+    let inventory = Inventory::capture(&f.source()).unwrap();
+    assert_eq!(
+        inventory.last_commit_dates,
+        BTreeMap::from([("wanted.py".to_owned(), "2026-01-01".to_owned())])
+    );
 }
