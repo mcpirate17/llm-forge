@@ -160,7 +160,11 @@ inputs, stages both outputs and consumes only explicitly authorized discovered
 artifacts after publication. Focused native tests and eleven comparisons against
 a private current-source Python/PyO3 comparator pass; release measurement and
 full publication gates remain pending. Independent review found and fixed a
-future discovery-namespace alias. `make slop-backlog` keeps its Python gate first
+future discovery-namespace alias and tightened destructive-path permissions.
+The hardened path passes 17 backlog tests and both CLI/Make tests; strict Clippy
+passes. [Issue #219](https://github.com/mcpirate17/llm-forge/issues/219) is the next
+priority: apply the permission boundary to older shared report writers.
+`make slop-backlog` keeps its Python gate first
 and migrates only the second fold invocation. See [usage](equivalence-backlog.md)
 and the [evidence index](../research/performance/forge-program-20261106-backlog.json).
 

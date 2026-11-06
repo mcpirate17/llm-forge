@@ -232,9 +232,45 @@ impl Prepared {
         self.previous_ledger.verify()?;
         self.previous_report.verify()
     }
+    fn verify_consumption(&self) -> Result<()> {
+        if let Some(artifacts) = &self.artifacts {
+            ensure!(
+                artifacts.path.starts_with(&self.host.root),
+                "consumption of configured artifacts outside the host is refused"
+            );
+            if let Some(binding) = &artifacts.binding {
+                binding.verify_mutation()?;
+            }
+        }
+        for input in &self.summaries[self.discovered..] {
+            input
+                .held
+                .as_ref()
+                .context("captured artifact missing")?
+                .verify_mutation()?;
+        }
+        Ok(())
+    }
+    fn verify_publication(&self, consume: bool) -> Result<()> {
+        self.verify()?;
+        for parent in &self.output_parents {
+            parent.verify_mutation()?;
+        }
+        for input in [&self.previous_ledger, &self.previous_report] {
+            if let Some(held) = &input.held {
+                held.verify_mutation()?;
+            }
+        }
+        if consume {
+            self.verify_consumption()?;
+        }
+        Ok(())
+    }
     fn consume(&self) -> Result<Vec<PathBuf>> {
         self.verify_inputs()
             .context("outputs published; input recheck failed; no artifacts consumed")?;
+        self.verify_consumption()
+            .context("outputs published; consumption admission failed; no artifacts consumed")?;
         let recorded = &self.summaries[self.discovered..];
         let mut consumed = Vec::new();
         for (index, input) in recorded.iter().enumerate() {
@@ -256,13 +292,15 @@ impl Prepared {
         Ok(consumed)
     }
     fn finish(&self, apply: bool, consume: bool) -> Result<Value> {
+        ensure!(!consume || apply, "consumption requires publication");
         self.verify()?;
         let mut consumed = Vec::new();
         if apply {
+            self.verify_publication(consume)?;
             candidate_report_store::publish_pair_checked(
                 (&self.previous_report.path, self.folded.report.as_bytes()),
                 (&self.previous_ledger.path, self.folded.ledger.as_bytes()),
-                || self.verify(),
+                || self.verify_publication(consume),
             )?;
             if consume {
                 consumed = self.consume()?;

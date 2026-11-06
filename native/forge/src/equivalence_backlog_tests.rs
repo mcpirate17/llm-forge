@@ -167,6 +167,7 @@ fn unsafe_paths_and_aliases_never_overwrite_or_consume() {
 fn configured_external_output_needs_explicit_operator_path() {
     let fixture = Fixture::new();
     let external = tempfile::tempdir().unwrap();
+    fs::set_permissions(external.path(), fs::Permissions::from_mode(0o700)).unwrap();
     fixture.write("pyproject.toml", format!("[tool.forge.test_record]\nstore='r'\n[tool.forge.equivalence_probe]\nledger={:?}\nreport='report.md'\n", external.path().join("ledger.json")).as_bytes());
     let mut args = fixture.args();
     assert!(refused(&args).contains("outside the host"));
@@ -289,4 +290,65 @@ fn traversal_and_named_user_paths_fail_loudly() {
         b"[tool.forge.equivalence_probe]\nledger='~other/ledger.json'\nreport='report.md'\n",
     );
     assert!(refused(&fixture.args()).contains("named-user"));
+}
+
+#[test]
+fn shared_output_parent_is_readable_but_apply_refuses_before_staging() {
+    let fixture = Fixture::new();
+    fs::set_permissions(fixture.0.path(), fs::Permissions::from_mode(0o775)).unwrap();
+    let prepared = prepare(&fixture.args()).unwrap();
+    prepared.finish(false, false).unwrap();
+    let error = format!("{:#}", prepared.finish(true, false).unwrap_err());
+    assert!(error.contains("mutation directory"), "{error}");
+    assert!(!fixture.path("report.md").exists());
+    assert!(!fixture.path("ledger.json").exists());
+}
+
+#[test]
+fn shared_existing_output_leaves_are_observable_but_not_replaceable() {
+    for name in ["ledger.json", "report.md"] {
+        let fixture = Fixture::new();
+        fixture.write(name, b"{}");
+        fs::set_permissions(fixture.path(name), fs::Permissions::from_mode(0o664)).unwrap();
+        let prepared = prepare(&fixture.args()).unwrap();
+        prepared.finish(false, false).unwrap();
+        assert!(
+            format!("{:#}", prepared.finish(true, false).unwrap_err()).contains("mutation input")
+        );
+        assert_eq!(fs::read(fixture.path(name)).unwrap(), b"{}");
+        assert!(!fixture
+            .path(if name == "ledger.json" {
+                "report.md"
+            } else {
+                "ledger.json"
+            })
+            .exists());
+    }
+}
+
+#[test]
+fn shared_recorded_directory_or_leaf_refuses_consumption_before_publication() {
+    for name in ["runs", "runs/gate-first.json"] {
+        let fixture = Fixture::new();
+        fixture.recorded();
+        let mode = if name == "runs" { 0o775 } else { 0o664 };
+        fs::set_permissions(fixture.path(name), fs::Permissions::from_mode(mode)).unwrap();
+        let prepared = prepare(&fixture.args()).unwrap();
+        prepared.finish(false, false).unwrap();
+        assert!(format!("{:#}", prepared.finish(true, true).unwrap_err()).contains("mutation"));
+        assert!(!fixture.path("report.md").exists());
+        assert!(!fixture.path("ledger.json").exists());
+        assert!(fixture.path("runs/gate-first.json").exists());
+        prepared.finish(true, false).unwrap();
+        assert!(fixture.path("runs/gate-first.json").exists());
+    }
+}
+
+#[test]
+fn output_permission_change_after_capture_is_stale() {
+    let fixture = Fixture::new();
+    let prepared = prepare(&fixture.args()).unwrap();
+    fs::set_permissions(fixture.0.path(), fs::Permissions::from_mode(0o775)).unwrap();
+    assert!(prepared.finish(true, false).is_err());
+    assert!(!fixture.path("report.md").exists());
 }

@@ -8,12 +8,12 @@
   "scope": "Native configuration/discovery/folding/publication/explicit consumption. The existing Python gate remains the first Make step. No probe engine or model launched.",
   "verification": {
     "shared_fold_tests_passed": 9,
-    "backlog_tests_passed": 13,
+    "backlog_tests_passed": 17,
     "publisher_tests_passed": 13,
     "host_config_tests_passed": 1,
     "actual_cli_and_make_tests_passed": 2,
-    "strict_forge_clippy": "PASS",
-    "independent_review": "Pure fold and paired publisher independently reviewed. Future output/discovery namespace alias fixed with regression; aggregate bound enforced before reading.",
+    "strict_forge_clippy": "PASS after permission hardening",
+    "independent_review": "Pure fold and paired publisher independently reviewed. Future output/discovery namespace alias fixed with regression; aggregate bound enforced before reading. Read-only repository bindings now upgrade affected files/directories to strict mutation permissions before staging and replacement/removal; independent hardening review found no blocker.",
     "parity_scenarios_passed": 11,
     "parity": {
       "root": "/home/tim/Projects/llm-forge/.git/backlog-parity-cnwi2b4r",
@@ -21,7 +21,11 @@
       "sha256": "35ee59e07df1faefa78394b9726f1561ca1b1736accea609b3e26b59d86980db"
     },
     "full_local_check": "PENDING",
-    "local_verify": "PENDING"
+    "local_verify": "PENDING",
+    "initial_parity_independent_audit": {
+      "path": ".git/forge-backlog-parity-independent.json",
+      "sha256": "412d413c643197a9461343a6841ea1fe208276939597beb8c171978bce756858"
+    }
   },
   "original_comparator": {
     "root": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601",
@@ -105,6 +109,48 @@
       "passed": 4,
       "failed": 9,
       "cause": "Authored test summaries omitted required schema fields. Fixtures repaired using complete Summary serialization; production parser unchanged."
+    },
+    {
+      "log": ".git/forge-backlog-focused3.log",
+      "passed": 16,
+      "failed": 1,
+      "cause": "Positive external-output fixture inherited group-writable temporary directory mode. Fixture now explicitly0700; strict production admission preserved."
+    },
+    {
+      "binary": {
+        "scope": "clean release build/private install; no shared installation or adoption",
+        "binary": "/tmp/forge-backlog-release-1949709-bp2c4xcm/bin/forge",
+        "sha256": "a2d1f66e2d8439357e841faeb400ac90dfeb2f9426bb91080c9b3bc9d5789c0f",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "1949709d0afac857b44fb8a35b46c951a723405f",
+          "compiled_source_sha256": "413d33f15f2a7b6fe8f9ec85bf4684736e9cd65035a964761b30e5717ca53827",
+          "executable_sha256": "a2d1f66e2d8439357e841faeb400ac90dfeb2f9426bb91080c9b3bc9d5789c0f"
+        },
+        "head": "1949709d0afac857b44fb8a35b46c951a723405f",
+        "tree": "c3e0edd737d139dc7d191973e0acd3867ba8e044",
+        "source_clean": true,
+        "bytes": 54971176,
+        "nlink": 1,
+        "elapsed_seconds": 229.1959969997406,
+        "build_log_sha256": "3800fbbf3b14bc8f4b6b6d59884c65ba6a688a4b2f63d277bfd55d07b176d5e8",
+        "argv": [
+          "cargo",
+          "+1.98.0",
+          "install",
+          "--jobs",
+          "2",
+          "--offline",
+          "--locked",
+          "--path",
+          "native/forge-cli",
+          "--root",
+          "/tmp/forge-backlog-release-1949709-bp2c4xcm",
+          "--target-dir",
+          "/home/tim/Projects/llm-forge/native/forge/target"
+        ]
+      },
+      "disposition": "Clean1949709 release retained but not accepted or benchmarked: subsequent permission review identified a destructive-path group-write gap, now hardened. New release required."
     }
   ],
   "limitations": [
@@ -112,6 +158,8 @@
     "Same-UID hostile writes are outside cooperative-parent guarantee.",
     "Intentional differences: preview default, explicit apply/consume, owned normalized paths/output parents, external-output explicit flags, bounded strict JSON, one coherent clock instant.",
     "Dirty debug binary used only for initial functional parity; clean release and performance evidence pending.",
-    "Owned authored fixture/Make stub evidence is not real guest or agent-task evidence."
-  ]
+    "Owned authored fixture/Make stub evidence is not real guest or agent-task evidence.",
+    "Read-only shared repository inputs remain allowed; destructive output/artifact parents and existing affected leaves reject group/world write access. Trusted ancestors remain required."
+  ],
+  "next_priority_issue": "https://github.com/mcpirate17/llm-forge/issues/219"
 }

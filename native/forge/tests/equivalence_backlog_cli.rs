@@ -32,6 +32,11 @@ fn fixture() -> tempfile::TempDir {
         summary(json!({})),
     )
     .unwrap();
+    fs::set_permissions(
+        dir.path().join("runs/gate-recorded.json"),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
     fs::write(dir.path().join("authored-empty.json"), summary(json!({}))).unwrap();
     dir
 }

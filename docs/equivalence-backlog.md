@@ -45,6 +45,10 @@ paths. It refuses symlinks, hard-linked inputs/outputs, traversal, world-writabl
 inputs, output/input aliases, duplicate JSON keys and output names that could be
 rediscovered as `gate-*.json`. Named-user `~user` expansion is unsupported; supply
 an absolute path. Missing or whitespace-only ledgers remain empty ledgers.
+Read-only observation permits group-writable repository data. Publication and
+consumption require parents without group/world write permissions and existing
+affected files owned by the operator without group/world write permissions.
+These checks run before staging and again before replacement or removal.
 Limits are 256 summaries, 16 MiB per summary/output/previous ledger or report,
 64 MiB total summary bytes, 4,096 artifact-directory entries, and 64 ancestor
 configuration files of at most 1 MiB each. JSON nesting is bounded to 32 levels.
@@ -58,6 +62,8 @@ removed and remaining files. A sync error can follow an actual replacement or
 removal and is reported explicitly. Hostile concurrent writes by the same Unix
 user remain outside the cooperative-parent guarantee. Backlog artifacts are
 observed input data, not authenticated evidence or execution authority.
+Path ancestors must also remain trusted and stable; these checks are not a
+general filesystem sandbox against hostile ancestor replacement.
 
 `make slop-backlog` still invokes the Python equivalence gate first, then calls
 `$(FORGE) equivalence backlog --apply --consume-recorded` for the native fold.
