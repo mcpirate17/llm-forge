@@ -357,9 +357,8 @@ checkout-sync:  ## Native guarded dirty-layer fast-forward (set CHECKOUT_SYNC_RE
 	"$(FORGE)" checkout-sync --repo "$(CONDUCTOR_HOST_ROOT)" \
 		$(if $(CHECKOUT_SYNC_RECOVERY_DIR),--recovery-dir "$(CHECKOUT_SYNC_RECOVERY_DIR)") $(CHECKOUT_SYNC_ARGS)
 
-dead-tests:  ## Import-closure dead-test finder: broken tests, test-only targets, unreferenced sources
-	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)"
-	$(PYTHON) -m conductor.dead_tests --root "$(CONDUCTOR_HOST_ROOT)" \
+dead-tests:  ## Native advisory Python import-closure and unreferenced-source report
+	"$(FORGE)" analyze --root "$(CONDUCTOR_HOST_ROOT)" --max-bytes 4194304 tests \
 		--json-out "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_AUDIT_DIR)/dead_tests.json"
 
 # Test execution is explicit; an absent guest interpreter/toolchain fails visibly.

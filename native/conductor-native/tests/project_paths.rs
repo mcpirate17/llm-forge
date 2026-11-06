@@ -205,3 +205,97 @@ fn selected_path_does_not_resolve_unrelated_invalid_keys() {
         "unknown project path key: unknown"
     );
 }
+
+#[test]
+fn captured_selected_key_respects_replacement_defaults_and_isolated_overrides() {
+    const CHILD: &str = "FORGE_PROJECT_CAPTURED_KEY_TEST_CHILD";
+    if let Ok(mode) = std::env::var(CHILD) {
+        let case = Case::new();
+        let path = case.root().join("forge.toml");
+        fs::write(&path, "schema_version=1\n[conductor]\nmutation_registry='kept/registry.json'\nnotes_root=123\n").unwrap();
+        let config = conductor_native::project_config::parse_native(
+            &path,
+            &fs::read_to_string(&path).unwrap(),
+        )
+        .unwrap();
+        fs::write(&path, "invalid replacement TOML [[").unwrap();
+        use conductor_native::project_paths::resolve_key_from_config as selected;
+        assert_eq!(
+            selected(Some(&config), "mutation_registry").unwrap(),
+            ("kept/registry.json".into(), true)
+        );
+        assert_eq!(
+            selected(Some(&config), "crate_roster").unwrap(),
+            ("tooling/native/crates.toml".into(), false)
+        );
+        assert_eq!(
+            selected(None, "mutation_registry").unwrap(),
+            ("conductor/mutation_campaigns/registry.json".into(), false)
+        );
+        assert_eq!(
+            selected(Some(&config), "unknown").unwrap_err(),
+            "unknown project path key: unknown"
+        );
+        assert!(
+            resolve(case.root()).is_err(),
+            "replacement config must be invalid when reopened"
+        );
+        match mode.as_str() {
+            "clean" | "empty" => assert!(selected(Some(&config), "notes_root")
+                .unwrap_err()
+                .contains("must be a string")),
+            "override" => assert_eq!(
+                selected(Some(&config), "notes_root").unwrap(),
+                ("override/notes".into(), true)
+            ),
+            "invalid" => assert!(selected(Some(&config), "notes_root")
+                .unwrap_err()
+                .contains("repo-root-relative")),
+            "nonutf8" => assert_eq!(
+                selected(Some(&config), "notes_root").unwrap_err(),
+                "CONDUCTOR_NOTES_ROOT must be UTF-8"
+            ),
+            _ => panic!("unknown child mode"),
+        }
+        return;
+    }
+    use std::os::unix::ffi::OsStringExt;
+    for mode in ["clean", "empty", "override", "invalid", "nonutf8"] {
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "captured_selected_key_respects_replacement_defaults_and_isolated_overrides",
+                "--nocapture",
+            ])
+            .env(CHILD, mode)
+            .env_remove("CONDUCTOR_MUTATION_REGISTRY")
+            .env_remove("CONDUCTOR_CRATE_ROSTER")
+            .env_remove("CONDUCTOR_NOTES_ROOT");
+        match mode {
+            "empty" => {
+                command.env("CONDUCTOR_NOTES_ROOT", "  ");
+            }
+            "override" => {
+                command.env("CONDUCTOR_NOTES_ROOT", "override/./notes");
+            }
+            "invalid" => {
+                command.env("CONDUCTOR_NOTES_ROOT", "../outside");
+            }
+            "nonutf8" => {
+                command.env(
+                    "CONDUCTOR_NOTES_ROOT",
+                    std::ffi::OsString::from_vec(b"invalid\xff".to_vec()),
+                );
+            }
+            _ => (),
+        }
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{mode}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}

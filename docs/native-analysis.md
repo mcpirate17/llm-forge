@@ -46,7 +46,7 @@ Structural findings use source order. The low-level audit API reports unparsed
 files as explicit coverage gaps while retaining line-based file findings; the
 CLI's gate scan fails on invalid syntax.
 
-## Bounds and file handling
+## Selected-source bounds and file handling
 
 The CLI uses the same source-directory capability as `forge code`: relative
 paths, no final symlinks or special files, strict UTF-8, a 1 MiB per-file bound,
@@ -57,6 +57,84 @@ for scans and 100 for ablations). The serialized output must fit `--max-bytes`
 (512 bytes–4 MiB, default 64 KiB), or the operation fails before printing it.
 Parser and individual scanner allocations remain proportional to the bounded
 source; these scanners do not claim zero allocation or a hard execution deadline.
+
+## Python test import report
+
+```sh
+forge analyze --root /path/to/repo tests
+forge analyze --root /path/to/repo --max-bytes 4194304 tests --check
+forge analyze --root /path/to/repo tests --json-out tasks/audit/dead_tests.json
+make dead-tests
+```
+
+`tests` reuses the shared Rust dead-test classifier. Native Git inventory, history,
+reference collection and parsing require neither a Git executable nor Python on
+`PATH`; no source imports or tests are executed. The scope is tracked Python
+modules and Python test filenames, not Rust test coverage or dynamic reachability.
+All findings are advisory and provide no authority to delete code or tests.
+
+The versioned JSON envelope includes the canonical repository root, HEAD,
+shallow-history flag, source/lookup digest summaries and the complete `report`:
+
+| Signal | Meaning |
+| --- | --- |
+| `broken` | A test's transitive first-party closure contains a hard missing import |
+| `depends_on_untracked`, `untracked_importers` | Present but untracked first-party dependencies and their importers |
+| `stale_imports` | Missing first-party imports in guarded or deferred code |
+| `orphan_target` | Direct test targets have no detected non-test importer or configuration reference |
+| `unreferenced_sources` | Non-test modules have no detected importer or reference |
+| `untracked_tests` | Untracked Python test files, respecting Git ignores |
+
+Broken findings take precedence over untracked/orphan rows for the same test.
+Configuration references suppress orphan/unreferenced signals; `notes_only`
+annotations do not suppress them. Reference text is a heuristic, not proof of
+execution. History reports the first encountered non-merge change's author-local
+day, follows both merge parents, and treats shallow boundaries as roots. Shallow
+history cannot establish dates beyond the locally available boundary.
+
+The default prints JSON and writes no artifact. `--json-out` explicitly publishes
+the legacy report object, without its envelope, using the existing atomic writer.
+It must name an untracked `.json` file inside the repository and outside captured
+sources, reference trees and Git metadata. `make dead-tests` selects
+`$(CONDUCTOR_AUDIT_DIR)/dead_tests.json` and prints the native envelope. Exit 0 means
+the report completed; `--check` returns 1 only for `broken` findings. Unsafe,
+malformed, changed or unsupported input and output overflow return 2 without
+publishing a new report. A previous artifact is retained on failure and must not
+be mistaken for that failed invocation's result.
+
+The input capture admits at most 100,000 files, 16 MiB per source and 1 GiB total;
+each reference corpus is limited to 32 MiB. Git index admission is 32 MiB. History
+has 100,000-commit/path limits, one million tree-entry/path-event limits, 128 MiB
+metadata admission, bounded relevant rename work (65,536 pairs), and a cooperative
+30-second history deadline. These are not a hard whole-command time/RSS limit:
+libgit2 discovery/status and native parsing have additional work. Oversized or
+unsupported history refuses rather than silently dropping dates or rename matches.
+Rename scoring is skipped when no added/deleted path can affect a currently tracked
+Python path's date. Relevant diffs retain all competing candidates; full history,
+tree and path admission still run. This report does not verify unrelated blob contents.
+The ordinary `--max-bytes` output ceiling applies; no partial report is emitted.
+
+Source bytes, import existence observations, Git identities/settings/inventories
+and reference inventories are rechecked before publication. These are cooperative
+drift checks, not an atomic filesystem snapshot or protection against a hostile
+same-user process. Selected symlinks and nonregular files are refused. Reference
+text and Python parsing retain the classifier's lossy UTF-8 compatibility; project
+configuration must be valid UTF-8. Unsafe/non-UTF-8 Git paths are refused.
+
+Two deliberate corrections differ from the old Python collector: mutation
+campaign references are excluded using the configured registry parent, and Unicode
+path dates use raw Git paths instead of text-quoted keys. Git replacements/grafts,
+inline configuration overrides and environment-based repository redirection are
+unsupported and refuse explicitly. `GIT_INDEX_FILE` and supported
+`GIT_CONFIG_GLOBAL/SYSTEM/NOSYSTEM` selections are honored; an explicit global
+file together with an existing XDG Git config refuses because the pinned libgit2
+would otherwise combine files that Git treats differently.
+
+The Python `conductor.dead_tests` API remains for host compatibility and delegates
+classification to the same Rust implementation. Its legacy collector and human
+summary remain distinct. This report is not yet exposed through MCP: external Git
+metadata/configuration admission and whole-operation cancellation need a service
+boundary before it can use the harness's source-root capability safely.
 
 ## Ablation proposals
 

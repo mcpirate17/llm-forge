@@ -273,14 +273,18 @@ impl<'a> SourceOrderVisitor<'a> for DeadTestImportCollector {
 }
 
 #[derive(Debug)]
-enum DeadTestScanError {
+pub enum DeadTestScanError {
     Read {
         path: PathBuf,
-        source: std::io::Error,
+        source: anyhow::Error,
     },
     Parse {
         path: String,
         detail: String,
+    },
+    Lookup {
+        path: String,
+        source: anyhow::Error,
     },
 }
 
@@ -289,6 +293,7 @@ impl std::fmt::Display for DeadTestScanError {
         match self {
             Self::Read { path, source } => write!(f, "cannot read {}: {source}", path.display()),
             Self::Parse { path, detail } => write!(f, "{path} does not parse: {detail}"),
+            Self::Lookup { path, source } => write!(f, "cannot inspect {path}: {source}"),
         }
     }
 }
@@ -304,6 +309,9 @@ impl DeadTestScanError {
             Self::Parse { path, detail } => {
                 PyValueError::new_err(format!("{path} does not parse: {detail}"))
             }
+            Self::Lookup { path, source } => {
+                PyOSError::new_err(format!("cannot inspect {path}: {source}"))
+            }
         }
     }
 }
@@ -314,7 +322,8 @@ fn record_dead_test_import(
     base: &str,
     attribute: Option<&str>,
     hard: bool,
-) {
+    lookup: &mut impl FnMut(&str) -> anyhow::Result<bool>,
+) -> Result<(), DeadTestScanError> {
     if let Some(attribute) = attribute.filter(|attribute| *attribute != "*") {
         let dotted = if base.is_empty() {
             attribute.to_owned()
@@ -323,16 +332,26 @@ fn record_dead_test_import(
         };
         if let Some(path) = resolver.resolve(&dotted, &module.path) {
             module.deps.insert(path);
-            return;
+            return Ok(());
         }
     }
     if base.is_empty() {
-        return;
+        return Ok(());
     }
     if let Some(path) = resolver.resolve(base, &module.path) {
         module.deps.insert(path);
     } else if resolver.is_first_party(base) && !resolver.is_satisfied(base, &module.path) {
-        if let Some(path) = resolver.resolve_untracked(base, &module.path) {
+        let mut found = None;
+        for candidate in PythonModuleResolver::candidates(base, &module.path) {
+            if lookup(&candidate).map_err(|source| DeadTestScanError::Lookup {
+                path: candidate.clone(),
+                source,
+            })? {
+                found = Some(candidate);
+                break;
+            }
+        }
+        if let Some(path) = found {
             module.untracked.insert(path);
         } else if hard {
             module.missing.insert(base.to_owned());
@@ -340,8 +359,10 @@ fn record_dead_test_import(
             module.soft_missing.insert(base.to_owned());
         }
     }
+    Ok(())
 }
 
+#[cfg(any(feature = "python", test))]
 fn scan_dead_test_module(
     source_root: &Path,
     path: &str,
@@ -350,9 +371,20 @@ fn scan_dead_test_module(
     let source_path = source_root.join(path);
     let source = fs::read(&source_path).map_err(|source| DeadTestScanError::Read {
         path: source_path,
-        source,
+        source: source.into(),
     })?;
-    let source = String::from_utf8_lossy(&source);
+    scan_dead_test_bytes(path, &source, resolver, &mut |candidate| {
+        Ok(resolver.repo_root.join(candidate).is_file())
+    })
+}
+
+fn scan_dead_test_bytes(
+    path: &str,
+    source: &[u8],
+    resolver: &PythonModuleResolver,
+    lookup: &mut impl FnMut(&str) -> anyhow::Result<bool>,
+) -> Result<DeadTestModule, DeadTestScanError> {
+    let source = String::from_utf8_lossy(source);
     let statements = ruff_python_parser::parse_module(&source)
         .map_err(|error| DeadTestScanError::Parse {
             path: path.to_owned(),
@@ -374,10 +406,24 @@ fn scan_dead_test_module(
         untracked: BTreeSet::new(),
     };
     for (base, attribute) in collector.hard {
-        record_dead_test_import(&mut module, resolver, &base, attribute.as_deref(), true);
+        record_dead_test_import(
+            &mut module,
+            resolver,
+            &base,
+            attribute.as_deref(),
+            true,
+            lookup,
+        )?;
     }
     for (base, attribute) in collector.soft {
-        record_dead_test_import(&mut module, resolver, &base, attribute.as_deref(), false);
+        record_dead_test_import(
+            &mut module,
+            resolver,
+            &base,
+            attribute.as_deref(),
+            false,
+            lookup,
+        )?;
     }
     for dotted in collector.strings {
         if let Some(path) = resolver.resolve(&dotted, path) {
@@ -386,43 +432,6 @@ fn scan_dead_test_module(
     }
     module.deps.remove(path);
     Ok(module)
-}
-
-#[cfg(feature = "python")]
-fn is_dead_test_file(path: &str) -> bool {
-    let name = path.rsplit('/').next().unwrap_or(path);
-    let Some(stem) = name.strip_suffix(".py") else {
-        return false;
-    };
-    stem.starts_with("test_") || stem.ends_with("_test")
-}
-
-#[cfg(feature = "python")]
-fn is_dead_test_side(path: &str) -> bool {
-    if is_dead_test_file(path) || path.rsplit('/').next() == Some("conftest.py") {
-        return true;
-    }
-    let parts = path.split('/').collect::<Vec<_>>();
-    parts
-        .get(..parts.len().saturating_sub(1))
-        .is_some_and(|parents| parents.contains(&"tests"))
-}
-
-#[cfg(feature = "python")]
-fn dotted_module_name(path: &str) -> String {
-    let mut stem = path.strip_suffix(".py").unwrap_or(path);
-    for marker in ["/__init__", "/__main__"] {
-        if let Some(value) = stem.strip_suffix(marker) {
-            stem = value;
-            break;
-        }
-    }
-    stem.replace('/', ".")
-}
-
-#[cfg(feature = "python")]
-fn corpus_references(path: &str, corpus: &str) -> bool {
-    corpus.contains(path) || corpus.contains(&dotted_module_name(path))
 }
 
 fn dependency_closure(
@@ -449,61 +458,6 @@ fn dependency_closure(
         );
     }
     Ok((missing, untracked))
-}
-
-#[derive(Debug, Serialize)]
-#[cfg(feature = "python")]
-struct BrokenDeadTest {
-    test: String,
-    missing: Vec<String>,
-    last_commit: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[cfg(feature = "python")]
-struct UntrackedDeadTest {
-    test: String,
-    untracked: Vec<String>,
-    last_commit: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[cfg(feature = "python")]
-struct OrphanDeadTest {
-    test: String,
-    targets: Vec<String>,
-    notes_only: Vec<String>,
-    last_commit: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[cfg(feature = "python")]
-struct StaleDeadTestImport {
-    module: String,
-    missing: Vec<String>,
-    last_commit: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[cfg(feature = "python")]
-struct UnreferencedDeadTestSource {
-    path: String,
-    has_main: bool,
-    notes_only: bool,
-    last_commit: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[cfg(feature = "python")]
-struct DeadTestReportCore {
-    tests_scanned: usize,
-    modules_scanned: usize,
-    broken: Vec<BrokenDeadTest>,
-    depends_on_untracked: Vec<UntrackedDeadTest>,
-    untracked_importers: BTreeMap<String, Vec<String>>,
-    stale_imports: Vec<StaleDeadTestImport>,
-    orphan_target: Vec<OrphanDeadTest>,
-    unreferenced_sources: Vec<UnreferencedDeadTestSource>,
 }
 
 #[cfg(feature = "python")]
@@ -590,28 +544,22 @@ impl DeadTestsResolverNative {
 }
 
 #[cfg(feature = "python")]
+struct FileReportInputs<'a> {
+    root: &'a Path,
+}
+#[cfg(feature = "python")]
+impl report::Inputs for FileReportInputs<'_> {
+    fn read(&mut self, path: &str) -> anyhow::Result<Vec<u8>> {
+        Ok(fs::read(self.root.join(path))?)
+    }
+    fn is_file(&mut self, path: &str) -> anyhow::Result<bool> {
+        Ok(self.root.join(path).is_file())
+    }
+}
+#[cfg(feature = "python")]
 #[pyclass(module = "conductor_native")]
 struct DeadTestsAnalysisNative {
-    modules: BTreeMap<String, DeadTestModule>,
-    importers: BTreeMap<String, BTreeSet<String>>,
-    dynamic_basenames: BTreeSet<String>,
-    untracked_importers: BTreeMap<String, Vec<String>>,
-}
-
-#[cfg(feature = "python")]
-impl DeadTestsAnalysisNative {
-    fn source_reachable(&self, path: &str, config_text: &str) -> bool {
-        let non_test = self.importers.get(path).is_some_and(|importers| {
-            importers
-                .iter()
-                .any(|importer| !is_dead_test_side(importer))
-        });
-        let dynamic = path
-            .rsplit('/')
-            .next()
-            .is_some_and(|name| self.dynamic_basenames.contains(name));
-        non_test || dynamic || corpus_references(path, config_text)
-    }
+    analysis: report::Analysis,
 }
 
 #[cfg(feature = "python")]
@@ -619,143 +567,26 @@ impl DeadTestsAnalysisNative {
 impl DeadTestsAnalysisNative {
     #[new]
     fn new(repo_root: PathBuf, tracked: Vec<String>) -> PyResult<Self> {
-        let resolver = PythonModuleResolver::new(&repo_root, &tracked);
-        let mut paths = resolver.tracked_python.iter().cloned().collect::<Vec<_>>();
-        paths.sort_unstable();
-        let mut modules = BTreeMap::new();
-        for path in paths {
-            let module = scan_dead_test_module(&repo_root, &path, &resolver)
-                .map_err(DeadTestScanError::into_python)?;
-            modules.insert(path, module);
-        }
-        let mut importers = BTreeMap::<String, BTreeSet<String>>::new();
-        for module in modules.values() {
-            for dependency in &module.deps {
-                importers
-                    .entry(dependency.clone())
-                    .or_default()
-                    .insert(module.path.clone());
-            }
-        }
-        let dynamic_basenames = modules
-            .values()
-            .filter(|module| !is_dead_test_side(&module.path))
-            .flat_map(|module| module.basenames.iter().cloned())
-            .collect();
-        let mut untracked_importers = BTreeMap::<String, Vec<String>>::new();
-        for module in modules.values() {
-            for path in &module.untracked {
-                untracked_importers
-                    .entry(path.clone())
-                    .or_default()
-                    .push(module.path.clone());
-            }
-        }
-        Ok(Self {
-            modules,
-            importers,
-            dynamic_basenames,
-            untracked_importers,
-        })
+        let analysis = report::Analysis::from_captured(
+            &repo_root,
+            &tracked,
+            &mut FileReportInputs { root: &repo_root },
+        )
+        .map_err(DeadTestScanError::into_python)?;
+        Ok(Self { analysis })
     }
-
     fn report(
         &self,
         config_text: &str,
         notes_text: &str,
         dates: HashMap<String, String>,
     ) -> PyResult<String> {
-        let tests = self
-            .modules
-            .keys()
-            .filter(|path| is_dead_test_file(path))
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut broken = Vec::new();
-        let mut depends_on_untracked = Vec::new();
-        let mut orphan_target = Vec::new();
-        for test in &tests {
-            let (missing, untracked) =
-                dependency_closure(test, &self.modules).map_err(PyKeyError::new_err)?;
-            if !missing.is_empty() {
-                broken.push(BrokenDeadTest {
-                    test: test.clone(),
-                    missing: missing.into_iter().collect(),
-                    last_commit: dates.get(test).cloned(),
-                });
-                continue;
-            }
-            if !untracked.is_empty() {
-                depends_on_untracked.push(UntrackedDeadTest {
-                    test: test.clone(),
-                    untracked: untracked.into_iter().collect(),
-                    last_commit: dates.get(test).cloned(),
-                });
-            }
-            let targets = self.modules[test]
-                .deps
-                .iter()
-                .filter(|dependency| !is_dead_test_side(dependency))
-                .cloned()
-                .collect::<Vec<_>>();
-            if !targets.is_empty()
-                && !targets
-                    .iter()
-                    .any(|target| self.source_reachable(target, config_text))
-            {
-                let notes_only = targets
-                    .iter()
-                    .filter(|target| corpus_references(target, notes_text))
-                    .cloned()
-                    .collect();
-                orphan_target.push(OrphanDeadTest {
-                    test: test.clone(),
-                    targets,
-                    notes_only,
-                    last_commit: dates.get(test).cloned(),
-                });
-            }
-        }
-        let stale_imports = self
-            .modules
-            .values()
-            .filter(|module| !module.soft_missing.is_empty())
-            .map(|module| StaleDeadTestImport {
-                module: module.path.clone(),
-                missing: module.soft_missing.iter().cloned().collect(),
-                last_commit: dates.get(&module.path).cloned(),
-            })
-            .collect();
-        let unreferenced_sources = self
-            .modules
-            .values()
-            .filter(|module| {
-                !is_dead_test_side(&module.path)
-                    && self
-                        .importers
-                        .get(&module.path)
-                        .is_none_or(BTreeSet::is_empty)
-                    && !module.path.ends_with("__init__.py")
-                    && !self.source_reachable(&module.path, config_text)
-            })
-            .map(|module| UnreferencedDeadTestSource {
-                path: module.path.clone(),
-                has_main: module.has_main,
-                notes_only: corpus_references(&module.path, notes_text),
-                last_commit: dates.get(&module.path).cloned(),
-            })
-            .collect();
-        let report = DeadTestReportCore {
-            tests_scanned: tests.len(),
-            modules_scanned: self.modules.len(),
-            broken,
-            depends_on_untracked,
-            untracked_importers: self.untracked_importers.clone(),
-            stale_imports,
-            orphan_target,
-            unreferenced_sources,
-        };
-        serde_json::to_string(&report).map_err(|error| PyValueError::new_err(error.to_string()))
+        let dates = dates.into_iter().collect();
+        let result = self
+            .analysis
+            .report(config_text, notes_text, &dates)
+            .map_err(PyKeyError::new_err)?;
+        serde_json::to_string(&result).map_err(|error| PyValueError::new_err(error.to_string()))
     }
 }
 
@@ -993,3 +824,9 @@ mod tests;
 
 #[path = "dead_tests_bounded.rs"]
 pub mod bounded;
+
+#[path = "dead_tests_report.rs"]
+pub mod report;
+
+#[path = "dead_tests_inputs.rs"]
+pub mod inputs;

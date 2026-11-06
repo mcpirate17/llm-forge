@@ -15,7 +15,7 @@ PR head `966ae9a128458a6cbc488bfcd51bc574c4b623eb`. The canonical measurement an
 Open defects live in the [issue tracker](https://github.com/mcpirate17/llm-forge/issues),
 not a parallel local defect ledger.
 
-### Native reporting increment — publication validation, 2026-11-06
+### Native reporting increment — merged, 2026-11-06
 
 Issue [#208](https://github.com/mcpirate17/llm-forge/issues/208) moves explicit,
 changed, coverage and canary reports to shared Rust validation and routes their
@@ -29,12 +29,32 @@ reports matched Python's median, while coverage and canary remained slower.
 
 A real two-mutant automatic control verified installed native receipt acceptance,
 missing-identity debt and invalid-pin refusal. Make routes were traced with `UV=false`.
-The final committed tree must pass the full local check and current-base verification
-before publication. Existing Python host APIs remain compatibility surfaces; this
+The final full 18-check gate passed with 4,850 test executions, zero failures and
+189 ignored cases across 180 harnesses. Exact-head/current-base verification passed
+before [PR #209](https://github.com/mcpirate17/llm-forge/pull/209) merged as `0c35e00`;
+the merged tree matches checked head `58f32f3`. Existing Python host APIs remain compatibility surfaces; this
 increment establishes neither host adoption nor complete Rust migration.
 Remaining priorities include issue #196's ordinary mutation profiles and native
 prompt/tool assistance. Report overhead remains a documented limitation, not a
 general speedup claim; select the next increment from current user-value evidence.
+
+The active increment is [#210](https://github.com/mcpirate17/llm-forge/issues/210):
+the shared dead-test classifier now backs `forge analyze tests` and `make dead-tests`
+through native Git/reference collection, retaining advisory classifications and
+explicit legacy JSON output. Focused classifier/input/path/report/CLI checks,
+strict Clippy and the optional Python binding compile passed. Six retained report
+pairs cover authored merge/rename/shallow fixtures and the actual Forge checkout;
+the latter matched complete JSON and exits (123 modules, 17 tests, 35 advisory
+unreferenced sources). Independent review checked all 98 commands and the exact
+two intentional fixture differences. Clean source `1195b04` also passed 22 report
+tests, two CLI tests and the stricter six-pair parity rerun. The matched three-arm
+benchmark completed 108 executions: median native latency fell from 510.75 to
+218.97 ms, while Python remained faster at 181.06 ms. Independent audit verified
+all 18 receipts and exact report comparisons. The original slower baseline and
+remaining gap are retained in the [performance report](performance.md#full-native-test-import-report--2026-11-06).
+Final publication gates remain pending. See the
+[command contract](native-analysis.md#python-test-import-report). MCP admission and
+cancellation remain a separate integration gap; no host adoption is claimed.
 
 ### Architecture, evidence and disposition
 

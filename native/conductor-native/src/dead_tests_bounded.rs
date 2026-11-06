@@ -1,19 +1,20 @@
 //! Interpreter-free, bounded import closure. Parse/read errors are explicit.
-use super::{collect_python_imports, PythonModuleResolver};
+use super::{
+    collect_python_imports,
+    inputs::{safe_lookup, valid_path},
+    PythonModuleResolver,
+};
 use anyhow::{ensure, Context, Result};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashSet},
-    fs::{self, OpenOptions},
-    io::Read,
-    os::unix::fs::{MetadataExt, OpenOptionsExt},
-    path::{Component, Path},
+    fs,
+    os::unix::fs::MetadataExt,
+    path::Path,
 };
 
-const MAX_FILES: usize = 100_000;
-const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
-const MAX_TOTAL_BYTES: u64 = 1024 * 1024 * 1024;
+use super::inputs::MAX_FILES;
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Finding {
@@ -30,134 +31,11 @@ pub struct Scan {
     pub lookups: BTreeMap<String, bool>,
     pub root_identity: (u64, u64),
 }
-fn valid_path(path: &str) -> bool {
-    !path.is_empty()
-        && path
-            .split('/')
-            .all(|part| !part.is_empty() && part != "." && part != "..")
-        && path.len() <= 4096
-        && Path::new(path)
-            .components()
-            .all(|part| matches!(part, Component::Normal(_)))
-}
 fn read_source(root: &Path, path: &str, total: &mut u64) -> Result<String> {
-    ensure!(valid_path(path), "invalid import-closure path: {path}");
-    let absolute = root.join(path);
-    let canonical = absolute
-        .canonicalize()
-        .with_context(|| format!("resolve closure source {path}"))?;
-    ensure!(
-        canonical == absolute,
-        "closure source contains a symlink: {path}"
-    );
-    let mut file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
-        .open(&absolute)?;
-    let before = file.metadata()?;
-    ensure!(
-        before.is_file() && before.len() <= MAX_FILE_BYTES,
-        "closure source is not a bounded file: {path}"
-    );
-    *total = total
-        .checked_add(before.len())
-        .context("closure byte count overflow")?;
-    ensure!(
-        *total <= MAX_TOTAL_BYTES,
-        "closure source byte budget exceeded"
-    );
-    let mut bytes = Vec::new();
-    file.by_ref()
-        .take(MAX_FILE_BYTES + 1)
-        .read_to_end(&mut bytes)?;
-    ensure!(
-        bytes.len() as u64 <= MAX_FILE_BYTES,
-        "closure source grew beyond limit: {path}"
-    );
-    let after = file.metadata()?;
-    let named = fs::symlink_metadata(&absolute)?;
-    ensure!(
-        named.is_file() && (named.dev(), named.ino()) == (after.dev(), after.ino()),
-        "closure source name changed while reading: {path}"
-    );
-    ensure!(
-        (
-            before.dev(),
-            before.ino(),
-            before.len(),
-            before.mtime(),
-            before.mtime_nsec(),
-            before.ctime(),
-            before.ctime_nsec()
-        ) == (
-            after.dev(),
-            after.ino(),
-            after.len(),
-            after.mtime(),
-            after.mtime_nsec(),
-            after.ctime(),
-            after.ctime_nsec()
-        ) && absolute.canonicalize()? == absolute,
-        "closure source changed while reading: {path}"
-    );
+    let (bytes, _) = super::inputs::read_raw(root, path, total)?;
     String::from_utf8(bytes).with_context(|| format!("closure source is not UTF-8: {path}"))
 }
-fn safe_lookup(
-    root: &Path,
-    path: &str,
-    seen: &mut BTreeMap<String, bool>,
-    bytes: &mut usize,
-) -> Result<bool> {
-    ensure!(valid_path(path), "invalid import lookup path: {path}");
-    let absolute = root.join(path);
-    let mut parent = absolute.parent().context("import lookup parent missing")?;
-    loop {
-        match fs::symlink_metadata(parent) {
-            Ok(meta) => {
-                ensure!(
-                    meta.is_dir() && !meta.file_type().is_symlink(),
-                    "unsafe import parent"
-                );
-                break;
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                parent = parent.parent().context("import ancestor missing")?
-            }
-            Err(error) => return Err(error.into()),
-        }
-    }
-    ensure!(
-        parent.starts_with(root) && parent.canonicalize()? == parent,
-        "import parent contains symlink"
-    );
-    let present = match fs::symlink_metadata(&absolute) {
-        Ok(meta) => {
-            ensure!(
-                !meta.file_type().is_symlink(),
-                "symlink import candidate refused: {path}"
-            );
-            meta.is_file()
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(error) => return Err(error.into()),
-    };
-    if let Some(previous) = seen.get(path) {
-        ensure!(
-            *previous == present,
-            "import lookup changed during scan: {path}"
-        );
-    } else {
-        *bytes = bytes
-            .checked_add(path.len())
-            .context("import lookup bytes overflow")?;
-        ensure!(
-            seen.len() < 100_000 && *bytes <= 16 * 1024 * 1024,
-            "import lookup budget exceeded"
-        );
-        seen.insert(path.into(), present);
-    }
-    Ok(present)
-}
+
 fn untracked(
     resolver: &PythonModuleResolver,
     importer: &str,
