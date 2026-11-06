@@ -82,6 +82,50 @@ fn legacy_handshakes_and_modern_requests_can_share_a_process() {
 }
 
 #[test]
+fn annotations_survive_discovery_without_expanding_call_authority() {
+    let catalog = json!({"tools":[{"name":"echo",
+        "annotations":{"readOnlyHint":true,"destructiveHint":false,
+            "openWorldHint":false,"idempotentHint":true},
+        "inputSchema":{"type":"object","additionalProperties":false,
+            "properties":{"text":{"type":"string"}},"required":["text"]}}]});
+    for version in LEGACY.iter().copied().map(Some).chain([None]) {
+        let mut protocol = Protocol::new(catalog.clone()).unwrap();
+        if let Some(version) = version {
+            let initialized = reply(
+                &mut protocol,
+                json!({"jsonrpc":"2.0","id":0,
+                "method":"initialize","params":{"protocolVersion":version,
+                    "capabilities":{},"clientInfo":{"name":"test","version":"1"}}}),
+            );
+            assert_eq!(initialized["result"]["protocolVersion"], version);
+            assert!(matches!(
+                protocol.prepare(
+                    br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+                    &BTreeMap::new()
+                ),
+                Action::Ignore
+            ));
+        }
+        let request = |method| {
+            if version.is_some() {
+                json!({"jsonrpc":"2.0","id":1,"method":method})
+            } else {
+                modern(method)
+            }
+        };
+        let listed = reply(&mut protocol, request("tools/list"));
+        assert_eq!(listed["result"]["tools"], catalog["tools"]);
+        let mut call = request("tools/call");
+        call["params"]["name"] = json!("unregistered");
+        call["params"]["arguments"] = json!({"text":"test"});
+        assert_eq!(reply(&mut protocol, call.clone())["error"]["code"], -32602);
+        call["params"]["name"] = json!("echo");
+        call["params"]["arguments"]["unregistered"] = json!(true);
+        assert_eq!(reply(&mut protocol, call)["result"]["isError"], true);
+    }
+}
+
+#[test]
 fn raw_duplicate_arguments_invalid_ids_and_concurrent_id_reuse_fail_closed() {
     let mut protocol = protocol();
     let raw=br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{"text":"first","text":"second"},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}"#;

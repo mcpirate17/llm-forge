@@ -10,6 +10,38 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Actual Codex approval diagnostic — 2026-11-05
+
+The [retained failed attempt](../research/performance/forge-program-20261105-codex-mcp-approval.json)
+used Codex CLI 0.166.0, requested `gpt-6-luna` with low reasoning, and the checked
+`bab611f` Forge build from PR #201. Invocation-only MCP configuration exposed
+`code_inspect` and the operator-pinned `outbound_read_file` fixture. The prompt
+requested exactly three calls: inspect an authored Rust symbol, read its allowed
+source, then attempt an explicitly ungranted sibling path. This is a prescribed
+interoperability workload, not autonomous tool selection.
+
+**The attempt failed.** Codex discovered and attempted all three tools, but each
+client event reported `MCP tool call requires approval, but approval policy is never`.
+There were zero successful tool calls and zero outbound endpoint launches/calls.
+The client exited zero; the independent result oracle correctly rejected that
+false success signal. Eleven diagnostic phases completed and one failed, with
+none censored or unstarted. Both native managed scopes and the socket were
+positively absent after cleanup and independently rechecked. The user's persistent
+configuration hash was unchanged; client approval settings were not relaxed.
+
+The final client event reported 50,293 input tokens, including 39,296 cached input
+tokens, and 196 output tokens. These are client-reported counts for this failed
+attempt, not independently verified billing or savings. The source fixture was
+46 bytes; input usage includes context outside the requested file, whose exact
+composition was not measured. No task benefit, denied-read enforcement, serving
+model attestation, CPU/RSS comparison or dollar-cost conclusion follows.
+
+The artifact retains literal client arguments, executable/source/driver hashes,
+task resource enforcement, phase observations, client results and raw-log hashes.
+The native task owner enforced one attempt, a 90-second deadline, one CPU,
+1 GiB RAM and bounded retained logs. Repeating model calls requires the operator's
+client approval decision; see [client configuration](native-mcp-setup.md#codex-cli).
+
 ### Native outbound MCP observations — 2026-11-05
 
 The [five native observations](../research/performance/forge-program-20261105-outbound-mcp.json)

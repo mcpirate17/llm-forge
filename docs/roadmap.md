@@ -64,7 +64,7 @@ this audit.
 ### Ordered continuation and acceptance criteria
 
 The descendant-cleanup and exact-test-target repairs landed in PR #198. The
-latest implemented correctness increment addresses [#197](https://github.com/mcpirate17/llm-forge/issues/197):
+Cargo freshness repair in PR #199 addresses [#197](https://github.com/mcpirate17/llm-forge/issues/197):
 ordinary Cargo discovery-input freshness now passes the real automatic-engine
 drift experiment and full source-bound gate below. Restoring the
 broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
@@ -90,6 +90,12 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
 2. Validate one real client: setup, advertised tools, an agent-selected read,
    allowed/denied/failure cases, reconnect and undo. Test the client-specific
    configuration rather than treating a custom wire client as client adoption.
+   The first Codex CLI 0.166.0 probe reached discovery and attempted the three
+   prescribed calls, but the client approval gate refused all of them. Cleanup
+   was verified; the zero client exit code was rejected by the result oracle.
+   [The failed attempt and observed usage](performance.md#actual-codex-approval-diagnostic--2026-11-05)
+   remain evidence, not adoption success. A new probe awaits an explicit,
+   narrowly scoped operator approval decision.
 3. Evaluate deterministic prompt strengthening with explicit task modes, reusing
    composition, catalog filtering, token counts and recovery. Literal retention
    alone cannot establish preserved meaning, instruction priority or improved
@@ -111,6 +117,18 @@ The existing root-only profile cannot yet execute Forge's own workspace campaign
    paths. Retire proven duplicates and interpreted boundaries after caller/parity
    verification; add readiness/setup/status/undo without parallel machinery.
 
+**Current source-tool interoperability increment:** `code_inspect` and `code_fold`
+now advertise their verified read-only effects using four boolean MCP annotations.
+The strict native catalog parser validates this optional metadata without using
+it for dispatch or authority. Other tools, including arbitrary outbound tools,
+remain unclassified. Catalog/schema tests and legacy/modern MCP discovery tests
+passed (14 focused tests, one existing delegated-cgroup test ignored), as did
+strict all-target Clippy and formatting. An initial test fixture omitted the
+legacy initialization notification; the fixture was corrected without changing
+production protocol handling. Independent review found no concrete blocker.
+These annotations do not establish successful client approval or adoption; each
+committed tree still requires its full publication checks.
+
 **Verified native MCP increment:** the local outbound endpoint passed six opted-in
 wire integration tests, seven protocol/controller tests (including delegated
 prelaunch cleanup), and three admission tests. The shared owner passed all 22
@@ -126,9 +144,13 @@ The final release repeated all 22 owner, seven controller/protocol and six wire
 tests with zero ignored cases. Five observations completed 160 selected-tool calls
 with verified cleanup: warm medians were 1.259–1.333 ms; the ordinary CLI control
 stayed within its existing budget. [The performance report](performance.md#native-outbound-mcp-observations--2026-11-05)
-records identities, controls, failures and limitations. Later documentation/test
-guard changes require their own publication receipt. Real coding-client use,
-task benefit and global installation remain separate unverified milestones.
+records identities, controls, failures and limitations. The final documentation
+and test-guard head `bab611fd1274dd35a0b5cf21bbd77863fbb99581` also passed all
+18 checks and local verification with the same counts; receipt SHA-256
+`73b39250e1a71e1274ce145457d70af62c74d41463311257ed35e68429be05fe`.
+[PR #201](https://github.com/mcpirate17/llm-forge/pull/201) merged as `d891e83`
+with the exact checked tree. Successful real coding-client use, task benefit
+and global installation remain separate unverified milestones.
 See [the operator contract](native-harness.md#optional-outbound-mcp-tool).
 
 **Rejected candidate:** optional next-inspection advice passed focused

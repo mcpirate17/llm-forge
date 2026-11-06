@@ -66,9 +66,13 @@ impl ToolRegistry {
             let map = entry.as_object().context("tool must be an object")?;
             ensure!(
                 map.keys()
-                    .all(|key| ["name", "description", "inputSchema"].contains(&key.as_str())),
+                    .all(|key| ["name", "description", "inputSchema", "annotations"]
+                        .contains(&key.as_str())),
                 "unsupported tool catalog field"
             );
+            if let Some(annotations) = map.get("annotations") {
+                validate_annotations(annotations)?;
+            }
             let name = map
                 .get("name")
                 .and_then(Value::as_str)
@@ -166,4 +170,26 @@ impl ToolRegistry {
             repaired: false,
         })
     }
+}
+
+// Optional descriptive metadata never enters Tool or call validation. Only the
+// bounded MCP boolean profile is accepted; absent hints acquire no defaults.
+fn validate_annotations(value: &Value) -> anyhow::Result<()> {
+    let annotations = value
+        .as_object()
+        .context("tool annotations must be an object")?;
+    for (key, value) in annotations {
+        ensure!(
+            [
+                "readOnlyHint",
+                "destructiveHint",
+                "openWorldHint",
+                "idempotentHint"
+            ]
+            .contains(&key.as_str())
+                && value.is_boolean(),
+            "unsupported tool annotation or non-boolean hint"
+        );
+    }
+    Ok(())
 }

@@ -1,0 +1,344 @@
+{
+  "schema": "forge.actual-client-observation.v1",
+  "date": "2026-11-05",
+  "status": "FAILED_CLIENT_APPROVAL",
+  "scope": "One actual Codex exec attempt against private authored fixtures. Adoption diagnostic; not a productivity or speedup benchmark.",
+  "source": {
+    "checkout_commit": "d891e83b69165817ed36d8d89bde7dd29d993555",
+    "native_identity": {
+      "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+      "compiled_git_commit": "bab611fd1274dd35a0b5cf21bbd77863fbb99581",
+      "compiled_source_sha256": "53016f2e460a71facc56f77d74b6e7ee3824e922c990837231cf519deddc9be6",
+      "executable_sha256": "56b61f70e0032d85cd51d8124177bbf1187f34dc99652d4d6175b520973b952b"
+    },
+    "pins": {
+      "driver": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-program-codex-mcp-adoption.py",
+        "sha256": "9e75afd3fb72a0ace7c7cb6bb4e93bbccd0df5929b65be9e2e7671b6fea30b2e"
+      },
+      "helper": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-program-no-python-check.py",
+        "sha256": "7001d35af92a19e9bfe7586858635ccabe23d670063f2a19d31e3337cb21790b"
+      },
+      "forge": {
+        "supplied": "/home/tim/Projects/llm-forge/.git/forge-tools/native-install/bin/forge",
+        "private_copy": "/tmp/forge-codex-mcp-3bish6ar/bin/forge",
+        "sha256": "56b61f70e0032d85cd51d8124177bbf1187f34dc99652d4d6175b520973b952b"
+      },
+      "fixture": {
+        "supplied": "/home/tim/Projects/llm-forge/native/forge/target/release/examples/outbound_mcp_server",
+        "private_copy": "/tmp/forge-codex-mcp-3bish6ar/bin/server",
+        "sha256": "ada9fd60af6ed7b280bdfc199c50c2d6216760230667e22729acee69449bafdd"
+      },
+      "codex": {
+        "path": "/home/tim/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex",
+        "sha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8"
+      },
+      "source": {
+        "path": "/tmp/forge-codex-mcp-3bish6ar/source/probe.rs",
+        "sha256": "921d59e50a73c768e61a13dde17a63a261ca5b6ed6e895c6f2df4894463555fd"
+      },
+      "policy": {
+        "path": "/tmp/forge-codex-mcp-3bish6ar/policy.json",
+        "sha256": "ed5f7f332fc2c4f2bb3baf240f1345d610c8a8f7fad42553d931bcbd8b94c224"
+      }
+    }
+  },
+  "client": {
+    "version": "codex-cli 0.166.0",
+    "requested_model": "gpt-6-luna",
+    "requested_reasoning_effort": "low",
+    "argv": [
+      "/home/tim/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "read-only",
+      "--cd",
+      "/tmp/forge-codex-mcp-3bish6ar/source",
+      "--json",
+      "--model",
+      "gpt-6-luna",
+      "-c",
+      "model_reasoning_effort=\"low\"",
+      "-c",
+      "mcp_servers={forge={command=\"/tmp/forge-codex-mcp-3bish6ar/bin/forge\",args=[\"harness\", \"stdio\", \"--socket\", \"/tmp/forge-codex-mcp-3bish6ar/states/run-1337183-fc4585264493ce807cae75649e4bdce2/socket\", \"--source-root\", \"/tmp/forge-codex-mcp-3bish6ar/source\"],required=true,enabled_tools=[\"code_inspect\",\"outbound_read_file\"]}}",
+      "Use only the forge MCP server. Do not run shell commands, edit files, or use other tools. Make exactly these three calls in this order: 1. code_inspect with path=\"probe.rs\", symbol=\"forge_probe_answer\", max_results=5, max_bytes=8192. 2. outbound_read_file with path=\"/tmp/forge-codex-mcp-3bish6ar/source/probe.rs\". 3. outbound_read_file with path=\"/tmp/forge-codex-mcp-3bish6ar/denied.txt\". The third read should be refused; report that outcome without trying another path. Finish with only a short JSON object with keys inspected_name, sha_agreement, denied. Set inspected_name to the actual returned symbol name; sha_agreement compares source_sha256 from inspection with sha256 from the allowed outbound result; denied is a boolean from the third call."
+    ],
+    "persistent_configuration_unchanged": true,
+    "model_identity_limitation": "Requested model is recorded; this trace does not independently attest the serving model or provider."
+  },
+  "workload": {
+    "ordered_operations": [
+      "source symbol inspection",
+      "allowed outbound read",
+      "denied outbound read"
+    ],
+    "source_bytes": 46,
+    "scope": "Explicit instructions selected these tools; this does not test autonomous tool selection.",
+    "expected_final": {
+      "inspected_name": "forge_probe_answer",
+      "sha_agreement": true,
+      "denied": true
+    }
+  },
+  "accounting": {
+    "attempted": 1,
+    "successful": 0,
+    "failed": 1,
+    "censored": 0,
+    "unstarted": 0,
+    "client_reported_tool_attempts": 3,
+    "client_reported_tool_successes": 0,
+    "outbound_launches": 0,
+    "outbound_calls": 0,
+    "phases": {
+      "completed": 11,
+      "failed": 1,
+      "censored": 0,
+      "running": 0,
+      "unstarted": 0
+    },
+    "native_commands": {
+      "completed": 8,
+      "failed": 0,
+      "censored": 0,
+      "running": 0,
+      "unstarted": 0
+    }
+  },
+  "failure": [
+    "RuntimeError: unexpected MCP server or incomplete client tool item"
+  ],
+  "client_completed_tool_items": [
+    {
+      "id": "item_0",
+      "type": "mcp_tool_call",
+      "server": "forge",
+      "tool": "code_inspect",
+      "arguments": {
+        "path": "probe.rs",
+        "symbol": "forge_probe_answer",
+        "max_results": 5,
+        "max_bytes": 8192
+      },
+      "result": null,
+      "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+      },
+      "status": "failed"
+    },
+    {
+      "id": "item_1",
+      "type": "mcp_tool_call",
+      "server": "forge",
+      "tool": "outbound_read_file",
+      "arguments": {
+        "path": "/tmp/forge-codex-mcp-3bish6ar/source/probe.rs"
+      },
+      "result": null,
+      "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+      },
+      "status": "failed"
+    },
+    {
+      "id": "item_2",
+      "type": "mcp_tool_call",
+      "server": "forge",
+      "tool": "outbound_read_file",
+      "arguments": {
+        "path": "/tmp/forge-codex-mcp-3bish6ar/denied.txt"
+      },
+      "result": null,
+      "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+      },
+      "status": "failed"
+    }
+  ],
+  "client_final_items": [
+    {
+      "id": "item_3",
+      "type": "agent_message",
+      "text": "{\"inspected_name\":null,\"sha_agreement\":false,\"denied\":false}"
+    }
+  ],
+  "client_reported_usage": [
+    {
+      "input_tokens": 50293,
+      "cached_input_tokens": 39296,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 196,
+      "reasoning_output_tokens": 0
+    }
+  ],
+  "usage_limitation": "Client-reported usage for this failed attempt only, not independently verified model-side billing, marginal cost, task benefit or token savings. Cached input is reported as a subset; fields are not summed.",
+  "task_receipt": {
+    "schema_version": 2,
+    "task_id": "codex-mcp-probe",
+    "attempt": 1,
+    "owner": "codex-probe",
+    "session_id": null,
+    "claim_id": null,
+    "message_id": null,
+    "started_at": 1793888866,
+    "finished_at": 1793888875,
+    "exit_code": 0,
+    "timed_out": false,
+    "succeeded": true,
+    "detail": "command exited 0",
+    "resources": {
+      "requested": {
+        "cpus": 1.0,
+        "memory_mib": 1024,
+        "max_load": null,
+        "gpu": null,
+        "vram_mib": null
+      },
+      "available": {
+        "captured_at": 1793888866,
+        "allowed_cpus": 32,
+        "effective_cpus": 32.0,
+        "load_1m": 0.26,
+        "load_5m": 0.13,
+        "load_15m": 0.42,
+        "memory_total_mib": 126335,
+        "memory_available_mib": 120248,
+        "cgroup_v2_path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-kitty-4278.scope",
+        "cgroup_memory_limit_mib": null,
+        "cgroup_memory_available_mib": null,
+        "gpu": null
+      },
+      "enforcement": {
+        "backend": "systemd_user_scope",
+        "unit": "forge-task-0e46a8d30789da18f830949d1954e3ed-1337194.scope",
+        "verified": true,
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/forge-task-0e46a8d30789da18f830949d1954e3ed-1337194.scope",
+        "cpu_quota_us": 100000,
+        "cpu_period_us": 100000,
+        "memory_max_bytes": 1073741824,
+        "memory_swap_max_bytes": 0,
+        "requested_runtime_seconds": 90
+      }
+    },
+    "stdout": {
+      "retained_bytes": 2049,
+      "discarded_bytes": 0
+    },
+    "stderr": {
+      "retained_bytes": 39,
+      "discarded_bytes": 0
+    }
+  },
+  "phase_observations": [
+    {
+      "name": "capture",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.3537277900031768
+    },
+    {
+      "name": "native_identity",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.032545016998483334
+    },
+    {
+      "name": "service_start",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.06814874900010182
+    },
+    {
+      "name": "catalog",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.0015724469994893298
+    },
+    {
+      "name": "task_create",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.007856698000978213
+    },
+    {
+      "name": "task_run",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 8.704287410997495
+    },
+    {
+      "name": "client_evidence",
+      "state": "failed",
+      "error": "RuntimeError: unexpected MCP server or incomplete client tool item",
+      "elapsed_seconds_single_observation": 0.0002559319982538
+    },
+    {
+      "name": "task_cleanup",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.000237691005168017
+    },
+    {
+      "name": "service_stop",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.007804608001606539
+    },
+    {
+      "name": "service_cleanup",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.0002153509994968772
+    },
+    {
+      "name": "input_recheck",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.1470918109989725
+    },
+    {
+      "name": "config_recheck",
+      "state": "completed",
+      "elapsed_seconds_single_observation": 0.00025645200366852805
+    }
+  ],
+  "outbound_status": {
+    "state": "not_started",
+    "launches": 0,
+    "calls": 0,
+    "error": null,
+    "scratch_path": null,
+    "cgroup_path": null
+  },
+  "cleanup": {
+    "ownership": {
+      "service": "verified_absent",
+      "task_scope": "verified_absent"
+    },
+    "task": {
+      "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/forge-task-0e46a8d30789da18f830949d1954e3ed-1337194.scope",
+      "absent": true,
+      "scope": "native task receipt plus positive ENOENT; not process-producer attestation"
+    },
+    "service": {
+      "verified_absent": true,
+      "service_cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/forge-harness-1337183-8310242c2869f6c63c1bc38866ea1d53.service",
+      "socket": "/tmp/forge-codex-mcp-3bish6ar/states/run-1337183-fc4585264493ce807cae75649e4bdce2/socket"
+    },
+    "independent_recheck": "Reviewer observed ENOENT for exact task cgroup, service cgroup and socket after completion."
+  },
+  "provenance": {
+    "private_summary": {
+      "path": "/tmp/forge-codex-mcp-3bish6ar/summary.json",
+      "sha256": "f10bf663f36dacd6bb3bdaaa944b7aa94787c469ce4538fc71ba368663222064"
+    },
+    "client_stdout": {
+      "path": "/tmp/forge-codex-mcp-3bish6ar/.agents/forge/runs/codex-mcp-probe/1/stdout.log",
+      "sha256": "462fc1a71868c5305ecd23d9595ae530c9fcff5d7f4a924c64ad1edc3e4f9f70",
+      "bytes": 2049
+    },
+    "private_logs_retained": true,
+    "producer_attestation": false
+  },
+  "limitations": [
+    "A zero client process exit code did not satisfy the tool-result oracle.",
+    "Discovery and attempted calls occurred; no requested MCP tool executed.",
+    "No denied-path enforcement, outbound integration success, autonomous choice or task-quality improvement was observed.",
+    "No CPU, RSS peak, allocation, comparative latency or dollar-cost measurement was made.",
+    "No persistent client approval setting, managed policy or authentication material was changed."
+  ]
+}
