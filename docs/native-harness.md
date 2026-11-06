@@ -4,7 +4,9 @@
 confined PTYs and the existing SQLite task journal. It requires Linux Landlock
 ABI 6 or newer, seccomp user notifications and a systemd user manager/client
 version 254 or newer. Start fails if enforcement or controller readback fails.
-There is no unconfined fallback. No Python or Node process is involved.
+There is no unconfined fallback. The Forge-owned service and adapter need no
+Python or Node runtime; operator-selected external programs may use their own
+toolchains.
 
 The operator supplies capabilities once, when starting the service. Model calls
 can select a configured executable and arguments, inspect source, or apply an
@@ -170,6 +172,42 @@ is 1–20 seconds. Pre/post filesystem capture and verification are cooperative
 and can delay cancellation or shutdown; this is not a hard whole-call deadline.
 Cancellation requests child termination and waits for owned cleanup. Uncertain
 cleanup fails closed and retains scratch for inspection.
+
+### Reproduce report controls
+
+The ignored `native_test_report_service` integration tests require the kernel
+and user-manager controls above. Build a release Forge, select its absolute path
+as `FORGE_TEST_BIN`, and supply its independently measured SHA-256 through
+`FORGE_TEST_BIN_SHA256`. Set `FORGE_TEST_REPORT_RUNTIME_READS` to a JSON array
+of explicitly authorized, canonical runtime library/cache file paths for that
+binary. The fixture adds its private executable copy to those grants; it does
+not discover or grant a host runtime automatically.
+
+The synthetic lifecycle cases additionally require a separately compiled fixture:
+
+```sh
+rustc +1.98.0 --edition=2021 \
+  native/forge/tests/support/test_report_worker_fixture.rs -o /private/path/worker
+```
+
+Set `FORGE_TEST_REPORT_WORKER` to that absolute path and
+`FORGE_TEST_REPORT_WORKER_SHA256` to its independently measured digest, then run:
+
+```sh
+cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml \
+  --test native_test_report_service -- --ignored --nocapture --test-threads=1 \
+  --skip observation::matched_cli_mcp_python_test_report_observation
+```
+
+These controls retain evidence on success and failure and print its location.
+The actual Forge report comparison is separate from synthetic ownership/error
+controls. For the as-configured performance observation, set
+`FORGE_TEST_REPORT_OBSERVATION` to a new absolute JSON output path and select
+`observation::matched_cli_mcp_python_test_report_observation` with
+`--exact --ignored --nocapture`. It measures first calls and 31 alternating pairs;
+see [measurement limits](performance.md#confined-mcp-test-report--2026-11-06).
+An outer native `forge performance benchmark` receipt measures the entire test,
+including setup, hashing and cleanup, rather than individual MCP calls.
 
 ## Calls and reconnects
 

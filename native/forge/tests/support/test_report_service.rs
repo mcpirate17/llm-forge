@@ -429,7 +429,103 @@ impl Running {
         );
         serde_json::from_slice(&output.stdout).unwrap()
     }
-    pub async fn finish(mut self) {
+    pub async fn preparing_or_active(&self) -> Value {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let status = self.status().await;
+                let report = &status["python_test_report"];
+                if report["scratch_path"].is_string() {
+                    let phase = if report["cgroup_path"].is_null() { "preparing" } else { "prepared_or_running" };
+                    self.save("early-shutdown-observation", json!({"status":status,"observed_phase":phase,
+                        "scope":"point observation; shutdown may race preparation/execution; no exact launch count claimed"}));
+                    return status;
+                }
+                assert_eq!(report["fatal"], false);
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        }).await.unwrap()
+    }
+    pub async fn shutdown_during_report(self, status: &Value, pids: &[u32]) {
+        let parent = self.owned_parent(status);
+        let report = &status["python_test_report"];
+        let scratch = Path::new(report["scratch_path"].as_str().unwrap());
+        assert_eq!(scratch.parent(), Some(self.state.as_path()));
+        assert!(scratch
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("test-report-"));
+        if let Some(group) = report["cgroup_path"].as_str() {
+            assert_eq!(Path::new(group).parent(), Some(parent.as_path()));
+        }
+        let pid = status["pid"].as_u64().unwrap();
+        self.save(
+            "shutdown-before",
+            json!({"status":status,"known_worker_pids":pids,"owned_parent":parent,
+            "daemon_stat":fs::read_to_string(format!("/proc/{pid}/stat")).unwrap()}),
+        );
+        let response = tokio::time::timeout(
+            Duration::from_secs(8),
+            forge::harness::transport::request(
+                &self.state.join("socket"),
+                br#"{"method":"shutdown"}"#,
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        self.save("shutdown-response", response.clone());
+        assert_eq!(response["ok"], true, "{response}");
+        self.wait_daemon_cleanup(status, &parent, pids).await;
+        self.save("daemon-cleanup-before-manager-stop",json!({"worker_scratch_and_groups_absent":true,
+            "known_worker_pids_absent":pids,"daemon_pid_absent":pid,"socket_absent":true,
+            "scope":"fresh positive absence checked before Service::stop; manager automatic exit handling is not excluded"}));
+        self.finish_stopped(parent);
+    }
+    async fn wait_daemon_cleanup(&self, status: &Value, parent: &Path, pids: &[u32]) {
+        let mut paths = vec![
+            PathBuf::from(format!("/proc/{}", status["pid"].as_u64().unwrap())),
+            self.state.join("socket"),
+        ];
+        for key in ["scratch_path", "cgroup_path"] {
+            if let Some(path) = status["python_test_report"][key].as_str() {
+                paths.push(path.into());
+            }
+        }
+        paths.extend(pids.iter().map(|pid| PathBuf::from(format!("/proc/{pid}"))));
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let absent = paths.iter().all(|path| match fs::symlink_metadata(path) {
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+                    Ok(_) => false,
+                    Err(error) => panic!("cannot verify shutdown absence: {error}"),
+                });
+                let scratch = fs::read_dir(&self.state)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().file_name())
+                    .any(|name| name.to_str().unwrap().starts_with("test-report-"));
+                let groups = match fs::read_dir(parent) {
+                    Ok(entries) => entries.map(|entry| entry.unwrap()).any(|entry| {
+                        entry.file_type().unwrap().is_dir() && entry.file_name() != "supervisor"
+                    }),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+                    Err(error) => panic!("cannot inspect owned shutdown cgroup: {error}"),
+                };
+                if absent && !scratch && !groups {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        for path in paths {
+            missing(&path);
+        }
+        missing(&self.state.join("failure.json"));
+    }
+    pub async fn finish(self) {
         let status = self.status().await;
         self.save("final-status", status.clone());
         if status["python_test_report"]["cgroup_path"].is_string() {
@@ -447,6 +543,9 @@ impl Running {
         .unwrap()
         .unwrap();
         assert_eq!(response["ok"], true, "{response}");
+        self.finish_stopped(parent);
+    }
+    fn finish_stopped(mut self, parent: PathBuf) {
         self.service.as_mut().unwrap().stop().unwrap();
         missing(&parent);
         for (path, expected) in &self.pins {

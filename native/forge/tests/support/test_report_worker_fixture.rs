@@ -45,6 +45,10 @@ fn main() {
     let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap());
     assert!(std::env::var_os("FORGE_TEST_REPORT_SYNTHETIC_SECRET").is_none());
     let mode = fs::read_to_string(root.join("worker-mode")).unwrap();
+    if mode == "nonzero" {
+        eprintln!("synthetic controlled worker exit7 λ");
+        std::process::exit(7);
+    }
     if mode == "denied" {
         let outside = fs::read_to_string(root.join("worker-denied")).unwrap();
         assert_eq!(

@@ -56,17 +56,32 @@ The full 18-check gate passed on `378ee44`: 4,889 passing test executions, zero
 failures and 189 ignored across 181 harnesses. Exact-head/current-base verification
 passed before [PR #211](https://github.com/mcpirate17/llm-forge/pull/211) merged as
 `22ec5bf`; its tree matches the checked head. See the
-[command contract](native-analysis.md#python-test-import-report). MCP admission and
-cancellation remain a separate integration gap; no host adoption is claimed.
+[command contract](native-analysis.md#python-test-import-report). The subsequent
+MCP integration is tracked in #212 below; no host adoption is claimed.
 
 The active increment is [#212](https://github.com/mcpirate17/llm-forge/issues/212):
 an operator-enabled MCP report using the existing confined native worker owner.
-The first implementation adds fixed-root admission, isolated Git configuration,
-report-specific disconnect cancellation and bounded output. Strict Clippy and
-67 focused debug test executions passed, including CLI parity and adapter wire
-tests. Live service cleanup, release validation and matched service overhead
-remain unverified. Filesystem preparation remains cooperative; the child deadline
-does not establish a hard whole-operation deadline. No service adoption is claimed.
+It adds fixed-root admission, isolated Git configuration, report-specific
+disconnect cancellation and bounded output. A first live attempt refused before
+launch because a pinned executable also hit a smaller data-file limit. The
+reviewed correction retains strict executable pins and ordinary data bounds.
+Focused tests and strict Clippy passed; six new live controls and the existing
+terminal-cancellation regression passed against release `2d23d1c`. Independent
+audit verified real report parity on an authored repository, synthetic lifecycle
+controls and owned cleanup. Subsequent shutdown controls passed for an observed
+preparing request and an active detached worker tree, with cleanup checked before
+explicit manager stop. The extended error control preserved exit 7 and UTF-8
+stderr. Nine targeted live test executions passed; the original pre-launch
+failure remains recorded. Final publication checks are pending at this checkpoint.
+
+The reproducible observation at `a3ac295` completed all 396 calls with exact
+report parity. Scored inner medians were 2.22–2.36 ms for direct CLI and
+79.99–80.59 ms for the configured confined MCP path. Its worker CPU limit differs
+from direct CLI, and every request launches a new worker; this is documented
+service cost, not a speedup or agent benefit. See the [performance report](performance.md#confined-mcp-test-report--2026-11-06)
+and [evidence index](../research/performance/forge-program-20261106-mcp-test-report.json).
+Filesystem preparation remains cooperative; the child deadline is not a hard
+whole-operation deadline. No external-client or host adoption is claimed.
 
 ### Architecture, evidence and disposition
 
@@ -92,7 +107,9 @@ flowchart TD
   Service --> Source[Source / search / context / workspace tools]
   Service --> Terminal[Confined PTYs + task journal]
   Service --> Outbound[Operator-pinned outbound MCP session]
-  Outbound --> Owner[Shared confined duplex process owner]
+  Service --> Report[Operator-pinned native test report worker]
+  Outbound --> Owner[Shared confined process ownership]
+  Report --> Owner
   Owner --> Controls
   CLI[forge-cli: main.rs] --> Dispatch[CLI dispatch / native hooks]
   Dispatch --> Native[forge library + conductor-native contracts]
@@ -103,8 +120,9 @@ flowchart TD
 ```
 
 The service compiles its catalog/schema/grammar once; it cannot grant new paths,
-executables, networking or budgets from model requests. RPC cancellation suppresses
-an adapter response; it does not undo a daemon operation. Same-UID unconfined
+executables, networking or budgets from model requests. Report cancellation closes
+its one-shot connection and requests owned cleanup. Other RPC cancellation
+suppresses the adapter response without undoing daemon work. Same-UID unconfined
 programs remain trusted. See [the harness contract](native-harness.md).
 
 Initial 2026-11-04 native graph snapshot at `.git/forge-program-graph.db`: 1,300 files, 18,327

@@ -186,7 +186,7 @@ async fn disabled_and_invalid_report_requests_do_not_launch_a_worker() {
 #[ignore = "requires pinned standalone synthetic worker + SHA256, owned service and explicit runtime reads"]
 async fn synthetic_worker_timeout_invalid_output_budget_and_read_confinement_are_distinct() {
     tokio::time::timeout(Duration::from_secs(90), async {
-        for mode in ["hang", "invalid", "large", "denied"] {
+        for mode in ["hang", "invalid", "large", "denied", "nonzero"] {
             let service = Running::start(true, true, if mode == "hang" { 1 } else { 20 }).await;
             service.mode(mode);
             let mut client = service.connect().await;
@@ -201,9 +201,18 @@ async fn synthetic_worker_timeout_invalid_output_budget_and_read_confinement_are
                     reason.contains(match mode {
                         "hang" => "TimedOut",
                         "invalid" => "invalid report worker JSON",
+                        "nonzero" => "exit_code=Some(7)",
                         _ => "requested output budget",
                     }),
                     "{status}"
+                );
+            }
+            if mode == "nonzero" {
+                let text = reply["result"]["content"][0]["text"].as_str().unwrap();
+                assert!(
+                    text.contains("exit_code=Some(7)")
+                        && text.contains("synthetic controlled worker exit7 λ"),
+                    "{reply}"
                 );
             }
             let status = service.status().await;
@@ -340,6 +349,56 @@ async fn synthetic_active_report_halfclose_and_pipeline_clean_tree_before_reuse(
             client.finish().await; service.finish().await;
         }
     }).await.expect("owned service control exceeded cooperative test bound");
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires newly pinned synthetic detached-worker fixture, owned service/cgroup and explicit runtime reads"]
+async fn synthetic_daemon_shutdown_cleans_active_and_early_reports_before_manager_stop() {
+    tokio::time::timeout(Duration::from_secs(90), async {
+        for early in [false, true] {
+            let service = Running::start(true, true, 20).await;
+            service.mode("descendant");
+            let mut client = service.connect().await;
+            service.save(
+                "shutdown-report-request",
+                request(2, json!({"max_output_bytes":4096})),
+            );
+            client
+                .send(request(2, json!({"max_output_bytes":4096})))
+                .await;
+            let (status, pids) = if early {
+                let status = service.preparing_or_active().await;
+                (status, Vec::new())
+            } else {
+                let (status, witness) = service.active().await;
+                assert!(witness["child"].as_u64().unwrap() > 0);
+                service.save(
+                    "shutdown-active-processes",
+                    witness_processes(&status, &witness),
+                );
+                let pids = ["pid", "child"]
+                    .into_iter()
+                    .map(|key| witness[key].as_u64().unwrap() as u32)
+                    .collect();
+                (status, pids)
+            };
+            assert!(status["python_test_report"]["launches"].as_u64().unwrap() <= 1);
+            assert_eq!(status["python_test_report"]["calls"], 0);
+            let state = service.state.clone();
+            service.shutdown_during_report(&status, &pids).await;
+            // The control waits for cleanup after the raw shutdown request. An adapter
+            // may report cancellation/transport failure, never a successful report.
+            let reply = client.receive().await;
+            assert_eq!(reply["id"], 2);
+            refused(&reply);
+            let path = state.join("shutdown-mcp-reply.json");
+            assert!(!path.exists());
+            fs::write(path, serde_json::to_vec_pretty(&reply).unwrap()).unwrap();
+            client.finish().await;
+        }
+    })
+    .await
+    .expect("shutdown control exceeded cooperative test bound");
 }
 
 #[path = "support/test_report_observation.rs"]
