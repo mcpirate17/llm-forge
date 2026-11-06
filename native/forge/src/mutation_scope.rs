@@ -157,7 +157,10 @@ pub fn explicit_scope(paths: &[String], repo_root: &Path) -> Result<Vec<String>,
 
 fn is_test_path(relative: &str) -> bool {
     let name = relative.rsplit('/').next().unwrap_or(relative);
-    name.starts_with("test_") || name == "conftest.py" || relative.contains("/tests/")
+    name.starts_with("test_")
+        || name == "conftest.py"
+        || relative.starts_with("tests/")
+        || relative.contains("/tests/")
 }
 
 /// Parse `SOURCE=TEST` into exact repository-relative pairs.

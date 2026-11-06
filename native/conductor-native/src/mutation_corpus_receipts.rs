@@ -175,12 +175,61 @@ fn requires_native_workspace(campaign: &Campaign<'_>) -> bool {
             == Some("cargo-workspace-v3")
 }
 
+fn mull_supporting_error(
+    object: &serde_json::Map<String, Value>,
+    campaign: &Campaign<'_>,
+    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
+) -> Option<String> {
+    let Some(contract) = campaign.ordinary_contract else {
+        return Some("independent confined Mull contract missing".into());
+    };
+    if contract.get("execution_profile").and_then(Value::as_str) != Some("mull-confined-v1")
+        || !campaign.generated
+    {
+        return Some("independent confined Mull binding unavailable or mismatched".into());
+    }
+    if let Some(reason) = crate::mutation_mull_receipt::evidence_error(
+        object,
+        campaign.campaign_id,
+        contract.get("source_sha256").unwrap_or(&Value::Null),
+        contract.get("test_sha256").unwrap_or(&Value::Null),
+    ) {
+        return Some(reason);
+    }
+    if let Some(reason) = crate::mutation_mull_outcome::corpus_error(object) {
+        return Some(reason);
+    }
+    if object.get("status").and_then(Value::as_str) == Some("RATCHET_HELD") {
+        let Some(baseline) = contract.get("survivor_baseline").and_then(Value::as_array) else {
+            return Some("verified Mull survivor baseline missing".into());
+        };
+        let Some(survivors) = object.get("survivors").and_then(Value::as_array) else {
+            return Some("Mull survivors missing after outcome validation".into());
+        };
+        if survivors.iter().any(|id| !baseline.contains(id)) {
+            return Some("Mull ratchet contains a survivor outside the verified baseline".into());
+        }
+    }
+    if let Some(reason) = ordinary_binding_error(object, campaign) {
+        return Some(reason);
+    }
+    crate::mutation_cargo_supporting_binding::compare_profile(
+        object.get("supporting_inputs"),
+        supporting,
+        Some("mull-confined-v1"),
+    )
+    .err()
+}
+
 fn native_supporting_error(
     object: &serde_json::Map<String, Value>,
     campaign: &Campaign<'_>,
     supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
     fest: bool,
 ) -> Option<String> {
+    if campaign.execution_profile == Some("mull-confined-v1") {
+        return mull_supporting_error(object, campaign, supporting);
+    }
     if fest {
         if let Some(reason) = crate::mutation_fest_receipt::cleanup_error(object) {
             return Some(reason);
@@ -230,6 +279,17 @@ fn native_supporting_error(
     None
 }
 
+fn expand_profile(receipt: &Value, campaign: &Campaign<'_>) -> Result<Option<Value>, String> {
+    let mull = campaign.execution_profile == Some("mull-confined-v1");
+    if mull && campaign.ordinary_contract.is_none() {
+        return Err("independent confined Mull contract missing".into());
+    }
+    expand_ordinary(
+        receipt,
+        campaign.ordinary_cargo || requires_native_fest(campaign) || mull,
+    )
+}
+
 pub fn rejection_with_supporting(
     campaign: &Campaign<'_>,
     receipt: &Value,
@@ -245,7 +305,8 @@ pub fn rejection_with_supporting(
     );
     let raw = receipt.as_object().context("receipt must be an object")?;
     let fest = requires_native_fest(campaign);
-    let expanded = match expand_ordinary(receipt, campaign.ordinary_cargo || fest) {
+    let mull = campaign.execution_profile == Some("mull-confined-v1");
+    let expanded = match expand_profile(receipt, campaign) {
         Ok(value) => value,
         Err(error) => return Ok(Some(error)),
     };
@@ -257,10 +318,12 @@ pub fn rejection_with_supporting(
     if let Some(reason) = native_runner::partial_progress_error(object) {
         return Ok(Some(reason.into()));
     }
-    if fest && !native_runner::declared(object) {
-        return Ok(Some(
-            "confined Fest requires a native runner receipt".into(),
-        ));
+    if (fest || mull) && !native_runner::declared(object) {
+        return Ok(Some(if fest {
+            "confined Fest requires a native runner receipt".into()
+        } else {
+            "confined Mull requires a native runner receipt".into()
+        }));
     }
     if requires_native_workspace(campaign) && !native_runner::declared(object) {
         return Ok(Some("workspace v3 requires a native runner receipt".into()));
@@ -292,6 +355,14 @@ pub fn rejection_with_supporting(
             ));
         }
     }
+    stale_source_error(object, campaign, source_hash)
+}
+
+fn stale_source_error(
+    object: &serde_json::Map<String, Value>,
+    campaign: &Campaign<'_>,
+    mut source_hash: impl FnMut(&str) -> Result<Option<String>>,
+) -> Result<Option<String>> {
     let hashes = match object.get("source_sha256") {
         None | Some(Value::Null) => None,
         Some(Value::Object(rows)) => Some(rows),

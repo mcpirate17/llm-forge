@@ -86,7 +86,9 @@ fn eligible_contract(contract: &serde_json::Value) -> bool {
     contract["source_drifted"] != true
         && contract["generated"] == true
         && contract["generated_value"].is_null()
-        && (contract["mutation_engine"] == "cargo-mutants" || confined_fest(contract))
+        && (contract["mutation_engine"] == "cargo-mutants"
+            || confined_fest(contract)
+            || confined_mull(contract))
 }
 
 /// Only a profile from the verified campaign selects Fest's snapshot hash domain.
@@ -96,6 +98,14 @@ pub(crate) fn confined_fest(contract: &serde_json::Value) -> bool {
         && contract["language"] == "python"
         && contract["mutation_engine"] == "fest"
         && contract["execution_profile"] == "fest-confined-v1"
+}
+
+pub(crate) fn confined_mull(contract: &serde_json::Value) -> bool {
+    contract["generated"] == true
+        && contract["generated_value"].is_null()
+        && contract["language"] == "cpp"
+        && contract["mutation_engine"] == "mull"
+        && contract["execution_profile"] == "mull-confined-v1"
 }
 
 fn eligible_receipt(
