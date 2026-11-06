@@ -217,7 +217,7 @@ verification passed; merge `2d0564e` has the identical checked tree. Initial com
 and fixture failures are retained in the
 [evidence index](../research/performance/forge-program-20261106-committed-equivalence.json).
 The Make gate's live-worktree/default-changed/all contract remains unmigrated.
-[Issue #226](https://github.com/mcpirate17/llm-forge/issues/226) adds explicit
+[PR #227](https://github.com/mcpirate17/llm-forge/pull/227) delivered issue #226: explicit
 live-input selection using the shared scanner, held host inputs and a private Stage
 object store. Release `62858f7` passed ten standalone and four candidate Stage guest
 controls; three authored live-input cases matched the actual Python wrapper's full
@@ -225,10 +225,23 @@ summaries, reports and exits. Independent audits verified 240 paired preparation
 observations and 480 shared-capture observations. Live preparation costs more;
 the captured inputs do not bind every authorized host read. A real guest control
 demonstrates that boundary. The failed observer attempt remains accounted for.
-Full publication checks are next, followed by profiling repeated materialization
-before selecting an optimization. Make/default-changed/all migration remains open;
+All 18 publication checks passed at `9e63d03`: 5,092 passing executions, zero failed,
+215 ignored across 185 harnesses; fresh-base verification passed. Merge `981163d`
+has the identical checked tree, and all 1,494 native entries retained their bytes
+and filesystem identities during integration. Make/default-changed/all migration remains open;
 no unrestricted legacy live-tree parity is claimed. See the
 [live-input evidence index](../research/performance/forge-program-20261106-live-equivalence.json).
+[Issue #228](https://github.com/mcpirate17/llm-forge/issues/228) investigated batching
+directory syncs while retaining file and publication syncs. Candidate `a4a8431`
+passed focused, CLI and real-guest controls, but its 960-observation comparison
+did not demonstrate improvement on the primary 1,000-file workload. Small cases
+improved; substantial reference-block drift prevents treating the larger pooled
+difference as a proven causal regression. Independent review agreed to reject
+the added bookkeeping. All native source is restored to `981163d`; no speedup is
+promoted. The [experiment and receipts](../research/performance/forge-program-20261106-snapshot-sync.json)
+retain the profile, failures, successful controls, comparison and cleanup proof.
+Publication checks for this investigation record are next, followed by native
+default-changed/tracked-all multi-module selection for the remaining Make gate.
 
 ### Architecture, evidence and disposition
 
