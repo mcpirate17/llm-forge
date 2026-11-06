@@ -127,3 +127,38 @@ fn selected_sources_map_to_workspace_relative_without_broadening() {
     let glob = BTreeMap::from([("native/workspace/src/*.rs".into(), "a".into())]);
     assert!(source_mapping(&root, &root.join("native/workspace"), &glob).is_err());
 }
+
+#[test]
+fn metadata_accepts_confined_parent_components_in_targets_and_manifest() {
+    let (_temp, root, home, mut data, sources, tests) = fixture();
+    fs::create_dir(root.join("sibling")).unwrap();
+    data["packages"][0]["manifest_path"] = json!(root.join("sibling/../Cargo.toml"));
+    data["packages"][0]["targets"][0]["src_path"] = json!(root.join("sibling/../src/lib.rs"));
+    let selection = run(&root, &home, &data, &sources, &tests).unwrap();
+    assert_eq!(selection.package_name, "demo");
+}
+
+#[test]
+fn metadata_rejects_escape_reentry_and_every_symlink_component() {
+    use std::os::unix::fs::symlink;
+    let (temp, root, home, mut data, sources, tests) = fixture();
+    fs::create_dir(root.join("sibling")).unwrap();
+    symlink("sibling", root.join("alias")).unwrap();
+    symlink("src/lib.rs", root.join("final-link.rs")).unwrap();
+    symlink("missing.rs", root.join("dangling.rs")).unwrap();
+    let candidates = [
+        root.join("../repo/src/lib.rs"),
+        root.join("alias/../src/lib.rs"),
+        root.join("final-link.rs"),
+        root.join("dangling.rs"),
+        temp.path().join("outside.rs"),
+    ];
+    fs::write(temp.path().join("outside.rs"), "fn outside() {}\n").unwrap();
+    for path in candidates {
+        data["packages"][0]["targets"][0]["src_path"] = json!(path);
+        assert!(
+            run(&root, &home, &data, &sources, &tests).is_err(),
+            "accepted {path:?}"
+        );
+    }
+}

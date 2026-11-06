@@ -4,7 +4,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 #[derive(Clone, Debug)]
@@ -35,15 +35,45 @@ fn array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
 fn inside(root: &Path, value: &str) -> Result<PathBuf> {
     let path = Path::new(value);
     ensure!(
+        root.is_absolute() && root.canonicalize()? == root,
+        "metadata root is not canonical"
+    );
+    ensure!(
+        value.len() <= 4096 && !value.bytes().any(|b| b.is_ascii_control()),
+        "invalid metadata path"
+    );
+    ensure!(
         path.is_absolute() && path.starts_with(root),
         "metadata path outside admitted root: {value}"
     );
+    let mut normalized = root.to_owned();
+    for component in path.strip_prefix(root)?.components() {
+        match component {
+            Component::Normal(name) => {
+                normalized.push(name);
+                let meta = std::fs::symlink_metadata(&normalized)?;
+                ensure!(
+                    !meta.file_type().is_symlink(),
+                    "metadata path traverses symlink: {value}"
+                );
+            }
+            Component::ParentDir => {
+                ensure!(
+                    normalized != root,
+                    "metadata path escapes admitted root: {value}"
+                );
+                normalized.pop();
+            }
+            _ => anyhow::bail!("unsupported metadata path component: {value}"),
+        }
+    }
     ensure!(
-        path.canonicalize()? == path,
+        normalized.starts_with(root) && path.canonicalize()? == normalized,
         "metadata path is aliased: {value}"
     );
-    Ok(path.to_owned())
+    Ok(normalized)
 }
+
 fn verify_pins(root: &Path, pins: &BTreeMap<String, String>) -> Result<()> {
     ensure!(
         !pins.is_empty() && pins.len() <= 100_000,
@@ -173,14 +203,14 @@ fn selected_package<'a>(
             }
             _ => anyhow::bail!("unsupported Cargo package source"),
         };
-        inside(&admitted, path)?;
+        let normalized_manifest = inside(&admitted, path)?;
         for target in array(item, "targets")? {
             inside(&admitted, text(target, "src_path")?)?;
         }
         if name == package && members.contains(id) {
             ensure!(selected.is_none(), "ambiguous Cargo workspace package name");
             ensure!(
-                Path::new(path) == selected_manifest,
+                normalized_manifest == selected_manifest,
                 "Cargo selected manifest mismatch"
             );
             selected = Some(item);
