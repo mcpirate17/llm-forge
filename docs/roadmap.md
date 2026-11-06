@@ -88,18 +88,20 @@ Filesystem preparation remains cooperative; the child deadline is not a hard
 whole-operation deadline. No external-client or host adoption is claimed.
 
 The active increment returns to [#196](https://github.com/mcpirate17/llm-forge/issues/196):
-a narrowly admitted Fest profile using a pinned private guest and the existing
-native command owner. It adds complete snapshot bindings, read-only empty bytecode
-caches, guest-first imports, complete kill attribution and native guest inventory
-export. Strict Clippy and 13 guest checks passed after correcting fixture modes.
-Debug controls now produced strong `PASS` (three attributed kills), weak
-`RATCHET_HELD` (one survivor), and collection-error `ERROR` (zero attributed kills).
-The combined strong/weak observer and collection observer failed incorrect exit
-expectations; their corrected assertions still require a release rerun. Earlier
-inventory, environment, coverage-config and thread-pool failures remain recorded.
-Next run corrected release controls, independently audit supporting-input freshness
-and complete publication gates. Unmarked Fest and Mull execution remain refused.
-See the [active evidence index](../research/performance/forge-program-20261106-confined-fest.json).
+the explicit [confined Fest profile](mutation-fest.md) uses a pinned private guest
+and the existing native command owner. It adds captured-snapshot bindings,
+read-only empty bytecode caches, guest-first imports, complete kill attribution
+and native guest inventory export. Clean release `234b60f` passed all three real
+controls: strong `PASS` (three attributed kills), weak `RATCHET_HELD` (one survivor),
+and collection-error `ERROR` (zero attributed kills). Independent audit matched
+all outcomes and confirmed 20 child cgroups, three snapshots and three caches
+absent before supervisor retirement. Native export matched all 1,302 guest entries.
+Live and committed consumers accepted the strong receipt, rejected an admitted
+supporting-input addition, and accepted exact restoration. An initial excluded
+untracked `.txt` probe and all earlier debug/observer failures remain recorded.
+Full publication checks are next. Unmarked Fest and Mull execution remain refused;
+this does not establish general Python compatibility or agent productivity gains.
+See the [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
 ### Architecture, evidence and disposition
 

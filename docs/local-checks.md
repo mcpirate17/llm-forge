@@ -215,7 +215,7 @@ FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
 FORGE_TEST_CGROUP_PARENT=/operator/existing/delegated-cgroup \
   cargo +1.98.0 test --release --offline --locked \
   --manifest-path native/forge/Cargo.toml --test mutation_run_cli \
-  -- --include-ignored --test-threads=1
+  -- --include-ignored --test-threads=1 --skip confined_cli::real::fest::
 ```
 
 These are synthetic Cargo protocol fixtures exercising real CLI admission,

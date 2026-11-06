@@ -52,7 +52,7 @@ forge mutation plan python --repo-root /absolute/repository --owner my-lane \
 forge mutation write python --repo-root /absolute/repository --owner my-lane \
   --base origin/main --only path/to/changed.py --fest-confined --python-jobs 1 --run-timeout 120
 forge mutation run campaigns/PATH-FROM-WRITE.json --repo-root /absolute/repository \
-  --owner my-lane --base origin/main --allow-mutations \
+  --owner my-lane --base origin/main --only path/to/changed.py --allow-mutations \
   --receipt campaigns/receipts/my-run.json \
   --execution-grants /operator/private/grants.json \
   --execution-grants-sha256 SHA256_OF_EXACT_GRANT_BYTES
@@ -67,3 +67,41 @@ Forge holds and checks the guest and exact external files, derives a trusted-fir
 Bytecode writes are disabled and `PYTHONPYCACHEPREFIX` points to an initially empty, read-only sibling outside writable scratch. Its identity and emptiness are checked, and its removal is recorded only after owned processes and input verification complete. This differs from the legacy Fest plugin/eviction path described in the historical bytecode section of [mutation.md](mutation.md). Unknown cleanup or changed inputs cause refusal and may retain the snapshot or cache for inspection; receipt paths are diagnostic, not authority to delete them.
 
 A marked Fest PASS requires normal successful baseline runs, complete owned process and cache cleanup, and a complete JUnit-backed attribution for every engine-reported kill. Attribution reruns require normal pytest test-failure exit status and selected failed nodes; setup/collection errors, missing XML and timeouts do not establish kills. Retained normalized observations and the recomputed test-value analysis are consistency evidence, not independent producer attestation. Survivors, incomplete runs, drift and `RATCHET_HELD` are not PASS. Review the generated receipt and source/test pins; the mutation run does not itself approve the candidate or validate every possible Python workload.
+
+Supporting-input freshness binds the complete captured snapshot, not every file
+in the working directory. The existing snapshot policy selects tracked inputs
+and permitted nonignored untracked inputs; for example, an untracked root-level
+`.json` is included, while an arbitrary untracked root-level `.txt` is excluded.
+Live and committed consumers reconstruct the applicable input identity.
+
+## Reproduce the automatic controls
+
+The optional real CLI tests create separate authored repositories and generate
+mutants through the selected Fest executable. They check a strong suite, a weak
+suite with a survivor, and a collection-error case. They deliberately equalize
+source mtimes through an external, path-bounded fixture observer without changing
+mutant bytes or relaxing the production sandbox. This is a stress condition,
+not a measurement of naturally occurring timestamp collisions.
+
+These tests use a separate operator fixture configuration, not the execution
+grant above. Set `schema_version` to `1`, copy the admitted `programs`, `read_only`,
+`cgroup_parent` and `python_guest` fields into it, and add
+`"setup_git": {"path": "/canonical/path/to/git", "sha256": "GIT_SHA256"}`.
+There are no other top-level fields. The fixture creates the source and scratch
+paths and derives a pinned execution grant. All configured paths and hashes must
+already be verified; the tests do not install the guest or create cgroup delegation.
+
+```sh
+FORGE_TEST_BIN=/absolute/path/to/verified/forge \
+FORGE_TEST_FEST_CONFIG=/operator/private/fixture-config.json \
+FORGE_TEST_FEST_CONFIG_SHA256=SHA256_OF_EXACT_CONFIG_BYTES \
+  cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml \
+  --test mutation_run_cli confined_cli::real::fest:: \
+  -- --ignored --nocapture --test-threads=1
+```
+
+Each completed fixture reports its retained root and cleanup disposition. Audit
+its command ledger, raw receipts, observations and input pins before retiring the
+owned supervisor; a supervisor timeout alone does not establish child cleanup.
+The host test process uses cooperative waits and is outside the mutation cgroup.
+Normal test runs leave these operator-dependent cases ignored.

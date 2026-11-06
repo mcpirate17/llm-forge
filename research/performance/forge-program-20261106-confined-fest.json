@@ -1,18 +1,19 @@
 {
   "schema_version": 1,
-  "status": "IN_PROGRESS_NOT_ACCEPTED",
-  "scope": "confined Fest profile validation; debug outcomes observed, corrected release controls and publication gates pending",
+  "status": "RELEASE_CONTROLS_VALIDATED_PUBLICATION_PENDING",
+  "scope": "narrow confined Fest profile; release functional controls and supporting-input freshness, no speedup or whole-profile restoration claim",
   "attempts": {
-    "observer_tests_passed": 0,
+    "observer_tests_passed": 2,
     "observer_tests_failed": 6,
     "pre_payload_refusals": 2,
     "partial_baseline_only_runs": 1,
-    "engine_runs_completed": 3,
+    "engine_runs_completed": 6,
     "weak_controls_unstarted": 4,
-    "collection_error_control": "DEBUG_NATIVE_ERROR_EXPECTED_OBSERVER_ORACLE_FAILED",
+    "collection_error_control": "RELEASE_EXPECTED_ERROR_AND_OBSERVER_PASS",
     "engine_startup_failures": 1,
     "debug_strong": "PASS_3_KILLED_3_ATTRIBUTED",
-    "debug_weak": "RATCHET_HELD_2_KILLED_1_SURVIVED_NOT_PASS"
+    "debug_weak": "RATCHET_HELD_2_KILLED_1_SURVIVED_NOT_PASS",
+    "scope": "cumulative actual mutation controls; freshness probes counted separately"
   },
   "evidence": [
     {
@@ -206,6 +207,78 @@
     {
       "path": ".git/forge-fest-debug-collection-fresh-absence.json",
       "sha256": "0296724ecf1941d7e1d9dec00087c757135c81e71d90af13676f5398c19f1708"
+    },
+    {
+      "path": ".git/forge-fest-release-binary.json",
+      "sha256": "5d8e203cd007e398f698687a96749852666f49141c3d5ad2c10f69323554d864"
+    },
+    {
+      "path": ".git/forge-fest-release-test-binary.json",
+      "sha256": "52a1a2a0cf979dbcca0e571e35058691fafc2cc39752c4e7e53e837011d1bcf6"
+    },
+    {
+      "path": ".git/forge-fest-native-export.json",
+      "sha256": "622bf326216ba14a1d017ee07ce3b9400baaca7e43edb60d57fe1fcbf6728a2a"
+    },
+    {
+      "path": ".git/forge-fest-release-controls.json",
+      "sha256": "ef4f610c9ca96a54313c6380685676aba0d47ff0693ef27bf7a7cd1eec722967"
+    },
+    {
+      "path": ".git/forge-fest-release-strong-independent.json",
+      "sha256": "0e1ecfd496d32dade679a4f204e39089329824631cb7487a428b976cb50e6b99"
+    },
+    {
+      "path": ".git/forge-fest-release-weak-independent.json",
+      "sha256": "55bb10a50b55485c24da5fcafc14f538a8a378b032cf81c442fc2ab0e2e9cc2c"
+    },
+    {
+      "path": ".git/forge-fest-release-collection-independent.json",
+      "sha256": "4ed624cff78f79b6a6f37272dc4aa37db8e401a79652ef61787c1a7c5e7579b6"
+    },
+    {
+      "path": ".git/forge-fest-release-all-fresh-absence.json",
+      "sha256": "99973281642c5e912f695bfa7974a7db03f9af05a20efa459dba7839e68ce6bd"
+    },
+    {
+      "path": ".git/forge-fest-release-unit-stop.json",
+      "sha256": "5c5430dadbf24af5993db232e3b14ee650b78b817de63a1b9311f809d23c66a8"
+    },
+    {
+      "path": ".git/forge-fest-release-defaults.json",
+      "sha256": "ae3bfe4a17b6240b0b7ef7d0ad07866dea5f5017d4bf40973af1de99d08a8af2"
+    },
+    {
+      "path": ".git/forge-fest-release-freshness-location.json",
+      "sha256": "7d0933a842932dde2fe2a9e5c10eb5196238874ab996849a02b1148296d3910a"
+    },
+    {
+      "path": ".git/forge-fest-release-freshness-v2-location.json",
+      "sha256": "db4441323c358134eeafe898a217d704f2d0522f71e2b51145a9455261cc69f0"
+    },
+    {
+      "path": ".git/forge-fest-excluded-txt-restoration.json",
+      "sha256": "2377953a9963ac004d6bf3bc65030912bf6fa0c16b2e939a4d107b6dce4c86ef"
+    },
+    {
+      "path": "/tmp/forge-fest-freshness-release-d0868e081278/summary.json",
+      "sha256": "0fb291201876271985cab95eb10f91c1de92b8f2a6ed453900b192003db02cd3"
+    },
+    {
+      "path": "/tmp/forge-fest-freshness-release-v2-0297b8c66066/summary.json",
+      "sha256": "dcb060d0c90fe4868e5b1ce6b53287da5e7c13762c079db48f660cc06a15e8a1"
+    },
+    {
+      "path": ".git/forge-fest-release-freshness-independent.json",
+      "sha256": "39854fb66ed472783a87ff0fe54ea589daac2fb206292a39e59d103b50457a2c"
+    },
+    {
+      "path": ".git/forge-fest-release-freshness-independent-v2.json",
+      "sha256": "081211506ff19fff80f7d82087e108f865abdc2a38e5cb6ca026f5403c047f5b"
+    },
+    {
+      "path": ".git/forge-fest-freshness-provenance-links.json",
+      "sha256": "7a9efb186dbf4dd322b8780c57e27c38851d28f0a1799142f02fc60c025fd46b"
     }
   ],
   "limitations": [
@@ -214,13 +287,14 @@
     "No accepted optimization, external-client result, host adoption or full release-gate result is established.",
     "Debug strong/weak independent resource absence was observed while the parent cgroup existed; collection independent absence was observed only after parent expiry.",
     "Same-size automatic source replacement was witnessed at a deliberately equalized mtime, but default return values remained 7; the changed return-value mutant had a different source size.",
-    "Collection marker PIDs are correlated by exact automatic mutant source bytes, not directly bound to command PIDs. Original JUnit files were disposed; the collection stdout tail contained the full engine JSON."
+    "Collection marker PIDs are correlated by exact automatic mutant source bytes, not directly bound to command PIDs. Original JUnit files were disposed; the collection stdout tail contained the full engine JSON.",
+    "Release controls establish the narrow authored workloads only. They do not admit arbitrary Python projects, unmarked Fest or Mull.",
+    "Supporting-input identity covers the captured snapshot; arbitrary excluded untracked files do not belong to it.",
+    "Complete original engine JSON survived inside retained stdout tails for all three release controls; original JUnit XML was disposed, and normalized observations were audited."
   ],
   "next": [
-    "Run corrected strong/weak and collection observer tests using a clean release binary and native-exported guest inventory.",
-    "Independently audit receipts and live/committed supporting-input freshness.",
-    "Verify documented native guest export/setup.",
-    "Run exact committed full local-check/local-verify before normal PR integration."
+    "Run exact committed full local-check/local-verify, publish related to issue196 through normal PR process.",
+    "Continue the broader native agent platform program; this increment does not complete the mission."
   ],
   "debug_outcomes": {
     "strong": {
@@ -260,5 +334,118 @@
         4
       ]
     }
+  },
+  "release_controls": {
+    "source_commit": "234b60f65b784ca0923f09c7cccc2a8be8f3792f",
+    "compiled_source_sha256": "ebafc303ee5d848b7410e7fec36ae5511fb5bb5bbbff82dbbb4dbbfdcb0dd78e",
+    "binary_sha256": "373f61f10921cd88d5aeae5d4c2d190eabcdd6ac6b91b7389bc3696c118068db",
+    "strong": {
+      "fixture": "/tmp/.tmpmehHhw",
+      "status": "PASS",
+      "generated": 3,
+      "killed": 3,
+      "attributed": 3
+    },
+    "weak": {
+      "fixture": "/tmp/.tmposndVI",
+      "status": "RATCHET_HELD",
+      "generated": 3,
+      "killed": 2,
+      "survived": 1,
+      "attributed": 2
+    },
+    "collection": {
+      "fixture": "/tmp/.tmpGVdWXE",
+      "status": "ERROR",
+      "generated": 3,
+      "engine_killed": 3,
+      "attributed": 0,
+      "attribution_exit_codes": [
+        4,
+        4,
+        4
+      ]
+    },
+    "all_fixture_assertions": "PASS",
+    "independent_resource_absence_before_supervisor_stop": {
+      "command_cgroups": 20,
+      "snapshots": 3,
+      "bytecode_caches": 3
+    },
+    "supervisor": "stopped only after independent child absence; supervisor cgroup then positively absent"
+  },
+  "native_guest_export": {
+    "entries": 1302,
+    "file_bytes": 36257088,
+    "manifest_sha256": "fde4b7d510e48ee3544feb445ed81dd841404fdd7994b035a77865512caabbcb",
+    "exact_inventory_parity": true,
+    "no_clobber_refusal": true,
+    "unit_tests": {
+      "initial": {
+        "passed": 12,
+        "failed": 1,
+        "cause": "fixture files inherited unsafe group-write mode; production refusal preserved"
+      },
+      "corrected": {
+        "passed": 13,
+        "failed": 0
+      }
+    },
+    "strict_clippy": "PASS"
+  },
+  "freshness": {
+    "first_probe": "FAILED expectation; untracked root .txt excluded from snapshot selection and correctly did not change captured inputs",
+    "correction": "authored untracked .json admitted by existing filter; no product gate change",
+    "final_decision": "FRESHNESS_EXPECTATIONS_MET",
+    "cases": {
+      "baseline_live": {
+        "returncode": 0,
+        "status": "CLEAN",
+        "receipt_accepted": true
+      },
+      "baseline_commit": {
+        "returncode": 0,
+        "status": "CLEAN",
+        "receipt_accepted": true
+      },
+      "baseline_evidence": {
+        "returncode": 0,
+        "status": "PASS",
+        "receipt_accepted": null
+      },
+      "drift_live": {
+        "returncode": 7,
+        "status": "REGRESSED",
+        "receipt_accepted": false
+      },
+      "drift_commit": {
+        "returncode": 7,
+        "status": "REGRESSED",
+        "receipt_accepted": false
+      },
+      "drift_evidence": {
+        "returncode": 5,
+        "status": "FAIL",
+        "receipt_accepted": null
+      },
+      "restored_live": {
+        "returncode": 0,
+        "status": "CLEAN",
+        "receipt_accepted": true
+      },
+      "restored_commit": {
+        "returncode": 0,
+        "status": "CLEAN",
+        "receipt_accepted": true
+      },
+      "restored_evidence": {
+        "returncode": 0,
+        "status": "PASS",
+        "receipt_accepted": null
+      }
+    },
+    "restored_tree": "0f16d344c971dbe7c60f13103ae7b91f7170ac28",
+    "independent_review": "NO_DISCREPANCY_FOUND: 45 command records across failed excluded-input probe and completed admitted-input control",
+    "collector_correction": "Auditor initially treated prior_failed_probe_sha256 as a summary pin; it binds the unchanged prior location ledger. Explicit links attachment and new audit verify both separately; original failed audit preserved."
   }
 }

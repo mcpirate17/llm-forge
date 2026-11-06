@@ -1230,17 +1230,18 @@ Baseline/final result JSON SHA-256:
 
 ## Confined Fest validation — active, 2026-11-06
 
-Debug controls produced a strong `PASS` (3/3 kills attributed), weak `RATCHET_HELD`
-(2 kills, 1 survivor), and collection-error `ERROR` (3 engine-classified kills,
-none attributed). The combined strong/weak and collection observer tests failed
-incorrect exit expectations; corrected release reruns remain pending. The first
-four failures—inventory order, sandbox environment, coverage-config erasure and
-thread-pool admission—remain recorded. Strong/weak resource absence was observed
-before parent expiry; the collection independent check occurred after expiry.
+Clean release `234b60f` passed both observer tests: strong/weak in 16.36 seconds
+and collection-error in 8.21 seconds. These single functional-control timings
+include a debug harness and are not benchmark comparisons. Strong produced
+`PASS` (3/3 kills attributed), weak `RATCHET_HELD` (2 kills, 1 survivor), and
+collection `ERROR` (3 engine-classified kills, none attributed). Independent audit
+confirmed all 20 command cgroups, three snapshots and three caches absent before
+supervisor retirement. Native guest export matched 1,302 entries and refused overwrite.
 
-The same-size automatic source replacement was observed at an explicitly imposed
-mtime, with default return values unchanged; a separate return-value mutant had
-a different size. These are functional controls, not benchmark comparisons.
+Freshness controls accepted the original receipt, rejected an admitted `.json`
+addition live and committed, and accepted restoration. The earlier excluded `.txt`
+probe and six failed mutation observer runs remain recorded. Same-size mutant
+bytes were witnessed at an imposed mtime; the changed-return mutant differed in size.
 The [evidence index](../research/performance/forge-program-20261106-confined-fest.json)
-retains raw-artifact references, build identities, failures and remaining work.
-No agent task-success, token-cost, clean-host or installation benefit is inferred.
+retains identities, raw-artifact references and limits. Full publication gates remain
+pending; no task-success, token-cost, clean-host or installation benefit is inferred.
