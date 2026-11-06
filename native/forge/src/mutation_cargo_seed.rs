@@ -5,6 +5,10 @@
 mod archive;
 #[path = "mutation_cargo_seed_io.rs"]
 mod io;
+pub(crate) use io::{
+    root as inventory_root, tree as inventory_tree, verify_root as verify_inventory_root,
+    Budget as InventoryBudget, Entry as InventoryEntry,
+};
 #[cfg(test)]
 #[path = "mutation_cargo_seed_tests.rs"]
 mod tests;

@@ -59,7 +59,7 @@ passed before [PR #211](https://github.com/mcpirate17/llm-forge/pull/211) merged
 [command contract](native-analysis.md#python-test-import-report). The subsequent
 MCP integration is tracked in #212 below; no host adoption is claimed.
 
-The active increment is [#212](https://github.com/mcpirate17/llm-forge/issues/212):
+Issue [#212](https://github.com/mcpirate17/llm-forge/issues/212) is delivered:
 an operator-enabled MCP report using the existing confined native worker owner.
 It adds fixed-root admission, isolated Git configuration, report-specific
 disconnect cancellation and bounded output. A first live attempt refused before
@@ -72,7 +72,11 @@ controls and owned cleanup. Subsequent shutdown controls passed for an observed
 preparing request and an active detached worker tree, with cleanup checked before
 explicit manager stop. The extended error control preserved exit 7 and UTF-8
 stderr. Nine targeted live test executions passed; the original pre-launch
-failure remains recorded. Final publication checks are pending at this checkpoint.
+failure remains recorded. All 18 publication checks passed on `bbffed4`: 4,907
+passing test executions, zero failures and 197 ignored across 182 harnesses
+(including repeated feature-matrix cases). Fresh-base local verification passed
+before [PR #213](https://github.com/mcpirate17/llm-forge/pull/213) merged as
+`9299baa`; its tree matches the verified head.
 
 The reproducible observation at `a3ac295` completed all 396 calls with exact
 report parity. Scored inner medians were 2.22–2.36 ms for direct CLI and
@@ -82,6 +86,25 @@ service cost, not a speedup or agent benefit. See the [performance report](perfo
 and [evidence index](../research/performance/forge-program-20261106-mcp-test-report.json).
 Filesystem preparation remains cooperative; the child deadline is not a hard
 whole-operation deadline. No external-client or host adoption is claimed.
+
+The validated Fest increment addresses part of [#196](https://github.com/mcpirate17/llm-forge/issues/196).
+The explicit [confined profile](mutation-fest.md) uses a pinned private guest and
+the existing native command owner. It adds captured-snapshot bindings, read-only
+empty bytecode caches, guest-first imports, complete kill attribution and native
+inventory export. Implementation release `c8722ce` passed three real controls:
+strong `PASS` (three attributed kills), weak `RATCHET_HELD` (one survivor), and
+collection-error `ERROR` (zero attributed kills). Independent audit confirmed all
+20 child cgroups, three snapshots and three caches absent before supervisor retirement.
+Native export matched all 1,302 entries. A 31-command probe verified live/committed
+receipt acceptance, admitted supporting-input rejection and exact restoration.
+
+The full 18-step gate and exact-head/current-base verification passed at `c8722ce`:
+4,956 test executions passed, zero failed and 200 were ignored across 182 harnesses.
+The first gate's fixture/API and minimal-feature errors were repaired; all failed
+controls and probes remain recorded. Later publication heads require their own
+source-bound receipts. Unmarked Fest and Mull remain refused. Next implement the
+bounded Mull prerequisites; agent-task value and actual-client adoption still need
+separate evidence. See the [evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
 ### Architecture, evidence and disposition
 

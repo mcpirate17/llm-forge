@@ -65,6 +65,57 @@ fn eligible_fixture() -> (serde_json::Value, serde_json::Value) {
 }
 
 #[test]
+fn fest_snapshot_capture_is_selected_by_verified_contract_not_receipt_profile() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (mut contract, mut payload) = eligible_fixture();
+    contract["language"] = serde_json::json!("python");
+    contract["mutation_engine"] = serde_json::json!("fest");
+    payload["execution_profile"] = serde_json::json!("fest-confined-v1");
+    payload["supporting_inputs"]["schema_version"] = serde_json::json!(2);
+    payload["supporting_inputs"]["scope"] = serde_json::json!("complete-snapshot-inputs-v2");
+    let receipt = CapturedReceipt {
+        path: "receipt.json".into(),
+        text: payload.to_string(),
+    };
+    assert!(workspace_required_for(
+        std::slice::from_ref(&contract),
+        std::slice::from_ref(&receipt),
+        || panic!("unmarked Python must not request native snapshot capture"),
+        None,
+    )
+    .unwrap()
+    .is_empty());
+    contract["execution_profile"] = serde_json::json!("fest-confined-v1");
+    let requested = workspace_required_for(
+        std::slice::from_ref(&contract),
+        std::slice::from_ref(&receipt),
+        || Ok(Some("e".repeat(64))),
+        None,
+    )
+    .unwrap();
+    let pins = requested["c"].as_ref().unwrap();
+    assert_eq!(pins.manifest, "campaign.json");
+    assert_eq!(pins.pins.len(), 2);
+    assert!(
+        required_for(
+            std::slice::from_ref(&contract),
+            std::slice::from_ref(&receipt),
+            || Ok(Some("e".repeat(64))),
+            None,
+        )
+        .unwrap()
+        .is_none(),
+        "Fest must never use the root Cargo hash domain"
+    );
+    contract["execution_profile"] = serde_json::json!("fest-confined-v9");
+    assert!(
+        workspace_required_for(&[contract], &[receipt], || panic!("unknown profile"), None,)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn inventory_is_only_requested_for_admissible_native_ordinary_receipts() {
     use conductor_native::mutation_evidence::CapturedReceipt;
     let (contract, mut payload) = eligible_fixture();

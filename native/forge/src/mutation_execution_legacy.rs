@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::{ensure, Context, Result};
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::BTreeMap,
     fs,
     os::unix::fs::{symlink, PermissionsExt},
@@ -21,6 +21,7 @@ use std::{
 fn error(value: impl std::fmt::Display) -> String {
     value.to_string()
 }
+
 fn table<'a>(
     value: &'a toml::Value,
     label: &str,
@@ -272,6 +273,7 @@ impl RootInputs {
 pub(crate) enum Inputs {
     Root(Box<RootInputs>),
     Workspace(Box<crate::mutation_workspace_inputs::Inputs>),
+    Fest(Box<crate::mutation_fest_inputs::Inputs>),
 }
 impl Inputs {
     pub fn capture(campaign: &Campaign, root: &Path, grants: &Grants) -> Result<Self> {
@@ -281,6 +283,7 @@ impl Inputs {
             .and_then(serde_json::Value::as_str)
         {
             None => {
+                ensure!(!grants.has_fest_guest(), "Fest guest requires Fest profile");
                 ensure!(
                     grants.cargo_workspace.is_none(),
                     "workspace grant requires workspace profile"
@@ -288,28 +291,37 @@ impl Inputs {
                 RootInputs::capture(campaign, root).map(|inputs| Self::Root(Box::new(inputs)))
             }
             Some("cargo-workspace-v2" | "cargo-workspace-v3") => {
+                ensure!(!grants.has_fest_guest(), "Fest guest requires Fest profile");
                 crate::mutation_workspace_inputs::Inputs::capture(campaign, root, grants)
                     .map(|inputs| Self::Workspace(Box::new(inputs)))
             }
-            Some(_) => anyhow::bail!("unsupported Cargo execution profile"),
+            Some("fest-confined-v1") => {
+                grants.fest_guest()?;
+                crate::mutation_fest_inputs::Inputs::capture(campaign, root)
+                    .map(|inputs| Self::Fest(Box::new(inputs)))
+            }
+            Some(_) => anyhow::bail!("unsupported execution profile"),
         }
     }
     pub fn populate(&self, snapshot: &mut Snapshot, root: &Path) -> Result<()> {
         match self {
             Self::Root(_) => snapshot.populate(root).map_err(anyhow::Error::msg),
             Self::Workspace(inputs) => inputs.populate(snapshot),
+            Self::Fest(inputs) => inputs.populate(snapshot),
         }
     }
     pub fn verify(&self, snapshot: Option<&Path>) -> Result<()> {
         match self {
             Self::Root(inputs) => inputs.verify(snapshot),
             Self::Workspace(inputs) => inputs.verify(snapshot),
+            Self::Fest(inputs) => inputs.verify(snapshot),
         }
     }
     pub fn verify_snapshot(&self, root: &Path) -> Result<()> {
         match self {
             Self::Root(inputs) => inputs.verify_snapshot(root),
             Self::Workspace(inputs) => inputs.verify(Some(root)),
+            Self::Fest(inputs) => inputs.verify(Some(root)),
         }
     }
     pub fn supporting_identity(
@@ -318,21 +330,169 @@ impl Inputs {
         match self {
             Self::Root(inputs) => inputs.supporting_identity(),
             Self::Workspace(inputs) => inputs.identity(),
+            Self::Fest(inputs) => inputs.identity(),
         }
     }
     pub fn receipt(&self, relative: &str) -> Result<()> {
         match self {
             Self::Root(_) => Ok(()),
             Self::Workspace(inputs) => inputs.receipt(relative),
+            Self::Fest(inputs) => inputs.receipt(relative),
         }
     }
     fn stage(&self, path: &Path) -> Result<Option<crate::mutation_cargo_seed::StagedSeed>> {
         match self {
             Self::Root(_) => Ok(None),
             Self::Workspace(inputs) => inputs.stage(path),
+            Self::Fest(_) => Ok(None),
         }
     }
 }
+fn cargo_environment(root: &Path, grants: &Grants) -> Result<BTreeMap<String, String>> {
+    Ok(BTreeMap::from([
+        (
+            "PATH".into(),
+            root.join("bin").to_string_lossy().into_owned(),
+        ),
+        (
+            "CARGO".into(),
+            grants.program("cargo")?.to_string_lossy().into_owned(),
+        ),
+        (
+            "RUSTC".into(),
+            grants.program("rustc")?.to_string_lossy().into_owned(),
+        ),
+        (
+            "RUSTDOC".into(),
+            grants.program("rustdoc")?.to_string_lossy().into_owned(),
+        ),
+        (
+            "CARGO_HOME".into(),
+            root.join("cargo-home").to_string_lossy().into_owned(),
+        ),
+        (
+            "CARGO_TARGET_DIR".into(),
+            root.join("target").to_string_lossy().into_owned(),
+        ),
+        ("CARGO_NET_OFFLINE".into(), "true".into()),
+        ("CARGO_BUILD_JOBS".into(), "1".into()),
+        ("CARGO_TERM_COLOR".into(), "never".into()),
+        ("LANG".into(), "C".into()),
+        ("TZ".into(), "UTC".into()),
+        (
+            "PYTHONPYCACHEPREFIX".into(),
+            root.join("pycache").to_string_lossy().into_owned(),
+        ),
+    ]))
+}
+
+const FEST_COVERAGE_CONFIG: &[u8] = b"[run]\nparallel = False\n[json]\nshow_contexts = True\n";
+const FEST_PYTEST_CONFIG: &[u8] = b"[pytest]\n";
+
+fn python_path(path: &Path) -> Result<&str> {
+    let text = path.to_str().context("Fest path must be UTF-8")?;
+    ensure!(
+        path.is_absolute()
+            && !text.chars().any(|c| c.is_control()
+                || c.is_whitespace()
+                || matches!(c, ':' | '\\' | '\'' | '"')),
+        "Fest paths cannot contain separators, quotes, whitespace or controls"
+    );
+    Ok(text)
+}
+
+fn fest_environment(
+    root: &Path,
+    worktree: &Path,
+    guest: &Path,
+    cache: &Path,
+) -> Result<BTreeMap<String, String>> {
+    for path in [root, worktree, guest, cache] {
+        python_path(path)?;
+    }
+    let output = root.join("fest-output");
+    Ok(BTreeMap::from([
+        (
+            "PATH".into(),
+            root.join("bin").to_string_lossy().into_owned(),
+        ),
+        ("PYTHONHOME".into(), guest.to_string_lossy().into_owned()),
+        ("VIRTUAL_ENV".into(), guest.to_string_lossy().into_owned()),
+        (
+            "PYTHONPATH".into(),
+            format!("{}:{}:{}:{}:{}", guest.join("lib/python3.12").display(),
+                guest.join("lib/python3.12/lib-dynload").display(),
+                guest.join("lib/python3.12/dist-packages").display(),
+                worktree.display(), worktree.join("src").display()),
+        ),
+        (
+            "PYTHONPYCACHEPREFIX".into(),
+            cache.to_string_lossy().into_owned(),
+        ),
+        ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
+        ("PYTHONNOUSERSITE".into(), "1".into()),
+        ("PYTHONSAFEPATH".into(), "1".into()),
+        // Fest creates a Tokio runtime and Rayon pools independently of the
+        // selected mutation worker count. Bound those ambient defaults too.
+        ("RAYON_NUM_THREADS".into(), "1".into()),
+        ("TOKIO_WORKER_THREADS".into(), "1".into()),
+        ("PYTEST_DISABLE_PLUGIN_AUTOLOAD".into(), "1".into()),
+        (
+            "PYTEST_ADDOPTS".into(),
+            format!("-c {}/pytest.ini --rootdir={} --confcutdir={} --noconftest --import-mode=importlib -p pytest_cov.plugin -p no:cacheprovider",
+                output.display(), worktree.display(), worktree.display()),
+        ),
+        (
+            "COVERAGE_FILE".into(),
+            output.join("coverage-data").to_string_lossy().into_owned(),
+        ),
+        (
+            "COVERAGE_RCFILE".into(),
+            output.join("coverage.rc").to_string_lossy().into_owned(),
+        ),
+        ("LANG".into(), "C".into()),
+        ("TZ".into(), "UTC".into()),
+    ]))
+}
+
+fn prepare_fest_output(root: &Path) -> Result<()> {
+    fs::create_dir(root.join("fest-output"))?;
+    use std::io::Write as _;
+    let mut config = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(root.join("fest-output/coverage.rc"))?;
+    config.write_all(FEST_COVERAGE_CONFIG)?;
+    let mut pytest = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(root.join("fest-output/pytest.ini"))?;
+    pytest.write_all(FEST_PYTEST_CONFIG)?;
+    Ok(())
+}
+
+fn validate_runtime_programs(
+    fest: bool,
+    programs: &BTreeMap<String, PathBuf>,
+    grants: &Grants,
+) -> Result<()> {
+    if fest {
+        ensure!(
+            programs.len() == 2 && programs.contains_key("python") && programs.contains_key("fest"),
+            "confined Fest requires exactly the pinned python and fest aliases"
+        );
+    } else {
+        for required in ["cargo", "cargo-mutants", "rustc", "rustdoc"] {
+            grants.program(required)?;
+        }
+        ensure!(
+            !programs.contains_key("git"),
+            "Git payloads are not supported by this profile"
+        );
+    }
+    Ok(())
+}
+
 /// Own sandbox, reactor and cleanup ledger for one admitted snapshot.
 pub(crate) struct Runtime<'a> {
     grants: &'a Grants,
@@ -344,6 +504,7 @@ pub(crate) struct Runtime<'a> {
     seed: Option<crate::mutation_cargo_seed::StagedSeed>,
     cleanup_complete: Cell<bool>,
     signal: Cell<Option<i32>>,
+    fest_cache: RefCell<Option<crate::mutation_fest_guest::ReadOnlyCache>>,
 }
 impl<'a> Runtime<'a> {
     pub fn prepare(snapshot: &Snapshot, grants: &'a Grants, inputs: &'a Inputs) -> Result<Self> {
@@ -354,71 +515,72 @@ impl<'a> Runtime<'a> {
         grants.verify()?;
         grants.validate_private_root(&snapshot.root)?;
         let programs = grants.programs();
-        for required in ["cargo", "cargo-mutants", "rustc", "rustdoc"] {
-            grants.program(required)?;
-        }
-        ensure!(
-            !programs.contains_key("git"),
-            "Git payloads are not supported by this profile"
-        );
+        let fest = matches!(inputs, Inputs::Fest(_));
+        validate_runtime_programs(fest, &programs, grants)?;
         let root = snapshot.root.canonicalize()?;
-        let environment = BTreeMap::from([
-            (
-                "PATH".into(),
-                root.join("bin").to_string_lossy().into_owned(),
-            ),
-            (
-                "CARGO".into(),
-                grants.program("cargo")?.to_string_lossy().into_owned(),
-            ),
-            (
-                "RUSTC".into(),
-                grants.program("rustc")?.to_string_lossy().into_owned(),
-            ),
-            (
-                "RUSTDOC".into(),
-                grants.program("rustdoc")?.to_string_lossy().into_owned(),
-            ),
-            (
-                "CARGO_HOME".into(),
-                root.join("cargo-home").to_string_lossy().into_owned(),
-            ),
-            (
-                "CARGO_TARGET_DIR".into(),
-                root.join("target").to_string_lossy().into_owned(),
-            ),
-            ("CARGO_NET_OFFLINE".into(), "true".into()),
-            ("CARGO_BUILD_JOBS".into(), "1".into()),
-            ("CARGO_TERM_COLOR".into(), "never".into()),
-            ("LANG".into(), "C".into()),
-            ("TZ".into(), "UTC".into()),
-            (
-                "PYTHONPYCACHEPREFIX".into(),
-                root.join("pycache").to_string_lossy().into_owned(),
-            ),
-        ]);
-        let sandbox = Sandbox::prepare(Policy {
-            read_only: grants.read_only.clone(),
-            scratch: root.clone(),
-            working_directory: root.clone(),
-            environment: environment.clone(),
-        })?;
-        fs::create_dir(root.join("bin"))?;
-        let seed = inputs.stage(&root.join("cargo-home"))?;
-        if seed.is_none() {
-            fs::create_dir(root.join("cargo-home"))?;
-            fs::set_permissions(root.join("cargo-home"), fs::Permissions::from_mode(0o700))?;
-        }
-        fs::create_dir(root.join("target"))?;
-        for (alias, path) in &programs {
-            symlink(path, root.join("bin").join(alias))?;
-        }
-        let isolated = isolated_python_env(&environment, &root, &[]).map_err(anyhow::Error::msg)?;
-        ensure!(isolated == environment, "unexpected bytecode environment");
-        let reactor = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .max_blocking_threads(2)
-            .build()?;
+        let mut cache = if fest {
+            Some(crate::mutation_fest_guest::ReadOnlyCache::create(grants)?)
+        } else {
+            None
+        };
+        let prepared = (|| -> Result<_> {
+            let environment = if let Some(cache) = cache.as_ref() {
+                fest_environment(
+                    &root,
+                    &snapshot.worktree,
+                    grants.fest_guest()?.root(),
+                    cache.path(),
+                )?
+            } else {
+                cargo_environment(&root, grants)?
+            };
+            let mut read_only = grants.read_only.clone();
+            if let Some(cache) = cache.as_ref() {
+                read_only.push(cache.path().to_owned());
+            }
+            let sandbox = Sandbox::prepare(Policy {
+                read_only,
+                scratch: root.clone(),
+                working_directory: root.clone(),
+                environment: environment.clone(),
+            })?;
+            fs::create_dir(root.join("bin"))?;
+            let seed = if fest {
+                prepare_fest_output(&root)?;
+                None
+            } else {
+                let seed = inputs.stage(&root.join("cargo-home"))?;
+                if seed.is_none() {
+                    fs::create_dir(root.join("cargo-home"))?;
+                    fs::set_permissions(
+                        root.join("cargo-home"),
+                        fs::Permissions::from_mode(0o700),
+                    )?;
+                }
+                fs::create_dir(root.join("target"))?;
+                let isolated =
+                    isolated_python_env(&environment, &root, &[]).map_err(anyhow::Error::msg)?;
+                ensure!(isolated == environment, "unexpected bytecode environment");
+                seed
+            };
+            for (alias, path) in &programs {
+                symlink(path, root.join("bin").join(alias))?;
+            }
+            let reactor = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .max_blocking_threads(2)
+                .build()?;
+            Ok((sandbox, seed, reactor))
+        })();
+        let (sandbox, seed, reactor) = match prepared {
+            Ok(value) => value,
+            Err(error) => {
+                if let Some(cache) = cache.take() {
+                    return Err(cache.prelaunch_error(error));
+                }
+                return Err(error);
+            }
+        };
         Ok(Self {
             grants,
             inputs,
@@ -429,10 +591,27 @@ impl<'a> Runtime<'a> {
             seed,
             cleanup_complete: Cell::new(true),
             signal: Cell::new(None),
+            fest_cache: RefCell::new(cache),
         })
     }
     pub fn verify(&self, snapshot: Option<&Path>) -> Result<()> {
         self.grants.verify()?;
+        if let Some(cache) = self.fest_cache.borrow().as_ref() {
+            cache.verify()?;
+            let (_, bytes) =
+                candidate_inputs::repository_live(&self.root.join("fest-output/coverage.rc"), 4096)
+                    .context("Fest coverage configuration unavailable")?;
+            ensure!(
+                bytes == FEST_COVERAGE_CONFIG,
+                "Fest coverage configuration changed"
+            );
+            let (_, pytest) =
+                candidate_inputs::repository_live(&self.root.join("fest-output/pytest.ini"), 4096)?;
+            ensure!(
+                pytest == FEST_PYTEST_CONFIG,
+                "Fest pytest configuration changed"
+            );
+        }
         self.grants.validate_private_root(&self.root)?;
         if let Some(path) = snapshot {
             if self.workspace() {
@@ -474,6 +653,7 @@ impl<'a> Runtime<'a> {
                 let tests = inputs.tests()?;
                 Ok((tests.baseline_args.clone(), tests.engine_args.clone()))
             }
+            Inputs::Fest(_) => anyhow::bail!("Fest has no Cargo test arguments"),
         }
     }
     pub fn admit(&self, run: &mut EngineRun<'_>) -> Step<()> {
@@ -618,14 +798,69 @@ impl<'a> Runtime<'a> {
         match self.inputs {
             Inputs::Root(_) => Ok(campaign.option_text("package_root").unwrap_or_default()),
             Inputs::Workspace(inputs) => Ok(inputs.tests()?.report_root.clone()),
+            Inputs::Fest(_) => anyhow::bail!("Fest has no Cargo report root"),
         }
     }
     pub fn report_package(&self) -> Result<Option<&str>> {
         match self.inputs {
             Inputs::Root(_) => Ok(None),
             Inputs::Workspace(inputs) => Ok(Some(&inputs.tests()?.package_name)),
+            Inputs::Fest(_) => anyhow::bail!("Fest has no Cargo report package"),
         }
     }
+    /// Persist the sibling cache path before any guest child is launched.
+    pub(crate) fn record_admission(
+        &self,
+        receipt: &mut crate::mutation_score::Receipt,
+    ) -> Result<()> {
+        if let Some(cache) = self.fest_cache.borrow().as_ref() {
+            cache.verify_admission()?;
+            receipt.insert(
+                "fest_cache".into(),
+                serde_json::json!({
+                    "schema_version": 1, "path": cache.path(), "read_only": true,
+                "initially_empty": true, "removed": false,
+                    "scope": "initially empty sibling; no hostile transient-change attestation"
+                }),
+            );
+        }
+        Ok(())
+    }
+
+    /// Call only after the coordinator verifies the complete owned process ledger.
+    pub(crate) fn finish_cache(&self, worktree: &Path) -> Result<()> {
+        ensure!(self.cleanup_complete.get(), "Fest cleanup is not complete");
+        self.verify(Some(worktree))?;
+        if let Some(cache) = self.fest_cache.borrow_mut().take() {
+            cache.remove_verified()?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn fest_mutant<'b>(
+        &'b self,
+        row: &serde_json::Value,
+        worktree: &Path,
+    ) -> Result<Option<crate::mutation_fest_inputs::FestMutantGuard<'b>>> {
+        match self.inputs {
+            Inputs::Fest(inputs) => inputs.begin_mutant(row, worktree).map(Some),
+            _ => Ok(None),
+        }
+    }
+
+    pub(crate) fn fest_output(&self, name: &str) -> Option<PathBuf> {
+        if matches!(self.inputs, Inputs::Fest(_))
+            && matches!(
+                name,
+                "coverage" | "coverage.json" | "coverage-curated.json" | "config" | "attribution"
+            )
+        {
+            Some(self.root.join("fest-output").join(name))
+        } else {
+            None
+        }
+    }
+
     pub fn command(
         &self,
         run: &mut EngineRun<'_>,
@@ -648,8 +883,8 @@ impl<'a> Runtime<'a> {
         timeout: i64,
         capture: Capture,
     ) -> Step<(CommandResult, String)> {
-        if self.workspace() && cwd != run.worktree {
-            return Err("workspace command must use the verified snapshot cwd".into());
+        if (self.workspace() || matches!(self.inputs, Inputs::Fest(_))) && cwd != run.worktree {
+            return Err("mutation command must use the verified snapshot cwd".into());
         }
         self.verify(Some(run.worktree)).map_err(error)?;
         let session = CommandSession {
@@ -679,5 +914,65 @@ impl<'a> Runtime<'a> {
             return Err(error(failure).into());
         }
         result.map(|(report, stdout, _)| (report, stdout))
+    }
+}
+
+#[cfg(test)]
+mod fest_environment_tests {
+    use super::*;
+
+    #[test]
+    fn trusted_guest_imports_precede_snapshot_and_pytest_uses_importlib() {
+        let env = fest_environment(
+            Path::new("/scratch"),
+            Path::new("/scratch/worktree"),
+            Path::new("/guest"),
+            Path::new("/cache"),
+        )
+        .unwrap();
+        assert_eq!(env["PYTHONPATH"], "/guest/lib/python3.12:/guest/lib/python3.12/lib-dynload:/guest/lib/python3.12/dist-packages:/scratch/worktree:/scratch/worktree/src");
+        assert_eq!(env["PYTHONSAFEPATH"], "1");
+        assert_eq!(env["RAYON_NUM_THREADS"], "1");
+        assert_eq!(env["TOKIO_WORKER_THREADS"], "1");
+        assert!(env["PYTEST_ADDOPTS"].contains("--import-mode=importlib"));
+        let data_prefix = format!("{}.", env["COVERAGE_FILE"]);
+        for protected in [
+            env["COVERAGE_RCFILE"].as_str(),
+            "/scratch/fest-output/coverage.json",
+            "/scratch/fest-output/coverage-curated.json",
+        ] {
+            assert!(!protected.starts_with(&data_prefix));
+            assert_ne!(protected, env["COVERAGE_FILE"].as_str());
+        }
+        crate::sandbox::validate_environment(&env).unwrap();
+        assert!(!env.contains_key("TMPDIR"));
+        assert!(fest_environment(
+            Path::new("/scratch"),
+            Path::new("/scratch/colon:bad"),
+            Path::new("/guest"),
+            Path::new("/cache")
+        )
+        .is_err());
+    }
+
+    #[test]
+    #[ignore = "requires Landlock ABI 6 and seccomp notification support"]
+    fn fixed_fest_environment_is_admitted_by_the_real_sandbox() {
+        let root = tempfile::tempdir().unwrap();
+        let scratch = root.path().join("scratch");
+        let guest = root.path().join("guest");
+        let cache = root.path().join("cache");
+        for path in [&scratch, &guest, &cache] {
+            fs::create_dir(path).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let env = fest_environment(&scratch, &scratch.join("worktree"), &guest, &cache).unwrap();
+        Sandbox::prepare(Policy {
+            read_only: vec![guest, cache],
+            scratch: scratch.clone(),
+            working_directory: scratch,
+            environment: env,
+        })
+        .unwrap();
     }
 }

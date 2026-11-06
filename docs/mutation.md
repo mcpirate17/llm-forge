@@ -253,8 +253,9 @@ On Linux, the ordinary root profile admits a dependency-free Cargo package with
 one explicit standard-harness integration target. The explicit workspace profile
 below also supports captured local paths and verified registry seeds. Both require
 one worker, no campaign environment overrides,
-no configured Python guest and operator-pinned execution grants. Ordinary Fest
-and Mull execution remain unsupported under these grants (#196). The opt-in
+no configured Python guest and operator-pinned execution grants. The separate
+[confined Fest profile](mutation-fest.md) uses its own explicit Python guest grant.
+Ordinary Mull execution remains unsupported under these grants (#196). The opt-in
 Cargo per-test value workflow above retains its separate execution interface.
 
 Ordinary execution requires an operator-owned, pinned grant document:
@@ -859,6 +860,10 @@ creation; unforced campaign publication cannot overwrite a concurrent winner.
 Configured ancestors remain trusted against concurrent replacement.
 
 ### Bytecode isolation
+
+This section describes the historical Fest interpreter/plugin path. The current
+[confined Fest profile](mutation-fest.md) uses a pinned private guest and an empty,
+read-only bytecode namespace; the historical timing results below do not measure it.
 
 Every child command an engine spawns — the baseline suite, the engine binary
 (and the per-mutant test commands it spawns in turn), attribution's re-applied

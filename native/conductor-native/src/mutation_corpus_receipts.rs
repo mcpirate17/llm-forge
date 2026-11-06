@@ -12,6 +12,8 @@ pub struct Campaign<'a> {
     pub campaign_id: &'a str,
     pub generated: bool,
     pub ordinary_cargo: bool,
+    /// Profile from the independently verified campaign, never a receipt.
+    pub execution_profile: Option<&'a str>,
     /// Independently loaded campaign fields, never derived from a receipt.
     pub ordinary_contract: Option<&'a Value>,
     pub declares_value_analysis: bool,
@@ -160,6 +162,10 @@ fn ordinary_supporting_error(
     .err()
 }
 
+fn requires_native_fest(campaign: &Campaign<'_>) -> bool {
+    campaign.execution_profile == Some("fest-confined-v1")
+}
+
 fn requires_native_workspace(campaign: &Campaign<'_>) -> bool {
     campaign.ordinary_cargo
         && campaign
@@ -167,6 +173,61 @@ fn requires_native_workspace(campaign: &Campaign<'_>) -> bool {
             .and_then(|value| value.get("execution_profile"))
             .and_then(Value::as_str)
             == Some("cargo-workspace-v3")
+}
+
+fn native_supporting_error(
+    object: &serde_json::Map<String, Value>,
+    campaign: &Campaign<'_>,
+    supporting: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
+    fest: bool,
+) -> Option<String> {
+    if fest {
+        if let Some(reason) = crate::mutation_fest_receipt::cleanup_error(object) {
+            return Some(reason);
+        }
+        if !campaign.generated {
+            return Some("confined Fest requires a generated campaign".into());
+        }
+        if campaign
+            .ordinary_contract
+            .and_then(|c| c.get("execution_profile"))
+            .and_then(Value::as_str)
+            != Some("fest-confined-v1")
+        {
+            return Some(
+                "independent confined Fest campaign binding unavailable or mismatched".into(),
+            );
+        }
+        let Some(contract) = campaign.ordinary_contract else {
+            return Some("independent Fest contract missing".into());
+        };
+        let (Some(sources), Some(tests)) =
+            (contract.get("source_sha256"), contract.get("test_sha256"))
+        else {
+            return Some("independent Fest pins missing".into());
+        };
+        if let Some(reason) = crate::mutation_fest_receipt::attribution_error(
+            object,
+            campaign.campaign_id,
+            sources,
+            tests,
+        ) {
+            return Some(reason);
+        }
+        if let Some(reason) = ordinary_binding_error(object, campaign) {
+            return Some(reason);
+        }
+        return crate::mutation_cargo_supporting_binding::compare_profile(
+            object.get("supporting_inputs"),
+            supporting,
+            Some("fest-confined-v1"),
+        )
+        .err();
+    }
+    if campaign.ordinary_cargo {
+        return ordinary_supporting_error(object, campaign, supporting);
+    }
+    None
 }
 
 pub fn rejection_with_supporting(
@@ -183,7 +244,8 @@ pub fn rejection_with_supporting(
         "current runner components must be an object"
     );
     let raw = receipt.as_object().context("receipt must be an object")?;
-    let expanded = match expand_ordinary(receipt, campaign.ordinary_cargo) {
+    let fest = requires_native_fest(campaign);
+    let expanded = match expand_ordinary(receipt, campaign.ordinary_cargo || fest) {
         Ok(value) => value,
         Err(error) => return Ok(Some(error)),
     };
@@ -195,14 +257,17 @@ pub fn rejection_with_supporting(
     if let Some(reason) = native_runner::partial_progress_error(object) {
         return Ok(Some(reason.into()));
     }
+    if fest && !native_runner::declared(object) {
+        return Ok(Some(
+            "confined Fest requires a native runner receipt".into(),
+        ));
+    }
     if requires_native_workspace(campaign) && !native_runner::declared(object) {
         return Ok(Some("workspace v3 requires a native runner receipt".into()));
     }
     if native_runner::declared(object) {
-        if campaign.ordinary_cargo {
-            if let Some(reason) = ordinary_supporting_error(object, campaign, supporting) {
-                return Ok(Some(reason));
-            }
+        if let Some(reason) = native_supporting_error(object, campaign, supporting, fest) {
+            return Ok(Some(reason));
         }
         if let Some(reason) = native_runner::owned_cleanup_error(object) {
             return Ok(Some(reason));

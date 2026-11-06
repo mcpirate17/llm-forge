@@ -786,7 +786,7 @@ pub(super) fn live_identity(
     paths.extend(untracked);
     let root = open_absolute_directory(source.root())?;
     validate_outputs(&root, selection)?;
-    let identity = hash_paths(&root, &paths, selection)?;
+    let identity = hash_paths(&root, &paths, selection, None)?;
     validate_outputs(&root, selection)?;
     inputs.verify()?;
     reject_workspace_path_overrides()?;
@@ -803,7 +803,14 @@ fn hash_paths(
     root: &Dir,
     paths: &BTreeSet<String>,
     selection: &super::inputs::Selection,
+    replacement: Option<&super::inputs::Replacement>,
 ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+    if let Some(replacement) = replacement {
+        ensure!(
+            paths.contains(replacement.path()) && !selection.contains(replacement.path()),
+            "attribution target is absent or excluded"
+        );
+    }
     let mut builder =
         conductor_native::mutation_snapshot_inputs::Builder::new(selection.excluded())
             .map_err(anyhow::Error::msg)?;
@@ -812,14 +819,25 @@ fn hash_paths(
         if selection.contains(path) {
             continue;
         }
+        let replaced = replacement.filter(|r| r.path() == path);
+        if replaced.is_some() {
+            regular_single_link(root, path)?;
+        }
         if let Some((mode, bytes)) = capture(root, path)? {
             total = total
                 .checked_add(bytes.len() as u64)
                 .context("snapshot input size overflow")?;
             ensure!(total <= MAX_TOTAL, "snapshot inputs exceed 2 GiB");
-            builder
-                .add(path, mode, &bytes)
-                .map_err(anyhow::Error::msg)?;
+            let bytes = match replaced {
+                Some(replacement) => {
+                    regular_single_link(root, path)?;
+                    replacement.original_for(mode, &bytes)?
+                }
+                None => bytes.as_slice(),
+            };
+            builder.add(path, mode, bytes).map_err(anyhow::Error::msg)?;
+        } else {
+            ensure!(replaced.is_none(), "attribution target disappeared");
         }
     }
     builder.finish().map_err(anyhow::Error::msg)
@@ -943,6 +961,14 @@ pub(super) fn materialized_identity(
     root: &Path,
     selection: &super::inputs::Selection,
 ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+    materialized_identity_replaced(root, selection, None)
+}
+
+pub(super) fn materialized_identity_replaced(
+    root: &Path,
+    selection: &super::inputs::Selection,
+    replacement: Option<&super::inputs::Replacement>,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
     let root = root.canonicalize()?;
     let dir = open_absolute_directory(&root)?;
     validate_outputs(&dir, selection)?;
@@ -953,10 +979,41 @@ pub(super) fn materialized_identity(
         entries: 0,
     };
     scan.walk(&dir, "", 0)?;
-    let identity = hash_paths(&dir, &scan.paths, selection)?;
+    let identity = hash_paths(&dir, &scan.paths, selection, replacement)?;
     verify_directories(&root, &scan.dirs)?;
     validate_outputs(&dir, selection)?;
     Ok(identity)
+}
+
+fn regular_single_link(root: &Dir, path: &str) -> Result<()> {
+    let (dir, name) = parent(root, path)?;
+    let meta = dir.symlink_metadata(name)?;
+    ensure!(
+        meta.is_file() && !meta.is_symlink() && meta.nlink() == 1,
+        "attribution target must be a regular file without aliases"
+    );
+    Ok(())
+}
+
+pub(super) fn attribution_replacement(
+    root: &Path,
+    row: &serde_json::Value,
+    pins: &std::collections::BTreeMap<String, String>,
+) -> Result<super::inputs::Replacement> {
+    let path = row["path"].as_str().context("missing engine mutant path")?;
+    conductor_native::mutation_snapshot_inputs::validate_path(path).map_err(anyhow::Error::msg)?;
+    let pin = pins
+        .get(path)
+        .context("engine mutant is outside the pinned source set")?;
+    let dir = open_absolute_directory(root)?;
+    regular_single_link(&dir, path)?;
+    let (mode, bytes) = capture(&dir, path)?.context("engine mutation source is missing")?;
+    regular_single_link(&dir, path)?;
+    ensure!(
+        crate::mutation_campaign::sha256_hex(&bytes) == *pin,
+        "attribution original source differs from campaign pin"
+    );
+    super::inputs::Replacement::from_row(path.into(), mode, bytes, row)
 }
 
 /// Refuse physical aliases in existing coordinator-owned output roots.

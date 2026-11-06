@@ -412,3 +412,23 @@ fn successful_baseline_without_coverage_refuses_before_fest() {
 fn non_json_fest_output_refuses_after_clean_baseline() {
     delegated_fest_failure(true);
 }
+
+#[test]
+fn confined_rows_refuse_outside_alias_and_unselected_sources() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("a.py");
+    std::fs::write(&source, "test").unwrap();
+    let selected = ["a.py".to_owned()].into_iter().collect();
+    let mut item = result("Killed", 0, 1);
+    item["mutant"]["file_path"] = json!(source.to_str().unwrap());
+    assert!(rows_confined(&json!({"results":[item.clone()]}), root.path(), &selected).is_ok());
+    let outside = tempfile::tempdir().unwrap();
+    let other = outside.path().join("a.py");
+    std::fs::write(&other, "test").unwrap();
+    item["mutant"]["file_path"] = json!(other.to_str().unwrap());
+    assert!(rows_confined(&json!({"results":[item.clone()]}), root.path(), &selected).is_err());
+    item["mutant"]["file_path"] = json!(root.path().join("./a.py").to_str().unwrap());
+    assert!(rows_confined(&json!({"results":[item.clone()]}), root.path(), &selected).is_err());
+    item["mutant"]["file_path"] = json!(source.to_str().unwrap());
+    assert!(rows_confined(&json!({"results":[item]}), root.path(), &Default::default()).is_err());
+}

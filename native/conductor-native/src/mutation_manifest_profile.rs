@@ -18,13 +18,95 @@ pub fn execution_profile(
     let profile = value
         .as_str()
         .ok_or("generator.options.execution_profile must be a string")?;
-    if !crate::mutation_workspace_selector::is_workspace(Some(profile))
-        || language != "rust"
-        || engine != "cargo-mutants"
-    {
+    let cargo = crate::mutation_workspace_selector::is_workspace(Some(profile))
+        && language == "rust"
+        && engine == "cargo-mutants";
+    let fest = profile == "fest-confined-v1" && language == "python" && engine == "fest";
+    if !cargo && !fest {
         return Err("unsupported generator execution profile for campaign".into());
     }
     Ok(Some(profile.to_owned()))
+}
+
+/// Validate one literal repository-relative Python path used by the Fest profile.
+pub fn validate_fest_path(path: &str) -> Result<(), String> {
+    crate::mutation_snapshot_inputs::validate_path(path)?;
+    if !path.ends_with(".py")
+        || path.starts_with('-')
+        || path
+            .bytes()
+            .any(|b| matches!(b, b'*' | b'?' | b'[' | b']' | b'{' | b'}' | b':' | b'\\'))
+    {
+        return Err("confined Fest requires a literal Python path".into());
+    }
+    Ok(())
+}
+
+pub(super) fn validate_fest_if_selected(
+    profile: Option<&str>,
+    generator: &Map<String, Value>,
+    payload: &Map<String, Value>,
+) -> Result<(), String> {
+    if profile == Some("fest-confined-v1") {
+        let sources = super::digest_map(payload, "source_sha256")?;
+        let tests = super::digest_map(payload, "test_sha256")?;
+        let argv = super::string_list(payload.get("test_argv"), "test_argv")?;
+        validate_fest(generator, payload, &sources, &tests, &argv)?;
+    }
+    Ok(())
+}
+
+pub(super) fn validate_fest(
+    generator: &Map<String, Value>,
+    payload: &Map<String, Value>,
+    sources: &Map<String, Value>,
+    tests: &Map<String, Value>,
+    argv: &[String],
+) -> Result<(), String> {
+    let options = generator
+        .get("options")
+        .and_then(Value::as_object)
+        .ok_or("Fest profile options missing")?;
+    if options.len() != 1
+        || generator.get("jobs").and_then(Value::as_u64) != Some(1)
+        || !payload
+            .get("environment")
+            .and_then(Value::as_object)
+            .is_some_and(Map::is_empty)
+        || sources.len() != 1
+        || tests.is_empty()
+        || generator.get("seed").and_then(Value::as_u64) != Some(0)
+        || generator.get("operators") != Some(&serde_json::json!([]))
+        || generator.get("exclude") != Some(&serde_json::json!(["**/test_*.py", "**/conftest.py"]))
+        || sources.keys().any(|path| tests.contains_key(path))
+    {
+        return Err("invalid confined Fest campaign scope or options".into());
+    }
+    for path in sources.keys().chain(tests.keys()) {
+        validate_fest_path(path)?;
+    }
+    let declared = generator
+        .get("source")
+        .and_then(Value::as_array)
+        .ok_or("Fest source missing")?;
+    if declared.len() != 1 || declared[0].as_str() != sources.keys().next().map(String::as_str) {
+        return Err("confined Fest source differs from pinned scope".into());
+    }
+    let prefix = ["python", "-m", "pytest", "-q", "--rootdir=."];
+    if argv.len() != prefix.len() + tests.len()
+        || !argv
+            .iter()
+            .zip(prefix)
+            .all(|(actual, expected)| actual == expected)
+    {
+        return Err("invalid confined Fest test argv".into());
+    }
+    let paths: std::collections::BTreeSet<_> =
+        argv[prefix.len()..].iter().map(String::as_str).collect();
+    if paths.len() != tests.len() || !tests.keys().all(|path| paths.contains(path.as_str())) {
+        return Err("confined Fest tests differ from pinned scope".into());
+    }
+    Ok(())
 }
 
 pub(super) fn generated_test_scopes(
@@ -123,3 +205,7 @@ mod tests {
         assert!(contract(&value, "cargo-mutants").is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "mutation_manifest_fest_tests.rs"]
+mod fest_tests;

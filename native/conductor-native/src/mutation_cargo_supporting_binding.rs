@@ -81,7 +81,11 @@ mod tests {
     }
 }
 
-/// Select identity version from the independently verified campaign, never a receipt.
+/// Whether an independently verified profile uses the full snapshot domain.
+pub fn uses_snapshot_inputs(profile: Option<&str>) -> bool {
+    crate::mutation_workspace_selector::is_workspace(profile) || profile == Some("fest-confined-v1")
+}
+
 pub fn compare_profile(
     recorded: Option<&serde_json::Value>,
     expected: Option<&SupportingInputs>,
@@ -89,13 +93,11 @@ pub fn compare_profile(
 ) -> Result<(), String> {
     let scope = match profile {
         None => "cargo-root-rust-discovery-v1",
-        Some(profile) if crate::mutation_workspace_selector::is_workspace(Some(profile)) => {
-            "complete-snapshot-inputs-v2"
-        }
-        Some(_) => return Err("unsupported verified Cargo execution profile".into()),
+        Some(profile) if uses_snapshot_inputs(Some(profile)) => "complete-snapshot-inputs-v2",
+        Some(_) => return Err("unsupported verified execution profile".into()),
     };
     if expected.is_some_and(|identity| identity.scope != scope) {
-        return Err("independent Cargo supporting input profile differs from campaign".into());
+        return Err("independent supporting input profile differs from campaign".into());
     }
     compare(recorded, expected)
 }
@@ -124,6 +126,9 @@ mod workspace_tests {
         assert!(compare_profile(Some(&v1), Some(&root), None).is_ok());
         assert!(compare_profile(Some(&v2), Some(&workspace), Some("cargo-workspace-v2")).is_ok());
         assert!(compare_profile(Some(&v2), Some(&workspace), Some("cargo-workspace-v3")).is_ok());
+        assert!(compare_profile(Some(&v2), Some(&workspace), Some("fest-confined-v1")).is_ok());
+        assert!(compare_profile(Some(&v1), Some(&root), Some("fest-confined-v1")).is_err());
+        assert!(compare_profile(Some(&v2), None, Some("fest-confined-v1")).is_err());
         assert!(compare_profile(Some(&v2), Some(&workspace), None).is_err());
         assert!(compare_profile(Some(&v1), Some(&root), Some("cargo-workspace-v2")).is_err());
         assert!(compare_profile(Some(&v1), Some(&root), Some("cargo-workspace-v3")).is_err());

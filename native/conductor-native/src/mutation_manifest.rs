@@ -933,6 +933,7 @@ pub(crate) fn generated_campaign_contract_with(
     if test_argv.is_empty() {
         return Err("test_argv must be a non-empty list".to_owned());
     }
+    profile::validate_fest_if_selected(profile.as_deref(), generator, payload)?;
     // `pytest a.py b.py` names its files; `ctest` and `cargo test` run a whole suite and name
     // none. Both are honest, and a suite runner covers more than it declares, never less. What
     // is not honest is naming some and quietly claiming another, so the check bites there.

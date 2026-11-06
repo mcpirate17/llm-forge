@@ -14,6 +14,7 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 #[path = "mutation_snapshot_inputs.rs"]
 mod inputs;
+pub(crate) use inputs::Replacement as SnapshotReplacement;
 pub(crate) use inputs::Selection as SnapshotSelection;
 #[path = "mutation_snapshot_ignore.rs"]
 mod ignore_rules;
@@ -179,6 +180,26 @@ pub(crate) fn materialized_input_identity(
 ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String> {
     native::materialized_identity(root, selection)
         .map_err(|e| format!("snapshot materialized identity: {e:#}"))
+}
+
+/// Bind an engine-generated replacement to the original selected source before applying it.
+pub(crate) fn attribution_replacement(
+    root: &Path,
+    row: &serde_json::Value,
+    pins: &std::collections::BTreeMap<String, String>,
+) -> Result<SnapshotReplacement, String> {
+    native::attribution_replacement(root, row, pins)
+        .map_err(|e| format!("snapshot attribution replacement: {e:#}"))
+}
+
+/// Hash every original input while verifying one exact expected automatic mutation.
+pub(crate) fn materialized_input_identity_with_replacement(
+    root: &Path,
+    selection: &SnapshotSelection,
+    replacement: &SnapshotReplacement,
+) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String> {
+    native::materialized_identity_replaced(root, selection, Some(replacement))
+        .map_err(|e| format!("snapshot attribution identity: {e:#}"))
 }
 
 /// One disposable checkout of the host's current state.

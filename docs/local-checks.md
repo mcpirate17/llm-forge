@@ -215,13 +215,16 @@ FORGE_TEST_BIN="$PWD/native/forge/target/release/forge" \
 FORGE_TEST_CGROUP_PARENT=/operator/existing/delegated-cgroup \
   cargo +1.98.0 test --release --offline --locked \
   --manifest-path native/forge/Cargo.toml --test mutation_run_cli \
-  -- --include-ignored --test-threads=1
+  -- --include-ignored --test-threads=1 --skip confined_cli::real::fest::
 ```
 
 These are synthetic Cargo protocol fixtures exercising real CLI admission,
 confinement, timeout/cancellation, drift rejection and cleanup disposition. They
-are not automatic-engine mutation evidence. Fest execution remains unsupported
-by the ordinary CLI; parser/scorer tests retain its protocol semantics, and the
-explicitly delegated `mutation_engine_fest::tests` cases exercise missing
-coverage and non-JSON refusals through the confined adapter. Fixture paths are
-retained when process disposition or cleanup cannot be verified.
+are not automatic-engine mutation evidence. Parser/scorer tests retain Fest
+protocol semantics, and explicitly delegated `mutation_engine_fest::tests` cases
+exercise missing coverage and non-JSON refusals through the confined adapter.
+The separate [confined Fest profile](mutation-fest.md) requires an operator-pinned
+external guest and explicit grants. Its real CLI controls additionally require
+`FORGE_TEST_FEST_CONFIG` and `FORGE_TEST_FEST_CONFIG_SHA256`; skip
+`confined_cli::real::fest::` when running only the Cargo fixtures above. Fixture
+paths are retained when process disposition or cleanup cannot be verified.

@@ -95,6 +95,63 @@ pub(crate) fn generated_errors_with_installed(
             "workspace v3 requires a native runner receipt",
         ));
     }
+    errors.extend(profile_errors(payload, campaign, supporting));
+
+    if native_runner::declared(payload) {
+        if let Some(detail) = native_runner::owned_cleanup_error(payload) {
+            errors.push(reject(RejectionKind::SchemaError, detail));
+        }
+        errors.extend(native_binding_errors(
+            payload, campaign, hash, lineage, installed,
+        ));
+    } else {
+        errors.extend(runner_errors_with(payload, runner, lineage));
+        errors.extend(binding_errors(payload, campaign, hash));
+    }
+    errors.extend(survivor_errors(payload, campaign));
+    errors.extend(generated_outcome_errors(payload));
+    errors.extend(cargo_value_errors(payload, campaign));
+    errors
+}
+fn profile_errors(
+    payload: &Map<String, Value>,
+    campaign: &CampaignContract,
+    supporting: Result<Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>, &str>,
+) -> Vec<Rejection> {
+    let mut errors = Vec::new();
+    if campaign.execution_profile.as_deref() == Some("fest-confined-v1") {
+        if let Some(detail) = crate::mutation_fest_receipt::cleanup_error(payload) {
+            errors.push(reject(RejectionKind::NotPass, detail));
+        }
+        if let Some(detail) = crate::mutation_fest_receipt::attribution_error(
+            payload,
+            &campaign.campaign_id,
+            &campaign.source_sha256,
+            &campaign.test_sha256,
+        ) {
+            errors.push(reject(RejectionKind::NotPass, detail));
+        }
+        if !native_runner::declared(payload) {
+            errors.push(reject(
+                RejectionKind::NotPass,
+                "confined Fest requires a native runner receipt",
+            ));
+        } else {
+            let checked = match supporting {
+                Ok(identity) => crate::mutation_cargo_supporting_binding::compare_profile(
+                    payload.get("supporting_inputs"),
+                    identity,
+                    campaign.execution_profile.as_deref(),
+                ),
+                Err(error) => Err(format!(
+                    "independently captured Fest supporting inputs unavailable: {error}"
+                )),
+            };
+            if let Err(detail) = checked {
+                errors.push(reject(RejectionKind::NotPass, detail));
+            }
+        }
+    }
     if native_runner::declared(payload)
         && campaign.generated_value.is_none()
         && campaign.mutation_engine == "cargo-mutants"
@@ -122,21 +179,6 @@ pub(crate) fn generated_errors_with_installed(
             errors.push(reject(RejectionKind::NotPass, detail));
         }
     }
-
-    if native_runner::declared(payload) {
-        if let Some(detail) = native_runner::owned_cleanup_error(payload) {
-            errors.push(reject(RejectionKind::SchemaError, detail));
-        }
-        errors.extend(native_binding_errors(
-            payload, campaign, hash, lineage, installed,
-        ));
-    } else {
-        errors.extend(runner_errors_with(payload, runner, lineage));
-        errors.extend(binding_errors(payload, campaign, hash));
-    }
-    errors.extend(survivor_errors(payload, campaign));
-    errors.extend(generated_outcome_errors(payload));
-    errors.extend(cargo_value_errors(payload, campaign));
     errors
 }
 fn cargo_value_errors(payload: &Map<String, Value>, campaign: &CampaignContract) -> Vec<Rejection> {

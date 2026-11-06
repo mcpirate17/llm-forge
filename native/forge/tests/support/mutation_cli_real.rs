@@ -1,5 +1,8 @@
 //! Opt-in real automatic engine control; operator inputs grant every tool/read root.
 use super::*;
+
+#[path = "mutation_cli_fest.rs"]
+mod fest;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;

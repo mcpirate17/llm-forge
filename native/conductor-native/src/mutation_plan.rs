@@ -809,6 +809,8 @@ pub struct PlanRequest {
     pub jobs: i64,
     #[serde(default)]
     pub python_jobs: Option<i64>,
+    #[serde(default)]
+    pub fest_confined: bool,
     #[serde(default = "default_timeout")]
     pub run_timeout_seconds: i64,
     pub campaigns_root: String,
@@ -828,14 +830,18 @@ fn default_timeout() -> i64 {
     1800
 }
 
-/// Compute one `plan()`-equivalent response. No Python involved: pure filesystem
-/// reads under `request.repo_root`.
-pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
+fn validate_plan_request(request: &PlanRequest) -> Result<(), String> {
     if request.language != "python" && request.language != "rust" {
         return Err(format!(
             "unknown language '{}'; known: python, rust",
             request.language
         ));
+    }
+    if request.fest_confined && request.language != "python" {
+        return Err("--fest-confined is Python-only".into());
+    }
+    if request.fest_confined && request.python_jobs.is_some_and(|jobs| jobs != 1) {
+        return Err("--fest-confined requires one Python worker".into());
     }
     if !request.extra_tests.is_empty() && request.language != "python" {
         return Err("--extra-test pairs python subjects only".to_string());
@@ -846,6 +852,13 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
     if request.python_jobs.is_some_and(|jobs| jobs <= 0) {
         return Err("Python worker count must be positive".into());
     }
+    Ok(())
+}
+
+/// Compute one `plan()`-equivalent response. No Python involved: pure filesystem
+/// reads under `request.repo_root`.
+pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
+    validate_plan_request(request)?;
     let repo_root = Path::new(&request.repo_root);
     let covered = if request.include_covered || request.priority.is_some() {
         BTreeSet::new()
@@ -869,7 +882,11 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
             scope.as_ref(),
             &request.owner,
             &request.day,
-            request.python_jobs,
+            if request.fest_confined {
+                Some(1)
+            } else {
+                request.python_jobs
+            },
             request.run_timeout_seconds,
             &request.extra_tests,
         )?;
@@ -891,6 +908,11 @@ pub fn compute_plan(request: &PlanRequest) -> Result<Value, String> {
         (manifests, Vec::new(), untested, already)
     };
 
+    if request.fest_confined {
+        for manifest in &mut manifests {
+            manifest["generator"]["options"] = json!({"execution_profile":"fest-confined-v1"});
+        }
+    }
     let unpaired_lines: u64 = unpaired_json
         .iter()
         .filter_map(|u| u.get("lines").and_then(Value::as_u64))
@@ -1044,6 +1066,37 @@ mod fixture_parity_tests {
     }
 
     #[test]
+    fn confined_fest_planning_marks_only_native_python_and_requires_one_worker() {
+        let case = fixtures_root().join("case01_basic_pair");
+        let root = scratch_dir();
+        copy_tree(&case.join("tree"), &root);
+        let mut value: Value =
+            serde_json::from_slice(&fs::read(case.join("request.json")).unwrap()).unwrap();
+        value["repo_root"] = json!(root.to_string_lossy().to_string());
+        value["fest_confined"] = json!(true);
+        let mut request: PlanRequest = serde_json::from_value(value).unwrap();
+        request.python_jobs = None;
+        let result = compute_plan(&request).unwrap();
+        let manifests = result["manifests"].as_array().unwrap();
+        assert!(!manifests.is_empty());
+        for manifest in manifests {
+            assert_eq!(
+                manifest["generator"]["options"]["execution_profile"],
+                "fest-confined-v1"
+            );
+            assert_eq!(manifest["generator"]["jobs"], 1);
+        }
+        request.python_jobs = Some(2);
+        assert!(compute_plan(&request)
+            .unwrap_err()
+            .contains("one Python worker"));
+        request.python_jobs = None;
+        request.language = "rust".into();
+        assert!(compute_plan(&request).unwrap_err().contains("Python-only"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn unknown_language_is_refused() {
         let repo_root = scratch_dir();
         let request = PlanRequest {
@@ -1054,6 +1107,7 @@ mod fixture_parity_tests {
             day: "20260913".to_string(),
             jobs: 4,
             python_jobs: None,
+            fest_confined: false,
             run_timeout_seconds: 1800,
             campaigns_root: "conductor/mutation_campaigns".to_string(),
             only_sources: None,

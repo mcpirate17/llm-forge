@@ -156,6 +156,52 @@ fn sort_key(result: &Value) -> Result<(String, u64), String> {
 
 /// Name every generated mutant, in file order, deterministically.
 pub(crate) fn rows(report: &Value, worktree: &Path) -> Result<Vec<Value>, String> {
+    rows_inner(report, worktree, None)
+}
+
+fn confined_path(
+    file: &str,
+    worktree: &Path,
+    selected: &std::collections::BTreeSet<String>,
+) -> Result<String, String> {
+    let root = worktree
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve Fest snapshot: {e}"))?;
+    if root != worktree {
+        return Err("Fest snapshot path is aliased".into());
+    }
+    let path = Path::new(file);
+    let relative = path
+        .strip_prefix(&root)
+        .map_err(|_| "Fest reported a source outside its snapshot")?;
+    let relative = relative.to_str().ok_or("Fest source path is not UTF-8")?;
+    conductor_native::mutation_snapshot_inputs::validate_path(relative)?;
+    if !selected.contains(relative)
+        || root.join(relative).as_os_str() != path.as_os_str()
+        || path
+            .canonicalize()
+            .map_err(|e| format!("cannot resolve Fest source: {e}"))?
+            .as_os_str()
+            != path.as_os_str()
+    {
+        return Err("Fest reported an aliased or unselected source".into());
+    }
+    Ok(relative.to_owned())
+}
+
+pub(crate) fn rows_confined(
+    report: &Value,
+    worktree: &Path,
+    selected: &std::collections::BTreeSet<String>,
+) -> Result<Vec<Value>, String> {
+    rows_inner(report, worktree, Some(selected))
+}
+
+fn rows_inner(
+    report: &Value,
+    worktree: &Path,
+    selected: Option<&std::collections::BTreeSet<String>>,
+) -> Result<Vec<Value>, String> {
     let mut results = Vec::new();
     for result in report
         .get("results")
@@ -169,7 +215,10 @@ pub(crate) fn rows(report: &Value, worktree: &Path) -> Result<Vec<Value>, String
     let mut entries = Vec::with_capacity(results.len());
     for ((file, _), result) in &results {
         entries.push([
-            relative(Path::new(file), worktree),
+            match selected {
+                Some(selected) => confined_path(file, worktree, selected)?,
+                None => relative(Path::new(file), worktree),
+            },
             mutant_text(result, "mutator_name")?,
             mutant_text(result, "original_text")?,
             mutant_text(result, "mutated_text")?,
@@ -339,20 +388,95 @@ fn require_clean_exit(result: &CommandResult) -> Result<(), String> {
     ))
 }
 
+fn ensure_last_cov_report(argv: &mut Vec<String>) -> Result<(), String> {
+    if argv.pop().as_deref() != Some("--cov-report=") {
+        return Err("unexpected Fest baseline coverage command".into());
+    }
+    Ok(())
+}
+
 /// Collect coverage, generate and run the mutants, fill in the receipt.
+fn confined_engine_arguments(argv: &mut Vec<String>, campaign: &Campaign) -> Step<()> {
+    argv.extend(["--source".to_owned(), campaign.source[0].clone()]);
+    for exclusion in &campaign.exclude {
+        argv.extend(["--exclude".to_owned(), exclusion.clone()]);
+    }
+    argv.extend([
+        "--workers".to_owned(),
+        "1".to_owned(),
+        "--timeout".to_owned(),
+        campaign.mutant_timeout()?.to_string(),
+        "--seed".to_owned(),
+        campaign.seed.to_string(),
+        "--backend".to_owned(),
+        "subprocess".to_owned(),
+        "--no-coverage-cache".to_owned(),
+    ]);
+    Ok(())
+}
+
+fn record_report(
+    run: &mut EngineRun,
+    result: &CommandResult,
+    stdout: &str,
+    worktree: &Path,
+) -> Step<()> {
+    let report: Value = serde_json::from_str(stdout).map_err(|_| {
+        format!(
+            "fest produced no JSON report (rc={}): {}",
+            result.rc_text(),
+            last_chars(&result.stderr_tail, 800)
+        )
+    })?;
+    run.planned = report.get("mutants_generated").and_then(Value::as_u64);
+    require_clean_exit(result)?;
+    run.receipt
+        .insert("engine_summary".into(), summary(&report));
+    let mutants =
+        if run.campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1") {
+            let selected = run.campaign.source_sha256.keys().cloned().collect();
+            rows_confined(&report, worktree, &selected)?
+        } else {
+            rows(&report, worktree)?
+        };
+    run.receipt.insert("mutants".into(), Value::Array(mutants));
+    run.require_executed(
+        counted(&report, "mutants_generated"),
+        counted(&report, "mutants_tested"),
+    )?;
+    Ok(())
+}
+
 pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
     let interpreter = run.require_python()?;
     require_no_drift(run.campaign, run.worktree)?;
     let worktree = run.worktree.to_path_buf();
     let timeout = run.campaign.run_timeout_seconds;
-    let coverage = worktree.join(".coverage");
-    let attribution_environment = environment(run.campaign, &worktree, interpreter);
+    let confined =
+        run.campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1");
+    let runtime = run.runtime;
+    let coverage = if confined {
+        runtime
+            .and_then(|owner| owner.fest_output("coverage.json"))
+            .ok_or("confined Fest output owner missing")?
+    } else {
+        worktree.join(".coverage")
+    };
+    let attribution_environment = if confined {
+        BTreeMap::new()
+    } else {
+        environment(run.campaign, &worktree, interpreter)
+    };
     let mut bound = attribution_environment.clone();
     bound.insert(
         "COVERAGE_FILE".into(),
         coverage.to_string_lossy().into_owned(),
     );
-    let baseline_argv = coverage_argv(run.campaign, interpreter);
+    let mut baseline_argv = coverage_argv(run.campaign, interpreter);
+    if confined {
+        ensure_last_cov_report(&mut baseline_argv)?;
+        baseline_argv.push(format!("--cov-report=json:{}", coverage.display()));
+    }
     let (baseline, _) = run.run(&baseline_argv, &worktree, timeout, &bound, &[])?;
     run.note_baseline(&baseline, &baseline_argv)?;
     if !coverage.is_file() {
@@ -362,39 +486,48 @@ pub fn execute(run: &mut EngineRun, binary: &str) -> Step<()> {
         )
         .into());
     }
-    let toml = config(run.campaign, interpreter)?;
-    fs::write(worktree.join("fest.toml"), toml)
-        .map_err(|error| format!("cannot write fest.toml: {error}"))?;
+    let coverage_bindings = if confined {
+        let projected = runtime
+            .and_then(|owner| owner.fest_output("coverage-curated.json"))
+            .ok_or("confined Fest coverage projection owner missing")?;
+        Some((
+            projected.clone(),
+            crate::mutation_fest_coverage::capture(&coverage, &projected, &worktree, run.campaign)
+                .map_err(|e| format!("Fest coverage admission: {e:#}"))?,
+        ))
+    } else {
+        let toml = config(run.campaign, interpreter)?;
+        fs::write(worktree.join("fest.toml"), toml)
+            .map_err(|error| format!("cannot write fest.toml: {error}"))?;
+        None
+    };
     let mutated: Vec<PathBuf> = run
         .campaign
         .source_sha256
         .keys()
         .map(|relative| worktree.join(relative))
         .collect();
-    let argv = engine_argv(run.campaign, binary, &coverage);
+    let effective_coverage = coverage_bindings
+        .as_ref()
+        .map_or(&coverage, |(path, _)| path);
+    let mut argv = engine_argv(run.campaign, binary, effective_coverage);
+    if confined {
+        confined_engine_arguments(&mut argv, run.campaign)?;
+    }
     let (result, stdout) = run.run(&argv, &worktree, timeout, &bound, &mutated)?;
+    if let Some((_, (raw, projected))) = &coverage_bindings {
+        raw.verify()
+            .map_err(|e| format!("raw coverage changed: {e:#}"))?;
+        projected
+            .verify()
+            .map_err(|e| format!("curated coverage changed: {e:#}"))?;
+    }
     run.receipt
         .insert("engine_result".into(), result.as_value());
     if result.timed_out {
         return Err(format!("fest timed out after {timeout}s").into());
     }
-    let report: Value = serde_json::from_str(&stdout).map_err(|_| {
-        format!(
-            "fest produced no JSON report (rc={}): {}",
-            result.rc_text(),
-            last_chars(&result.stderr_tail, 800)
-        )
-    })?;
-    run.planned = report.get("mutants_generated").and_then(Value::as_u64);
-    require_clean_exit(&result)?;
-    run.receipt
-        .insert("engine_summary".into(), summary(&report));
-    let mutants = rows(&report, &worktree)?;
-    run.receipt.insert("mutants".into(), Value::Array(mutants));
-    run.require_executed(
-        counted(&report, "mutants_generated"),
-        counted(&report, "mutants_tested"),
-    )?;
+    record_report(run, &result, &stdout, &worktree)?;
     attribute(run, &attribution_environment)
 }
 

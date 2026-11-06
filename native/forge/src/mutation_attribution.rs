@@ -29,6 +29,43 @@ const RERUN_TIMEOUT_FLOOR_SECONDS: i64 = 60;
 const CRITICALITY: &str = "high";
 const TRUNCATING: [&str; 2] = ["-x", "--exitfirst"];
 const DESELECTING: [&str; 2] = ["-k", "-m"];
+const OBSERVATION_LIMIT: usize = 4 * 1024 * 1024;
+
+/// Charge each normalized report before retaining it, including escaped keys
+/// and container separators. Legacy campaigns keep their existing limits.
+struct ObservationBudget(Option<usize>);
+
+impl ObservationBudget {
+    fn new(confined: bool) -> Self {
+        // The empty envelope is smaller than this fixed reservation. Per-entry
+        // charges below cover every growing field, including exit-code keys.
+        Self(confined.then_some(OBSERVATION_LIMIT - 256))
+    }
+
+    fn retain(&mut self, id: Option<&str>, report: &Value) -> Step<()> {
+        let Some(remaining) = self.0 else {
+            return Ok(());
+        };
+        let charge = (|| -> anyhow::Result<usize> {
+            let report_bytes = crate::json_canon::encoded_size(report, remaining)?;
+            let overhead = match id {
+                Some(id) => {
+                    let key = crate::json_canon::encoded_size(&json!(id), remaining)?;
+                    key.checked_mul(2).and_then(|n| n.checked_add(6))
+                }
+                None => Some(1),
+            }
+            .ok_or_else(|| anyhow::anyhow!("attribution size overflow"))?;
+            report_bytes
+                .checked_add(overhead)
+                .filter(|size| *size <= remaining)
+                .ok_or_else(|| anyhow::anyhow!("attribution size exceeds remaining budget"))
+        })()
+        .map_err(|_| "Fest attribution observations exceed 4 MiB".to_string())?;
+        self.0 = Some(remaining - charge);
+        Ok(())
+    }
+}
 
 /// The function-level nodeid a JUnit report can be matched back to.
 ///
@@ -267,7 +304,12 @@ impl Session<'_> {
 
     /// The unmutated runs every mutant is compared against; their wall time then
     /// bounds the mutant re-runs.
-    fn baselines(&mut self, run: &mut EngineRun, ranked: &[String]) -> Step<Vec<Value>> {
+    fn baselines(
+        &mut self,
+        run: &mut EngineRun,
+        ranked: &[String],
+        budget: &mut ObservationBudget,
+    ) -> Step<Vec<Value>> {
         let mut reports = Vec::new();
         let mut slowest = 0.0_f64;
         for index in 0..BASELINE_REPETITIONS {
@@ -283,7 +325,20 @@ impl Session<'_> {
                     )
                     .into());
                 }
-                Measured::Report(report) => reports.push(report),
+                Measured::Report(report) => {
+                    if run.campaign.option_text("execution_profile").as_deref()
+                        == Some("fest-confined-v1")
+                        && !result.succeeded()
+                    {
+                        return Err(format!(
+                            "attribution baseline {index} exited {}",
+                            result.rc_text()
+                        )
+                        .into());
+                    }
+                    budget.retain(None, &report)?;
+                    reports.push(report);
+                }
             }
             slowest = slowest.max(result.duration_seconds);
         }
@@ -332,6 +387,46 @@ fn unusable_reason(measured: &Measured) -> Option<&'static str> {
     }
 }
 
+fn confined_fest_reason(result: &CommandResult, measured: &Measured) -> Option<&'static str> {
+    if result.timed_out || result.returncode != Some(1) {
+        return Some("pytest did not exit with a normal test failure");
+    }
+    if matches!(measured, Measured::Report(report) if report["tests"].as_object().is_some_and(|tests| tests.values().any(|test| test["outcome"] == "ERROR")))
+    {
+        return Some("pytest reported a setup or collection error");
+    }
+    unusable_reason(measured)
+}
+
+/// Reapply only this engine mutation, then require the original input identity again.
+fn measure_mutant(
+    session: &Session,
+    run: &mut EngineRun,
+    row: &Value,
+    covering: &[String],
+    name: &str,
+) -> Step<(CommandResult, Measured)> {
+    let runtime = run.runtime;
+    let guard = runtime
+        .map(|runtime| runtime.fest_mutant(row, &session.worktree))
+        .transpose()
+        .map_err(|e| format!("attribution scope: {e:#}"))?
+        .flatten();
+    let result = with_mutant(&session.worktree, row, || {
+        session.measure(run, covering, name)
+    });
+    let confined_fest = guard.is_some();
+    drop(guard);
+    if confined_fest {
+        // Restoration failures are decisive even when the child also failed.
+        runtime
+            .ok_or("Fest runtime disappeared during attribution")?
+            .verify(Some(&session.worktree))
+            .map_err(|e| format!("attribution restoration verification: {e:#}"))?;
+    }
+    result
+}
+
 /// One JUnit report per killed mutant, over that mutant's covering set.
 fn matrix(
     session: &Session,
@@ -339,6 +434,7 @@ fn matrix(
     killed: &[Value],
     ranked: &[String],
     summary: &mut Map<String, Value>,
+    budget: &mut ObservationBudget,
 ) -> Step<Map<String, Value>> {
     let known: BTreeSet<&String> = ranked.iter().collect();
     let total = killed.len();
@@ -357,9 +453,13 @@ fn matrix(
             continue;
         }
         let name = format!("mutant-{position}");
-        let (_, measured) = with_mutant(&session.worktree, row, || {
-            session.measure(run, &covering, &name)
-        })?;
+        let (result, measured) = measure_mutant(session, run, row, &covering, &name)?;
+        if run.campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1") {
+            if let Some(reason) = confined_fest_reason(&result, &measured) {
+                unattributed(summary, id, reason);
+                continue;
+            }
+        }
         if matches!(measured, Measured::TimedOut) {
             eprintln!(
                 "attribution: mutant {}/{total} ({id}) re-run timed out after {}s",
@@ -369,6 +469,7 @@ fn matrix(
         }
         match (unusable_reason(&measured), measured) {
             (None, Measured::Report(report)) => {
+                budget.retain(Some(id), &report)?;
                 matrix.insert(id.to_string(), report);
             }
             (reason, _) => unattributed(summary, id, reason.unwrap_or("no report")),
@@ -385,7 +486,10 @@ fn measure_kills(
     killed: &[Value],
     summary: &mut Map<String, Value>,
 ) -> Step<()> {
-    let reports = run.worktree.join(".attribution");
+    let reports = run
+        .runtime
+        .and_then(|runtime| runtime.fest_output("attribution"))
+        .unwrap_or_else(|| run.worktree.join(".attribution"));
     fs::create_dir_all(&reports)
         .map_err(|error| format!("cannot create {}: {error}", reports.display()))?;
     let mut session = Session {
@@ -395,8 +499,11 @@ fn measure_kills(
         timeout: run.campaign.run_timeout_seconds,
         worktree: run.worktree.to_path_buf(),
     };
-    let baselines = session.baselines(run, ranked)?;
-    let matrix = matrix(&session, run, killed, ranked, summary)?;
+    let confined =
+        run.campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1");
+    let mut budget = ObservationBudget::new(confined);
+    let baselines = session.baselines(run, ranked, &mut budget)?;
+    let matrix = matrix(&session, run, killed, ranked, summary, &mut budget)?;
     summary.insert("attributed_mutants".into(), json!(matrix.len()));
     if matrix.is_empty() {
         summary.insert("status".into(), json!("NO_ATTRIBUTION"));
@@ -415,6 +522,14 @@ fn measure_kills(
         .keys()
         .map(|id| (id.clone(), json!(KILLED)))
         .collect();
+    if confined {
+        let evidence = json!({"schema_version":1, "baseline_reports": baselines, "mutants": matrix, "baseline_exit_codes":[0,0], "mutant_exit_codes":ids.iter().map(|id| (id.clone(), json!(1))).collect::<Map<String, Value>>()});
+        crate::json_canon::encoded_size(&evidence, OBSERVATION_LIMIT)
+            .map_err(|_| "Fest attribution observations exceed 4 MiB".to_string())?;
+        run.receipt
+            .insert("fest_attribution_observations".into(), evidence);
+        summary.insert("attributed_ids".into(), json!(ids));
+    }
     let analysed = analyze_reports(
         spec(run.campaign, ranked, &paths, &ids),
         baselines,
