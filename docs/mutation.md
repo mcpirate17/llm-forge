@@ -250,8 +250,9 @@ test-value and cleanup results independently of any candidate approval.
 ## Ordinary Cargo execution grants
 
 On Linux, the ordinary root profile admits a dependency-free Cargo package with
-one explicit standard-harness integration target. The workspace profile below is
-under validation. Both require one worker, no campaign environment overrides,
+one explicit standard-harness integration target. The explicit workspace profile
+below also supports captured local paths and verified registry seeds. Both require
+one worker, no campaign environment overrides,
 no configured Python guest and operator-pinned execution grants. Ordinary Fest
 and Mull execution remain unsupported under these grants (#196). The opt-in
 Cargo per-test value workflow above retains its separate execution interface.
@@ -321,7 +322,7 @@ closure, and producer authenticity are outside its scope. The existing opt-in
 Cargo per-test value contract has its own inventory and is not replaced by this
 binding.
 
-### Ordinary workspace profile — under validation
+### Ordinary workspace profile
 
 Generate the profile through the native writer; do not edit its manifest:
 
@@ -389,6 +390,19 @@ uses its single-worker default while requiring one worker in the campaign.
 Nonzero passing libtest observations must agree between direct and engine
 baselines. Full source restoration and owned cleanup are checked before disposal.
 
+Cargo metadata paths may contain confined parent components, as in a CLI package
+sharing a sibling's source. Every existing component is checked for symlinks;
+paths cannot escape the admitted root and re-enter it. Missing example, test or
+bench paths are allowed only for unselected packages, since published dependencies
+can omit those files. Selected package targets and dependency build targets remain
+required. An absent suffix cannot be followed by a parent component. Refusals
+identify the package, target and path.
+
+An exact `--only` selection ignores unrelated dirty output files when checking
+ownership. Selected dirty files still require this owner's active claim, even
+when their paths also appear in the committed branch diff. Unchanged selections
+remain refused.
+
 Active Cargo/toolchain configuration is refused along the command's actual
 directory ancestry, including the writable scratch parent. Input checks run
 before and after commands. These are point-in-time observations, not protection
@@ -409,12 +423,18 @@ restoring timestamps or ownership. Each package's checksum, inventory and writte
 contents are checked before its exact Cargo completion marker is created. The
 complete package set is checked around commands; missing packages also refuse.
 This preserves the sandbox's metadata restrictions. Partial staging is retained
-on failure. Small registry-backed execution is verified; clean-build admission
-and full-project dependency workloads remain under validation. Actual
-Forge package tests additionally require fixtures such as `FORGE_TEST_BIN` and
-Git that this interface does not grant. A fixture campaign is not proof that
-Forge's own complete package suite can run under these grants. See the current
-[engineering status](roadmap.md) and [observations](performance.md).
+on failure. Clean-release workspace and registry-backed trials verify scoped
+corpus admission, source/data drift refusal, exact restoration and owned cleanup.
+A timed-out real mutant produced an incomplete ERROR receipt and retained the
+unrestored snapshot after process cleanup.
+
+The actual Forge workload admitted all 338 registry packages but its baseline
+failed while compiling `ring`: the explicit read grants excluded the required
+`/usr/include/stdc-predef.h` header. A seed does not grant compiler headers.
+Forge package tests also require fixtures such as `FORGE_TEST_BIN` and Git that
+this interface does not grant. The full package suite and engine remain unproven;
+the successful authored fixtures do not establish that broader support. See the
+current [engineering status](roadmap.md) and [observations](performance.md).
 
 ## Receipt format
 

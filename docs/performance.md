@@ -10,7 +10,7 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
-### Workspace mutation work in progress — 2026-11-06
+### Cargo workspace mutation evidence — 2026-11-06
 
 The first bounded Cargo seed preparation attempt refused the local cache's
 group-writable permissions before copying any files. The native task receipt
@@ -46,9 +46,64 @@ registry-backed trial: both automatic mutants were killed, direct/engine baselin
 each observed one passing test, and all three cgroups plus the snapshot were
 confirmed absent. Its 325 ms engine observation excludes admission and staging.
 The dirty-build trial completed 15 checks with 19 clean-build/corpus checks left
-unstarted. Clean-build corpus admission, the full Forge dependency workload and
-release measurements remain unproven. No failed or unstarted phase is counted
-as passing evidence.
+unstarted. Subsequent clean-release trials are recorded separately below; the
+dirty attempts do not establish clean runner identity or corpus acceptance.
+
+The [17-trial evidence index](../research/performance/forge-program-20261106-workspace-mutation.json)
+retains every attempt, source/executable identity, native outcome, orchestration
+accounting and command-log digest. It is an evidence index, not an admission
+receipt or execution attestation. Repeated trials of the same authored fixtures
+are not independent task samples.
+
+| Group | Trials | Observed result |
+| --- | ---: | --- |
+| Full-lock seed preparation | 2 | Initial permission refusal, then successful preparation |
+| Dirty workspace diagnostics | 6 | Four failures and two core-behavior successes; no clean admission |
+| Initial clean workspace fixtures at `0522270` | 2 | Scoped core and corpus checks satisfied |
+| Real-mutant timeout | 1 | Incomplete ERROR receipt, process cleanup and unrestored snapshot retained |
+| Actual Forge workspace | 4 | Three admission refusals, then BASELINE_FAILED |
+| Final clean workspace fixtures at `fee612b` | 2 | 31 and 34 checks completed; none failed, censored or unstarted |
+
+The final clean release has executable SHA-256
+`e690d44f1baec3e2d3d64d7b2459f80a3ae73ddf1b77b598fb70b82980807f96`
+and compiled source SHA-256
+`1f252decab4d1c16b7aab22bda12515face03b3f327035c87aea67a329bc31c3`.
+Each final fixture killed two automatically generated mutants and observed one
+passing test in each direct/engine baseline. Both live and committed corpus
+checks accepted the original inputs, rejected supporting-source and test-data
+drift, and accepted exact restoration. All three owned command groups and the
+snapshot were independently confirmed absent for each fixture. These are scoped
+receipt checks, not whole-candidate approval, test value or agent effectiveness.
+
+The timeout trial used a generated mutant that wrote an observation marker and
+then slept beyond the ten-second command limit. The marker and changed source
+were observed, the nonzero direct baseline had passed, and the engine timed out.
+All owned groups were removed; the unrestored snapshot remained with an incomplete
+ERROR receipt. Its 12 completed oracle checks do not constitute mutation PASS.
+
+Actual Forge attempts identified and repaired exact-scope handling of generated
+outputs, confined parent paths in Cargo metadata, and missing unused dependency
+examples. Inspection of the locked `nom` archive found six declared examples
+absent from its contents; that explains the third attempt's opaque missing-path
+error by inference. New errors identify the package, target and path.
+
+The fourth actual trial consumed the 338-package seed and admitted metadata:
+96 ms, exit zero, 1,720,304 captured stdout bytes. Its unmutated package baseline
+exited 101 after 29.961 seconds, without timeout, because `ring` compilation could
+not read `/usr/include/stdc-predef.h` under the supplied grants. The native receipt
+is BASELINE_FAILED; two owned groups and the snapshot were confirmed absent.
+The driver has 8 completed, 1 failed and 4 unstarted checks. Its unstarted
+projection is not proof no native work occurred: the native ledger records both
+metadata and baseline commands. No mutation engine or passing Forge suite is
+established by this trial. Phase durations exclude preparation and admission.
+
+No matched speedup, p50/p95 distribution, model-token saving or task-benefit claim
+is made here. Resource grants are caps, not observed CPU or peak-memory usage.
+Raw binaries, fixtures, logs and private collector scripts remain on the measurement
+host; the committed index preserves hashes and references but is not a standalone
+replay bundle. Failed generated outputs were preserved byte-for-byte outside the
+active campaign registry, with pinned relocation records. No failed, censored or
+unstarted phase is counted as passing evidence.
 
 ### Actual Codex approval diagnostic — 2026-11-05
 
