@@ -44,13 +44,11 @@ fn independent_snapshot_must_match_and_all_targets_be_included() {
     assert!(Held::capture(host.path(), 32, &excluded).is_err());
 }
 
-#[test]
-fn inventory_is_only_requested_for_admissible_native_ordinary_receipts() {
-    use conductor_native::mutation_evidence::CapturedReceipt;
+fn eligible_fixture() -> (serde_json::Value, serde_json::Value) {
     let contract = serde_json::json!({"campaign_id":"c","generated":true,"manifest":"campaign.json", "manifest_sha256":"f".repeat(64),
         "mutation_engine":"cargo-mutants","source_sha256":{"src/lib.rs":"a".repeat(64)},
         "test_sha256":{"tests/contract.rs":"b".repeat(64)}});
-    let mut payload = serde_json::json!({"runner_kind":"forge-native","campaign_id":"c",
+    let payload = serde_json::json!({"runner_kind":"forge-native","campaign_id":"c",
         "status":"PASS","schema_version":"llm.mutation-testing.receipt.v3","mutants_are_generated":true,
         "manifest":"campaign.json","manifest_sha256":"f".repeat(64),
         "source_sha256":{"src/lib.rs":"a".repeat(64)},"test_sha256":{"tests/contract.rs":"b".repeat(64)},
@@ -63,6 +61,13 @@ fn inventory_is_only_requested_for_admissible_native_ordinary_receipts() {
         "mutants":[{"path":"src/lib.rs","outcome":"KILLED"}],
         "source_coverage":{"schema_version":1,"complete":true,"scored_by_source":{"src/lib.rs":1},"missing":[]},
         "supporting_inputs":{"schema_version":1,"algorithm":"sha256-framed-path-content-v1","scope":"cargo-root-rust-discovery-v1","digest":"a".repeat(64),"files":4}});
+    (contract, payload)
+}
+
+#[test]
+fn inventory_is_only_requested_for_admissible_native_ordinary_receipts() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (contract, mut payload) = eligible_fixture();
     let row = |value: &serde_json::Value| CapturedReceipt {
         path: "evidence.json".into(),
         text: value.to_string(),
@@ -108,6 +113,83 @@ fn inventory_is_only_requested_for_admissible_native_ordinary_receipts() {
     assert!(!stale_native_contract(&stale, &python, true));
     payload.as_object_mut().unwrap().remove("supporting_inputs");
     assert!(check(&payload).is_none());
+}
+
+#[test]
+fn eligible_receipt_checks_schema_and_generated_flag_before_fingerprint() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (contract, payload) = eligible_fixture();
+    let row = |value: &serde_json::Value| CapturedReceipt {
+        path: "evidence.json".into(),
+        text: value.to_string(),
+    };
+    let mut calls = 0;
+    let accepted = eligible_receipt(
+        &row(&payload),
+        std::slice::from_ref(&contract),
+        &mut || {
+            calls += 1;
+            Ok(Some("e".repeat(64)))
+        },
+        None,
+    )
+    .unwrap();
+    assert_eq!(accepted.as_deref(), Some("c"));
+    assert_eq!(calls, 1);
+    for (field, value) in [
+        ("schema_version", Some(serde_json::json!("wrong"))),
+        ("schema_version", None),
+        ("mutants_are_generated", Some(serde_json::json!(false))),
+        ("mutants_are_generated", None),
+    ] {
+        let mut bad = payload.clone();
+        if let Some(value) = value {
+            bad[field] = value;
+        } else {
+            bad.as_object_mut().unwrap().remove(field);
+        }
+        assert!(
+            eligible_receipt(
+                &row(&bad),
+                std::slice::from_ref(&contract),
+                &mut || panic!("invalid {field} must not request fingerprint"),
+                None
+            )
+            .unwrap()
+            .is_none(),
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn eligible_receipt_checks_each_contract_guard_before_fingerprint() {
+    use conductor_native::mutation_evidence::CapturedReceipt;
+    let (contract, payload) = eligible_fixture();
+    let row = CapturedReceipt {
+        path: "evidence.json".into(),
+        text: payload.to_string(),
+    };
+    for (field, value) in [
+        ("source_drifted", serde_json::json!(true)),
+        ("generated", serde_json::json!(false)),
+        ("mutation_engine", serde_json::json!("fest")),
+        ("generated_value", serde_json::json!({})),
+    ] {
+        let mut bad = contract.clone();
+        bad[field] = value;
+        assert!(
+            eligible_receipt(
+                &row,
+                &[bad],
+                &mut || panic!("invalid {field} must not request fingerprint"),
+                None
+            )
+            .unwrap()
+            .is_none(),
+            "{field}"
+        );
+    }
 }
 
 #[test]

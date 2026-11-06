@@ -1,5 +1,8 @@
-//! Synthetic CLI protocol fixture. Delegation is required; never mutation evidence.
+//! Confined synthetic CLI fixtures and an opt-in real automatic engine control.
 use super::*;
+
+#[path = "mutation_cli_real.rs"]
+mod real;
 
 struct CargoFixture {
     root: Option<tempfile::TempDir>,
@@ -171,54 +174,10 @@ impl CargoFixture {
             receipt: self.repo.join(RECEIPT),
         }
     }
-    fn finish(&self, mut owner: OwnedChild) -> Run {
-        use std::io::Read;
-        use std::sync::mpsc;
-        let child = owner.child.as_mut().unwrap();
-        let stdout = child.stdout.take().unwrap();
-        let stderr = child.stderr.take().unwrap();
-        let (tx, rx) = mpsc::channel();
-        for (name, stream) in [
-            ("stdout", Box::new(stdout) as Box<dyn Read + Send>),
-            ("stderr", Box::new(stderr) as Box<dyn Read + Send>),
-        ] {
-            let tx = tx.clone();
-            std::thread::spawn(move || {
-                let mut bytes = Vec::new();
-                let result = stream
-                    .take(2 * 1024 * 1024 + 1)
-                    .read_to_end(&mut bytes)
-                    .and_then(|_| {
-                        if bytes.len() <= 2 * 1024 * 1024 {
-                            Ok(bytes)
-                        } else {
-                            Err(std::io::Error::other("fixture output overflow"))
-                        }
-                    });
-                let _ = tx.send((name, result));
-            });
-        }
-        drop(tx);
-        let status = owner
-            .wait_bounded(Duration::from_secs(20))
-            .expect("owned CLI status");
-        let mut captured = std::collections::BTreeMap::new();
-        for _ in 0..2 {
-            let (name, bytes) = rx.recv_timeout(Duration::from_secs(3)).unwrap_or_else(|_| {
-                owner.uncertain.set(true);
-                panic!(
-                    "CLI output drain unresolved; retained receipt {}",
-                    owner.receipt.display()
-                );
-            });
-            let bytes = bytes.unwrap_or_else(|error| {
-                owner.uncertain.set(true);
-                panic!("CLI output read failed: {error}");
-            });
-            captured.insert(name, bytes);
-        }
-        let stdout = &captured["stdout"];
-        let stderr = &captured["stderr"];
+    fn finish(&self, owner: OwnedChild) -> Run {
+        let output = owner.capture(Duration::from_secs(20));
+        let stdout = &output.stdout;
+        let stderr = &output.stderr;
         let printed: Value = serde_json::from_slice(stdout)
             .unwrap_or_else(|e| panic!("{e}: {}", String::from_utf8_lossy(stderr)));
         let receipt = match fs::read(self.repo.join(RECEIPT)) {
@@ -228,7 +187,7 @@ impl CargoFixture {
         };
         self.settle(&printed, &receipt);
         Run {
-            code: status.code(),
+            code: output.status.code(),
             printed,
             receipt,
         }
@@ -279,6 +238,56 @@ struct OwnedChild {
     receipt: PathBuf,
 }
 impl OwnedChild {
+    fn capture(mut self, limit: Duration) -> std::process::Output {
+        use std::io::Read;
+        use std::sync::mpsc;
+        let child = self.child.as_mut().unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let (tx, rx) = mpsc::channel();
+        for (name, stream) in [
+            ("stdout", Box::new(stdout) as Box<dyn Read + Send>),
+            ("stderr", Box::new(stderr) as Box<dyn Read + Send>),
+        ] {
+            let tx = tx.clone();
+            std::thread::spawn(move || {
+                let mut bytes = Vec::new();
+                let result = stream
+                    .take(2 * 1024 * 1024 + 1)
+                    .read_to_end(&mut bytes)
+                    .and_then(|_| {
+                        if bytes.len() <= 2 * 1024 * 1024 {
+                            Ok(bytes)
+                        } else {
+                            Err(std::io::Error::other("fixture output overflow"))
+                        }
+                    });
+                let _ = tx.send((name, result));
+            });
+        }
+        drop(tx);
+        let status = self.wait_bounded(limit).expect("owned CLI status");
+        let mut captured = std::collections::BTreeMap::new();
+        for _ in 0..2 {
+            let (name, bytes) = rx.recv_timeout(Duration::from_secs(3)).unwrap_or_else(|_| {
+                self.uncertain.set(true);
+                panic!(
+                    "CLI output drain unresolved; retained receipt {}",
+                    self.receipt.display()
+                );
+            });
+            let bytes = bytes.unwrap_or_else(|error| {
+                self.uncertain.set(true);
+                panic!("CLI output read failed: {error}");
+            });
+            captured.insert(name, bytes);
+        }
+        std::process::Output {
+            status,
+            stdout: captured.remove("stdout").unwrap(),
+            stderr: captured.remove("stderr").unwrap(),
+        }
+    }
     fn wait_bounded(&mut self, limit: Duration) -> Option<std::process::ExitStatus> {
         let deadline = Instant::now() + limit;
         loop {

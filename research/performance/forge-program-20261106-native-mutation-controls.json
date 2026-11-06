@@ -1,0 +1,232 @@
+{
+  "schema": "forge.native-controls.evidence-index.v1",
+  "scope": "three opt-in real cargo-mutants integration attempts; third test PASS is never campaign PASS",
+  "generator": {
+    "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-report.py",
+    "sha256": "3ea6087afe430a25365ae7cf8747dad8fb29e9c95ffbf78fc6ae4c1253c54d38",
+    "bytes": 13177,
+    "argv": [
+      ".git/forge-native-controls-report.py"
+    ],
+    "capture_helper_sha256": "482c61dd39e12793fb9f08ba262a1a5e969628c0b9fa7749ab32178e069f5ecb"
+  },
+  "binary_ledger": {
+    "path": "/home/tim/Projects/llm-forge/.git/forge-real-control-clean-binary.json",
+    "sha256": "021caac95945f09e42c95821e89dda358fe846ea608fd1023b560826b378c68f",
+    "bytes": 1018,
+    "record": {
+      "head": "5f78e9b24f983b670197c6fe4edbdf3b5aa3ed5b",
+      "tree": "022c75b9a45b1989ece4a455eddff23078b7d581",
+      "install_root": "/tmp/forge-real-control-clean-5f78e9b-p45anyre",
+      "source_status": "clean",
+      "scope": "isolated native installation for opt-in integration test; full publication gate not yet run",
+      "binary": "/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge",
+      "sha256": "308d51c93ea0058b1035412dfe7c2610d48b9a5aab4032859cb472ac48a21341",
+      "bytes": 53647688,
+      "identity": {
+        "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+        "compiled_git_commit": "5f78e9b24f983b670197c6fe4edbdf3b5aa3ed5b",
+        "compiled_source_sha256": "3b6e75aafcf9e676ca2c36f383918221afe376d3bd258a4d1a13165b089f3b8d",
+        "executable_sha256": "308d51c93ea0058b1035412dfe7c2610d48b9a5aab4032859cb472ac48a21341"
+      },
+      "build_log_sha256": "8c40b7f4dcf463edea72032acc01e9545ff2bfc206faa33946fa2c7af8ad0989",
+      "build_time": "/home/tim/Projects/llm-forge/.git/forge-real-control-clean-build-time.txt"
+    },
+    "executed_binary": {
+      "path": "/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge",
+      "sha256": "308d51c93ea0058b1035412dfe7c2610d48b9a5aab4032859cb472ac48a21341",
+      "bytes": 53647688
+    }
+  },
+  "harness_sources": [
+    {
+      "path": "/home/tim/Projects/llm-forge/native/forge/tests/support/mutation_cli_real.rs",
+      "sha256": "98e2b8f637a5fc96ce439992875d993c92b91629c6f4a9a004bb4f66f3b30e81",
+      "bytes": 25301
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/native/forge/tests/support/mutation_cli_fixture.rs",
+      "sha256": "8292326f539875023fdf0d339a912d434daac135de54c29520666a112dc5e976",
+      "bytes": 26197
+    }
+  ],
+  "attachments": [
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-real-control-clean-input.json",
+      "sha256": "7a45bacb5e3432e81a4883835e0fc3b2256be8ce252b5990ae570cff470921fe",
+      "bytes": 313,
+      "record": {
+        "head": "5f78e9b24f983b670197c6fe4edbdf3b5aa3ed5b",
+        "tree": "022c75b9a45b1989ece4a455eddff23078b7d581",
+        "install_root": "/tmp/forge-real-control-clean-5f78e9b-p45anyre",
+        "source_status": "clean",
+        "scope": "isolated native installation for opt-in integration test; full publication gate not yet run"
+      }
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-real-control-clean-build.log",
+      "sha256": "8c40b7f4dcf463edea72032acc01e9545ff2bfc206faa33946fa2c7af8ad0989",
+      "bytes": 561
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-real-control-clean-build-time.txt",
+      "sha256": "04afc1cde672c72866358b152d1cdd3b822ad0a41d403b39bf24fdb1bf03bbfb",
+      "bytes": 851
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-real-control-engine-copy.json",
+      "sha256": "82bb2dfad73b7b7d0ca54691572656d4ed9654b2097940d863e0800fd28a55da",
+      "bytes": 574,
+      "record": {
+        "original": "/home/tim/.cargo/bin/cargo-mutants",
+        "original_parent_mode": "0o775",
+        "copy": "/tmp/forge-real-control-engine-b5sa22kj/cargo-mutants",
+        "sha256": "5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2",
+        "copy_mode": "0o755",
+        "private_parent_mode": "0o700",
+        "config": "/home/tim/Projects/llm-forge/.git/forge-real-mutation-config3.json",
+        "config_sha256": "d0ccd1759874a2ebf6484c12d541339807d28f9e9d5a7abfdcde22e9804d0a6d",
+        "scope": "copy of exact pinned external engine into a private safe ancestor; shared permissions unchanged"
+      }
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-supporting-tests.log",
+      "sha256": "e103f9d473ca52e867c887612992c56e8b26639c64e00810d2a3197afff47b57",
+      "bytes": 1225
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-cli-tests.log",
+      "sha256": "e271cb3283ab91017d72341d315b14164681de5b9ff7b25f23de2c6796e77ce3",
+      "bytes": 2380
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-confined-tests.log",
+      "sha256": "fbde23564e5e4097bdf1a7b2e72d7f6634b752bc59947e0c86f5c95ba0cb6d33",
+      "bytes": 1119
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-clippy.log",
+      "sha256": "77881d7f233892e8b42fac7e906f005d9bc6058af07e9ee498e7051f2197d3e5",
+      "bytes": 315
+    },
+    {
+      "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-function-audit.json",
+      "sha256": "9b8dc51cc1ce5844b57a9ae72eab5dacc8b91708b037229862ec3238ee7cd4c8",
+      "bytes": 685,
+      "record": [
+        {
+          "path": "native/forge/src/mutation_cargo_supporting_tests.rs",
+          "sha256": "6a889203a20966628ed2550f017ef30f9ab874800bbde0cdfd26a7d0c1540404",
+          "lines": 245,
+          "max_function_lines": 49,
+          "symbol_count": 9
+        },
+        {
+          "path": "native/forge/tests/support/mutation_cli_fixture.rs",
+          "sha256": "8292326f539875023fdf0d339a912d434daac135de54c29520666a112dc5e976",
+          "lines": 676,
+          "max_function_lines": 100,
+          "symbol_count": 32
+        },
+        {
+          "path": "native/forge/tests/support/mutation_cli_real.rs",
+          "sha256": "98e2b8f637a5fc96ce439992875d993c92b91629c6f4a9a004bb4f66f3b30e81",
+          "lines": 734,
+          "max_function_lines": 81,
+          "symbol_count": 22
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Host-local tools/configuration/delegated cgroup are required; not a portable replay bundle.",
+    "Audit findings and stream ledgers appear once; collector rehashed their retained bytes.",
+    "GNU time records outer cargo-test observations, not aggregate workload memory or matched performance.",
+    "Zero completed mutant outcomes prove discovery diagnostics only; remaining mutant states are unknown.",
+    "No model/token/productivity measurements or execution attestation; no complete mutation PASS."
+  ],
+  "trials": [
+    {
+      "name": "first",
+      "test_outcome": "FAILED",
+      "native_outcome": "REFUSED_BEFORE_PAYLOAD",
+      "campaign_pass": false,
+      "receipt_present": false,
+      "inputs": {"operator_config":{"path":"/home/tim/Projects/llm-forge/.git/forge-real-mutation-config.json","sha256":"97decc8765de7f7e2722ca0c02c9f34dad629dccadf29f3ce56b6175e99efcdd","bytes":2284},"retained_config":{"path":"/tmp/.tmpAITFND/operator-config.json","sha256":"97decc8765de7f7e2722ca0c02c9f34dad629dccadf29f3ce56b6175e99efcdd","bytes":2284},"provenance":{"path":"/tmp/.tmpAITFND/operator-inputs.json","sha256":"b530c568292f1b785d811927c9417dd29726af0b44dbfa183ded91feb905f5a8","bytes":344},"grant":{"path":"/tmp/.tmpAITFND/grant.json","sha256":"7df118eccdd0db6326523f3d03dc20b1fea90cd6ea40ff60b46bb7fea2d31b08","bytes":2001},"manifest_before":{"path":"/tmp/.tmpAITFND/logs/manifest-before.json","sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","bytes":1550},"automatic_outputs":[{"path":"/tmp/.tmpAITFND/repo/campaigns/lane_member_cargo_20261106.json","sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","bytes":1550},{"path":"/tmp/.tmpAITFND/repo/campaigns/registry.d/lane_member_cargo_20261106.json","sha256":"4333e3b3b67bcf6abf2047bd078575c844216607e09bb911c86c741a74219004","bytes":62}]},
+      "outer_time": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-real-time.txt",
+        "sha256": "23a9b6035dfe5d6e8212f99be8c0f1d1f34d61b3a6b0f087d1a56f7d4fa8ba78",
+        "bytes": 1361,
+        "outer_command_observations": {
+          "User time (seconds)": "0.15",
+          "System time (seconds)": "0.06",
+          "Elapsed (wall clock) time (h:mm:ss or m:ss)": "0:00.32",
+          "Maximum resident set size (kbytes)": "86592",
+          "Exit status": "101"
+        },
+        "scope": "GNU time outer cargo-test command; not aggregate workload memory, tree peak or matched performance"
+      },
+      "independent_audit": {"path":"/home/tim/Projects/llm-forge/.git/forge-real-control-first-independent.json","sha256":"7cfc0fc2e23b4d51f0746801491761d1840737e9d6af717a973a10adab79fac1","bytes":10130,"findings":{"schema":"forge.real-control-first-independent.v1","audited_at_utc":"2026-11-06T06:14:27.391199+00:00","root":"/tmp/.tmpAITFND","test_log":{"path":".git/forge-native-controls-real.log","sha256":"f8300d7e0ea51d1d857df3cf12a113d141bc6266cfb900730dba917c9931d050","result":"FAILED: 0 passed, 1 failed, 15 filtered"},"command_count":13,"commands":[{"name":"base-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","add","forge.toml",".gitignore","crates"],"returncode":0,"command_sha256":"0f8617c00c3bf48acf7ee62064d1a5543c72468704068d12c3562a67b951f636","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"base-commit","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","commit","-qm","authored baseline"],"returncode":0,"command_sha256":"194a041e365e32f63b59654d459dcb18f998cdfb7a662cc6eccf95b34996ee27","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"branch","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","checkout","-qb","timeout-control"],"returncode":0,"command_sha256":"601e5c3296c9452773e7a1a5c3327d40ad330f93488c8e1e9e9728b981e27e5f","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"engine-version","program":"/home/tim/.cargo/bin/cargo-mutants","argv":["mutants","--version"],"returncode":0,"command_sha256":"0a80a348fbe53a9b1c3ce435aef0b329460a54979cee3b864975ab37134760fa","stdout_sha256":"ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"fixture-lock","program":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","argv":["generate-lockfile","--offline","--manifest-path","crates/workspace/Cargo.toml"],"returncode":0,"command_sha256":"46ce9c5faa1e628212359cfe41a230144c84217627c5597bd1392da28a843fee","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"init","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","init","-q","-b","main","--template=/tmp/.tmpAITFND/empty-hooks"],"returncode":0,"command_sha256":"2e5611499985b2dcbe922ebab62914a7e81f6f48f2bc3acd94c0dadb7bad2b3b","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"plan","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","plan","rust","--repo-root","/tmp/.tmpAITFND/repo","--owner","lane","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10"],"returncode":0,"command_sha256":"dc221d76a53a305028ec1e8de774b45dfa240458d83f31f35e7ae5f1bf1e9998","stdout_sha256":"5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"receipt","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["receipt","show","/tmp/.tmpAITFND/repo/campaigns/receipts/run.json"],"returncode":1,"command_sha256":"f3209b697f942993e44a615dbd86a767d3c7cb6357a3b441acd6620684fca8c3","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"68abe3604266861da21aad9e9e3093076ec2fdcb2f9d6e0723c902cea2cae0e2"},{"name":"registry-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","add","-f","campaigns/registry.json"],"returncode":0,"command_sha256":"591da96d4c03d61710435b7557805fdd688046cf3d5f74aacd015ee8a56ee4aa","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"run","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","run","/tmp/.tmpAITFND/repo/campaigns/lane_member_cargo_20261106.json","--repo-root","/tmp/.tmpAITFND/repo","--allow-mutations","--owner","lane","--base","main","--receipt","campaigns/receipts/run.json","--execution-grants","/tmp/.tmpAITFND/grant.json","--execution-grants-sha256","7df118eccdd0db6326523f3d03dc20b1fea90cd6ea40ff60b46bb7fea2d31b08"],"returncode":4,"command_sha256":"2924d4b5e066b5fc8617a00faaf713e6ffcb46fecf8618edc012bbd08a985206","stdout_sha256":"aba216d0b4408ff2163eef68a16af3ddc8dac80f68404c0414e18cccb16d265e","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"source-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","add","crates/workspace/member/src/selected.rs"],"returncode":0,"command_sha256":"1bcb33797748a3777e65aa82a3750672615febf3ce28349d193962e66533b190","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"source-commit","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpAITFND/empty-hooks","commit","-qm","select two boolean functions"],"returncode":0,"command_sha256":"74e208109b1c140e38aa0f1d9e3bc5f26bb86c98026db6081ea3008527e41aed","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"write","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","write","rust","--repo-root","/tmp/.tmpAITFND/repo","--owner","lane","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10"],"returncode":0,"command_sha256":"b664f80ae00b98a5b561a01f71c3ea9efb56f70f4cc919876f97b19bad022ab0","stdout_sha256":"98dccc9bdb7475d49326b237c4801906def43ddbd3e701542f091e7ad07c9ab6","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}],"run_stdout":{"error":"execution grants: execution program lacks explicit read grant","status":"REFUSED"},"run_exit":4,"receipt_show_exit":1,"receipt_show_stderr":"forge receipt show: /tmp/.tmpAITFND/repo/campaigns/receipts/run.json: /tmp/.tmpAITFND/repo/campaigns/receipts/run.json: No such file or directory (os error 2)\n","receipt_absent_now":true,"scratch_children_now":[],"config_sha256":"97decc8765de7f7e2722ca0c02c9f34dad629dccadf29f3ce56b6175e99efcdd","grant_sha256":"7df118eccdd0db6326523f3d03dc20b1fea90cd6ea40ff60b46bb7fea2d31b08","manifest_before_sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","engine_path":"/home/tim/.cargo/bin/cargo-mutants","engine_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","configured_engine_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","engine_read_root_covered":false,"read_roots":["/usr/bin","/usr/lib","/usr/libexec/gcc","/etc/ld.so.cache","/tmp/forge-192-toolchain-fdiy923q"],"scope":"Observed refusal and no current receipt or scratch child; no evidence of payload launch, not a successful control or attestation."}}
+    },
+    {
+      "name": "second",
+      "test_outcome": "FAILED",
+      "native_outcome": "REFUSED_BEFORE_PAYLOAD",
+      "campaign_pass": false,
+      "receipt_present": false,
+      "inputs": {"operator_config":{"path":"/home/tim/Projects/llm-forge/.git/forge-real-mutation-config2.json","sha256":"b89d2addbb618f2f98a7d140f77d859cdbfd14471b596ee533201d211a26b65f","bytes":2326},"retained_config":{"path":"/tmp/.tmpOnFAUR/operator-config.json","sha256":"b89d2addbb618f2f98a7d140f77d859cdbfd14471b596ee533201d211a26b65f","bytes":2326},"provenance":{"path":"/tmp/.tmpOnFAUR/operator-inputs.json","sha256":"858dfb2f7c8b4c06727c97b3decc958441849aa12f2aaf8983389acb5dee8f9b","bytes":345},"grant":{"path":"/tmp/.tmpOnFAUR/grant.json","sha256":"5e2a327309113592c217ab10d58875686d23e22eb5c0ad06b44bbedafc6b659b","bytes":2038},"manifest_before":{"path":"/tmp/.tmpOnFAUR/logs/manifest-before.json","sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","bytes":1550},"automatic_outputs":[{"path":"/tmp/.tmpOnFAUR/repo/campaigns/lane_member_cargo_20261106.json","sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","bytes":1550},{"path":"/tmp/.tmpOnFAUR/repo/campaigns/registry.d/lane_member_cargo_20261106.json","sha256":"4333e3b3b67bcf6abf2047bd078575c844216607e09bb911c86c741a74219004","bytes":62}]},
+      "outer_time": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-real2-time.txt",
+        "sha256": "766492949d27952a88d731425fe6140bdda46098517bcd1b422b2ed0cb9783cd",
+        "bytes": 1363,
+        "outer_command_observations": {
+          "User time (seconds)": "0.11",
+          "System time (seconds)": "0.07",
+          "Elapsed (wall clock) time (h:mm:ss or m:ss)": "0:00.31",
+          "Maximum resident set size (kbytes)": "86032",
+          "Exit status": "101"
+        },
+        "scope": "GNU time outer cargo-test command; not aggregate workload memory, tree peak or matched performance"
+      },
+      "independent_audit": {"path":"/home/tim/Projects/llm-forge/.git/forge-real-control-second-independent.json","sha256":"b5ed2a1214d14ff3d4f81f155180c2f025eae8213ac5abce423fab4175d4ce4f","bytes":10258,"findings":{"schema":"forge.real-control-second-independent.v1","audited_at_utc":"2026-11-06T06:17:01.432370+00:00","root":"/tmp/.tmpOnFAUR","test_log":{"path":".git/forge-native-controls-real2.log","sha256":"fff133bc6a3c27c7471807c403355a13b4b690fe2f9ec258029467cd482ac9b3","result":"FAILED: 0 passed, 1 failed, 15 filtered"},"command_count":13,"commands":[{"name":"base-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","add","forge.toml",".gitignore","crates"],"returncode":0,"command_sha256":"680f96283324cef3d405dd42afa3626bebacc16834cdb1748d0a4fd4104da8c1","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"base-commit","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","commit","-qm","authored baseline"],"returncode":0,"command_sha256":"5791b17789f0164b1e289bceaafe797bc931166554d9b5d8d4ad51033d860356","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"branch","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","checkout","-qb","timeout-control"],"returncode":0,"command_sha256":"49544763c4f8d123df579cf4f2209a667d3ca821372bd845fc38a056dadb6a0f","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"engine-version","program":"/home/tim/.cargo/bin/cargo-mutants","argv":["mutants","--version"],"returncode":0,"command_sha256":"0a80a348fbe53a9b1c3ce435aef0b329460a54979cee3b864975ab37134760fa","stdout_sha256":"ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"fixture-lock","program":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","argv":["generate-lockfile","--offline","--manifest-path","crates/workspace/Cargo.toml"],"returncode":0,"command_sha256":"46ce9c5faa1e628212359cfe41a230144c84217627c5597bd1392da28a843fee","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"init","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","init","-q","-b","main","--template=/tmp/.tmpOnFAUR/empty-hooks"],"returncode":0,"command_sha256":"8fbf7891f0dfbf5f36523b9892e882b5767b7ff4ce7d434774e24b48f5f0a97b","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"plan","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","plan","rust","--repo-root","/tmp/.tmpOnFAUR/repo","--owner","lane","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10"],"returncode":0,"command_sha256":"419e5183d9f7b787a3e78bb8565c9a3235b3dd55583bf38f425be1b40894e4c6","stdout_sha256":"5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"receipt","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["receipt","show","/tmp/.tmpOnFAUR/repo/campaigns/receipts/run.json"],"returncode":1,"command_sha256":"a978d670393d02eda5436b4a867f44e0d5b6fca0845fa5088a9915083ff5f1a6","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"90b1abb9444c597fc0e34e09538538e106081c543100ff0430d67c569213bc03"},{"name":"registry-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","add","-f","campaigns/registry.json"],"returncode":0,"command_sha256":"ff0cdf336e85b2629bf20aa08d37e077e3e9379b27c44183ca318f7f7411012c","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"run","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","run","/tmp/.tmpOnFAUR/repo/campaigns/lane_member_cargo_20261106.json","--repo-root","/tmp/.tmpOnFAUR/repo","--allow-mutations","--owner","lane","--base","main","--receipt","campaigns/receipts/run.json","--execution-grants","/tmp/.tmpOnFAUR/grant.json","--execution-grants-sha256","5e2a327309113592c217ab10d58875686d23e22eb5c0ad06b44bbedafc6b659b"],"returncode":4,"command_sha256":"19c8918b1472cf84e75002513e2469233822b2a0251c2825b930acd13f98798f","stdout_sha256":"8f848eaf9d76bc4872eeb09b37421f631daf38bc91c82a72f1d6732d5333dbe9","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"source-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","add","crates/workspace/member/src/selected.rs"],"returncode":0,"command_sha256":"f15fba292da713f205d5a07462a745dd713ccab55e4c5c0621a2a960bf850a62","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"source-commit","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmpOnFAUR/empty-hooks","commit","-qm","select two boolean functions"],"returncode":0,"command_sha256":"bac40f28d98161f01e3b90d984addce1e2f1a1f0a508103d2f181b6592df13ed","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"write","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","write","rust","--repo-root","/tmp/.tmpOnFAUR/repo","--owner","lane","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10"],"returncode":0,"command_sha256":"5f6f4d706c18848b8cfcd966e1261f165817e7068c981e272dae24ce46a8134f","stdout_sha256":"98dccc9bdb7475d49326b237c4801906def43ddbd3e701542f091e7ad07c9ab6","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}],"run_stdout":{"error":"execution grants: unsafe execution grant ancestor: /home/tim/.cargo/bin","status":"REFUSED"},"run_exit":4,"receipt_show_exit":1,"receipt_show_stderr":"forge receipt show: /tmp/.tmpOnFAUR/repo/campaigns/receipts/run.json: /tmp/.tmpOnFAUR/repo/campaigns/receipts/run.json: No such file or directory (os error 2)\n","receipt_absent_now":true,"scratch_children_now":[],"config_sha256":"b89d2addbb618f2f98a7d140f77d859cdbfd14471b596ee533201d211a26b65f","grant_sha256":"5e2a327309113592c217ab10d58875686d23e22eb5c0ad06b44bbedafc6b659b","manifest_before_sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","engine_path":"/home/tim/.cargo/bin/cargo-mutants","engine_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","configured_engine_sha256":"5fc771f7c23f19c1493d6e702bab24ea632029dc57f8cd0d9474fa54209313d2","engine_read_root_covered":true,"read_roots":["/usr/bin","/usr/lib","/usr/libexec/gcc","/etc/ld.so.cache","/tmp/forge-192-toolchain-fdiy923q","/home/tim/.cargo/bin/cargo-mutants"],"refused_ancestor":"/home/tim/.cargo/bin","ancestor_mode_now":"0o775","scope":"Observed refusal and no current receipt or scratch child; no recorded payload launch, not a successful control or attestation."}}
+    },
+    {
+      "name": "third",
+      "test_outcome": "PASS",
+      "native_outcome": "ERROR_INCOMPLETE",
+      "campaign_pass": false,
+      "raw_receipt": {
+        "path": "/tmp/.tmp1euP2P/repo/campaigns/receipts/run.json",
+        "sha256": "56de7a68af7803483621dc3efd5e8d59197406aef2eabf411e7f8a430d65d326",
+        "bytes": 9664
+      },
+      "expanded_receipt": {
+        "path": "/tmp/.tmp1euP2P/logs/receipt.stdout",
+        "sha256": "69aa1ddb42f5dd49a67fbc9b9eaf882daed1efb3db2a12c8b97e0b42a0ca2636",
+        "bytes": 9618
+      },
+      "manifest_binding": {
+        "path": "/tmp/.tmp1euP2P/logs/manifest-binding.json",
+        "sha256": "c015e933684d6d8f5ef300277317eef78b23ebff3006599e53598f47cc18621a",
+        "bytes": 251
+      },
+      "fresh_groups_absent": true,
+      "fresh_check_scope": "point-in-time collector observation; diagnostic paths confer no kill authority",
+      "inputs": {"operator_config":{"path":"/home/tim/Projects/llm-forge/.git/forge-real-mutation-config3.json","sha256":"d0ccd1759874a2ebf6484c12d541339807d28f9e9d5a7abfdcde22e9804d0a6d","bytes":2364},"retained_config":{"path":"/tmp/.tmp1euP2P/operator-config.json","sha256":"d0ccd1759874a2ebf6484c12d541339807d28f9e9d5a7abfdcde22e9804d0a6d","bytes":2364},"provenance":{"path":"/tmp/.tmp1euP2P/operator-inputs.json","sha256":"b73c8ac5258fb40fe2d669b9e8c76a3837400e4686f5bc39e6aace42c429c158","bytes":345},"grant":{"path":"/tmp/.tmp1euP2P/grant.json","sha256":"848a0e40b6056f3ed93eb8d59c5ac9eb9b0b9a4259963ae1413222af79c978f6","bytes":2076},"manifest_before":{"path":"/tmp/.tmp1euP2P/logs/manifest-before.json","sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","bytes":1550},"automatic_outputs":[{"path":"/tmp/.tmp1euP2P/repo/campaigns/lane_member_cargo_20261106.json","sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","bytes":1550},{"path":"/tmp/.tmp1euP2P/repo/campaigns/registry.d/lane_member_cargo_20261106.json","sha256":"4333e3b3b67bcf6abf2047bd078575c844216607e09bb911c86c741a74219004","bytes":62}]},
+      "outer_time": {
+        "path": "/home/tim/Projects/llm-forge/.git/forge-native-controls-real3-time.txt",
+        "sha256": "16e04f863459b7ef7f8f145fbf145b59d9c24cc20a90cf3eadec1f4160f492ab",
+        "bytes": 1326,
+        "outer_command_observations": {
+          "User time (seconds)": "0.91",
+          "System time (seconds)": "0.28",
+          "Elapsed (wall clock) time (h:mm:ss or m:ss)": "0:11.21",
+          "Maximum resident set size (kbytes)": "131424",
+          "Exit status": "0"
+        },
+        "scope": "GNU time outer cargo-test command; not aggregate workload memory, tree peak or matched performance"
+      },
+      "independent_audit": {"path":"/home/tim/Projects/llm-forge/.git/forge-real-control-third-independent.json","sha256":"c60d9166391e94629dd0aea856e9af594803bbafe8038da875654d75e63c64df","bytes":13746,"findings":{"schema":"forge.real-control-third-independent.v1","audited_at_utc":"2026-11-06T06:18:05.053317+00:00","root":"/tmp/.tmp1euP2P","test_log":{"path":".git/forge-native-controls-real3.log","sha256":"6b26046f4a1f38d0ef8ca9ed369ef620258bdad9292c674cf872cb67f865162b","result":"PASS: 1 passed, 0 failed, 15 filtered; native campaign remains ERROR"},"command_count":13,"commands":[{"name":"base-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","add","forge.toml",".gitignore","crates"],"returncode":0,"command_sha256":"64e52a3f3427ccbe919c3b51b2965bc6b99aea464b2547464f9fb474f25b5ca2","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"base-commit","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","commit","-qm","authored baseline"],"returncode":0,"command_sha256":"e7ae1d0c5b94d6181b6d6e9b8cc4f58d6a6da4524b158e253ea4c88e77aa2ab8","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"branch","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","checkout","-qb","timeout-control"],"returncode":0,"command_sha256":"deb07c57a8603c4cc1bf2a79e798b339e42d0cb5fc8039ccd58739543b564e07","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"engine-version","program":"/tmp/forge-real-control-engine-b5sa22kj/cargo-mutants","argv":["mutants","--version"],"returncode":0,"command_sha256":"7e45231716a89b636a6d8e40b477255f74de2f26d6cde4e70e69a6b83003dadc","stdout_sha256":"ba3c35073708a1da94eef75cafca1e263013077a73d090b5a798135dac2ffbe5","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"fixture-lock","program":"/tmp/forge-192-toolchain-fdiy923q/bin/cargo","argv":["generate-lockfile","--offline","--manifest-path","crates/workspace/Cargo.toml"],"returncode":0,"command_sha256":"46ce9c5faa1e628212359cfe41a230144c84217627c5597bd1392da28a843fee","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"init","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","init","-q","-b","main","--template=/tmp/.tmp1euP2P/empty-hooks"],"returncode":0,"command_sha256":"4bcfd952eea0fbabc002c8bff423015784d0000239d146069146461abcb44e8d","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"plan","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","plan","rust","--repo-root","/tmp/.tmp1euP2P/repo","--owner","lane","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10"],"returncode":0,"command_sha256":"7743ee872bfe9008fd8ea4586588b08a0e15c0578f31a89bc9c7816f9726f51e","stdout_sha256":"5ec51fb430cd90c9c97678040348f37cad957f45d724a620818be0f43d849299","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"receipt","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["receipt","show","/tmp/.tmp1euP2P/repo/campaigns/receipts/run.json"],"returncode":0,"command_sha256":"2061aefa95b5cfb26ee29feee0b8dcc160412657a3aa4339ce164ae39f1de6cb","stdout_sha256":"69aa1ddb42f5dd49a67fbc9b9eaf882daed1efb3db2a12c8b97e0b42a0ca2636","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"registry-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","add","-f","campaigns/registry.json"],"returncode":0,"command_sha256":"8b09b2c00acdb67697453425546f0f2bc3774fcdc314d9d3ec39cda594e9c408","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"run","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","run","/tmp/.tmp1euP2P/repo/campaigns/lane_member_cargo_20261106.json","--repo-root","/tmp/.tmp1euP2P/repo","--allow-mutations","--owner","lane","--base","main","--receipt","campaigns/receipts/run.json","--execution-grants","/tmp/.tmp1euP2P/grant.json","--execution-grants-sha256","848a0e40b6056f3ed93eb8d59c5ac9eb9b0b9a4259963ae1413222af79c978f6"],"returncode":4,"command_sha256":"41bb6f0f5816406333a9d8fe98d4641b8091e08c181be117ab1d4a835bb2c1bb","stdout_sha256":"76f0e8345927c9bb2560a934d92b2371d1d41f2291ce10801ed04fccb05d2320","stderr_sha256":"451643d85aaf9e0f45d0276fcf4b0bc7c6a9ae9ba570f15b6e40a156b9f5fee7"},{"name":"source-add","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","add","crates/workspace/member/src/selected.rs"],"returncode":0,"command_sha256":"4569935eb5fa08b07e80657e4e797c366ac1ba2491d27b354de350f2f378895f","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"source-commit","program":"/usr/bin/git","argv":["-c","user.name=fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=/tmp/.tmp1euP2P/empty-hooks","commit","-qm","select two boolean functions"],"returncode":0,"command_sha256":"0d328b9e89378a519ad754edba92cefadeb44f46c99ed1b8b44b55dcaf215474","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"write","program":"/tmp/forge-real-control-clean-5f78e9b-p45anyre/bin/forge","argv":["mutation","write","rust","--repo-root","/tmp/.tmp1euP2P/repo","--owner","lane","--base","main","--only","crates/workspace/member/src/selected.rs","--cargo-workspace","--jobs","1","--run-timeout","10"],"returncode":0,"command_sha256":"a4d5ef520e9087351408874b5ada7835efa6eabde6a6c7ed3e999a67346cd67c","stdout_sha256":"98dccc9bdb7475d49326b237c4801906def43ddbd3e701542f091e7ad07c9ab6","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}],"run_stdout":{"error":"workspace snapshot inputs changed","status":"REFUSED"},"receipt_status":"ERROR","complete_campaign":false,"accounting":{"censored":0,"completed":0,"failed":0,"planned":null,"unstarted":null},"partial_progress":{"complete":false,"inventory":{"bytes":1760,"discovered":2,"identities_sha256":"5e8aeebb26be9d1d844c42bdda9de8c71c3bea4f9e88fa53a1773528034e6582","sha256":"f20f971e92cc889810461221242b3e12ece6866854784ec0652bb6f1589155e7"},"outcomes":{"bytes":1127,"counts":{"ERROR":0,"KILLED":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0},"identities_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","observed":0,"sha256":"2cb47ded65e98d5f1c3fb1248b2f7e944c2635980a8726e439cca918cab11ef8"},"reason":"timeout","remaining_or_interrupted":null,"schema_version":1,"scope":"partial automatic engine observations; not scored coverage or execution attestation"},"report_files":{"inventory":{"path":"/tmp/.tmp1euP2P/scratch/llm-orchestrator-snapshot-v8opTr/mutants-output/mutants.out/mutants.json","sha256":"f20f971e92cc889810461221242b3e12ece6866854784ec0652bb6f1589155e7","bytes":1760,"hash_matches":true,"bytes_match":true},"outcomes":{"path":"/tmp/.tmp1euP2P/scratch/llm-orchestrator-snapshot-v8opTr/mutants-output/mutants.out/outcomes.json","sha256":"2cb47ded65e98d5f1c3fb1248b2f7e944c2635980a8726e439cca918cab11ef8","bytes":1127,"hash_matches":true,"bytes_match":true}},"independent_reconciliation":{"inventory_discovered":2,"observed":0,"inventory_digest":"5e8aeebb26be9d1d844c42bdda9de8c71c3bea4f9e88fa53a1773528034e6582","inventory_digest_matches":true,"observed_digest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","observed_digest_matches":true,"inventory_unique":true,"observed_unique_and_listed":true,"counts":{"KILLED":0,"SURVIVED":0,"TIMED_OUT":0,"UNVIABLE":0,"ERROR":0},"counts_match":true,"baseline_summaries":["Success"],"exact_source_package_scope":true,"remaining":"unknown"},"config":{"sha256":"d0ccd1759874a2ebf6484c12d541339807d28f9e9d5a7abfdcde22e9804d0a6d","matches_operator_record":true},"grant":{"sha256":"848a0e40b6056f3ed93eb8d59c5ac9eb9b0b9a4259963ae1413222af79c978f6","matches_receipt":true},"manifest":{"sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0","matches_receipt":true,"before_sha256":"a9f7640a9c83abf109506788366683750799e65ca5fb367e877b29184001a4d0"},"raw_receipt_sha256":"56de7a68af7803483621dc3efd5e8d59197406aef2eabf411e7f8a430d65d326","receipt_show_sha256":"69aa1ddb42f5dd49a67fbc9b9eaf882daed1efb3db2a12c8b97e0b42a0ca2636","binary_ledger":{"sha256":"021caac95945f09e42c95821e89dda358fe846ea608fd1023b560826b378c68f","binary_matches":true,"identity_matches":true},"source_pins_live_match":true,"process_groups":[{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1856125-5f80e4ef7649b15567b4de9c362ade39","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited","duration_ms":21},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1856125-4a768f377b5a20f9ad6a377ac25dbab3","receipt_cleanup_complete":true,"absent_now":true,"outcome":"exited","duration_ms":95},{"path":"/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/forge-native-1856125-7d050943644f4386c51ddf153f73dd5e","receipt_cleanup_complete":true,"absent_now":true,"outcome":"timed_out","duration_ms":10010}],"snapshot":{"root":"/tmp/.tmp1euP2P/scratch/llm-orchestrator-snapshot-v8opTr","retained":true,"host_source_sha256":"5507953790091f724a1095281147b162db0326f886646bc497d8dbfd202c25ac","snapshot_source_sha256":"c4b22535e9b2c2fe61ae5b72caef2eb2fea85bc3de09b8d404e13764d8a51dfa","marker_sha256":"62865a94ab91e2b99f1809c5a295cc8ff482807874345c919c0f3e48633dc21d","marker_bytes":"workspace-mutant-active\n","retained_reason":"process cleanup or execution input verification is incomplete"},"limits":"Cooperative retained evidence and point-in-time cleanup, no scored campaign PASS or execution attestation; remaining status unknown."}}
+    }
+  ]
+}

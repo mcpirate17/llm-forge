@@ -10,6 +10,42 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Reproducible native timeout fixture — 2026-11-06
+
+The checked-in opt-in Rust test at `5f78e9b` reproduces the interrupted-engine
+control through automatic plan/write and the existing confined command owner.
+It uses explicit tool/configuration hashes, independently checks campaign and
+source/test bindings, and retains raw command logs and the unrestored snapshot.
+[Setup instructions](mutation.md#reproduce-the-real-engine-timeout-control) describe
+the required external tools and grants; the test does not bundle a toolchain.
+
+The [three-attempt index](../research/performance/forge-program-20261106-native-mutation-controls.json)
+retains two failed configuration attempts and the successful control. The first
+was refused because the pinned engine lacked a read grant; the second was refused
+because its existing cargo-bin ancestor was group-writable. Neither launched a
+recorded mutation payload or produced a receipt. The third used the identical
+engine bytes copied into a private directory and an explicit file read grant.
+The binary and test assertions were unchanged across attempts.
+
+The third test passed in 11.12 seconds. Its native receipt remains incomplete
+ERROR: two discovered mutants, zero completed outcomes and an unknown remainder.
+Native metadata, direct baseline and engine wall times were 21, 95 and 10,010 ms.
+Independent audit checked all 13 command ledgers and their streams, exact report
+hashes/digests, campaign/source/test pins and absence of the three owned cgroups.
+The baseline passed one test. The retained snapshot contains the automatic mutant
+and its marker. Either authored mutant triggers the timeout; no positive completed
+prefix is claimed.
+
+Outer GNU time recorded 11.21 seconds wall time, 0.91/0.28 seconds user/system CPU
+and a reported maximum RSS of 131,424 KiB for the test command. These are single
+outer-command observations, not aggregate concurrent memory, workload percentiles
+or matched speed measurements. Model tokens, cost and agent productivity remain
+unmeasured. Focused validation passed seven supporting-input tests, five ordinary
+CLI tests, ten explicitly enabled synthetic confined tests and strict Clippy.
+The two new admission tests cover the four previously observed predicate gaps;
+their automatic source campaign has not yet been rerun. The synthetic cases remain
+protocol tests, separate from the real automatic-engine control.
+
 ### Interrupted Cargo progress controls — 2026-11-06
 
 The clean native release build at `ad6f12f` preserves bounded partial engine progress
@@ -38,6 +74,12 @@ All three native receipts are incomplete ERROR results; progress changes neither
 official mutant accounting nor scoring. Either diagnostic field prevents passing
 receipt admission. Focused tests, strict Clippy and the clean control do not
 replace full publication checks for the final committed tree.
+
+The final tree subsequently passed all 18 publication checks and exact-head/base
+verification at `6369de3`: 4,819 passing test executions, zero failures and 188
+ignored across 179 harnesses. [PR #206](https://github.com/mcpirate17/llm-forge/pull/206)
+merged the identical tree as `c95592a`. This verifies the source and isolated
+installation, without claiming a shared-host upgrade or client activation.
 
 ### Compiler-header control and actual Forge timeout — 2026-11-06
 
