@@ -128,7 +128,7 @@ fn engine_hook_records_diagnostic_only_after_matching_owned_cleanup() {
         run.receipt.insert("status".into(), json!("RUNNING"));
         run.receipt
             .insert("process_cleanup".into(), json!({"complete":false}));
-        super::super::record_partial(run, &output, &selected, &argv, "timeout");
+        super::super::record_partial(run, &output, &selected, &argv, "actor_error");
         assert!(run.receipt["engine_partial_progress_error"]
             .as_str()
             .unwrap()
@@ -139,9 +139,16 @@ fn engine_hook_records_diagnostic_only_after_matching_owned_cleanup() {
             .insert("process_cleanup".into(), json!({"complete":true}));
         run.receipt.insert(
             "process_commands".into(),
-            json!([{"state":"observed","argv":argv,"confinement":{"cleanup_complete":true}}]),
+            json!([{"state":"observed","argv":argv,"confinement":{"cleanup_complete":true,"outcome":"exited"}}]),
         );
-        super::super::record_partial(run, &output, &selected, &argv, "timeout");
+        super::super::record_partial(run, &output, &selected, &argv, "actor_error");
+        assert_eq!(
+            run.receipt["engine_partial_progress"]["reason"],
+            "actor_error"
+        );
+        run.receipt["process_commands"][0]["confinement"]["outcome"] = json!("timed_out");
+        super::super::record_partial(run, &output, &selected, &argv, "actor_error");
+        assert_eq!(run.receipt["engine_partial_progress"]["reason"], "timeout");
         assert_eq!(
             run.receipt["engine_partial_progress"]["inventory"]["discovered"],
             2

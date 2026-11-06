@@ -316,6 +316,16 @@ fn record_partial(
             .and_then(|v| v.get("cleanup_complete"))
             == Some(&Value::Bool(true));
     let result = if safe {
+        let reason = if last
+            .and_then(|v| v.get("confinement"))
+            .and_then(|v| v.get("outcome"))
+            .and_then(Value::as_str)
+            == Some("timed_out")
+        {
+            "timeout"
+        } else {
+            reason
+        };
         partial::collect(output, selected, reason)
     } else {
         Err("owned engine cleanup is not verified; progress was not read".into())
