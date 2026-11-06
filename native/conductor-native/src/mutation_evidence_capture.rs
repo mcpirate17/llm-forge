@@ -486,6 +486,28 @@ fn reserve(
     Ok(())
 }
 fn runtime_guard(runtime: &Runtime) -> Result<(), String> {
+    let hash = |value: &str| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    if runtime.binding_sha256.values().any(|value| !hash(value)) {
+        return Err("captured runner hashes malformed or unavailable".into());
+    }
+    if runtime.runner.components.is_none() {
+        if runtime
+            .runner
+            .error
+            .as_deref()
+            .is_some_and(|error| !error.trim().is_empty())
+            && runtime.runner.mutation_testing_sha256.is_none()
+            && runtime.lineage.is_none()
+        {
+            return Ok(());
+        }
+        return Err("captured runner diagnostic is malformed".into());
+    }
     let components = runtime
         .runner
         .components
@@ -493,12 +515,6 @@ fn runtime_guard(runtime: &Runtime) -> Result<(), String> {
         .and_then(Value::as_object)
         .filter(|map| !map.is_empty())
         .ok_or("captured runner component map unavailable")?;
-    let hash = |value: &str| {
-        value.len() == 64
-            && value
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    };
     if components
         .values()
         .any(|value| value.as_str().is_none_or(|value| !hash(value)))
@@ -507,7 +523,6 @@ fn runtime_guard(runtime: &Runtime) -> Result<(), String> {
             .mutation_testing_sha256
             .as_deref()
             .is_none_or(|value| !hash(value))
-        || runtime.binding_sha256.values().any(|value| !hash(value))
     {
         return Err("captured runner hashes malformed or unavailable".into());
     }
@@ -535,3 +550,7 @@ fn inventory(request: &Request) -> Result<BTreeSet<String>, String> {
     }
     Ok(paths)
 }
+
+#[cfg(test)]
+#[path = "mutation_evidence_diagnostic_tests.rs"]
+mod diagnostic_tests;

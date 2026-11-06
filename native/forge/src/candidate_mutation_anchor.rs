@@ -13,6 +13,15 @@ pub(super) fn prove(
         definitions::legacy(baseline),
         "legacy receipt requires exact legacy grandfather pins"
     );
+    prove_fixed(git, path, bytes, contract)
+}
+
+pub(crate) fn prove_fixed(
+    git: &mut GitInputs<'_>,
+    path: &str,
+    bytes: &[u8],
+    contract: &Value,
+) -> Result<()> {
     ensure!(
         path.starts_with("conductor/mutation_campaigns/receipts/") && path.ends_with(".json"),
         "legacy receipt path is outside the anchored receipt directory"

@@ -150,18 +150,38 @@ mutation-receipt-promote:  ## Copy the newest .iterations receipt of MUTATION_CA
 	cp "$$newest" "$$receipt_root/" || exit $$?; \
 	echo "promoted $$newest -> $$receipt_root/$$(basename $$newest) -- git add it with the PR"
 
+# Forge's package identity is separate from the host being audited. Override when
+# comparing receipts produced by another installed legacy package.
+MUTATION_LEGACY_COMPONENT_ROOT ?=
+MUTATION_REPORT_ARGS ?=
+define mutation-report-identity
+legacy_root="$(MUTATION_LEGACY_COMPONENT_ROOT)"; \
+if [ -z "$$legacy_root" ]; then \
+    package_root=$$("$(FORGE)" project --host "$(CURDIR)" path package-root) || exit $$?; \
+    test -n "$$package_root" || { echo "empty legacy package root" >&2; exit 2; }; \
+    legacy_root="$(CURDIR)/$$package_root/.."; \
+fi
+endef
+
 mutation-evidence:  ## Verify PASS receipts for MUTATION_PATHS, or changed-since-MUTATION_BASE tests
-	@if [ -n "$(MUTATION_PATHS)" ]; then \
-		$(UV) run python -m conductor.mutation_testing verify-evidence $(MUTATION_PATHS); \
+	@$(mutation-report-identity); \
+	if [ -n "$(MUTATION_PATHS)" ]; then \
+		"$(FORGE)" mutation evidence --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+			--legacy-component-root "$$legacy_root" $(MUTATION_REPORT_ARGS) -- $(MUTATION_PATHS); \
 	else \
-		$(UV) run python -m conductor.mutation_coverage changed --base "$(MUTATION_BASE)"; \
+		"$(FORGE)" mutation evidence --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+			--legacy-component-root "$$legacy_root" --changed --base "$(MUTATION_BASE)" $(MUTATION_REPORT_ARGS); \
 	fi
 
 mutation-canary:  ## Repo-wide receipt decode canary; fails only on unreadable receipts
-	$(UV) run python -m conductor.mutation_coverage canary
+	@$(mutation-report-identity); \
+	"$(FORGE)" mutation canary --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+		--legacy-component-root "$$legacy_root" $(MUTATION_REPORT_ARGS)
 
 mutation-coverage:  ## Read-only inventory of test evidence; never executes mutants
-	$(UV) run python -m conductor.mutation_coverage coverage
+	@$(mutation-report-identity); \
+	"$(FORGE)" mutation coverage --repo-root "$(CONDUCTOR_HOST_ROOT)" \
+		--legacy-component-root "$$legacy_root" $(MUTATION_REPORT_ARGS)
 
 baselines: baseline-jscpd baseline-pmd baseline-complexity baseline-vulture  ## Regenerate all four candidate-review baselines from real tool output
 

@@ -501,6 +501,20 @@ fn should_skip_mutation_path(path: &str, skip_directory_names: &HashSet<&str>) -
         || (parts.contains(&"research") && parts.contains(&"cache"))
 }
 
+/// Classify a captured Git path with the same inventory glob and skip rules.
+pub fn inventory_name_match(path: &str, patterns: &[String], skip: &HashSet<&str>) -> Option<bool> {
+    if should_skip_mutation_path(path, skip) {
+        None
+    } else {
+        Some(is_mutation_test_path(path, patterns))
+    }
+}
+
+/// Classify held UTF-8 Rust source using the inventory's existing test rule.
+pub fn inventory_rust_source(source: &str) -> bool {
+    declares_rust_tests(source)
+}
+
 #[cfg(feature = "python")]
 #[pyfunction]
 fn should_skip_mutation_path_native(path: &str, skip_directory_names: Vec<String>) -> bool {

@@ -1,13 +1,13 @@
 //! Held mutation receipt/value observations for the native coordinator.
 //! Receipt consistency and compatibility provenance are never execution approval.
 #[path = "candidate_mutation_anchor.rs"]
-mod anchor;
+pub(crate) mod anchor;
 #[path = "candidate_mutation_context.rs"]
 mod context;
 #[path = "candidate_mutation_definitions.rs"]
 mod definitions;
 #[path = "candidate_mutation_git.rs"]
-mod git;
+pub(crate) mod git;
 #[path = "candidate_mutation_inputs.rs"]
 pub(crate) mod inputs;
 #[path = "candidate_mutation_native.rs"]
