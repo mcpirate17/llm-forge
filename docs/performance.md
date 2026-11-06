@@ -12,6 +12,30 @@ Confined Mull: [validated controls and observational cost](../research/performan
 Native backlog release `018b148`: Python/native preview p50 was **30.25/2.02 ms** for ten findings and **32.06/5.30 ms** for 1,000. All 96 reports matched after timestamp checks, with unchanged inputs.
 Counterbalanced warmed-cache runs scored 20 samples per arm/workload; shell startup is included. [Receipts, p95, CPU/RSS and comparator provenance](../research/performance/forge-program-20261106-backlog.json) are retained; no cold-cache, model-cost or agent-task gain is claimed.
 
+### No-record equivalence capture — 2026-11-06
+
+Release unit binaries `fdd816e` and `8dbdc85` use the identical benchmark fixture.
+The latter skips an unused full workspace copy during target capture; actual
+execution retains its separate confined Stage and recorded-store copying is unchanged.
+
+| Auxiliary 1 KiB files | Original p50 / p95 ms | Current p50 / p95 ms |
+| --- | ---: | ---: |
+| 0 | 4.585538 / 5.013369 | 0.239860 / 0.257800 |
+| 1,000 | 421.223473 / 429.975807 | 2.139969 / 2.230079 |
+
+Four ABBA blocks ran five fresh test processes each. Each process timed two
+warmups and ten captures per case: 100 scored observations and 20 warmups per
+arm/case, 480 total. Complete target/evidence and input identities matched.
+Inotify observed a scratch creation/deletion pair for every original capture and
+none for the optimized captures. Quantiles use nearest rank; observations within
+a process share a warmed fixture and are not independent cold starts.
+The [evidence index](../research/performance/forge-program-20261106-equivalence-capture.json)
+retains binary/build pins, raw observations and four independently verified receipts.
+The two command identities differ; this is a matched fixture comparison. Those outer
+receipts include executable hashing, fixture setup, assertions, disposal and shell
+startup; their CPU/RSS do not measure capture alone. No guest, complete-review,
+model or agent-task gain is established. Full publication validation remains pending.
+
 ### Confined MCP test report — 2026-11-06
 
 The operator-enabled `python_test_report` uses the native classifier through an
@@ -608,80 +632,51 @@ the embedded receipts; never edit receipt identities to retrofit a match.
 
 ### Deferred next-inspection advice — 2026-11-05
 
-**Decision: do not ship this candidate.** A deterministic optional `next_action`
-field produced one existing `code_inspect` call from caller-supplied location
-facts. It passed behavior checks, but the stronger control completed the same
-inspection with less latency and fewer bytes. Independent review recommended
-deferral; the implementation and its added discovery schema were removed from
-production. This is an evaluated, rejected candidate, not an accepted optimization.
+**Rejected; removed from production.** The optional deterministic `next_action`
+field suggested an existing inspection from supplied location facts. Its stronger
+control completed that inspection with less latency and fewer bytes. Independent
+review recommended deferral despite passing behavior checks.
 
-The [native MCP observations](../research/performance/forge-program-20261105-next-action-mcp-evaluation.json)
-retain five current runs, each with one first use, five warmups and 31 measured
-workflows per arm, in rotating order on the same warm service. All 740 workflows
-and 1,480 RPCs completed, including warmups; 620 workflows were measured samples.
-Each inspection checked the actual source hash, exact signature, line bounds and
-absence of truncation. These are fixture retrieval checks, not coding tasks.
+The [MCP evidence index](../research/performance/forge-program-20261105-next-action-mcp-evaluation.json)
+retains five rotating-order runs on one warm service: 740 completed workflows,
+1,480 RPCs and 620 measured workflows. Each checked source hash, signature,
+line bounds and no truncation. These are retrieval fixtures, not coding tasks.
 
-| Workflow | Calls | Per-run wall p50 range, µs | Per-run wall p95 range, µs | Request / response bytes per sampled workflow |
+| Workflow | Calls | Per-run p50 range, µs | Per-run p95 range, µs | Request / response bytes |
 | --- | ---: | ---: | ---: | ---: |
 | Known inspection directly | 1 | 58.391–68.000 | 64.880–89.220 | 165 / 1,107 |
-| Plain prompt preparation, then known inspection | 2 | 124.031–144.241 | 135.991–210.282 | 358 / 3,948 |
-| Prompt with advice, then advised inspection | 2 | 146.351–171.002 | 163.512–202.692 | 495 / 4,754 |
-| Plain prompt, repeated discovery, then inspection | 3 | 243.412–264.413 | 264.752–336.583 | 419 / 10,634 |
+| Plain prompt, known inspection | 2 | 124.031–144.241 | 135.991–210.282 | 358 / 3,948 |
+| Prompt with advice, advised inspection | 2 | 146.351–171.002 | 163.512–202.692 | 495 / 4,754 |
+| Plain prompt, repeated discovery, inspection | 3 | 243.412–264.413 | 264.752–336.583 | 419 / 10,634 |
 
-Advice added 22–27 µs to the within-run median versus prompt plus known inspection,
-and 943 complete JSONL frame bytes. The last arm repeats discovery after setup;
-it is a diagnostic comparison, not a stronger client baseline. Discovery itself
-grew from 5,408 to 6,684 bytes; the prompt tool's schema grew from 472 to 1,748
-compact JSON bytes. Every context-capability client would bear that schema cost.
-No provider input/output/cache tokens, task success or dollar savings were measured.
+Advice added 22–27 µs to the within-run median versus prompt plus known inspection
+and 943 JSONL frame bytes. Discovery grew from 5,408 to 6,684 bytes; the prompt
+schema grew from 472 to 1,748 compact JSON bytes. Repeated discovery is a diagnostic,
+not a capable-client baseline. No provider token, cache, task or dollar gain was measured.
+Timing includes validation/bookkeeping; first use is not cold-host evidence.
+Setup costs, coarse process CPU ticks and RSS snapshots remain in the index;
+they do not establish per-arm CPU, allocations or aggregate process-tree peaks.
 
-Workflow timings include local validation and measurement bookkeeping. First use
-occurs after other harness workloads; it is not cold process or cold filesystem
-evidence. Separate setup observations span 33.7–42.4 ms for fixtures, 41.4–44.7 ms
-for service launch/readiness, and 1.81–2.60 ms for adapter setup (including
-0.336–0.348 ms discovery). During the whole four-arm interval, CPU deltas at
-10 ms tick resolution were 0–10 ms each for driver and adapter, and 10–20 ms for
-service. Observed RSS ranges were 6.34–7.28, 16.27–16.54 and 22.79–23.25 MB,
-respectively. These are process snapshots, not per-arm costs or a summed tree
-peak. Allocations and cold-host measurements are unavailable.
-
-The initial attempt was refused before service launch: the fixture's 512 MiB
-reservation could not admit the context worker. The corrected fixture reserves
-1,024 MiB under the unchanged admission rule. Its five successful runs verified
-adapter EOF/exit, service stop, fixture removal and unchanged observed inputs.
-The failed prelaunch fixture remains at `/tmp/forge-hbench-1182259`. A separate
-old-binary run correctly reports the fused arm unavailable (37 unstarted), not
-PASS; its other arms and cleanup are retained. Per-process fixture paths differ,
-so no cross-binary MCP latency improvement is claimed.
+The initial 512 MiB reservation was refused before launch; the corrected 1,024 MiB
+fixture preserved admission rules and verified cleanup and unchanged inputs.
+The failed fixture `/tmp/forge-hbench-1182259` remains recorded. An old-binary run
+reported 37 fused-arm cases unstarted, not PASS; different fixture paths preclude
+a cross-binary MCP speedup claim.
 
 The [sealed CLI control](../research/performance/forge-program-20261105-next-action-cli-comparison.json)
-compares the unchanged plan request with 101 samples and five warmups per binary.
-Wall p50 was 1.637178 → 1.636747 ms, p95 1.832778 → 1.855489 ms; CPU p50 was
-1.161 → 1.171 ms and maximum child RSS 14,372,864 → 14,655,488 bytes. The original
-10% budget passed. All four absent-field CLI modes also returned byte-identical
-outputs. This regression control does not justify the advice's additional cost.
-
-Experiment implementation/tests are preserved at
-[`ee571e3`](https://github.com/mcpirate17/llm-forge/commit/ee571e3919ebed808dcdc63bf8940f0ebc5eabb0),
-with the benchmark reservation correction at
-[`dd79a75`](https://github.com/mcpirate17/llm-forge/commit/dd79a758a68a2d7824030259b17cf2ec7b7800e6).
-The measured executable is the clean `ee571e3` build, SHA-256
-`cd5c6682d38aebc6404263003318179afcd8ab9c9aed503fcde13e386b3d5f24`;
-the benchmark observes the `dd79a75` source tree. The projection binds executable,
-driver, build-input, fixture and raw-report hashes. At that experiment revision,
-build the release CLI and `cargo +1.98.0 bench --manifest-path native/forge/Cargo.toml
---locked --offline --bench harness --no-run`; execute the resulting harness with
-`FORGE_BENCH_SERVICE=1` and an absolute `FORGE_TEST_BIN`. The source includes
-cooperative deadlines and owned cleanup; terminating a wrapper is not cleanup
-proof. These revisions are historical experiment code, not the current interface.
-
-The candidate passed 26 focused tests and seven release adapter tests, including
-three explicitly enabled MCP tests. Held-out inspection cases covered qualified
-names, Unicode byte bounds, missing files, empty matches and truncation. Strict
-Clippy, formatting and source-size checks passed. Future recommendation work needs
-prospective tasks where guidance can change a real decision, with a capable
-baseline client and complete task, token, latency and failure accounting.
+used 101 samples and five warmups per binary: p50 1.637178 → 1.636747 ms,
+p95 1.832778 → 1.855489 ms. It passed the 10% budget; four absent-field modes were
+byte-identical. Full CPU/RSS and pins remain in that index; this does not justify advice.
+Implementation/tests are preserved at [`ee571e3`](https://github.com/mcpirate17/llm-forge/commit/ee571e3919ebed808dcdc63bf8940f0ebc5eabb0),
+with reservation correction [`dd79a75`](https://github.com/mcpirate17/llm-forge/commit/dd79a758a68a2d7824030259b17cf2ec7b7800e6).
+The projection binds the clean `ee571e3` executable, `dd79a75` observer, fixtures,
+build inputs and raw reports. Historical reproduction uses the release CLI and
+`cargo +1.98.0 bench --manifest-path native/forge/Cargo.toml --locked --offline --bench harness --no-run`,
+then that harness with `FORGE_BENCH_SERVICE=1` and absolute `FORGE_TEST_BIN`.
+Twenty-six focused and seven release adapter tests passed, including three enabled
+MCP tests; qualified names, Unicode, missing/empty results and truncation were covered.
+Future advice needs prospective tasks with a capable baseline and complete outcome,
+token, latency and failure accounting. This experiment is not the current interface.
 
 ### Prompt-contract behavior and overhead — 2026-11-04
 
