@@ -4,8 +4,8 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/222",
   "base_commit": "b34f6b37c552f386ee4cc33641e93d5cc482121d",
-  "status": "original_behavior_regression_confirmed_release_comparator_pending",
-  "scope": "Remove the unused temporary full execution workspace from no-record native target capture. Production code is still original in this baseline commit. Actual guest Stage, record-present private-copy path and later confinement remain outside the proposed change.",
+  "status": "no_record_fast_path_focused_passed_matched_measurements_pending",
+  "scope": "No-record target capture reuses the existing captured review snapshot without creating an unused full execution workspace. Record-present copying and later guest Stage admission are unchanged.",
   "baseline_verification": {
     "original_capture_tests": {
       "passed": 3,
@@ -57,9 +57,32 @@
       "result": "Two passed, two failed, one ignored: intended no-workspace RED plus malformed-record fixture refused its implicit shared parent before SQLite. Made only the authored temporary root explicitly 0700; no production admission change."
     }
   ],
-  "release_comparators": "PENDING",
+  "release_comparators": {
+    "baseline": {
+      "binary": "/home/tim/Projects/llm-forge/.git/capture-baseline-fdd816e-m8zr1j2l/unit-tests",
+      "sha256": "ddd8dec36f691e35d2d02ebb42ff4dc471aead04ecb971559231132cef328874",
+      "head": "fdd816e4079d461fb9a029acec48086cdb7f57fa",
+      "tree": "0f6bbff02ab206a88f550aebabc68dc1764e270e",
+      "fixture_sha256": "18f287850040ef8830b28387cf8da3523b941098561bfa2803315d2f41ac52c3",
+      "store_copy_sha256": "b3a5a773811a038607aaff5886b40d2d2a93897bff774034db047550e339d6a7",
+      "rustc_sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
+      "elapsed_seconds": 135.95857763290405
+    },
+    "baseline_build_ledger": {
+      "path": ".git/forge-capture-baseline-unit.json",
+      "sha256": "bb23a13c480268bd5b2f6d13c65e76b17b1d717f6b0e96df1a468fa9f94d008b"
+    },
+    "baseline_controls": {
+      "path": ".git/forge-capture-baseline-controls.json",
+      "sha256": "18188c2f6b12b86fe680492b0b0f630d7e2f2f2fa8278fbc1eb8a2929ebd12ca",
+      "capture_calls": 24,
+      "observed_scratch_events_per_capture": 2,
+      "release_regression": "expected RED exit101; original binary retained"
+    },
+    "current": "PENDING"
+  },
   "measurements": "PENDING",
-  "full_local_check": "PENDING after production improvement; this baseline contains the deliberate regression failure",
+  "full_local_check": "PENDING final optimized source and evidence head",
   "limitations": [
     "In-process capture cost is not total candidate review or guest latency.",
     "No new model-token, task-success, CPU/RSS/allocation or host-adoption evidence.",
@@ -76,5 +99,12 @@
       "sha256": "a5f19be6095154ca44b1c8bf5f8e1aa26162f2c61e62ffecaecfa6976b6c44ef"
     },
     "result": "Prior identical conductor source blobs acquired newer timestamps after its gate; timestamp-based fingerprints provide a sufficient invalidator, not proof of every dirty reason or actor. Registry feature targets already isolated. The next PR transition preserved all 1480 native entries exactly by non-forced local-main fast-forward before identical-tree checkout. No build-speed gain inferred and no fingerprints/profiles/test coverage changed."
+  },
+  "current_verification": {
+    "capture_and_artifact_tests_passed": 6,
+    "ignored_benchmark": 1,
+    "focused_log": ".git/forge-capture-current-tests1.log",
+    "strict_all_target_clippy": "PASS .git/forge-capture-current-clippy1.log",
+    "independent_production_review": "No blocker. Same native selector and held snapshot; captured input verification remains. Selection already admitted grants through a workspace; actual guest Stage still creates and validates its own. Record-present branch unchanged. Removing unnecessary scratch/copy/Sandbox/reopen failure paths is intentional and grants no execution authority."
   }
 }

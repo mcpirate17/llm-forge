@@ -225,6 +225,14 @@ fn store_copy(
     changed: &[(String, Option<Vec<usize>>)],
     timeout: f64,
 ) -> Result<Vec<slop_core::gate_types::Target>> {
+    if record.is_none() {
+        return conductor_native::equivalence_targets::targets(
+            &snapshot.path(),
+            None,
+            changed,
+            timeout,
+        );
+    }
     let source = execution.source()?;
     let workspace = Workspace::new(&source, &execution.candidate.tree_oid, &execution.grants)?;
     let path = workspace.runtime().join("equivalence-record.sqlite");

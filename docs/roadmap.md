@@ -190,8 +190,11 @@ See the [evidence index](../research/performance/forge-program-20261106-publicat
 and remove the unused temporary workspace in equivalence target capture when no
 recorded-test database is configured. Target discovery already reads the captured
 review snapshot; actual guest execution retains its separate confined Stage.
-Baseline fixtures and regression controls are being prepared before the production
-change. Standalone explicit-commit gate design remains subsequent work.
+The original release comparator passed 24 capture observations and triggered the
+expected scratch regression. The fast path passes six capture/artifact tests and
+strict Clippy; matched measurement and full publication checks are pending. See the
+[evidence index](../research/performance/forge-program-20261106-equivalence-capture.json).
+Standalone explicit-commit gate design remains subsequent work.
 
 ### Architecture, evidence and disposition
 
