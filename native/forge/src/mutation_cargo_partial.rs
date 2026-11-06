@@ -89,7 +89,7 @@ fn identity(value: &Value, sources: &BTreeSet<String>, package: &str) -> Result<
     if conductor_native::mutation_source_coverage::normalise(file)? != file {
         return Err("mutant source path is not normalized".into());
     }
-    let encoded = serde_json::to_string(&item).map_err(|e| e.to_string())?;
+    let encoded = crate::json_canon::canonical_json(&Value::Object(item));
     if encoded.len() > MAX_IDENTITY {
         return Err("mutant identity exceeds bound".into());
     }

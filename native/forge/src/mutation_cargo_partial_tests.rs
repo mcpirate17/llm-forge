@@ -18,6 +18,45 @@ fn sources() -> BTreeSet<String> {
 }
 
 #[test]
+fn discovered_and_observed_identities_ignore_json_object_key_order() {
+    let discovered: Value = serde_json::from_str(r#"{
+        "diff":"irrelevant", "name":"a", "package":"demo", "file":"src/a.rs",
+        "function":{"function_name":"f","return_type":"-> bool","span":{"start":{"line":1,"column":1},"end":{"line":2,"column":1}}},
+        "span":{"start":{"line":1,"column":1},"end":{"line":1,"column":2}},
+        "replacement":"false","genre":"FnValue"
+    }"#).unwrap();
+    let observed: Value = serde_json::from_str(r#"{
+        "genre":"FnValue","replacement":"false",
+        "span":{"end":{"column":2,"line":1},"start":{"column":1,"line":1}},
+        "function":{"span":{"end":{"column":1,"line":2},"start":{"column":1,"line":1}},"return_type":"-> bool","function_name":"f"},
+        "file":"src/a.rs","package":"demo","name":"a"
+    }"#).unwrap();
+    let selected = sources();
+    let left = identity(&discovered, &selected, "demo").unwrap();
+    let right = identity(&observed, &selected, "demo").unwrap();
+    assert_eq!(left, right);
+    assert_eq!(
+        identity_digest([left.clone()].into_iter()),
+        identity_digest([right].into_iter())
+    );
+    let inventory = inventory(&json!([discovered]), &selected, "demo").unwrap();
+    assert_eq!(
+        outcomes(
+            &report(vec![observed.clone()]),
+            &inventory,
+            &selected,
+            "demo"
+        )
+        .unwrap()
+        .0["KILLED"],
+        1
+    );
+    let mut changed = observed;
+    changed["replacement"] = json!("true");
+    assert!(outcomes(&report(vec![changed]), &inventory, &selected, "demo").is_err());
+}
+
+#[test]
 fn partial_counts_only_reconciled_completed_scenarios() {
     let a = mutant("a");
     let b = mutant("b");
