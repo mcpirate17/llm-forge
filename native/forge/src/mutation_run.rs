@@ -456,6 +456,37 @@ fn dispose_legacy_snapshot(
     }
     Ok(removal?)
 }
+
+fn finish_legacy_snapshot(
+    runtime: &crate::mutation_execution_legacy::Runtime<'_>,
+    snapshot: Snapshot,
+    receipt: &mut Receipt,
+) -> Step<()> {
+    let checked = runtime.verify(Some(&snapshot.worktree));
+    if let Err(error) = &checked {
+        receipt.insert(
+            "execution_verification_error".into(),
+            json!(format!("{error:#}")),
+        );
+    }
+    let mut verified = checked.is_ok();
+    let cache = if verified && ledger_verified(receipt) {
+        runtime.finish_cache(&snapshot.worktree)
+    } else {
+        Ok(())
+    };
+    if let Err(error) = &cache {
+        verified = false;
+        receipt["fest_cache"]["removal_error"] = json!(format!("{error:#}"));
+    } else if verified && ledger_verified(receipt) && receipt.contains_key("fest_cache") {
+        receipt["fest_cache"]["removed"] = json!(true);
+    }
+    let removal = dispose_legacy_snapshot(snapshot, receipt, verified);
+    checked.map_err(|error| Stop::Refused(format!("execution input verification: {error:#}")))?;
+    cache.map_err(|error| Stop::Refused(format!("Fest cache cleanup: {error:#}")))?;
+    removal
+}
+
 fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
     let grants = parts
         .grants
@@ -477,13 +508,17 @@ fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
     write_receipt(parts.output_path, parts.receipt)?;
     let runtime = crate::mutation_execution_legacy::Runtime::prepare(&snapshot, grants, inputs)
         .map_err(|e| format!("execution admission: {e:#}"))?;
+    runtime
+        .record_admission(parts.receipt)
+        .map_err(|e| format!("execution cache admission: {e:#}"))?;
+    write_receipt(parts.output_path, parts.receipt)?;
     inputs
         .populate(&mut snapshot, parts.repo_root)
         .map_err(|e| format!("snapshot population: {e:#}"))?;
     snapshot.remove_git_metadata()?;
     inputs
         .verify_snapshot(&snapshot.worktree)
-        .map_err(|e| format!("Cargo snapshot admission: {e:#}"))?;
+        .map_err(|e| format!("mutation snapshot admission: {e:#}"))?;
     runtime
         .verify(Some(&snapshot.worktree))
         .map_err(|e| format!("execution input verification: {e:#}"))?;
@@ -520,20 +555,8 @@ fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
             run.verify_identities()
         });
     *parts.planned = run.planned;
-    let checked = runtime.verify(Some(&snapshot.worktree));
-    if let Err(error) = &checked {
-        parts.receipt.insert(
-            "execution_verification_error".into(),
-            json!(format!("{error:#}")),
-        );
-    }
-    let removal = dispose_legacy_snapshot(snapshot, parts.receipt, checked.is_ok());
+    let removal = finish_legacy_snapshot(&runtime, snapshot, parts.receipt);
     finished?;
-    if let Err(error) = checked {
-        return Err(Stop::Refused(format!(
-            "execution input verification: {error:#}"
-        )));
-    }
     removal
 }
 fn prepare_legacy(
@@ -552,8 +575,11 @@ fn prepare_legacy(
         }
         return Ok(None);
     }
-    if campaign.language != "rust" || campaign.mutation_engine != "cargo-mutants" {
-        return Err("ordinary mutation profile is not yet supported; explicit confined Cargo grants are required".into());
+    let fest = campaign.language == "python"
+        && campaign.mutation_engine == "fest"
+        && campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1");
+    if !fest && (campaign.language != "rust" || campaign.mutation_engine != "cargo-mutants") {
+        return Err("ordinary mutation profile is not yet supported; explicit confined Cargo or generated Fest grants are required".into());
     }
     let path = request.execution_grants.as_deref().ok_or(
         "ordinary mutation execution requires --execution-grants and --execution-grants-sha256",
@@ -577,8 +603,35 @@ fn prepare_legacy(
     )
     .map_err(|e| format!("execution grants: {e:#}"))?;
     let inputs = crate::mutation_execution_legacy::Inputs::capture(campaign, root, &grants)
-        .map_err(|e| format!("ordinary Cargo admission: {e:#}"))?;
+        .map_err(|e| format!("ordinary mutation admission: {e:#}"))?;
     Ok(Some((grants, inputs)))
+}
+
+/// Confined guest selection belongs to held operator grants, never ambient PATH.
+fn selected_tools(
+    campaign: &Campaign,
+    root: &Path,
+    grants: Option<&crate::mutation_execution_grants::Grants>,
+) -> Result<(Option<String>, String), String> {
+    let Some(grants) = grants else {
+        let interpreter = selected_interpreter(campaign, root)?;
+        let binary = engine_binary(campaign, interpreter.as_deref())?;
+        return Ok((interpreter, binary));
+    };
+    if configured_snapshot_python(root)?.is_some() {
+        return Err("confined mutation profiles refuse a project-configured Python guest; use operator execution grants".into());
+    }
+    let tool = |alias| {
+        grants
+            .program(alias)
+            .map(|path| path.to_string_lossy().into_owned())
+            .map_err(|e| format!("execution grants: {e:#}"))
+    };
+    if campaign.mutation_engine == "fest" {
+        Ok((Some(tool("python")?), tool("fest")?))
+    } else {
+        Ok((None, tool("cargo-mutants")?))
+    }
 }
 fn dispose_snapshot(
     mut snapshot: Snapshot,
@@ -654,6 +707,19 @@ fn close_scored(
     planned: Option<u64>,
     relative: &str,
 ) -> Result<(), String> {
+    if campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1") {
+        if let Some(error) = conductor_native::mutation_fest_receipt::cleanup_error(receipt) {
+            return Err(error);
+        }
+        if let Some(error) = conductor_native::mutation_fest_receipt::attribution_error(
+            receipt,
+            &campaign.campaign_id,
+            &json!(campaign.source_sha256),
+            &json!(campaign.test_sha256),
+        ) {
+            return Err(error);
+        }
+    }
     if campaign.generated_value.is_none()
         && (!ledger_verified(receipt) || receipt["snapshot"]["removed"] != true)
     {
@@ -684,18 +750,11 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
         &request.only,
     )?;
     let legacy = prepare_legacy(request, &campaign, &repo_root)?;
-    let interpreter = selected_interpreter(&campaign, &repo_root)?;
-    if legacy.is_some() && interpreter.is_some() {
-        return Err("ordinary Cargo profile refuses a configured Python guest".into());
-    }
-    let binary = match &legacy {
-        Some((grants, _)) => grants
-            .program("cargo-mutants")
-            .map_err(|e| format!("execution grants: {e:#}"))?
-            .to_string_lossy()
-            .into_owned(),
-        None => engine_binary(&campaign, interpreter.as_deref())?,
-    };
+    let (interpreter, binary) = selected_tools(
+        &campaign,
+        &repo_root,
+        legacy.as_ref().map(|(grants, _)| grants),
+    )?;
     let opened = now();
     let mut receipt = open_receipt(
         &campaign,
@@ -762,11 +821,20 @@ pub fn inspect(campaign: &Campaign, repo_root: &Path) -> Result<Map<String, Valu
         reasons
             .push("ordinary mutation execution requires explicit pinned execution grants".into());
     }
-    let interpreter = selected_interpreter(campaign, repo_root);
-    let binary = interpreter
-        .and_then(|interpreter| engine_binary(campaign, interpreter.as_deref()))
-        .map_err(|error| reasons.push(error))
-        .ok();
+    let binary = if campaign.option_text("execution_profile").as_deref() == Some("fest-confined-v1")
+    {
+        // Inspection has no operator grant document; do not infer a guest from host state.
+        reasons.push(
+            "confined Fest selects its Python guest and engine only from held operator grants"
+                .into(),
+        );
+        None
+    } else {
+        selected_interpreter(campaign, repo_root)
+            .and_then(|interpreter| engine_binary(campaign, interpreter.as_deref()))
+            .map_err(|error| reasons.push(error))
+            .ok()
+    };
     for (relative, expected) in &campaign.source_sha256 {
         let target = repo_root.join(relative);
         if !target.is_file() {

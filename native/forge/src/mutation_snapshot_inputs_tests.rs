@@ -1,6 +1,111 @@
 use super::*;
 use crate::mutation_run_test_support::{change, repository, write};
 
+fn replacement_fixture() -> (
+    tempfile::TempDir,
+    serde_json::Value,
+    std::collections::BTreeMap<String, String>,
+) {
+    let root = tempfile::tempdir().unwrap();
+    write(root.path(), "subject.py", "value = 1\n");
+    write(root.path(), "other.py", "other = 7\n");
+    let row = serde_json::json!({"path":"subject.py","byte_offset":8,"byte_length":1,
+        "original_text":"1","mutated_text":"2"});
+    let pins = std::collections::BTreeMap::from([(
+        "subject.py".into(),
+        crate::mutation_campaign::sha256_hex(b"value = 1\n"),
+    )]);
+    (root, row, pins)
+}
+
+#[test]
+fn attribution_identity_binds_exact_mutant_and_every_other_input() {
+    let (root, row, pins) = replacement_fixture();
+    let selection = SnapshotSelection::new(&[], &["subject.py".into()]).unwrap();
+    let original = materialized_input_identity(root.path(), &selection).unwrap();
+    let replacement = attribution_replacement(root.path(), &row, &pins).unwrap();
+    write(root.path(), "subject.py", "value = 2\n");
+    let observed =
+        || materialized_input_identity_with_replacement(root.path(), &selection, &replacement);
+    assert_eq!(observed().unwrap(), original);
+    assert_ne!(
+        materialized_input_identity(root.path(), &selection).unwrap(),
+        original
+    );
+    write(root.path(), "other.py", "other = 8\n");
+    assert_ne!(observed().unwrap(), original);
+    write(root.path(), "other.py", "other = 7\n");
+    write(root.path(), "added.py", "new = 1\n");
+    assert_ne!(observed().unwrap(), original);
+    fs::remove_file(root.path().join("added.py")).unwrap();
+    write(root.path(), "subject.py", "value = 3\n");
+    assert!(observed().is_err());
+    write(root.path(), "subject.py", "value = 1\n");
+    assert!(
+        observed().is_err(),
+        "restored source must leave the mutant-only scope"
+    );
+    assert_eq!(
+        materialized_input_identity(root.path(), &selection).unwrap(),
+        original
+    );
+}
+
+#[test]
+fn attribution_identity_rejects_target_aliases_modes_and_exclusions() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let (root, row, pins) = replacement_fixture();
+    let replacement = attribution_replacement(root.path(), &row, &pins).unwrap();
+    let selection = SnapshotSelection::new(&[], &[]).unwrap();
+    let observed =
+        || materialized_input_identity_with_replacement(root.path(), &selection, &replacement);
+    write(root.path(), "subject.py", "value = 2\n");
+    fs::set_permissions(
+        root.path().join("subject.py"),
+        fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    assert!(observed().is_err());
+    fs::set_permissions(
+        root.path().join("subject.py"),
+        fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
+    fs::hard_link(root.path().join("subject.py"), root.path().join("alias")).unwrap();
+    assert!(observed().is_err());
+    fs::remove_file(root.path().join("alias")).unwrap();
+    let excluded = SnapshotSelection::new(&["subject.py".into()], &[]).unwrap();
+    assert!(
+        materialized_input_identity_with_replacement(root.path(), &excluded, &replacement).is_err()
+    );
+    fs::remove_file(root.path().join("subject.py")).unwrap();
+    assert!(observed().is_err());
+    symlink("other.py", root.path().join("subject.py")).unwrap();
+    assert!(observed().is_err());
+}
+
+#[test]
+fn attribution_replacement_refuses_unpinned_or_inconsistent_engine_rows() {
+    let (root, row, pins) = replacement_fixture();
+    for (field, value) in [
+        ("path", serde_json::json!("other.py")),
+        ("path", serde_json::json!("../subject.py")),
+        ("byte_offset", serde_json::json!(u64::MAX)),
+        ("byte_length", serde_json::json!(2)),
+        ("original_text", serde_json::json!("9")),
+        ("mutated_text", serde_json::json!("1")),
+    ] {
+        let mut bad = row.clone();
+        bad[field] = value;
+        assert!(
+            attribution_replacement(root.path(), &bad, &pins).is_err(),
+            "{field}"
+        );
+    }
+    write(root.path(), "subject.py", "value = 9\n");
+    assert!(attribution_replacement(root.path(), &row, &pins).is_err());
+}
+
 #[test]
 fn bound_snapshot_excludes_owned_outputs_and_rechecks_real_inputs() {
     let host = repository(&["src/lib.rs", "assets/data.bin", "campaigns/receipt.json"]);

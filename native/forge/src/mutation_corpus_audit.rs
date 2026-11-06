@@ -289,8 +289,10 @@ fn campaign_receipts(
     let ordinary_cargo = campaign["generated"] == true
         && campaign["mutation_engine"] == "cargo-mutants"
         && campaign["generated_value"].is_null();
+    let ordinary_native =
+        ordinary_cargo || crate::mutation_cargo_supporting::confined_fest(campaign);
     let id = string(campaign, "campaign_id")?;
-    let workspace = conductor_native::mutation_workspace_selector::is_workspace(
+    let workspace = conductor_native::mutation_cargo_supporting_binding::uses_snapshot_inputs(
         campaign["execution_profile"].as_str(),
     );
     let (identity, supporting_error) = if workspace {
@@ -310,23 +312,24 @@ fn campaign_receipts(
         campaign_id: id,
         generated: campaign["generated"] == true,
         ordinary_cargo,
-        ordinary_contract: ordinary_cargo.then_some(campaign),
+        execution_profile: campaign["execution_profile"].as_str(),
+        ordinary_contract: ordinary_native.then_some(campaign),
         declares_value_analysis: !campaign["value_analysis_payload"].is_null(),
         source_symbols: &symbols,
     };
     let reject = |row: &Value, capture: &mut dyn CorpusInputs| {
-        if ordinary_cargo
+        if ordinary_native
             && row
                 .as_object()
                 .is_some_and(conductor_native::mutation_native_runner::declared)
         {
             if let Some(error) = supporting_error {
                 return Ok(Some(format!(
-                    "Cargo supporting-input capture unavailable: {error}"
+                    "native supporting-input capture unavailable: {error}"
                 )));
             }
         }
-        if crate::mutation_cargo_supporting::stale_native_contract(campaign, row, ordinary_cargo) {
+        if crate::mutation_cargo_supporting::stale_native_contract(campaign, row, ordinary_native) {
             return Ok(Some("current source or test hashes drifted".into()));
         }
         if bundle.is_none()

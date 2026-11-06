@@ -59,6 +59,102 @@ fn payload(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).expect("JSON on stdout")
 }
 
+fn python_host() -> tempfile::TempDir {
+    let dir = branch_host();
+    fs::write(
+        dir.path().join("sample.py"),
+        "def answer():\n    return 7\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("test_sample.py"),
+        "from sample import answer\n\ndef test_answer():\n    assert answer() == 7\n",
+    )
+    .unwrap();
+    git(dir.path(), &["add", "sample.py", "test_sample.py"]);
+    git(dir.path(), &["commit", "-qm", "python subject"]);
+    dir
+}
+
+#[test]
+fn confined_fest_profile_preserves_scope_and_is_published_by_the_native_writer() {
+    let dir = python_host();
+    let common = [
+        "plan",
+        "python",
+        "--only",
+        "sample.py",
+        "--verbose",
+        "--python-jobs",
+        "1",
+    ];
+    let plain = forge(dir.path(), &common);
+    assert!(plain.status.success(), "{plain:?}");
+    let selected = forge(
+        dir.path(),
+        &[common.as_slice(), &["--fest-confined"]].concat(),
+    );
+    assert!(selected.status.success(), "{selected:?}");
+    let mut manifests = payload(&selected)["manifests"].clone();
+    assert_eq!(manifests.as_array().unwrap().len(), 1);
+    assert_eq!(
+        manifests[0]["generator"]["options"]
+            .as_object_mut()
+            .unwrap()
+            .remove("execution_profile"),
+        Some(serde_json::json!("fest-confined-v1"))
+    );
+    assert!(manifests[0]["generator"]["options"]
+        .as_object()
+        .unwrap()
+        .is_empty());
+    manifests[0]["generator"]
+        .as_object_mut()
+        .unwrap()
+        .remove("options");
+    assert_eq!(manifests, payload(&plain)["manifests"]);
+    assert!(!dir.path().join("campaigns").exists());
+    let published = forge(
+        dir.path(),
+        &["write", "python", "--only", "sample.py", "--fest-confined"],
+    );
+    assert!(published.status.success(), "{published:?}");
+    let path = dir
+        .path()
+        .join(payload(&published)["written"][0].as_str().unwrap());
+    let manifest: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+    assert_eq!(
+        manifest["generator"]["options"]["execution_profile"],
+        "fest-confined-v1"
+    );
+    assert_eq!(
+        manifest["generator"]["source"],
+        serde_json::json!(["sample.py"])
+    );
+}
+
+#[test]
+fn confined_fest_rejects_other_languages_and_multiple_workers_without_publication() {
+    let dir = python_host();
+    for args in [
+        vec!["write", "rust", "--base", "main", "--fest-confined"],
+        vec![
+            "write",
+            "python",
+            "--only",
+            "sample.py",
+            "--fest-confined",
+            "--python-jobs",
+            "2",
+        ],
+    ] {
+        let output = forge(dir.path(), &args);
+        assert_eq!(output.status.code(), Some(4), "{output:?}");
+        assert_eq!(payload(&output)["status"], "REFUSED");
+        assert!(!dir.path().join("campaigns").exists());
+    }
+}
+
 #[test]
 fn plan_reports_only_the_branch_scope_and_writes_nothing() {
     let dir = branch_host();

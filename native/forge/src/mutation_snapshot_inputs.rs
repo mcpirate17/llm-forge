@@ -3,6 +3,86 @@ use anyhow::{ensure, Result};
 use conductor_native::mutation_snapshot_inputs::validate_path;
 use std::collections::BTreeSet;
 
+/// A single automatically generated replacement, bound before attribution mutates it.
+/// This is never deserialized from a receipt and never changes the selected path set.
+pub(crate) struct Replacement {
+    path: String,
+    mode: u32,
+    original: Vec<u8>,
+    expected_mutant_sha256: String,
+}
+impl Replacement {
+    pub(super) fn from_row(
+        path: String,
+        mode: u32,
+        original: Vec<u8>,
+        row: &serde_json::Value,
+    ) -> Result<Self> {
+        use anyhow::Context;
+        validate_path(&path).map_err(anyhow::Error::msg)?;
+        ensure!(
+            matches!(mode, 0o100644 | 0o100755),
+            "mutant target must be regular"
+        );
+        let offset = usize::try_from(
+            row["byte_offset"]
+                .as_u64()
+                .context("missing mutant offset")?,
+        )?;
+        let length = usize::try_from(
+            row["byte_length"]
+                .as_u64()
+                .context("missing mutant length")?,
+        )?;
+        let end = offset
+            .checked_add(length)
+            .context("mutant offset overflow")?;
+        let expected = row["original_text"]
+            .as_str()
+            .context("missing original mutant text")?
+            .as_bytes();
+        let changed = row["mutated_text"]
+            .as_str()
+            .context("missing mutated text")?
+            .as_bytes();
+        ensure!(
+            original.get(offset..end) == Some(expected),
+            "engine mutation does not match pinned original bytes"
+        );
+        let size = original
+            .len()
+            .checked_sub(length)
+            .and_then(|n| n.checked_add(changed.len()))
+            .context("mutant size overflow")?;
+        ensure!(size <= 32 * 1024 * 1024, "mutant exceeds 32 MiB");
+        let mut mutated = Vec::with_capacity(size);
+        mutated.extend_from_slice(&original[..offset]);
+        mutated.extend_from_slice(changed);
+        mutated.extend_from_slice(&original[end..]);
+        ensure!(
+            mutated != original,
+            "engine mutation does not change source"
+        );
+        Ok(Self {
+            path,
+            mode,
+            original,
+            expected_mutant_sha256: crate::mutation_campaign::sha256_hex(&mutated),
+        })
+    }
+    pub(super) fn path(&self) -> &str {
+        &self.path
+    }
+    pub(super) fn original_for<'a>(&'a self, mode: u32, bytes: &[u8]) -> Result<&'a [u8]> {
+        ensure!(mode == self.mode, "attribution target mode changed");
+        ensure!(
+            crate::mutation_campaign::sha256_hex(bytes) == self.expected_mutant_sha256,
+            "attribution source differs from the exact automatic mutation"
+        );
+        Ok(&self.original)
+    }
+}
+
 /// Exact files or directory roots chosen by trusted coordinator policy, never a receipt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Selection {

@@ -67,6 +67,10 @@ pub struct ScopeArgs {
     #[arg(long = "python-jobs")]
     pub python_jobs: Option<i64>,
 
+    /// Generate the confined Fest profile for one Python source per campaign.
+    #[arg(long, conflicts_with = "cargo_workspace")]
+    pub fest_confined: bool,
+
     #[arg(long = "run-timeout", default_value_t = 1800)]
     pub run_timeout: i64,
 
@@ -277,6 +281,9 @@ fn requested_selector(
 }
 
 fn plan(args: ScopeArgs) -> Result<Planned, String> {
+    if args.fest_confined && args.language != "python" {
+        return Err("--fest-confined requires Python planning".into());
+    }
     if args.cargo_workspace && args.language != "rust" {
         return Err("--cargo-workspace requires Rust planning".into());
     }
@@ -307,6 +314,7 @@ fn plan(args: ScopeArgs) -> Result<Planned, String> {
         day: args.day.unwrap_or_else(today_utc),
         jobs: args.jobs,
         python_jobs: args.python_jobs,
+        fest_confined: args.fest_confined,
         run_timeout_seconds: args.run_timeout,
         campaigns_root: campaigns.clone(),
         only_sources,

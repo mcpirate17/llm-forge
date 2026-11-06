@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
-pub use crate::mutation_manifest::profile::execution_profile;
+pub use crate::mutation_manifest::profile::{execution_profile, validate_fest_path};
 use serde::Deserialize;
 use serde_json::{json, Value};
 

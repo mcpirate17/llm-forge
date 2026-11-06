@@ -18,7 +18,7 @@ pub(super) const MAX_FILE: u64 = 256 * 1024 * 1024;
 pub(super) const MAX_DOCUMENT: usize = 16 * 1024 * 1024;
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Entry {
+pub(crate) struct Entry {
     pub path: String,
     pub directory: bool,
     pub bytes: u64,
@@ -52,12 +52,15 @@ impl ReadPolicy {
         }
     }
 }
-pub(super) struct Budget {
+pub(crate) struct Budget {
     start: Instant,
     entries: usize,
     bytes: u64,
     document: usize,
     expanded: u64,
+    max_entries: usize,
+    max_total: u64,
+    max_file: u64,
 }
 impl Budget {
     pub fn new() -> Self {
@@ -67,6 +70,17 @@ impl Budget {
             bytes: 0,
             document: 0,
             expanded: 0,
+            max_entries: MAX_ENTRIES,
+            max_total: MAX_TOTAL,
+            max_file: MAX_FILE,
+        }
+    }
+    pub(crate) fn guest() -> Self {
+        Self {
+            max_entries: 10_000,
+            max_total: 256 * 1024 * 1024,
+            max_file: 32 * 1024 * 1024,
+            ..Self::new()
         }
     }
     pub(super) fn deadline(&self) -> Instant {
@@ -91,8 +105,8 @@ impl Budget {
             .checked_add(serde_json::to_vec(entry)?.len() + 1)
             .context("seed manifest size overflow")?;
         ensure!(
-            self.entries <= MAX_ENTRIES
-                && self.bytes <= MAX_TOTAL
+            self.entries <= self.max_entries
+                && self.bytes <= self.max_total
                 && self.document <= MAX_DOCUMENT / 2,
             "Cargo seed entry/byte/manifest budget exceeded"
         );
@@ -130,7 +144,7 @@ pub(super) fn relative(path: &str) -> Result<()> {
     );
     Ok(())
 }
-pub(super) fn root(path: &Path) -> Result<Dir> {
+pub(crate) fn root(path: &Path) -> Result<Dir> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
         "Cargo seed root must be absolute/canonical"
@@ -146,7 +160,7 @@ pub(super) fn root(path: &Path) -> Result<Dir> {
     );
     Ok(Dir::open_ambient_dir(path, cap_std::ambient_authority())?)
 }
-pub(super) fn verify_root(path: &Path, held: &Dir) -> Result<()> {
+pub(crate) fn verify_root(path: &Path, held: &Dir) -> Result<()> {
     use std::os::unix::fs::MetadataExt as _;
     ensure!(
         path.canonicalize()? == path,
@@ -314,7 +328,7 @@ fn file(
     ensure!(
         before.is_file()
             && before.nlink() == 1
-            && before.len() <= MAX_FILE
+            && before.len() <= budget.max_file
             && policy.allows(&before),
         "seed file must be bounded, safely owned, singly linked and regular"
     );
@@ -323,11 +337,11 @@ fn file(
         "public cache import requires world-readable regular files"
     );
     ensure!(
-        budget.entries < MAX_ENTRIES
+        budget.entries < budget.max_entries
             && budget
                 .bytes
                 .checked_add(before.len())
-                .is_some_and(|n| n <= MAX_TOTAL),
+                .is_some_and(|n| n <= budget.max_total),
         "Cargo seed aggregate budget exceeded before copy"
     );
     let mut input = source.open_with(
@@ -365,7 +379,7 @@ fn file(
             .checked_add(n as u64)
             .context("seed file length overflow")?;
         ensure!(
-            total <= before.len() && total <= MAX_FILE,
+            total <= before.len() && total <= budget.max_file,
             "seed file grew while reading"
         );
         hash.update(&bytes[..n]);
@@ -410,7 +424,7 @@ fn walk(
             .into_string()
             .map_err(|_| anyhow::anyhow!("seed name must be UTF8"))?;
         ensure!(
-            names.len() + entries.len() < MAX_ENTRIES,
+            names.len() + entries.len() < budget.max_entries,
             "Cargo seed entry budget exceeded"
         );
         names.push(name);
@@ -459,7 +473,7 @@ fn walk(
     );
     Ok(())
 }
-pub(super) fn tree(
+pub(crate) fn tree(
     source: &Dir,
     target: Option<&Dir>,
     prefix: &str,

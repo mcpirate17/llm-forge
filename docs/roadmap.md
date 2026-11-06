@@ -59,7 +59,7 @@ passed before [PR #211](https://github.com/mcpirate17/llm-forge/pull/211) merged
 [command contract](native-analysis.md#python-test-import-report). The subsequent
 MCP integration is tracked in #212 below; no host adoption is claimed.
 
-The active increment is [#212](https://github.com/mcpirate17/llm-forge/issues/212):
+Issue [#212](https://github.com/mcpirate17/llm-forge/issues/212) is delivered:
 an operator-enabled MCP report using the existing confined native worker owner.
 It adds fixed-root admission, isolated Git configuration, report-specific
 disconnect cancellation and bounded output. A first live attempt refused before
@@ -72,7 +72,11 @@ controls and owned cleanup. Subsequent shutdown controls passed for an observed
 preparing request and an active detached worker tree, with cleanup checked before
 explicit manager stop. The extended error control preserved exit 7 and UTF-8
 stderr. Nine targeted live test executions passed; the original pre-launch
-failure remains recorded. Final publication checks are pending at this checkpoint.
+failure remains recorded. All 18 publication checks passed on `bbffed4`: 4,907
+passing test executions, zero failures and 197 ignored across 182 harnesses
+(including repeated feature-matrix cases). Fresh-base local verification passed
+before [PR #213](https://github.com/mcpirate17/llm-forge/pull/213) merged as
+`9299baa`; its tree matches the verified head.
 
 The reproducible observation at `a3ac295` completed all 396 calls with exact
 report parity. Scored inner medians were 2.22–2.36 ms for direct CLI and
@@ -82,6 +86,12 @@ service cost, not a speedup or agent benefit. See the [performance report](perfo
 and [evidence index](../research/performance/forge-program-20261106-mcp-test-report.json).
 Filesystem preparation remains cooperative; the child deadline is not a hard
 whole-operation deadline. No external-client or host adoption is claimed.
+
+The active increment returns to [#196](https://github.com/mcpirate17/llm-forge/issues/196):
+a narrowly admitted Fest profile using a pinned private guest and the existing
+native command owner. Fresh bytecode isolation, independent supporting-input
+bindings and real automatic-engine evidence are required before acceptance.
+Existing ordinary Fest and Mull execution remain refused while this work proceeds.
 
 ### Architecture, evidence and disposition
 

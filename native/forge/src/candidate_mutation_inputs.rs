@@ -333,6 +333,8 @@ impl<'a> Capture<'a> {
         &mut self,
         required: &crate::mutation_cargo_supporting::WorkspaceRequired,
     ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        // Shared full-snapshot domain for Cargo workspace and confined Fest profiles.
+        // The verified contract selects this path; a receipt cannot select its inputs.
         let config = self.config()?;
         crate::mutation_workspace_policy::manifest_in_namespace(
             config.as_ref(),

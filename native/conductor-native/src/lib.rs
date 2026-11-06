@@ -92,6 +92,7 @@ pub mod mutation_corpus_territory;
 pub mod mutation_coverage;
 #[cfg(feature = "source-analysis")]
 pub mod mutation_evidence;
+pub mod mutation_fest_receipt;
 #[cfg(feature = "source-analysis")]
 mod mutation_manifest;
 pub mod mutation_native_runner;

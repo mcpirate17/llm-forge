@@ -41,6 +41,7 @@ fn campaign<'a>(symbols: &'a BTreeSet<String>) -> Campaign<'a> {
         campaign_id: "c",
         generated: false,
         ordinary_cargo: false,
+        execution_profile: None,
         ordinary_contract: None,
         declares_value_analysis: false,
         source_symbols: symbols,
@@ -149,6 +150,57 @@ mod native_receipts {
         })
     }
 
+    fn check_stale_rows(
+        campaign: &Campaign<'_>,
+        receipt: &Value,
+        expected: &crate::mutation_cargo_supporting_binding::SupportingInputs,
+        check: &impl Fn(
+            &Campaign<'_>,
+            &Value,
+            Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>,
+        ) -> Option<String>,
+    ) {
+        let mut older = receipt.clone();
+        older["generated_at"] = json!("2026-01-01");
+        for field in [
+            "campaign_id",
+            "manifest",
+            "manifest_sha256",
+            "source_sha256",
+            "test_sha256",
+        ] {
+            let mut forged = receipt.clone();
+            forged["generated_at"] = json!("2027-01-01");
+            forged[field] = match field {
+                "source_sha256" => json!({"src/a.rs":"0".repeat(64)}),
+                "test_sha256" => json!({"tests/contract.rs":"0".repeat(64)}),
+                _ => json!("wrong"),
+            };
+            assert!(
+                check(campaign, &forged, Some(expected))
+                    .unwrap()
+                    .contains(field),
+                "{field}"
+            );
+            let rows = vec![older.clone(), forged];
+            let chosen = newest_acceptable(&rows, |row| Ok(check(campaign, row, Some(expected))))
+                .unwrap()
+                .unwrap();
+            assert_eq!(chosen["generated_at"], "2026-01-01", "{field}");
+        }
+        let mut forged_detail = receipt.clone();
+        forged_detail["detail"] =
+            json!({"encoding":"json", "test_sha256":{"tests/contract.rs":"0".repeat(64)}});
+        assert!(check(campaign, &forged_detail, Some(expected))
+            .unwrap()
+            .contains("test_sha256"));
+        let rows = vec![older, forged_detail];
+        let chosen = newest_acceptable(&rows, |row| Ok(check(campaign, row, Some(expected))))
+            .unwrap()
+            .unwrap();
+        assert_eq!(chosen["generated_at"], "2026-01-01");
+    }
+
     #[test]
     fn ordinary_native_receipt_requires_independent_current_supporting_identity() {
         use crate::mutation_cargo_supporting_binding::SupportingInputs;
@@ -159,6 +211,7 @@ mod native_receipts {
             campaign_id: "c",
             generated: true,
             ordinary_cargo: true,
+            execution_profile: None,
             ordinary_contract: Some(&contract),
             declares_value_analysis: false,
             source_symbols: &symbols,
@@ -197,45 +250,7 @@ mod native_receipts {
             .unwrap()
             .contains("campaign binding unavailable"));
 
-        let mut older = receipt.clone();
-        older["generated_at"] = json!("2026-01-01");
-        for field in [
-            "campaign_id",
-            "manifest",
-            "manifest_sha256",
-            "source_sha256",
-            "test_sha256",
-        ] {
-            let mut forged = receipt.clone();
-            forged["generated_at"] = json!("2027-01-01");
-            forged[field] = match field {
-                "source_sha256" => json!({"src/a.rs":"0".repeat(64)}),
-                "test_sha256" => json!({"tests/contract.rs":"0".repeat(64)}),
-                _ => json!("wrong"),
-            };
-            assert!(
-                check(&campaign, &forged, Some(&expected))
-                    .unwrap()
-                    .contains(field),
-                "{field}"
-            );
-            let rows = vec![older.clone(), forged];
-            let chosen = newest_acceptable(&rows, |row| Ok(check(&campaign, row, Some(&expected))))
-                .unwrap()
-                .unwrap();
-            assert_eq!(chosen["generated_at"], "2026-01-01", "{field}");
-        }
-        let mut forged_detail = receipt.clone();
-        forged_detail["detail"] =
-            json!({"encoding":"json", "test_sha256":{"tests/contract.rs":"0".repeat(64)}});
-        assert!(check(&campaign, &forged_detail, Some(&expected))
-            .unwrap()
-            .contains("test_sha256"));
-        let rows = vec![older, forged_detail];
-        let chosen = newest_acceptable(&rows, |row| Ok(check(&campaign, row, Some(&expected))))
-            .unwrap()
-            .unwrap();
-        assert_eq!(chosen["generated_at"], "2026-01-01");
+        check_stale_rows(&campaign, &receipt, &expected, &check);
         let mut python_row = receipt.clone();
         python_row["runner_kind"] = json!("python");
         python_row["detail"] = json!({"encoding":"json", "runner_kind":"forge-native"});
@@ -262,6 +277,7 @@ mod native_receipts {
             campaign_id: "c",
             generated: true,
             ordinary_cargo: true,
+            execution_profile: None,
             ordinary_contract: Some(&contract),
             declares_value_analysis: false,
             source_symbols: &symbols,
@@ -317,6 +333,7 @@ mod native_receipts {
             campaign_id: "c",
             generated: true,
             ordinary_cargo: true,
+            execution_profile: None,
             ordinary_contract: Some(&contract),
             declares_value_analysis: false,
             source_symbols: &symbols,
@@ -359,6 +376,7 @@ mod native_receipts {
             campaign_id: "c",
             generated: true,
             ordinary_cargo: true,
+            execution_profile: None,
             ordinary_contract: Some(&contract),
             declares_value_analysis: false,
             source_symbols: &symbols,
@@ -424,6 +442,7 @@ mod native_receipts {
             campaign_id: "c",
             generated: true,
             ordinary_cargo: false,
+            execution_profile: None,
             ordinary_contract: None,
             declares_value_analysis: false,
             source_symbols: &symbols,
@@ -494,6 +513,117 @@ mod native_receipts {
                 .unwrap()
                 .is_some()
         );
+    }
+
+    fn fest_receipt(
+        contract: &Value,
+        expected: &crate::mutation_cargo_supporting_binding::SupportingInputs,
+    ) -> Value {
+        let mut receipt = native_receipt();
+        for key in [
+            "campaign_id",
+            "manifest",
+            "manifest_sha256",
+            "source_sha256",
+            "test_sha256",
+        ] {
+            receipt[key] = contract[key].clone();
+        }
+        receipt["mutants"][0]["path"] = json!("src/a.py");
+        receipt["mutants"][0]["id"] = json!("m");
+        let evidence = crate::mutation_fest_receipt::attribution_tests::fixture();
+        for key in ["attribution", "fest_attribution_observations", "test_value"] {
+            receipt[key] = evidence[key].clone();
+        }
+        receipt["source_coverage"]["scored_by_source"] = json!({"src/a.py":1});
+        receipt["fest_cache"] = json!({"schema_version":1,"path":"/private/cache",
+            "initially_empty":true,"read_only":true,"removed":true});
+        receipt["supporting_inputs"] = serde_json::to_value(expected).unwrap();
+        receipt
+    }
+
+    #[test]
+    fn confined_fest_receipt_requires_native_runner_and_independent_snapshot() {
+        use crate::mutation_cargo_supporting_binding::SupportingInputs;
+        let symbols = BTreeSet::new();
+        let contract = json!({"campaign_id":"c","execution_profile":"fest-confined-v1",
+            "manifest":"campaign.json","manifest_sha256":"f".repeat(64),
+            "source_sha256":{"src/a.py":"e".repeat(64)},"test_sha256":{"tests/test_a.py":"b".repeat(64)}});
+        let campaign = Campaign {
+            campaign_id: "c",
+            generated: true,
+            ordinary_cargo: false,
+            execution_profile: Some("fest-confined-v1"),
+            ordinary_contract: Some(&contract),
+            declares_value_analysis: false,
+            source_symbols: &symbols,
+        };
+        let expected = SupportingInputs {
+            schema_version: 2,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "complete-snapshot-inputs-v2".into(),
+            digest: "a".repeat(64),
+            files: 3,
+        };
+        let mut receipt = fest_receipt(&contract, &expected);
+        let check = |value: &Value, identity: Option<&SupportingInputs>| {
+            rejection_with_supporting(
+                &campaign,
+                value,
+                &json!({}),
+                |_| Ok(Some("e".repeat(64))),
+                |_| Ok(false),
+                None,
+                identity,
+            )
+            .unwrap()
+        };
+        for status in ["PASS", "RATCHET_HELD"] {
+            receipt["status"] = json!(status);
+            assert!(check(&receipt, Some(&expected)).is_none());
+            let mut missing_attribution = receipt.clone();
+            missing_attribution
+                .as_object_mut()
+                .unwrap()
+                .remove("fest_attribution_observations");
+            assert!(check(&missing_attribution, Some(&expected))
+                .unwrap()
+                .contains("attribution"));
+            let mut retained = receipt.clone();
+            retained["fest_cache"]["removed"] = json!(false);
+            assert!(check(&retained, Some(&expected))
+                .unwrap()
+                .contains("cleanup"));
+            assert!(check(&receipt, None).unwrap().contains("unavailable"));
+            let mut drift = receipt.clone();
+            drift["supporting_inputs"]["digest"] = json!("d".repeat(64));
+            assert!(check(&drift, Some(&expected)).unwrap().contains("changed"));
+            let mut forged = receipt.clone();
+            forged["test_sha256"] = json!({"other.py":"b".repeat(64)});
+            assert!(check(&forged, Some(&expected))
+                .unwrap()
+                .contains("test_sha256"));
+            let mut python = receipt.clone();
+            python["runner_kind"] = json!("python");
+            assert!(check(&python, Some(&expected))
+                .unwrap()
+                .contains("native runner"));
+        }
+        let missing = Campaign {
+            ordinary_contract: None,
+            ..campaign
+        };
+        let rejection = rejection_with_supporting(
+            &missing,
+            &receipt,
+            &json!({}),
+            |_| Ok(Some("e".repeat(64))),
+            |_| Ok(false),
+            None,
+            Some(&expected),
+        )
+        .unwrap();
+        assert!(rejection.unwrap().contains("binding unavailable"));
     }
 
     #[test]

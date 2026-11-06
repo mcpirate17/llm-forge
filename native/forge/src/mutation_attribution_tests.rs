@@ -435,3 +435,46 @@ fn nothing_is_attempted_without_a_kill_or_a_test_junit_can_name() {
         "the coverage map names no usable pytest nodeid"
     );
 }
+
+#[test]
+fn confined_fest_kill_requires_normal_pytest_failure_and_complete_junit() {
+    let mut result = CommandResult {
+        returncode: Some(1),
+        timed_out: false,
+        duration_seconds: 0.1,
+        stdout_tail: String::new(),
+        stderr_tail: String::new(),
+    };
+    let good = Measured::Report(
+        json!({"status":"COMPLETE", "tests":{"tests/a.py::test_a":{"outcome":"FAILED"}}, "failed_nodeids":["tests/a.py::test_a"]}),
+    );
+    assert!(confined_fest_reason(&result, &good).is_none());
+    for code in [None, Some(0), Some(2)] {
+        result.returncode = code;
+        assert!(confined_fest_reason(&result, &good).is_some());
+    }
+    result.returncode = Some(1);
+    result.timed_out = true;
+    assert!(confined_fest_reason(&result, &good).is_some());
+    result.timed_out = false;
+    let setup = Measured::Report(
+        json!({"status":"COMPLETE", "tests":{"tests/a.py::test_a":{"outcome":"ERROR"}}, "failed_nodeids":["tests/a.py::test_a"]}),
+    );
+    assert!(confined_fest_reason(&result, &setup).is_some());
+    assert!(confined_fest_reason(&result, &Measured::NoReport).is_some());
+}
+
+#[test]
+fn confined_attribution_bounds_the_aggregate_before_retaining_reports() {
+    let report = json!({"diagnostic": "x".repeat(OBSERVATION_LIMIT / 2)});
+    let mut budget = ObservationBudget::new(true);
+    budget.retain(None, &report).unwrap();
+    assert!(budget.retain(Some("second"), &report).is_err());
+    // Escaped IDs occupy two JSON object keys, including the exit-code map.
+    let mut small = ObservationBudget(Some(20));
+    assert!(small.retain(Some("\n\n\n"), &Value::Null).is_err());
+    small.retain(Some("a"), &Value::Null).unwrap();
+    let mut legacy = ObservationBudget::new(false);
+    legacy.retain(None, &report).unwrap();
+    legacy.retain(Some("second"), &report).unwrap();
+}

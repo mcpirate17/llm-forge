@@ -58,6 +58,8 @@ struct Document {
     max_wall_seconds: u64,
     #[serde(default)]
     cargo_workspace: Option<CargoWorkspaceGrant>,
+    #[serde(default)]
+    python_guest: Option<crate::mutation_fest_guest::GuestConfig>,
 }
 
 /// The operator selects the lockfile independently of the seed's own metadata.
@@ -95,6 +97,7 @@ pub(crate) struct Grants {
     pub(crate) resources: cgroup::Limits,
     pub(crate) max_wall_seconds: u64,
     pub(crate) cargo_workspace: Option<CargoWorkspaceGrant>,
+    guest: Option<crate::mutation_fest_guest::HeldGuest>,
     common_git: PathBuf,
     git_dir: PathBuf,
     environment: EnvironmentSelection,
@@ -390,6 +393,7 @@ impl Grants {
         }
         disjoint(path, &document.scratch_parent)?;
         let (home, protected) = protected_roots()?;
+        let guest_config = document.python_guest;
         let mut grants = Self {
             git_dir: git_dir.into(),
             environment: environment_selection(),
@@ -403,6 +407,7 @@ impl Grants {
             resources: limits,
             max_wall_seconds: document.max_wall_seconds,
             cargo_workspace: document.cargo_workspace,
+            guest: None,
             control_path: path.into(),
             digest: pin.into(),
             control,
@@ -412,9 +417,23 @@ impl Grants {
             read_files: Vec::new(),
         };
         grants.bind_reads()?;
+        grants.bind_programs(document.programs)?;
+        if let Some(config) = &guest_config {
+            ensure!(
+                grants.cargo_workspace.is_none(),
+                "Fest guest and Cargo workspace grants cannot be combined"
+            );
+            grants.guest = Some(crate::mutation_fest_guest::HeldGuest::capture(
+                config, &grants,
+            )?);
+        }
+        grants.verify()?;
+        Ok(grants)
+    }
+    fn bind_programs(&mut self, programs: BTreeMap<String, Program>) -> Result<()> {
         let mut seen = BTreeSet::new();
         let mut total_bytes = 0u64;
-        for (alias, program) in document.programs {
+        for (alias, program) in programs {
             ensure!(
                 !alias.is_empty()
                     && alias.len() <= 128
@@ -426,7 +445,7 @@ impl Grants {
                 "invalid execution program alias"
             );
             ensure!(
-                grants.allows_program(&program.path),
+                self.allows_program(&program.path),
                 "execution program lacks explicit read grant"
             );
             let held = HeldProgram::capture(program, MAX_TOTAL_PROGRAM_BYTES - total_bytes)?;
@@ -435,10 +454,9 @@ impl Grants {
                 seen.insert((held.identity.dev, held.identity.ino)),
                 "execution program aliases share an inode"
             );
-            grants.tools.insert(alias, held);
+            self.tools.insert(alias, held);
         }
-        grants.verify()?;
-        Ok(grants)
+        Ok(())
     }
     fn bind_reads(&mut self) -> Result<()> {
         let mut total = 0usize;
@@ -484,6 +502,14 @@ impl Grants {
             root == path || self.read_directories.contains(root) && path.starts_with(root)
         })
     }
+    pub(crate) fn fest_guest(&self) -> Result<&crate::mutation_fest_guest::HeldGuest> {
+        self.guest
+            .as_ref()
+            .context("confined Fest requires a pinned private Python guest")
+    }
+    pub(crate) fn has_fest_guest(&self) -> bool {
+        self.guest.is_some()
+    }
     pub(crate) fn digest(&self) -> &str {
         &self.digest
     }
@@ -517,6 +543,9 @@ impl Grants {
         );
         ancestors(&self.control_path)?;
         self.control.verify()?;
+        if let Some(guest) = &self.guest {
+            guest.verify()?;
+        }
         for path in self
             .read_only
             .iter()

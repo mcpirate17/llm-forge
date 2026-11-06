@@ -85,8 +85,17 @@ pub(crate) fn stale_native_contract(
 fn eligible_contract(contract: &serde_json::Value) -> bool {
     contract["source_drifted"] != true
         && contract["generated"] == true
-        && contract["mutation_engine"] == "cargo-mutants"
         && contract["generated_value"].is_null()
+        && (contract["mutation_engine"] == "cargo-mutants" || confined_fest(contract))
+}
+
+/// Only a profile from the verified campaign selects Fest's snapshot hash domain.
+pub(crate) fn confined_fest(contract: &serde_json::Value) -> bool {
+    contract["generated"] == true
+        && contract["generated_value"].is_null()
+        && contract["language"] == "python"
+        && contract["mutation_engine"] == "fest"
+        && contract["execution_profile"] == "fest-confined-v1"
 }
 
 fn eligible_receipt(
@@ -212,7 +221,7 @@ pub(crate) struct WorkspaceRequired {
     pub(crate) pins: BTreeMap<String, String>,
     pub(crate) manifest: String,
 }
-/// Identify workspace contracts by their independently loaded profile, never receipt fields.
+/// Identify complete-snapshot profiles from verified contracts, never receipt fields.
 pub(crate) fn workspace_required_for(
     contracts: &[serde_json::Value],
     receipts: &[conductor_native::mutation_evidence::CapturedReceipt],
@@ -234,7 +243,7 @@ pub(crate) fn workspace_required_for(
         let Some(id) = contract["campaign_id"].as_str() else {
             continue;
         };
-        if !conductor_native::mutation_workspace_selector::is_workspace(
+        if !conductor_native::mutation_cargo_supporting_binding::uses_snapshot_inputs(
             contract["execution_profile"].as_str(),
         ) || !eligible.contains(id)
         {

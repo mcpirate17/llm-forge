@@ -331,3 +331,69 @@ fn generated_receipt_seam_accepts_v3_and_refuses_changed_selected_observation() 
         .iter()
         .any(|e| e.detail.contains("requires a native runner")));
 }
+
+#[test]
+fn generated_receipt_seam_requires_confined_fest_snapshot_and_native_runner() {
+    let (mut campaign, runner, supporting, mut payload) = generated_fixture();
+    campaign.language = "python".into();
+    campaign.mutation_engine = "fest".into();
+    campaign.execution_profile = Some("fest-confined-v1".into());
+    campaign.workspace_selector = None;
+    campaign.source_sha256 = json!({"src/a.py":"e".repeat(64)});
+    campaign.test_sha256 = json!({"tests/test_a.py":"b".repeat(64)});
+    payload.insert("source_sha256".into(), campaign.source_sha256.clone());
+    payload.insert("test_sha256".into(), campaign.test_sha256.clone());
+    payload.insert(
+        "fest_cache".into(),
+        json!({"schema_version":1,"path":"/private/cache",
+        "initially_empty":true,"read_only":true,"removed":true}),
+    );
+    payload.get_mut("mutants").unwrap()[0]["path"] = json!("src/a.py");
+    let evidence = crate::mutation_fest_receipt::attribution_tests::fixture();
+    for key in ["attribution", "fest_attribution_observations", "test_value"] {
+        payload.insert(key.into(), evidence[key].clone());
+    }
+    payload.get_mut("source_coverage").unwrap()["scored_by_source"] = json!({"src/a.py":1});
+    let check =
+        |payload: &Map<String, Value>,
+         identity: Option<&crate::mutation_cargo_supporting_binding::SupportingInputs>| {
+            crate::mutation_receipt::captured_generated_errors_with_installed(
+                payload,
+                &campaign,
+                &runner,
+                |_| Some("e".repeat(64)),
+                |_| false,
+                None,
+                Ok(identity),
+            )
+        };
+    assert!(check(&payload, Some(&supporting)).is_empty());
+    let mut missing_attribution = payload.clone();
+    missing_attribution.remove("fest_attribution_observations");
+    assert!(check(&missing_attribution, Some(&supporting))
+        .iter()
+        .any(|e| e.detail.contains("attribution")));
+    let mut cache_missing = payload.clone();
+    cache_missing.remove("fest_cache");
+    assert!(check(&cache_missing, Some(&supporting))
+        .iter()
+        .any(|e| e.detail.contains("cache")));
+    let mut retained = payload.clone();
+    retained["fest_cache"]["removed"] = json!(false);
+    assert!(check(&retained, Some(&supporting))
+        .iter()
+        .any(|e| e.detail.contains("cleanup")));
+    assert!(check(&payload, None)
+        .iter()
+        .any(|e| e.detail.contains("unavailable")));
+    let mut drift = payload.clone();
+    drift["supporting_inputs"]["digest"] = json!("c".repeat(64));
+    assert!(check(&drift, Some(&supporting))
+        .iter()
+        .any(|e| e.detail.contains("changed")));
+    let mut python = payload;
+    python.insert("runner_kind".into(), json!("python"));
+    assert!(check(&python, Some(&supporting))
+        .iter()
+        .any(|e| e.detail.contains("requires a native runner")));
+}

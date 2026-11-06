@@ -1,6 +1,6 @@
 {
   "schema": "forge.mcp-test-report.evidence.v1",
-  "status": "Live protocol/shutdown/error controls and performance observation independently audited; final committed-tree publication gate pending at index assembly.",
+  "status": "Delivered through PR #213; live controls, observation and full committed-tree publication gate passed with documented limits.",
   "scope": "Operator-enabled fixed-root native Python import report through MCP. Authored repository correctness and lifecycle evidence; no external-client or agent-productivity claim.",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/212",
   "implementation": {
@@ -397,7 +397,21 @@
         "sha256": "0278695aadb2ddf7e9165b1c2e7309e805ddf1c7920316fa0656a54db2a4da89"
       }
     ],
-    "full_publication_gate": "pending for final committed tree",
+    "full_publication_gate": {
+      "status": "PASS",
+      "checks": 18,
+      "receipt": ".git/forge-checks/run-1793966537591557795-2199119/receipt.json",
+      "receipt_sha256": "a3643b96aaeda6e5334f5e93057dad53ffd9d2be8de5b95f321cb19e6da6ac60",
+      "test_executions": {
+        "harnesses": 182,
+        "passed": 4907,
+        "failed": 0,
+        "ignored": 197
+      },
+      "count_scope": "Test execution totals; duplicate cases in separate feature matrices counted separately. Opt-in live controls were run separately.",
+      "local_verify": "PASS before publication and after fresh origin/main fetch",
+      "checked_head": "bbffed41b76061419219f872786dae6321cc092a"
+    },
     "shutdown_all_target_clippy": "PASS",
     "shutdown_debug_integration_compile": "PASS",
     "production_paths_unchanged_since_measured_release": true
@@ -410,5 +424,13 @@
   "synthetic_worker_exit7": {
     "path": ".git/forge-212-shutdown-synthetic-binary.json",
     "sha256": "8642bc50e268a84e0eb8c0adfd4ce7106e9534894e45193ba49ee3ee34c0a82d"
+  },
+  "publication": {
+    "pull_request": "https://github.com/mcpirate17/llm-forge/pull/213",
+    "merged_head": "9299baae5672ed748aeb2c81ffe7014f76ddf6ba",
+    "checked_and_merged_tree": "7711691d17748b41649ec329c3c6a8f4624cf2f1",
+    "merged_at": "2026-11-06T12:15:35Z",
+    "owned_branch_retired": true,
+    "shared_install_or_host_adoption": false
   }
 }
