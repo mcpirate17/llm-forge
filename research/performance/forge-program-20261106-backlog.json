@@ -1,0 +1,384 @@
+{
+  "schema_version": 1,
+  "kind": "native_equivalence_backlog",
+  "date": "2026-11-06",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/218",
+  "status": "clean_release_parity_and_matched_preview_measurements_passed_full_gate_pending",
+  "base_commit": "ac7e415108312df989ac12d5bad4797b91d7308e",
+  "scope": "Native configuration/discovery/folding/publication/explicit consumption. The existing Python gate remains the first Make step. No probe engine or model launched.",
+  "verification": {
+    "shared_fold_tests_passed": 9,
+    "backlog_tests_passed": 17,
+    "publisher_tests_passed": 13,
+    "host_config_tests_passed": 1,
+    "actual_cli_and_make_tests_passed": 2,
+    "strict_forge_clippy": "PASS after permission hardening",
+    "independent_review": "Pure fold and paired publisher independently reviewed. Future output/discovery namespace alias fixed with regression; aggregate bound enforced before reading. Read-only repository bindings now upgrade affected files/directories to strict mutation permissions before staging and replacement/removal; independent hardening review found no blocker.",
+    "parity_scenarios_passed": 11,
+    "parity": {
+      "root": "/home/tim/Projects/llm-forge/.git/backlog-parity-64bn_w38",
+      "summary": "/home/tim/Projects/llm-forge/.git/backlog-parity-64bn_w38/summary.json",
+      "sha256": "efcc203dd014fe50f54530cda918df70214160168ed75679f0846cceaec04502"
+    },
+    "full_local_check": "PENDING",
+    "local_verify": "PENDING",
+    "initial_parity_independent_audit": {
+      "path": ".git/forge-backlog-parity-independent.json",
+      "sha256": "412d413c643197a9461343a6841ea1fe208276939597beb8c171978bce756858"
+    },
+    "initial_dirty_debug_parity": {
+      "root": "/home/tim/Projects/llm-forge/.git/backlog-parity-cnwi2b4r",
+      "summary": "/home/tim/Projects/llm-forge/.git/backlog-parity-cnwi2b4r/summary.json",
+      "sha256": "35ee59e07df1faefa78394b9726f1561ca1b1736accea609b3e26b59d86980db"
+    },
+    "release_parity_scenarios_passed": 11,
+    "independent_release_audit": {
+      "status": "PASS",
+      "path": ".git/forge-backlog-release-independent.json",
+      "sha256": "99e3962bcfb9d869d57e2cc622ad1e22ddbc6404050f5dc72af99fe87439f79a",
+      "scope": "Recomputed eight receipt seals, all source/input/runtime pins, 80 scored samples and16warmups, 96 complete report outputs, 11 parity scenarios/28commands and unchanged fixture inputs."
+    }
+  },
+  "original_comparator": {
+    "root": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601",
+    "source_commit": "ac7e415108312df989ac12d5bad4797b91d7308e",
+    "source_tree": "525a7191daa26370996f205afb52449402790c46",
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "python": "Python 3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "python_executable": "/home/tim/Projects/LLM/.venv/bin/python",
+    "started_at": 1793987906.6779728,
+    "builds": {
+      "slop-core": {
+        "command": [
+          "cargo",
+          "+1.98.0",
+          "build",
+          "--release",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "2",
+          "--manifest-path",
+          "native/slop-core/Cargo.toml",
+          "--lib",
+          "--features",
+          "extension-module",
+          "--target-dir",
+          "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/slop-core-target"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 39.68006538899499,
+        "log": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/slop-core.log",
+        "binary": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/slop_core.so",
+        "sha256": "366d2d3c9aa997190c8405edd7620572b83466febdd064d9bf17e9e2e4cdce76"
+      },
+      "conductor-native": {
+        "command": [
+          "cargo",
+          "+1.98.0",
+          "build",
+          "--release",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "2",
+          "--manifest-path",
+          "native/conductor-native/Cargo.toml",
+          "--lib",
+          "--features",
+          "extension-module,bundled-sqlite",
+          "--target-dir",
+          "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/conductor-native-target"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 153.4319116199913,
+        "log": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/conductor-native.log",
+        "binary": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor_native.so",
+        "sha256": "950127c2e8e3981b8f77f3f2167799c906879f910eae36bf43e1d31bdae5d557"
+      }
+    },
+    "import_probe": {
+      "conductor_native": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor_native.so",
+      "slop_core": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/slop_core.so",
+      "wrapper": "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor/equivalence_gate.py",
+      "torch_imported": false,
+      "backlog_callable": true,
+      "config_callable": true
+    },
+    "finished_at": 1793988060.1660187,
+    "wrapper_sha256": {
+      "equivalence_gate.py": "f8bc186fcdf2cb68519c408b06fdab6b0dced06a80bd1176f7d9799e77670585",
+      "_native.py": "cb53ff8d66fb94053f0527525818643da06477f71c8917976e0dd268aa185e76"
+    }
+  },
+  "measurements": {
+    "status": "PASS",
+    "scope": "Two authored previews, counterbalanced ABBA/BAAB block order. 20 scored +4 warmups per arm/workload,96 matching complete report outputs, fresh processes with warmed caches. Includes sh startup. No cold-cache, allocation, model-token/cost, probe or agent-task claim.",
+    "summary": {
+      "root": "/home/tim/Projects/llm-forge/.git/backlog-measure-iix7x04g",
+      "summary": "/home/tim/Projects/llm-forge/.git/backlog-measure-iix7x04g/summary.json",
+      "sha256": "16a94bb42da541835c5edd5aa82008919aca64be1fc40c0073674824b4931a40"
+    },
+    "cases": [
+      {
+        "name": "small",
+        "findings": 10,
+        "summary_bytes": 1747,
+        "aggregate": {
+          "python": {
+            "scored_samples": 20,
+            "warmups": 4,
+            "p50_ms": 30.254153,
+            "p95_ms": 34.050482,
+            "cpu_p50_ms": 28.844,
+            "max_rss_bytes": 28274688
+          },
+          "native": {
+            "scored_samples": 20,
+            "warmups": 4,
+            "p50_ms": 2.01924,
+            "p95_ms": 2.139141,
+            "cpu_p50_ms": 1.569,
+            "max_rss_bytes": 19054592
+          }
+        },
+        "native_over_python_p50": 0.06674257249905492,
+        "receipts": [
+          {
+            "arm": "python",
+            "block": 0,
+            "receipt": "research/performance/forge-program-20261106-backlog-small-0-python-receipt.json",
+            "sha256": "64a03793126867779cc322fb206712b66c4e39817c8d7fb427c8ab6416455a3e",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989669981380733-2689643",
+            "verified_outputs": 12
+          },
+          {
+            "arm": "native",
+            "block": 1,
+            "receipt": "research/performance/forge-program-20261106-backlog-small-1-native-receipt.json",
+            "sha256": "6e3ee8472a8c4a26efa14e9b9e7f753cd6dc152f7658f6a2df4b19fd9ffd4f79",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989670388563029-2689707",
+            "verified_outputs": 12
+          },
+          {
+            "arm": "native",
+            "block": 2,
+            "receipt": "research/performance/forge-program-20261106-backlog-small-2-native-receipt.json",
+            "sha256": "848cc341307371513e12112a11ff42b5a5b50968d169fe78dc1233087cc9a5b4",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989670431701257-2689768",
+            "verified_outputs": 12
+          },
+          {
+            "arm": "python",
+            "block": 3,
+            "receipt": "research/performance/forge-program-20261106-backlog-small-3-python-receipt.json",
+            "sha256": "bb324c1037617dbd1bd3d013937d75fcdef8f1c96ee14b568a37312a7882c30e",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989670472247822-2689829",
+            "verified_outputs": 12
+          }
+        ],
+        "unchanged_inputs": {
+          "pyproject.toml": "a3c7cbaa961f429d4ae147915fd273bb2423d0caedaa85a1bfa2c29874bf2935",
+          "summary.json": "b0fd6dd914acb54e0d90ef45d30e5d08ea130fc783f9f241a5f8dcaa2b0b82b5"
+        }
+      },
+      {
+        "name": "larger",
+        "findings": 1000,
+        "summary_bytes": 154029,
+        "aggregate": {
+          "python": {
+            "scored_samples": 20,
+            "warmups": 4,
+            "p50_ms": 32.058042,
+            "p95_ms": 34.369043000000005,
+            "cpu_p50_ms": 30.664,
+            "max_rss_bytes": 30826496
+          },
+          "native": {
+            "scored_samples": 20,
+            "warmups": 4,
+            "p50_ms": 5.300376,
+            "p95_ms": 6.275392,
+            "cpu_p50_ms": 4.82,
+            "max_rss_bytes": 22269952
+          }
+        },
+        "native_over_python_p50": 0.165336859936736,
+        "receipts": [
+          {
+            "arm": "native",
+            "block": 0,
+            "receipt": "research/performance/forge-program-20261106-backlog-larger-0-native-receipt.json",
+            "sha256": "4b407546ded44ed92f48ac2bb7124d59549977f6527c265f3ca3d1908e03afde",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989670854556993-2689890",
+            "verified_outputs": 12
+          },
+          {
+            "arm": "python",
+            "block": 1,
+            "receipt": "research/performance/forge-program-20261106-backlog-larger-1-python-receipt.json",
+            "sha256": "71b7a4b491270c1c09def0b5cfcfe931c6cdfffba1f41dc72cb4122be181ef99",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989670939770573-2689951",
+            "verified_outputs": 12
+          },
+          {
+            "arm": "python",
+            "block": 2,
+            "receipt": "research/performance/forge-program-20261106-backlog-larger-2-python-receipt.json",
+            "sha256": "b35136f81de698ac2659326db1f5e38f657113175289dd76dc0ff0c2bd381d24",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989671353347091-2690012",
+            "verified_outputs": 12
+          },
+          {
+            "arm": "native",
+            "block": 3,
+            "receipt": "research/performance/forge-program-20261106-backlog-larger-3-native-receipt.json",
+            "sha256": "f57402b053be298bd543301207ea5da93370b00be980cf682f4e95c319597d19",
+            "raw_logs": "/home/tim/Projects/llm-forge/.git/forge-performance/run-1793989671761458912-2690073",
+            "verified_outputs": 12
+          }
+        ],
+        "unchanged_inputs": {
+          "pyproject.toml": "a3c7cbaa961f429d4ae147915fd273bb2423d0caedaa85a1bfa2c29874bf2935",
+          "summary.json": "b1c77f0c1302fa479ef408d1df03c34d9e3e62c8bdc2916a0fe708cccd772bab"
+        }
+      }
+    ],
+    "completed_benchmark_blocks": 8,
+    "failed_benchmark_blocks": 0,
+    "censored_or_unstarted_blocks": 0,
+    "scored_executions": 80,
+    "warmup_executions": 16,
+    "runtime_pins": {
+      "/tmp/forge-backlog-release-v2-018b148-0c7y73e4/bin/forge": "647e60082352fbee5319bb0dfa043303e40a6708478aac3932532b2ed93d46fa",
+      "/home/tim/Projects/LLM/.venv/bin/python": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+      "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/slop_core.so": "366d2d3c9aa997190c8405edd7620572b83466febdd064d9bf17e9e2e4cdce76",
+      "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor_native.so": "950127c2e8e3981b8f77f3f2167799c906879f910eae36bf43e1d31bdae5d557",
+      "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor/equivalence_gate.py": "f8bc186fcdf2cb68519c408b06fdab6b0dced06a80bd1176f7d9799e77670585",
+      "/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python/conductor/_native.py": "cb53ff8d66fb94053f0527525818643da06477f71c8917976e0dd268aa185e76"
+    },
+    "runtime_pin_scope": "Python executable and frozen wrapper/extensions plus candidate binary rehashed before and after measurement.",
+    "aggregate_percentile_definition": "Nearest rank: sorted samples[ceil(n*p)-1], n=20 per arm/workload; raw per-block recorder summaries are retained unchanged."
+  },
+  "retained_attempts": [
+    {
+      "log": ".git/forge-backlog-focused1.log",
+      "passed": 4,
+      "failed": 9,
+      "cause": "Authored test summaries omitted required schema fields. Fixtures repaired using complete Summary serialization; production parser unchanged."
+    },
+    {
+      "log": ".git/forge-backlog-focused3.log",
+      "passed": 16,
+      "failed": 1,
+      "cause": "Positive external-output fixture inherited group-writable temporary directory mode. Fixture now explicitly0700; strict production admission preserved."
+    },
+    {
+      "binary": {
+        "scope": "clean release build/private install; no shared installation or adoption",
+        "binary": "/tmp/forge-backlog-release-1949709-bp2c4xcm/bin/forge",
+        "sha256": "a2d1f66e2d8439357e841faeb400ac90dfeb2f9426bb91080c9b3bc9d5789c0f",
+        "identity": {
+          "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+          "compiled_git_commit": "1949709d0afac857b44fb8a35b46c951a723405f",
+          "compiled_source_sha256": "413d33f15f2a7b6fe8f9ec85bf4684736e9cd65035a964761b30e5717ca53827",
+          "executable_sha256": "a2d1f66e2d8439357e841faeb400ac90dfeb2f9426bb91080c9b3bc9d5789c0f"
+        },
+        "head": "1949709d0afac857b44fb8a35b46c951a723405f",
+        "tree": "c3e0edd737d139dc7d191973e0acd3867ba8e044",
+        "source_clean": true,
+        "bytes": 54971176,
+        "nlink": 1,
+        "elapsed_seconds": 229.1959969997406,
+        "build_log_sha256": "3800fbbf3b14bc8f4b6b6d59884c65ba6a688a4b2f63d277bfd55d07b176d5e8",
+        "argv": [
+          "cargo",
+          "+1.98.0",
+          "install",
+          "--jobs",
+          "2",
+          "--offline",
+          "--locked",
+          "--path",
+          "native/forge-cli",
+          "--root",
+          "/tmp/forge-backlog-release-1949709-bp2c4xcm",
+          "--target-dir",
+          "/home/tim/Projects/llm-forge/native/forge/target"
+        ]
+      },
+      "disposition": "Clean1949709 release retained but not accepted or benchmarked: subsequent permission review identified a destructive-path group-write gap, now hardened. New release required."
+    }
+  ],
+  "limitations": [
+    "Two output replacements are not transactional; partial states are explicit and artifacts retained on publication failure.",
+    "Same-UID hostile writes are outside cooperative-parent guarantee.",
+    "Intentional differences: preview default, explicit apply/consume, owned normalized paths/output parents, external-output explicit flags, bounded strict JSON, one coherent clock instant.",
+    "Owned authored fixture/Make stub evidence is not real guest or agent-task evidence.",
+    "Read-only shared repository inputs remain allowed; destructive output/artifact parents and existing affected leaves reject group/world write access. Trusted ancestors remain required.",
+    "Initial functional comparison used a dirty debug binary; final parity and measured workloads use clean018b148. Neither establishes actual-client adoption or end-to-end agent effectiveness."
+  ],
+  "next_priority_issue": "https://github.com/mcpirate17/llm-forge/issues/219",
+  "implementation_release": {
+    "scope": "clean release build/private install; no shared installation or adoption",
+    "binary": "/tmp/forge-backlog-release-v2-018b148-0c7y73e4/bin/forge",
+    "sha256": "647e60082352fbee5319bb0dfa043303e40a6708478aac3932532b2ed93d46fa",
+    "identity": {
+      "schema_version": "llm.mutation-testing.native-runner-pin.v1",
+      "compiled_git_commit": "018b1481224ebe2cee8569cff997130e606fb49a",
+      "compiled_source_sha256": "7096826ef1dc9cfa4ea3354993f5b096099557d2e8b8620608041d75146516ab",
+      "executable_sha256": "647e60082352fbee5319bb0dfa043303e40a6708478aac3932532b2ed93d46fa"
+    },
+    "head": "018b1481224ebe2cee8569cff997130e606fb49a",
+    "tree": "e8f7ac05cf8baa9a7b8168a07cf8f1737034ea7f",
+    "source_clean": true,
+    "bytes": 54972680,
+    "nlink": 1,
+    "elapsed_seconds": 176.47131061553955,
+    "build_log_sha256": "cb9ac004d8b9ba9b309f9da3fca9f8ab7f9d7b6167a58ce31414fbb16729131e",
+    "argv": [
+      "cargo",
+      "+1.98.0",
+      "install",
+      "--jobs",
+      "2",
+      "--offline",
+      "--locked",
+      "--path",
+      "native/forge-cli",
+      "--root",
+      "/tmp/forge-backlog-release-v2-018b148-0c7y73e4",
+      "--target-dir",
+      "/home/tim/Projects/llm-forge/native/forge/target"
+    ]
+  },
+  "fixture_recipe": {
+    "configuration": "[tool.forge.test_record]\nstore='r'\n[tool.forge.equivalence_probe]\nledger='ledger.json'\nreport='report.md'\n",
+    "summary": {
+      "modules_probed": 1,
+      "measured": [
+        {
+          "module": "subject.py",
+          "units": null
+        }
+      ],
+      "modules_without_drivers": [],
+      "modules_index_driven": [],
+      "blocking": [],
+      "advisory": "For i in 0..N: module=subject.py, qualname=function_<i>, verdict=NO_DIFFERENCE_OBSERVED, rule=drop_clamp, lineno=i+1, description=removed; N=10 or1000",
+      "untested": [],
+      "unreached": [],
+      "incomplete": [],
+      "unmeasured": [],
+      "live": 0
+    },
+    "serialization": "Python3.12 json.dumps with default separators, insertion order shown, plus newline; actual input SHA256 and lengths recorded per case. Missing ledger/report before every read-only sample.",
+    "commands": {
+      "original": "PYTHONPATH=<captured-prefix> PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PATH= exec <pinned-python> -m conductor.equivalence_gate backlog <summary> --root <fixture> --dry-run",
+      "native": "PATH= exec <pinned-forge> equivalence backlog <summary> --root <fixture> --dry-run",
+      "recorder": "<pinned-forge> performance benchmark --command <arm-command> --samples 10 --warmups 2 --timeout-seconds 10 --output <receipt> with exact --source and --input pins listed in receipts; RUSTUP_TOOLCHAIN=1.98.0"
+    },
+    "order": "small Python/native/native/Python; larger native/Python/Python/native. Complete normalized report equality checks only interval-bounded generated minute. Every fixture input hash unchanged."
+  }
+}

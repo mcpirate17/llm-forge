@@ -147,7 +147,7 @@ pub mod vector_index;
 // Test selection reads the record, so these two build without Python too; the rest of
 // each serves the Python recorder.
 #[cfg_attr(not(feature = "python"), allow(dead_code))]
-mod test_record_config;
+pub mod test_record_config;
 #[cfg(feature = "source-analysis")]
 #[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod test_record_digest;

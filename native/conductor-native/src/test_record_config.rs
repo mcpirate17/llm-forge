@@ -8,19 +8,30 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Table {
+pub struct Table {
     /// The SQLite record: absolute, `~/`-rooted, or relative to the declaring directory.
-    store: String,
+    pub store: String,
     /// Per-line hits feed coverage. Off records executed files only.
     #[serde(default = "enabled")]
-    lines: bool,
+    pub lines: bool,
     /// Environment variables whose values a test result depends on.
     #[serde(default)]
-    environment: Vec<String>,
+    pub environment: Vec<String>,
 }
 
 fn enabled() -> bool {
     true
+}
+
+/// Parse a captured host document without performing filesystem reads.
+pub fn parse_document(doc: &toml::Value) -> Result<Option<Table>, String> {
+    doc.get("tool")
+        .and_then(|tool| tool.get("forge"))
+        .and_then(|forge| forge.get("test_record"))
+        .cloned()
+        .map(toml::Value::try_into::<Table>)
+        .transpose()
+        .map_err(|error| format!("[tool.forge.test_record]: {error}"))
 }
 
 /// The nearest `pyproject.toml` at or above `start` that declares the table. A
@@ -34,23 +45,17 @@ fn find(start: &Path) -> Result<Option<(PathBuf, Table)>, String> {
         };
         let doc: toml::Value =
             toml::from_str(&raw).map_err(|error| format!("{}: {error}", path.display()))?;
-        let Some(table) = doc
-            .get("tool")
-            .and_then(|tool| tool.get("forge"))
-            .and_then(|forge| forge.get("test_record"))
+        let Some(table) =
+            parse_document(&doc).map_err(|error| format!("{} {error}", path.display()))?
         else {
             continue;
         };
-        let table = table
-            .clone()
-            .try_into::<Table>()
-            .map_err(|error| format!("{} [tool.forge.test_record]: {error}", path.display()))?;
         return Ok(Some((dir.to_path_buf(), table)));
     }
     Ok(None)
 }
 
-fn store_path(root: &Path, store: &str, home: Option<&str>) -> Result<PathBuf, String> {
+pub fn store_path(root: &Path, store: &str, home: Option<&str>) -> Result<PathBuf, String> {
     match store.strip_prefix("~/") {
         Some(rest) => home
             .map(|home| Path::new(home).join(rest))

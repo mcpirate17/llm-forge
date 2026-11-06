@@ -95,6 +95,16 @@ pub struct DirectoryBinding {
 }
 
 impl DirectoryBinding {
+    /// Upgrade a captured read binding to the same write-permission boundary as
+    /// `open`, without reopening or losing the captured directory identity.
+    pub(crate) fn verify_mutation(&self) -> Result<()> {
+        ensure!(
+            self.identity.mode & 0o022 == 0,
+            "mutation directory must not be group or world writable"
+        );
+        self.verify()
+    }
+
     pub fn open(path: &Path, snapshot_exclusion: Option<&Path>) -> Result<Self> {
         Self::open_mode(path, snapshot_exclusion, 0o022)
     }
@@ -247,6 +257,36 @@ fn capture(
 }
 
 impl BoundFile {
+    /// Mutating an observed leaf requires exclusive operator ownership, even
+    /// when read-only repository observation originally permitted group writes.
+    pub(crate) fn verify_mutation(&self) -> Result<()> {
+        self.parent.verify_mutation()?;
+        ensure!(
+            self.stamp.identity.uid == unsafe { libc::geteuid() }
+                && self.stamp.identity.mode & 0o022 == 0,
+            "mutation input must be owned and not group or world writable"
+        );
+        self.verify()
+    }
+
+    /// Consume this exact captured leaf through its held parent after revalidation.
+    /// Cooperative parent ownership is required, as for report publication.
+    pub(crate) fn consume(&self) -> Result<()> {
+        self.verify_mutation()?;
+        self.parent
+            .dir
+            .remove_file(&self.name)
+            .context("remove captured input")
+    }
+
+    pub(crate) fn sync_parent(&self) -> Result<()> {
+        self.parent
+            .dir
+            .open(".")?
+            .sync_all()
+            .context("sync captured input directory")
+    }
+
     pub(crate) fn verify_external_pin(&self, path: &Path, sha256: &str) -> Result<()> {
         canonical(path)?;
         ensure!(

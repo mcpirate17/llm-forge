@@ -1,0 +1,86 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1793989670,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "018b1481224ebe2cee8569cff997130e606fb49a",
+    "source_files": {
+      "native/conductor-native/src/test_record_config.rs": "ceaba2613392dd6d0460c61e0c253ee74898f830e34686b5572c4fb6e29c73cf",
+      "native/forge/Cargo.lock": "a40a856c4603e78fa2dcce537202bbcf17a87bc02978450a1e41df1cb91e1a4d",
+      "native/forge/src/candidate_inputs.rs": "7808532ebf42eb634c6192a880ac1fa3780f39727c54b487fd0c4a3cdc8e22f5",
+      "native/forge/src/candidate_report_store.rs": "92fafbdfa47049572372bd3efdaa30e902d9c1148c4ff6fec64bb0d57c152e51",
+      "native/forge/src/equivalence_backlog.rs": "68ade692d7278be92ec6759af59af41725e3c6580eea3a5b8a660dd5c8ea0f50",
+      "native/forge/src/equivalence_backlog_inputs.rs": "2d6fc425e7f8a6513758a58c335939e98a79812e82014042e016620e157de9cb",
+      "native/forge/src/main.rs": "af7e03beb90a42147976ed46f3931865f15524911bc2a874421252e34d579a3a",
+      "native/slop-core/Cargo.lock": "4d14e160a8a6c828a473e09835b376b6de33eaf9e203d60459a873e59852ed23",
+      "native/slop-core/src/backlog.rs": "2ca580fab3ae039a11df2c0ba979d67ad53dd4566606ebc4d945f73f2c195972",
+      "src/conductor/equivalence_gate.py": "f8bc186fcdf2cb68519c408b06fdab6b0dced06a80bd1176f7d9799e77670585"
+    },
+    "command": "PATH= PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/tmp/forge-backlog-baseline-ac7e415-xv8xg601/python exec /home/tim/Projects/LLM/.venv/bin/python -m conductor.equivalence_gate backlog /home/tim/Projects/llm-forge/.git/backlog-measure-iix7x04g/small/summary.json --root /home/tim/Projects/llm-forge/.git/backlog-measure-iix7x04g/small --dry-run",
+    "workload_sha256": "6389407e63372a8b1809566087c6ea1acaba5acae3f3357d4ab75113faa9b26d",
+    "environment_sha256": "f147fc97f14865d4033a32479cd43bd0b2f318906997801f4aabc04a9c0a6ae1",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "warmups": 2,
+    "timeout_seconds": 10
+  },
+  "samples": [
+    {
+      "wall_ms": 31.181227,
+      "cpu_ms": 29.765,
+      "max_rss_bytes": 27619328
+    },
+    {
+      "wall_ms": 30.254153,
+      "cpu_ms": 28.844,
+      "max_rss_bytes": 28229632
+    },
+    {
+      "wall_ms": 30.803296,
+      "cpu_ms": 29.402,
+      "max_rss_bytes": 27652096
+    },
+    {
+      "wall_ms": 31.347748000000003,
+      "cpu_ms": 29.928,
+      "max_rss_bytes": 27979776
+    },
+    {
+      "wall_ms": 32.362344,
+      "cpu_ms": 30.966,
+      "max_rss_bytes": 27398144
+    },
+    {
+      "wall_ms": 31.80081,
+      "cpu_ms": 30.388,
+      "max_rss_bytes": 27992064
+    },
+    {
+      "wall_ms": 34.050482,
+      "cpu_ms": 32.569,
+      "max_rss_bytes": 27672576
+    },
+    {
+      "wall_ms": 34.002962,
+      "cpu_ms": 32.632,
+      "max_rss_bytes": 27660288
+    },
+    {
+      "wall_ms": 33.343699,
+      "cpu_ms": 31.994,
+      "max_rss_bytes": 27992064
+    },
+    {
+      "wall_ms": 34.085322,
+      "cpu_ms": 32.649,
+      "max_rss_bytes": 27938816
+    }
+  ],
+  "summary": {
+    "p50_ms": 31.80081,
+    "p95_ms": 34.085322,
+    "cpu_p50_ms": 30.388,
+    "max_rss_bytes": 28229632
+  },
+  "receipt_sha256": "6dfcc10cd1b7a130b24d2d6063f47815e4db562d6a8f45fb257018f0cc50b444"
+}

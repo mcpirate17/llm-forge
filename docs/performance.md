@@ -4,13 +4,13 @@
 
 This is the canonical performance and effectiveness report; current mission status
 and ordered continuation are in [the roadmap](roadmap.md#current-mission-checkpoint--2026-11-05).
-Source baseline is `9117c2fb6436251d0de50038db85ef7fbb81e4b3`; the repair landed in
-[PR #185](https://github.com/mcpirate17/llm-forge/pull/185). Pre-change observations,
-repaired working-tree measurements and matched binary comparisons are separated
-below. They do not certify the eventual PR head or installed runtime. Test and
-publication status are in the current [engineering status](roadmap.md).
+Historical source baseline `9117c2fb6436251d0de50038db85ef7fbb81e4b3` was repaired in [PR #185](https://github.com/mcpirate17/llm-forge/pull/185).
+Pre-change, working-tree and matched binary measurements remain distinct; none certifies a later PR head or installed runtime. See [publication status](roadmap.md).
 
 Confined Mull: [validated controls and observational cost](../research/performance/forge-program-20261106-confined-mull.json), [refresh evidence](../research/performance/forge-program-20261106-mull-refresh.json), [scope and reproduction](mutation-mull.md); no matched speedup or agent-benefit result.
+
+Native backlog release `018b148`: Python/native preview p50 was **30.25/2.02 ms** for ten findings and **32.06/5.30 ms** for 1,000. All 96 reports matched after timestamp checks, with unchanged inputs.
+Counterbalanced warmed-cache runs scored 20 samples per arm/workload; shell startup is included. [Receipts, p95, CPU/RSS and comparator provenance](../research/performance/forge-program-20261106-backlog.json) are retained; no cold-cache, model-cost or agent-task gain is claimed.
 
 ### Confined MCP test report — 2026-11-06
 

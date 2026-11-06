@@ -29,17 +29,15 @@ struct Stored {
     items: Vec<Item>,
 }
 
-/// The ledger's items; a missing or empty file is an empty ledger.
-fn load(path: &Path) -> anyhow::Result<Vec<Item>> {
-    let text = match std::fs::read_to_string(path) {
-        Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(error).with_context(|| path.display().to_string()),
+fn load_captured(bytes: Option<&[u8]>) -> anyhow::Result<Vec<Item>> {
+    let Some(bytes) = bytes else {
+        return Ok(Vec::new());
     };
+    let text = std::str::from_utf8(bytes)?;
     if text.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let stored: Stored = serde_json::from_str(&text).with_context(|| path.display().to_string())?;
+    let stored: Stored = serde_json::from_str(text)?;
     Ok(stored.items)
 }
 
@@ -144,8 +142,8 @@ struct Backlog<'l> {
     items: &'l [Item],
 }
 
-fn render(backlog: &Backlog) -> String {
-    let now = DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M UTC");
+fn render(backlog: &Backlog, now: SystemTime) -> String {
+    let now = DateTime::<Utc>::from(now).format("%Y-%m-%d %H:%M UTC");
     let ledger_modules: BTreeSet<&str> = backlog
         .items
         .iter()
@@ -230,17 +228,17 @@ fn merged(previous: &[Item], folded: &Folded, items: &[Item]) -> Vec<Item> {
     out
 }
 
-fn save(path: &Path, items: &[Item], measured: &[Measured]) -> anyhow::Result<()> {
+fn ledger_text(items: &[Item], measured: &[Measured], now: SystemTime) -> anyhow::Result<String> {
     let scope: BTreeSet<&str> = items.iter().map(|item| item.module.as_str()).collect();
     let payload = json!({
         "schema_version": SCHEMA_VERSION,
-        "generated_at": DateTime::<Utc>::from(SystemTime::now()).to_rfc3339(),
+        "generated_at": DateTime::<Utc>::from(now).to_rfc3339(),
         // Every module the ledger speaks for, and, apart, what this fold measured.
         "scope": scope,
         "last_sweep_scope": measured,
         "items": items,
     });
-    write(path, &(serde_json::to_string_pretty(&payload)? + "\n"))
+    Ok(serde_json::to_string_pretty(&payload)? + "\n")
 }
 
 fn write(path: &Path, text: &str) -> anyhow::Result<()> {
@@ -250,24 +248,42 @@ fn write(path: &Path, text: &str) -> anyhow::Result<()> {
     std::fs::write(path, text).with_context(|| path.display().to_string())
 }
 
-/// Fold the summaries at `paths` into the ledger at `ledger` and write the report to
-/// `report`; with `dry_run`, write nothing and return the report.
-pub fn backlog(
-    paths: &[String],
-    ledger_path: &Path,
-    report: &Path,
-    dry_run: bool,
-) -> anyhow::Result<String> {
-    let summaries = paths
-        .iter()
-        .map(|path| {
-            let text = std::fs::read_to_string(path).with_context(|| path.clone())?;
-            serde_json::from_str::<Summary>(&text).with_context(|| path.clone())
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-    let folded = fold(&summaries)?;
+/// A complete fold over caller-captured inputs, ready for publication.
+pub struct FoldOutput {
+    pub report: String,
+    pub ledger: String,
+    pub findings: usize,
+    pub items: usize,
+    pub new: usize,
+    pub carried: usize,
+    pub fixed: usize,
+}
+
+impl FoldOutput {
+    pub fn status(&self, report: &Path, ledger: &Path) -> String {
+        format!(
+            "{} findings -> {} items ({} new, {} carried, {} fixed)\n  {}\n  {}",
+            self.findings,
+            self.items,
+            self.new,
+            self.carried,
+            self.fixed,
+            report.display(),
+            ledger.display()
+        )
+    }
+}
+
+/// Fold captured inputs without I/O. Both artifacts use the same supplied clock
+/// instant; the path adapter previously sampled the clock separately for each.
+pub fn fold_captured(
+    summaries: &[Summary],
+    previous_ledger: Option<&[u8]>,
+    now: SystemTime,
+) -> anyhow::Result<FoldOutput> {
+    let folded = fold(summaries)?;
     let items = ledger::aggregate(&folded.findings);
-    let previous = load(ledger_path)?;
+    let previous = load_captured(previous_ledger)?;
     let known: Vec<String> = previous
         .iter()
         .filter(|item| folded.speaks_for(&item.module, &item.qualname))
@@ -289,22 +305,45 @@ pub fn backlog(
         carried: diff.carried,
         items: &all,
     };
-    let text = render(&backlog);
+    Ok(FoldOutput {
+        report: render(&backlog, now),
+        ledger: ledger_text(&all, &folded.measured, now)?,
+        findings: folded.findings.len(),
+        items: items.len(),
+        new: backlog.new.len(),
+        carried: backlog.carried.len(),
+        fixed: backlog.fixed.len(),
+    })
+}
+
+/// Fold the summaries at `paths` into the ledger at `ledger` and write the report to
+/// `report`; with `dry_run`, write nothing and return the report.
+pub fn backlog(
+    paths: &[String],
+    ledger_path: &Path,
+    report: &Path,
+    dry_run: bool,
+) -> anyhow::Result<String> {
+    let summaries = paths
+        .iter()
+        .map(|path| {
+            let text = std::fs::read_to_string(path).with_context(|| path.clone())?;
+            serde_json::from_str::<Summary>(&text).with_context(|| path.clone())
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let previous = match std::fs::read(ledger_path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error).with_context(|| ledger_path.display().to_string()),
+    };
+    let output = fold_captured(&summaries, previous.as_deref(), SystemTime::now())
+        .with_context(|| ledger_path.display().to_string())?;
     if dry_run {
-        return Ok(text);
+        return Ok(output.report);
     }
-    write(report, &text)?;
-    save(ledger_path, &all, &folded.measured)?;
-    Ok(format!(
-        "{} findings -> {} items ({} new, {} carried, {} fixed)\n  {}\n  {}",
-        folded.findings.len(),
-        items.len(),
-        backlog.new.len(),
-        backlog.carried.len(),
-        backlog.fixed.len(),
-        report.display(),
-        ledger_path.display()
-    ))
+    write(report, &output.report)?;
+    write(ledger_path, &output.ledger)?;
+    Ok(output.status(report, ledger_path))
 }
 
 /// Fold gate summaries (the JSON files at `summaries`) into the ledger and report.

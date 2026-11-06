@@ -170,3 +170,198 @@ fn guard_runs_once_after_staging_under_lock_and_failure_preserves_destination() 
         );
     }
 }
+
+fn paired_fixture(root: &Fixture) -> (std::path::PathBuf, std::path::PathBuf) {
+    let first = root.0.join("report");
+    let second = root.0.join("ledger");
+    fs::write(&first, b"old report").unwrap();
+    fs::write(&second, b"old ledger").unwrap();
+    (first, second)
+}
+
+#[test]
+fn paired_same_parent_stages_both_under_one_lock_before_guard() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    let mut calls = 0;
+    publish_pair_checked((&first, b"new report"), (&second, b"new ledger"), || {
+        calls += 1;
+        assert_eq!(fs::read(&first)?, b"old report");
+        assert_eq!(fs::read(&second)?, b"old ledger");
+        assert_eq!(fs::read_dir(&root.0)?.count(), 4);
+        assert!(crate::file_lock::Exclusive::try_new(
+            fs::File::open(&root.0)?,
+            "contending pair publisher"
+        )
+        .is_err());
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(calls, 1);
+    assert_eq!(fs::read(&first).unwrap(), b"new report");
+    assert_eq!(fs::read(&second).unwrap(), b"new ledger");
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 2);
+    for path in [&first, &second] {
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+}
+
+#[test]
+fn paired_second_staging_failure_leaves_both_originals_and_no_pending_file() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    let mut stages = 0;
+    let error = publish_pair_using(
+        (&first, b"new report"),
+        (&second, b"new ledger"),
+        || panic!("guard must not run before both stages succeed"),
+        |parent, bytes| {
+            stages += 1;
+            ensure!(stages != 2, "injected second staging failure");
+            stage(parent, bytes)
+        },
+        |_, _, _| panic!("no rename before both stages succeed"),
+    )
+    .unwrap_err()
+    .to_string();
+    assert_eq!(stages, 2);
+    assert!(error.contains("injected second staging failure"));
+    assert!(error.contains(&format!("first path={first:?} renamed=false durable=false")));
+    assert!(error.contains(&format!(
+        "second path={second:?} renamed=false durable=false"
+    )));
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+    assert_eq!(fs::read(&second).unwrap(), b"old ledger");
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 2);
+}
+
+#[test]
+fn paired_second_admission_failure_and_output_alias_never_replace_either_file() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    let sentinel = root.0.join("sentinel");
+    fs::rename(&second, &sentinel).unwrap();
+    symlink(&sentinel, &second).unwrap();
+    let error = publish_pair_using(
+        (&first, b"new report"),
+        (&second, b"new ledger"),
+        || panic!("unsafe destination must refuse before guard"),
+        |_, _| panic!("both destinations must be admitted before staging"),
+        |_, _, _| panic!("unsafe destination must refuse before rename"),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("renamed=false durable=false"));
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+    assert_eq!(fs::read(&sentinel).unwrap(), b"old ledger");
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 3);
+    assert!(
+        publish_pair_checked((&first, b"a"), (&root.0.join("./report"), b"b"), || {
+            panic!("aliased destinations must refuse before guard")
+        })
+        .is_err()
+    );
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+}
+
+#[test]
+fn paired_second_rename_failure_reports_first_durable_and_cleans_second_stage() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    let mut renames = 0;
+    let error = publish_pair_using(
+        (&first, b"new report"),
+        (&second, b"new ledger"),
+        || Ok(()),
+        stage,
+        |parent, from, to| {
+            renames += 1;
+            ensure!(renames != 2, "injected second rename failure");
+            parent.rename(from, parent, to)?;
+            Ok(())
+        },
+    )
+    .unwrap_err()
+    .to_string();
+    assert_eq!(renames, 2);
+    assert!(error.contains("injected second rename failure"));
+    assert!(error.contains(&format!("first path={first:?} renamed=true durable=true")));
+    assert!(error.contains(&format!(
+        "second path={second:?} renamed=false durable=false"
+    )));
+    assert_eq!(fs::read(&first).unwrap(), b"new report");
+    assert_eq!(fs::read(&second).unwrap(), b"old ledger");
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 2);
+}
+
+#[test]
+fn paired_stale_input_guard_refuses_after_staging_without_replacing_outputs() {
+    let root = Fixture::new();
+    let (first, second) = paired_fixture(&root);
+    let input = root.0.join("input");
+    fs::write(&input, b"captured input").unwrap();
+    let (held, _) = crate::candidate_inputs::repository_live(&input, 1024).unwrap();
+    assert!(
+        publish_pair_checked((&first, b"new report"), (&second, b"new ledger"), || {
+            assert_eq!(fs::read_dir(&root.0)?.count(), 5);
+            fs::write(&input, b"changed input")?;
+            held.verify()
+        })
+        .is_err()
+    );
+    assert_eq!(fs::read(&first).unwrap(), b"old report");
+    assert_eq!(fs::read(&second).unwrap(), b"old ledger");
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 3);
+}
+
+#[test]
+fn paired_cross_parent_locks_serialize_opposite_publication_orders() {
+    let root = Fixture::new();
+    let left = root.0.join("left");
+    let right = root.0.join("right");
+    fs::create_dir(&left).unwrap();
+    fs::create_dir(&right).unwrap();
+    let first = left.join("report");
+    let second = right.join("ledger");
+    let barrier = Arc::new(Barrier::new(2));
+    let mut jobs = Vec::new();
+    for value in [1_u8, 2] {
+        let (first, second, left, right, barrier) = (
+            first.clone(),
+            second.clone(),
+            left.clone(),
+            right.clone(),
+            barrier.clone(),
+        );
+        jobs.push(std::thread::spawn(move || {
+            barrier.wait();
+            for _ in 0..16 {
+                let bytes = vec![value; 4096];
+                let pair = if value == 1 {
+                    (&first, &second)
+                } else {
+                    (&second, &first)
+                };
+                publish_pair_checked((pair.0, &bytes), (pair.1, &bytes), || {
+                    for parent in [&left, &right] {
+                        assert!(crate::file_lock::Exclusive::try_new(
+                            fs::File::open(parent)?,
+                            "contending cross-parent publisher"
+                        )
+                        .is_err());
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            }
+        }));
+    }
+    for job in jobs {
+        job.join().unwrap();
+    }
+    assert_eq!(fs::read(&first).unwrap(), fs::read(&second).unwrap());
+    assert_eq!(fs::read_dir(left).unwrap().count(), 1);
+    assert_eq!(fs::read_dir(right).unwrap().count(), 1);
+}

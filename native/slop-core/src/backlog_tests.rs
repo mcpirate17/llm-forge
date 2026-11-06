@@ -1,11 +1,57 @@
 //! The backlog's contract: a run speaks only for what it measured, so what it did not
 //! measure is neither fixed nor lost.
 
-use crate::backlog::backlog;
+use crate::backlog::{backlog, fold_captured};
 use crate::gate_types::{Measured, Summary};
 use crate::index_tests::Tree;
 use serde_json::{json, Value};
 use std::path::PathBuf;
+use std::time::{Duration, UNIX_EPOCH};
+
+#[test]
+fn captured_fold_uses_one_clock_and_accepts_empty_ledgers() {
+    let now = UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    let summary = Summary {
+        measured: vec![whole("m.py")],
+        blocking: vec![finding("m.py", "f", "REACHABLE_BUT_UNTESTED", "rule")],
+        ..Summary::default()
+    };
+    let first = fold_captured(&[summary], None, now).unwrap();
+    let empty = fold_captured(&[], Some(b" \n\t"), now).unwrap();
+    let missing = fold_captured(&[], None, now).unwrap();
+    assert_eq!(empty.ledger, missing.ledger);
+    assert!(first.report.contains("Generated 2023-11-14 22:13 UTC"));
+    let ledger: Value = serde_json::from_str(&first.ledger).unwrap();
+    assert_eq!(ledger["generated_at"], "2023-11-14T22:13:20+00:00");
+    assert_eq!((first.findings, first.items, first.new), (1, 1, 1));
+    assert!(fold_captured(&[], Some(b"{bad"), now).is_err());
+    assert!(fold_captured(&[], Some(&[0xff]), now).is_err());
+}
+
+#[test]
+fn captured_partial_scope_preserves_unmeasured_and_deduplicates_findings() {
+    let now = UNIX_EPOCH;
+    let initial = Summary {
+        measured: vec![whole("m.py"), whole("other.py")],
+        blocking: vec![
+            finding("m.py", "f", "REACHABLE_BUT_UNTESTED", "r"),
+            finding("m.py", "f", "REACHABLE_BUT_UNTESTED", "r"),
+            finding("other.py", "g", "REACHABLE_BUT_UNTESTED", "r"),
+        ],
+        ..Summary::default()
+    };
+    let first = fold_captured(&[initial], None, now).unwrap();
+    assert_eq!((first.findings, first.items), (3, 2));
+    let next = Summary {
+        measured: vec![whole("m.py")],
+        ..Summary::default()
+    };
+    let result = fold_captured(&[next], Some(first.ledger.as_bytes()), now).unwrap();
+    let ledger: Value = serde_json::from_str(&result.ledger).unwrap();
+    assert_eq!(result.fixed, 1);
+    assert_eq!(ledger["items"].as_array().unwrap().len(), 1);
+    assert_eq!(ledger["items"][0]["module"], "other.py");
+}
 
 fn finding(module: &str, qualname: &str, verdict: &str, rule: &str) -> Value {
     json!({

@@ -4,11 +4,12 @@
 mutation, hygiene and audit entry point a host project runs. A host includes it
 from its own Makefile (`include /path/to/llm-forge/conductor.mk`) and overrides
 the variables below to match its own layout instead of editing the recipes —
-every recipe invokes `$(PYTHON) -m conductor.<module>`, so it runs under
-whatever interpreter installed `conductor-tooling`.
+native commands invoke `$(FORGE)`; remaining compatibility commands use
+`$(PYTHON) -m conductor.<module>` under the installed interpreter.
+See [native backlog usage](equivalence-backlog.md) for its preview and publication flags.
 
 This page is generated from the `##` help annotations in `conductor.mk`
-(47 targets); regenerate it rather than editing by hand when a
+(50 targets); regenerate it rather than editing by hand when a
 target changes.
 
 ## Variables a host overrides
@@ -17,6 +18,7 @@ target changes.
 |---|---|
 | `UV` | `env -u VIRTUAL_ENV uv` |
 | `PYTHON` | `$(UV) run python` |
+| `FORGE` | `forge` |
 | `CONDUCTOR_HOST_ROOT` | `$(CURDIR)` |
 | `CONDUCTOR_PACKAGE_ROOT` | `src/conductor` |
 | `CONDUCTOR_CANDIDATE_POLICY` | `candidate_policy.toml` |
@@ -36,18 +38,18 @@ target changes.
 
 | Command | What it does |
 |---|---|
-| `make governance-check` | Run the exact candidate-index fast review |
-| `make governance-audit` | Run the exact candidate-index full review and emit CI-format artifacts |
-| `make governance-preflight` | Reproduce the CI review locally for PREFLIGHT_REF (default HEAD) |
-| `make governance-fix` | Explicitly fix only FIX_PATHS='path ...' outside commit hooks |
+| `make governance-check` | Run the native candidate-index fast review |
+| `make governance-audit` | Run the native full review and export this execution's artifacts |
+| `make governance-preflight` | Run the native CI review for PREFLIGHT_REF (default HEAD) |
+| `make governance-fix` | Explicit native Ruff batch; set FIX_PATHS_FILE (JSON), FIX_GRANTS and FIX_RUFF_SHA256 |
 | `make governance-commit` | Hold the commit mutex; pass COMMIT_ARGS='-m ... path ...' |
 | `make governance-claim` | Claim exact paths; set CLAIM_PATHS and CLAIM_JUSTIFICATION (OWNER defaults to this lane) |
 | `make governance-release-claim` | Release CLAIM_ID as OWNER |
 | `make governance-claims` | Show active claims, one line each (CLAIM_PATH="a b" filters by overlap) |
 | `make governance-claims-json` | Show the full machine-readable claim store (active and expired) |
-| `make governance-close-session` | Atomically close session: release claims, append handoff, update state |
+| `make governance-close-session` | Close with explicit claim scope and memory configuration |
 | `make slop-gate` | Equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail) |
-| `make slop-backlog` | Probe SLOP_MODULES (default: changed), then fold it and every land's run into the ledger |
+| `make slop-backlog` | Probe with the Python gate, then fold summaries using native Forge (SLOP_MODULES defaults to changed) |
 | `make slop-imports` | Ablate the silenced (noqa F401) imports of SLOP_MODULE against its drivers |
 | `make slop-probe` | Probe one module against its driver tests: SLOP_MODULE=path.py SLOP_TESTS='tests...' |
 | `make complexity-report` | Report production Python cyclomatic complexity |
@@ -65,21 +67,24 @@ target changes.
 | `make mutation-retention` | Report (or with MUTATION_RETENTION_APPLY=1, delete) uncitable receipts |
 | `make mutation-patch-audit` | Report campaigns that cannot be applied, re-run, or vouched for |
 | `make mutation-patch-audit-record` | Re-record the reproducibility baseline after repairs |
+| `make mutation-reap` | List engine runs orphaned by a dead engine (MUTATION_REAP_APPLY=1 kills them) |
+| `make ci-history` | Fetch the ci_history cache the ledger's outcome join reads |
+| `make ledger-rollup` | Roll this project's harness transcripts into the ledger root |
+| `make ledger-report` | Print cost budget metrics and their measured statuses |
+| `make route-report` | Per-tier dispatch table: over_cap, would_deny, would_route, rework, ci_red |
+| `make cost-budget-audit` | Check hook latency, resend bytes and tokens/landed-PR against the recorded baseline |
+| `make cost-budget-record` | Re-record the cost-ledger budget baseline for the current window |
 | `make graph-seed-worktree` | Seed W=<worktree>'s code-review-graph store from this checkout (W required) |
 | `make worktree-reap` | Preview finished worktrees; REAP_ARGS=--apply explicitly removes eligible trees |
-| `make crg-probe` | Handshake with the code-review-graph MCP server declared in CRG_REPO's .mcp.json |
-| `make crg-sync` | Install this tree's native crates into the code-review-graph MCP interpreter |
-| `make crg-check` | Report (never repair) drift between this tree and the MCP interpreter |
-| `make workspace-hygiene` | Read-only: what is safe to delete (branches, worktrees, claims) and what breaks a clean clone |
-| `make branch-policy` | Branch binding status: live claim/branch pairs, age, PR number, staleness |
+| `make workspace-hygiene` | Read-only native claims, imports, checkout drift and workspace exposure report |
 | `make branch-policy-audit` | Check every branch-policy rule decidable without a push; exits 1 on violations |
-| `make checkout-sync` | Snapshot the dirty tree, then fast-forward this checkout onto the remote line |
-| `make dead-tests` | Import-closure dead-test finder: broken tests, test-only targets, unreferenced sources |
-| `make test-graph` | Run pytest on tests selected via code-review-graph for changed code |
+| `make checkout-sync` | Native guarded dirty-layer fast-forward (set CHECKOUT_SYNC_RECOVERY_DIR) |
+| `make dead-tests` | Native advisory Python import-closure and unreferenced-source report |
+| `make test-graph` | Advisory graph-selected tests; set GRAPH_TEST_ARGS for explicit guest prerequisites |
 | `make codex-journal` | Append an Obsidian-compatible Codex journal entry |
 | `make notebooklm-bundle` | Build a curated Markdown bundle for manual NotebookLM upload |
 | `make notebooklm-research-bundle` | Build a research-focused NotebookLM upload bundle (includes CodexVault notes when present) |
 | `make test-conductor-native` | cargo test the conductor-native crate |
 | `make test-slop-core` | cargo test the slop-core crate |
 | `make test-forge` | cargo test the forge crate (native hook launcher, step 1 of the Rust hook port) |
-| `make forge-build` | Build forge and install it to .tools/bin |
+| `make forge-build` | Build forge and install it to .tools/bin for a host project |
