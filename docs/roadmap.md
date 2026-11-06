@@ -192,7 +192,11 @@ recorded-test database is configured. Target discovery already reads the capture
 review snapshot; actual guest execution retains its separate confined Stage.
 The original release comparator passed 24 capture observations and triggered the
 expected scratch regression. The fast path passes six capture/artifact tests and
-strict Clippy; matched measurement and full publication checks are pending. See the
+strict Clippy. In 480 balanced capture observations, median time fell from
+4.59 to 0.24 ms with no auxiliary files and 421.22 to 2.14 ms with 1,000 files.
+Plans and input identities matched; scratch activity fell from a create/delete pair
+to none. Independent audit verified all four receipts and raw observations. This
+measures capture, not guest or full-review speed; full publication checks are pending. See the
 [evidence index](../research/performance/forge-program-20261106-equivalence-capture.json).
 Standalone explicit-commit gate design remains subsequent work.
 

@@ -1,0 +1,55 @@
+{
+  "schema": "forge.performance.v1",
+  "created_unix": 1793994643,
+  "identity": {
+    "host": "/home/tim/Projects/llm-forge",
+    "head": "8dbdc85166a853c5e47b51e1ead18ecfceebd8ce",
+    "source_files": {
+      "native/conductor-native/src/equivalence_targets.rs": "f93e669c945e99a7bcb40ad9502d78271c580b4df535d737ee9a04c483b68dd6",
+      "native/forge/Cargo.lock": "a40a856c4603e78fa2dcce537202bbcf17a87bc02978450a1e41df1cb91e1a4d",
+      "native/forge/src/candidate_equivalence_capture_tests.rs": "18f287850040ef8830b28387cf8da3523b941098561bfa2803315d2f41ac52c3",
+      "native/forge/src/candidate_equivalence_inputs.rs": "4c0160e7ca353bfc196432dccf20a240ec5cc0d78594a840413ce3ac8671a49f"
+    },
+    "command": "PATH= exec /home/tim/Projects/llm-forge/.git/capture-current-8dbdc85-oxdjdb3g/unit-tests --exact candidate_equivalence_inputs::capture_tests::benchmark_no_record_capture_small_and_large --ignored --nocapture --test-threads=1",
+    "workload_sha256": "2298f1b5b2058e3a7c17bbc3adde775f3ce118e39220be5465c5bd6b12847ab0",
+    "environment_sha256": "e1248aa289ec0fbbb6996125049d70ca930fffd983606cb7012739e1db893368",
+    "platform": "model name\t: AMD Ryzen 9 9950X3D 16-Core Processor; kernel=7.0.0-42-generic; arch=x86_64; cpus=32; /sys/fs/cgroup/cpu.max=absent; /sys/fs/cgroup/memory.max=absent",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "warmups": 0,
+    "timeout_seconds": 120
+  },
+  "samples": [
+    {
+      "wall_ms": 1096.0199969999999,
+      "cpu_ms": 301.995,
+      "max_rss_bytes": 53010432
+    },
+    {
+      "wall_ms": 1098.756189,
+      "cpu_ms": 299.094,
+      "max_rss_bytes": 52932608
+    },
+    {
+      "wall_ms": 1090.5854909999998,
+      "cpu_ms": 299.782,
+      "max_rss_bytes": 52908032
+    },
+    {
+      "wall_ms": 1097.7608930000001,
+      "cpu_ms": 299.312,
+      "max_rss_bytes": 53067776
+    },
+    {
+      "wall_ms": 1080.306345,
+      "cpu_ms": 297.132,
+      "max_rss_bytes": 52948992
+    }
+  ],
+  "summary": {
+    "p50_ms": 1096.0199969999999,
+    "p95_ms": 1098.756189,
+    "cpu_p50_ms": 299.312,
+    "max_rss_bytes": 53067776
+  },
+  "receipt_sha256": "72c1b3f3d7070d039c592c6c78cb106603496dc3f35553f0ff1e9adb6776ae26"
+}

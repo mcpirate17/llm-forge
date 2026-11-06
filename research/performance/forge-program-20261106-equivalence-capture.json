@@ -4,7 +4,7 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/222",
   "base_commit": "b34f6b37c552f386ee4cc33641e93d5cc482121d",
-  "status": "no_record_fast_path_focused_passed_matched_measurements_pending",
+  "status": "matched_capture_improvement_and_independent_audit_passed_full_gate_pending",
   "scope": "No-record target capture reuses the existing captured review snapshot without creating an unused full execution workspace. Record-present copying and later guest Stage admission are unchanged.",
   "baseline_verification": {
     "original_capture_tests": {
@@ -79,15 +79,136 @@
       "observed_scratch_events_per_capture": 2,
       "release_regression": "expected RED exit101; original binary retained"
     },
-    "current": "PENDING"
+    "current": {
+      "binary": "/home/tim/Projects/llm-forge/.git/capture-current-8dbdc85-oxdjdb3g/unit-tests",
+      "sha256": "65757d1c88658e2d21fab5db8b787e9d764ace04d3279b012c44dfe60be16caa",
+      "head": "8dbdc85166a853c5e47b51e1ead18ecfceebd8ce",
+      "tree": "a589120df763f60973b455388bed485e4824cef7",
+      "fixture_sha256": "18f287850040ef8830b28387cf8da3523b941098561bfa2803315d2f41ac52c3",
+      "store_copy_sha256": "cccaef0a6af07f802906e18ef64b9938504febc8b474d35dac8cbffeb0ab4591",
+      "rustc_sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
+      "elapsed_seconds": 135.7845380306244
+    },
+    "current_build_ledger": {
+      "path": ".git/forge-capture-current-unit.json",
+      "sha256": "cc2706c8fd15379485dc6a259ab06afd742cab362407814b443f63ecbdc407f2"
+    }
   },
-  "measurements": "PENDING",
+  "measurements": {
+    "summary": {
+      "root": "/home/tim/Projects/llm-forge/.git/capture-measure-rebntt9h",
+      "summary": "/home/tim/Projects/llm-forge/.git/capture-measure-rebntt9h/summary.json",
+      "sha256": "a0f825ceb9ecf220809a115a78cdc980a5b7db6080b11089246eb476ba4d243e"
+    },
+    "order": [
+      "baseline",
+      "current",
+      "current",
+      "baseline"
+    ],
+    "fresh_processes_per_block": 5,
+    "total_processes": 20,
+    "total_capture_calls": 480,
+    "total_scored": 400,
+    "total_warmups": 80,
+    "aggregate": [
+      {
+        "auxiliary_files": 0,
+        "arms": {
+          "baseline": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 4.585538,
+            "p95_ms": 5.013369,
+            "scratch_events_per_capture": [
+              2
+            ]
+          },
+          "current": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 0.23986,
+            "p95_ms": 0.2578,
+            "scratch_events_per_capture": [
+              0
+            ]
+          }
+        },
+        "current_over_baseline_p50": 0.05230792984378278
+      },
+      {
+        "auxiliary_files": 1000,
+        "arms": {
+          "baseline": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 421.223473,
+            "p95_ms": 429.975807,
+            "scratch_events_per_capture": [
+              2
+            ]
+          },
+          "current": {
+            "scored_samples": 100,
+            "warmups": 20,
+            "p50_ms": 2.139969,
+            "p95_ms": 2.230079,
+            "scratch_events_per_capture": [
+              0
+            ]
+          }
+        },
+        "current_over_baseline_p50": 0.005080365025146639
+      }
+    ],
+    "quantiles": "nearest rank ceil(n*q)-1; in-process samples share a warmed fixture",
+    "semantic_parity": "Every target/evidence/input identity matched across both arms; authored tree hashes independently reconstructed. Each original capture produced exactly an observed scratch-directory create/delete pair; each optimized capture produced zero events.",
+    "scope": "ABBA order of four blocks with five fresh unit-test processes each. Each process times 2warm+10scored captures per0/1000file case;480capture calls,400scored80warm. Recorded selected build settings match; full ambient/Cargo config closure is not claimed. Input trees and full target/evidence equal across arms, baseline2scratch events/current0. Inner timers are capture-only, in-process warmed fixtures. Native receipts measure entire test-driver process including binary hashing/fixture setup/assertions/disposal and shell; outer CPU/RSS are not capture CPU/RSS. No guest, model, complete-review or agent-task claim.",
+    "reviewed_patch_sha256": "6e239e42a9eccb5bc56f43610b0a6786e031770c93cb14b1800debf31a4ec1f2",
+    "driver": {
+      "path": ".git/forge-capture-measure.py",
+      "sha256": "7993f04314999a1356df262737e27c0814985886bd12d9c7ab94d1148d2ef2db"
+    },
+    "receipts": [
+      {
+        "block": 0,
+        "arm": "baseline",
+        "path": "research/performance/forge-program-20261106-capture-0-baseline-receipt.json",
+        "file_sha256": "96b9f307ea29365f05946fecce1580dbe3892f9d0e2f8897ab03844207b8c674",
+        "scope": "Native-sealed five-sample whole test-driver process observations; includes setup, executable hashing, assertions and disposal, not capture-only CPU/RSS."
+      },
+      {
+        "block": 1,
+        "arm": "current",
+        "path": "research/performance/forge-program-20261106-capture-1-current-receipt.json",
+        "file_sha256": "95b1ccf9b17adf0732ba1dc9aea362555a454d199b664139ce768bb5f9675053",
+        "scope": "Native-sealed five-sample whole test-driver process observations; includes setup, executable hashing, assertions and disposal, not capture-only CPU/RSS."
+      },
+      {
+        "block": 2,
+        "arm": "current",
+        "path": "research/performance/forge-program-20261106-capture-2-current-receipt.json",
+        "file_sha256": "679a4b114e6bddd148d88bdaf7fec66ef39c2fe31c8d8bbf33fd2f78a117b02c",
+        "scope": "Native-sealed five-sample whole test-driver process observations; includes setup, executable hashing, assertions and disposal, not capture-only CPU/RSS."
+      },
+      {
+        "block": 3,
+        "arm": "baseline",
+        "path": "research/performance/forge-program-20261106-capture-3-baseline-receipt.json",
+        "file_sha256": "eec6b6ab3a938feffde453e18ee7b5f948a09ab1cc92918b5742ca76698d8e73",
+        "scope": "Native-sealed five-sample whole test-driver process observations; includes setup, executable hashing, assertions and disposal, not capture-only CPU/RSS."
+      }
+    ]
+  },
   "full_local_check": "PENDING final optimized source and evidence head",
   "limitations": [
     "In-process capture cost is not total candidate review or guest latency.",
     "No new model-token, task-success, CPU/RSS/allocation or host-adoption evidence.",
     "Malformed SQLite case establishes error cleanup, not valid recorded-driver selection.",
-    "No manual or automatic mutation campaign executed in this increment."
+    "No manual or automatic mutation campaign executed in this increment.",
+    "Outer command identities differ by pinned unit executable: this is a matched semantic-fixture comparison, not a mechanical compatible-receipt comparison.",
+    "Selected compiler settings, compiler/profile/features and fixture match; full ambient/Cargo config closure is not claimed.",
+    "No new guest or cgroup execution control was run for this pure capture change; unchanged Stage admission was independently source-reviewed."
   ],
   "validation_process_observation": {
     "inventory": {
@@ -105,6 +226,13 @@
     "ignored_benchmark": 1,
     "focused_log": ".git/forge-capture-current-tests1.log",
     "strict_all_target_clippy": "PASS .git/forge-capture-current-clippy1.log",
-    "independent_production_review": "No blocker. Same native selector and held snapshot; captured input verification remains. Selection already admitted grants through a workspace; actual guest Stage still creates and validates its own. Record-present branch unchanged. Removing unnecessary scratch/copy/Sandbox/reopen failure paths is intentional and grants no execution authority."
-  }
+    "independent_production_review": "No blocker. Same native selector and held snapshot; captured input verification remains. Selection already admitted grants through a workspace; actual guest Stage still creates and validates its own. Record-present branch unchanged. Removing unnecessary scratch/copy/Sandbox/reopen failure paths is intentional and grants no execution authority.",
+    "release_unit_controls": "6 passed, 0 failed, 1 ignored; .git/forge-capture-current-release-tests1.log"
+  },
+  "independent_measurement_audit": {
+    "path": ".git/forge-capture-measure-independent.json",
+    "sha256": "7f53ca9a75e2ec856f5f9adf53398dd4858242c09e3a9be0d6e7f952ac334531",
+    "result": "No discrepancy across four seals/pins, twenty logs, 480 inner rows, exact patch/build/binary identities, targets/input trees and scratch controls; recomputed all p50/p95. Integrity is not producer authentication."
+  },
+  "prelaunch_review": "Recorder minimum is five samples; the initial one-sample design was corrected before execution. No one-sample attempt or receipt exists."
 }
