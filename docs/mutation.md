@@ -249,14 +249,12 @@ test-value and cleanup results independently of any candidate approval.
 
 ## Ordinary Cargo execution grants
 
-On Linux, ordinary native `forge mutation run` admits a narrow, dependency-free
-root Cargo package with one explicit standard-harness integration test, one
-worker and no campaign environment overrides or configured Python guest. It
-selects the declared test explicitly and invokes Cargo locked and offline. It
-refuses workspaces, dependencies, unsupported Cargo configuration, and ordinary
-Fest, Mull and other profiles before launching a payload. `forge mutation
-plan` and `write` remain available for planning those profiles. The opt-in Cargo
-per-test value workflow above retains its own execution interface.
+On Linux, the ordinary root profile admits a dependency-free Cargo package with
+one explicit standard-harness integration target. The workspace profile below is
+under validation. Both require one worker, no campaign environment overrides,
+no configured Python guest and operator-pinned execution grants. Ordinary Fest
+and Mull execution remain unsupported under these grants (#196). The opt-in
+Cargo per-test value workflow above retains its separate execution interface.
 
 Ordinary execution requires an operator-owned, pinned grant document:
 
@@ -290,7 +288,7 @@ the private root when cleanup or input verification is uncertain; there is no
 process-group cleanup fallback. Executable files and their ancestry must have
 safe ownership and permissions; a group-writable toolchain directory is refused.
 Provision a private verified runtime copy when necessary instead of weakening
-that check or modifying a shared installation. The declared integration target
+that check or modifying a shared installation. For the root profile, the declared integration target
 is used by both the baseline and cargo-mutants: an additional unpinned test must
 not supply kills for the declared test's campaign (regression #195).
 Ordinary `forge mutation inspect` reports
@@ -322,6 +320,101 @@ inputs: non-Rust files read by macros or at runtime, toolchain and environment
 closure, and producer authenticity are outside its scope. The existing opt-in
 Cargo per-test value contract has its own inventory and is not replaced by this
 binding.
+
+### Ordinary workspace profile — under validation
+
+Generate the profile through the native writer; do not edit its manifest:
+
+```sh
+forge mutation plan rust --owner my-lane --base origin/main \
+  --only path/to/package/src/changed.rs --cargo-workspace --jobs 1 --run-timeout 120
+forge mutation write rust --owner my-lane --base origin/main \
+  --only path/to/package/src/changed.rs --cargo-workspace --jobs 1 --run-timeout 120
+```
+
+This Rust-only option cannot be combined with `--rust-value-contract`. Explicit
+`--jobs 1` is required for execution; the general Rust planning default is four.
+Only selected changed sources are mutated. Forge maps package-relative generator
+selectors and repository-relative pins to workspace-relative engine file filters
+using validated Cargo metadata. Test pins are anchors for the selected package's
+whole standard test suite, not a claim of per-test attribution.
+
+Add an operator-selected repository-relative lockfile to the grant:
+
+```json
+"cargo_workspace": {"lockfile": "path/to/workspace/Cargo.lock"}
+```
+
+The discovered workspace must use that exact lockfile. Local path dependencies
+may lie outside the workspace directory but must remain inside the captured
+repository. External packages require a seed; Git and alternate registries are
+unsupported. Prepare crates.io inputs from an explicit public cache:
+
+```sh
+forge mutation cargo-seed \
+  --cache-root /absolute/public-cargo-cache \
+  --lockfile /absolute/repository/path/to/workspace/Cargo.lock \
+  --lockfile-sha256 SHA256_OF_EXACT_LOCK_BYTES \
+  --registry-directory EXACT_OPERATOR_SELECTED_NAMESPACE \
+  --cargo-sha256 SHA256_OF_GRANTED_DIRECT_CARGO \
+  --output /absolute/private/new-seed
+```
+
+Use the selected cache namespace, such as `index.crates.io-1949cf8c6b5b557f`, and
+independently hash the lockfile and the granted Cargo executable. The output must
+be a new private directory. Copy the returned `config` object unchanged into
+`cargo_workspace.seed`, then pin the final grant bytes. Run the campaign with
+the normal `--allow-mutations`, exact source scope and execution-grant arguments
+shown above. Never hand-author a seed manifest or change shared-cache modes.
+
+Provisioning reads only lock-selected archives, canonical sparse-index records
+and registry metadata `config.json`. It excludes Cargo-home configuration,
+credentials, Git caches and host-extracted sources. Imported public files must
+be regular, singly linked and world-readable. Current-user group-writable cache
+inputs are treated as untrusted; private seed destinations retain strict modes.
+Archive checksums are bound to held lock bytes. Index/config bytes are opaque
+public-cache observations, not authenticated by `Cargo.lock`.
+
+Snapshot identity v2 covers the captured source tree, including non-Rust data.
+It uses Git HEAD/index inputs and excludes configured mutation-output namespaces
+and fixed runtime outputs. Newly untracked sources must be committed or indexed
+before they can be part of this snapshot. Candidate and live/committed corpus
+validation independently derive the expected identity from the verified profile
+and held project configuration; a receipt cannot select its own exclusions.
+
+The baseline runs the selected package with `cargo test --locked --offline`.
+The engine runs `--in-place` only inside Forge's disposable snapshot and uses the
+same test package. cargo-mutants 27.1 rejects `--jobs` with `--in-place`; Forge
+uses its single-worker default while requiring one worker in the campaign.
+Nonzero passing libtest observations must agree between direct and engine
+baselines. Full source restoration and owned cleanup are checked before disposal.
+
+Active Cargo/toolchain configuration is refused along the command's actual
+directory ancestry, including the writable scratch parent. Input checks run
+before and after commands. These are point-in-time observations, not protection
+against hostile same-UID transient changes. Operator read/execute roots remain
+separate grants; source and seed identity do not attest all compiler/runtime
+inputs. This profile adds no network, ambient Cargo home, inherited environment,
+Python guest or Git payload authority.
+
+`resources.memory_mib` controls aggregate cgroup memory, not per-process
+`RLIMIT_DATA`. Explicitly positive `MUTATION_MEMORY_CAP_GIB` requests are refused
+because the confined path cannot honor that legacy contract. Receipts distinguish
+the aggregate enforcement from implicit or explicit legacy settings. If source
+verification fails after a command, its bounded diagnostics are retained alongside
+the verification failure; uncertain state retains the snapshot.
+
+All locked registry sources are staged by Forge's bounded archive reader without
+restoring timestamps or ownership. Each package's checksum, inventory and written
+contents are checked before its exact Cargo completion marker is created. The
+complete package set is checked around commands; missing packages also refuse.
+This preserves the sandbox's metadata restrictions. Partial staging is retained
+on failure. Small registry-backed execution is verified; clean-build admission
+and full-project dependency workloads remain under validation. Actual
+Forge package tests additionally require fixtures such as `FORGE_TEST_BIN` and
+Git that this interface does not grant. A fixture campaign is not proof that
+Forge's own complete package suite can run under these grants. See the current
+[engineering status](roadmap.md) and [observations](performance.md).
 
 ## Receipt format
 

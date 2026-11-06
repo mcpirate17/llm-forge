@@ -71,6 +71,32 @@ broader profiles in [#196](https://github.com/mcpirate17/llm-forge/issues/196)
 requires independently bound dependency manifests as well as confined execution.
 The existing root-only profile cannot yet execute Forge's own workspace campaigns.
 
+**Active #196 implementation, uncommitted:** the explicit generated workspace
+profile now connects the existing confined command owner to complete source
+snapshot freshness, package metadata admission and a lock-verified offline seed.
+Candidate and live corpus validators independently select the expected binding
+from the verified campaign. The engine operates inside the disposable snapshot;
+source restoration and cleanup are checked before disposition. Package baseline
+observations require passing test cases, without claiming per-test attribution
+or authenticated output. Operator runtime read grants remain separate inputs.
+Focused suites passed 194 Conductor and 336 Forge tests, with 28 existing Forge
+tests ignored. An initial real-cache preparation refused normal group-writable
+cache permissions before copying; a reviewed public-input import now selects
+only lock-required archives/index records, preserving private seed permissions.
+The revised importer prepared all 338 registry packages in Forge's lockfile;
+this validates preparation, not confined Cargo consumption. A dirty-build nested
+workspace/path-dependency trial killed both automatic mutants, matched nonzero
+direct/engine baseline observations and confirmed all owned cleanup. Earlier
+attempts exposed and fixed the metadata capture cap and incompatible engine
+arguments. The registry-backed trial then exposed Cargo timestamp restoration
+being denied by confinement; it correctly retained the incomplete snapshot.
+Native archive-derived staging then passed the registry-backed trial with both
+automatic mutants killed, matching nonzero baseline observations and confirmed
+cleanup, without expanding syscall permissions. Strict Clippy, 20 capture checks
+and the file/function limit audit pass.
+Clean-build corpus admission, actual Forge package tests and full publication
+checks remain pending. This is not a delivered profile.
+
 1. Validate and measure the implemented outbound MCP slice through the existing
    inbound service. It reuses the confined process owner, registers the endpoint
    separately from terminal programs, and admits one operator-pinned stdio tool

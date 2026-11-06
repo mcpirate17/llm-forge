@@ -260,6 +260,14 @@ impl Campaign {
         let generator = required(payload, "generator", Kind::Dict)?
             .as_object()
             .expect("kind checked");
+        let profile = conductor_native::mutation_evidence::execution_profile(
+            generator,
+            &language,
+            &mutation_engine,
+        )?;
+        if profile.is_some() && payload.contains_key("generated_value") {
+            return Err("workspace execution profile cannot carry a value contract".into());
+        }
         let source = text_list(required(generator, "source", Kind::List)?, "source")?;
         let options = generator
             .get("options")

@@ -367,6 +367,40 @@ impl<'a> Build<'a> {
         }
         Ok(())
     }
+    fn update_receipt_findings(
+        &mut self,
+        states: &Value,
+        paths: &[String],
+        registry_path: &str,
+    ) -> Result<()> {
+        let waived: Vec<_> = list(states)?
+            .iter()
+            .filter(|s| s["active"] == true)
+            .map(|s| s["path"].clone())
+            .collect();
+        self.findings.extend(rows(&decide(
+            "receipt_findings",
+            &json!({"payload":self.payload,"waived":waived}),
+        )?)?);
+        self.metrics = decide(
+            "mutation_metrics",
+            &json!({"payload":self.payload,"new_nodeids":self.gated,"waiver_states":states}),
+        )?
+        .as_object()
+        .context("mutation metrics must be an object")?
+        .clone();
+        self.metrics
+            .insert("registry_path".into(), json!(registry_path));
+        self.metrics.insert(
+            "receipt_exempt_tests".into(),
+            json!(self
+                .files
+                .iter()
+                .filter(|p| !paths.contains(p))
+                .collect::<Vec<_>>()),
+        );
+        Ok(())
+    }
     fn receipts(&mut self, ctx: &Context<'a>, paths: &[String]) -> Result<()> {
         let mut states = waivers::receipt_states(&mut self.capture, &self.candidate, ctx.policy)?;
         if !waiver_authorized(
@@ -426,37 +460,31 @@ impl<'a> Build<'a> {
             .as_ref()
             .map(Option::as_ref)
             .map_err(String::as_str);
-        let verified=conductor_native::mutation_evidence::verify_captured_native_with_supporting(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
+        let workspace_required = crate::mutation_cargo_supporting::workspace_required_for(
+            &catalog.contracts,
+            &catalog.receipts,
+            || Ok(native_fingerprint.clone()),
+            self.native.as_ref().map(native::Identity::identity),
+        )?;
+        let workspace = crate::mutation_cargo_supporting::capture_workspace_profiles(
+            workspace_required,
+            |pins| self.capture.workspace_inventory(pins),
+        );
+        let receipt_root = if workspace.is_empty() {
+            None
+        } else {
+            conductor_native::project_paths::mutation_receipt_root_from_config(config.as_ref()).ok()
+        };
+        let workspace_bindings = conductor_native::mutation_evidence::WorkspaceBindings {
+            identities: &workspace,
+            receipt_root: receipt_root.as_deref(),
+        };
+        let verified=conductor_native::mutation_evidence::verify_captured_native_with_supporting_profiles(&json!({"candidate_paths":paths,"campaigns":catalog.contracts,
             "runtime":runtime,"broken_campaigns":catalog.broken,"malformed_receipts":catalog.malformed}),&catalog.receipts,
             |path,bytes,contract|anchor::prove(&mut self.git,path,bytes,contract,ctx.grandfather).map_err(|e|format!("{e:#}")),
-            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity), supporting).map_err(anyhow::Error::msg)?;
+            native_fingerprint.as_deref(), self.native.as_ref().map(native::Identity::identity), supporting, Some(&workspace_bindings)).map_err(anyhow::Error::msg)?;
         self.payload = verified.result;
-        let waived: Vec<_> = list(&states)?
-            .iter()
-            .filter(|s| s["active"] == true)
-            .map(|s| s["path"].clone())
-            .collect();
-        self.findings.extend(rows(&decide(
-            "receipt_findings",
-            &json!({"payload":self.payload,"waived":waived}),
-        )?)?);
-        self.metrics = decide(
-            "mutation_metrics",
-            &json!({"payload":self.payload,"new_nodeids":self.gated,"waiver_states":states}),
-        )?
-        .as_object()
-        .context("mutation metrics must be an object")?
-        .clone();
-        self.metrics
-            .insert("registry_path".into(), json!(registry.path));
-        self.metrics.insert(
-            "receipt_exempt_tests".into(),
-            json!(self
-                .files
-                .iter()
-                .filter(|p| !paths.contains(p))
-                .collect::<Vec<_>>()),
-        );
+        self.update_receipt_findings(&states, paths, &registry.path)?;
         self.values = Some(value::Values::new(
             &self.payload,
             &self.gated,

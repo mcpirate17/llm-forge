@@ -3,6 +3,37 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::os::unix::fs::{symlink, PermissionsExt};
 
+#[test]
+fn confined_memory_reports_aggregate_and_refuses_explicit_per_process_limit() {
+    let resources = cgroup::Limits {
+        cpu_millis: 1000,
+        memory_mib: 1024,
+        processes: 32,
+    };
+    let legacy = crate::mutation_process::MemoryCap {
+        limit: 8 * 1024 * 1024 * 1024,
+        hard: 8 * 1024 * 1024 * 1024,
+    };
+    let report = memory_enforcement(&resources, Some(legacy), false).unwrap();
+    assert_eq!(report["mode"], "aggregate_cgroup");
+    assert_eq!(report["bytes"], 1024_u64 * 1024 * 1024);
+    assert_eq!(
+        report["legacy_requested_per_process_data_bytes"],
+        legacy.limit
+    );
+    assert!(report["scope"]
+        .as_str()
+        .unwrap()
+        .contains("not per-process"));
+    assert!(memory_enforcement(&resources, Some(legacy), true)
+        .unwrap_err()
+        .to_string()
+        .contains("MUTATION_MEMORY_CAP_GIB"));
+    let disabled = memory_enforcement(&resources, None, true).unwrap();
+    assert!(disabled["legacy_requested_per_process_data_bytes"].is_null());
+    assert_eq!(disabled["bytes"], report["bytes"]);
+}
+
 struct Fixture {
     root: tempfile::TempDir,
     document: Value,
@@ -57,9 +88,40 @@ fn exact_alias_resolution_and_reverification() {
     assert!(grants.program("Cargo").is_err());
     assert_eq!(grants.programs().len(), 1);
     assert_eq!(grants.digest().len(), 64);
+    assert!(grants.cargo_workspace.is_none());
+    assert_eq!(
+        grants.program_sha256("cargo").unwrap(),
+        f.document["programs"]["cargo"]["sha256"]
+    );
     grants.verify().unwrap();
     fs::write(f.path("tools/cargo"), b"different executable").unwrap();
     assert!(grants.verify().is_err());
+}
+#[test]
+fn seed_descriptor_selects_only_a_repository_lockfile_and_keeps_existing_grants() {
+    let mut f = Fixture::new();
+    f.document["cargo_workspace"] = json!({"lockfile":"native/forge/Cargo.lock",
+        "seed":{"root":f.path("seed"),"manifest_path":f.path("seed/seed-manifest.json"),
+            "expected_sha256":"a".repeat(64)}});
+    let grants = f.load().unwrap();
+    assert_eq!(
+        grants.cargo_workspace.as_ref().unwrap().lockfile,
+        "native/forge/Cargo.lock"
+    );
+    // Actual seed bytes are admitted separately against this held control and lockfile.
+    assert_eq!(grants.programs().len(), 1);
+    assert_eq!(grants.read_only, vec![f.path("tools")]);
+    assert!(grants.program("git").is_err());
+    for path in [
+        "../Cargo.lock",
+        "/Cargo.lock",
+        ".git/Cargo.lock",
+        "native/Cargo.toml",
+        "a//Cargo.lock",
+    ] {
+        f.document["cargo_workspace"]["lockfile"] = json!(path);
+        assert!(f.load().is_err(), "accepted {path}");
+    }
 }
 #[test]
 fn control_drift_wrong_pin_and_replacement_refuse() {

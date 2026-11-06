@@ -214,6 +214,60 @@ mod native_receipts {
         assert!(check(&campaign, &legacy, Some(&expected)).is_some());
     }
 
+    #[test]
+    fn workspace_profile_requires_its_own_independent_identity() {
+        use crate::mutation_cargo_supporting_binding::SupportingInputs;
+        let symbols = BTreeSet::new();
+        let contract = json!({"campaign_id":"c","manifest":"campaigns/a.json","manifest_sha256":"f".repeat(64),
+            "source_sha256":{"src/a.rs":"e".repeat(64)},"test_sha256":{"tests/a.rs":"b".repeat(64)},
+            "execution_profile":"cargo-workspace-v2"});
+        let campaign = Campaign {
+            campaign_id: "c",
+            generated: true,
+            ordinary_cargo: true,
+            ordinary_contract: Some(&contract),
+            declares_value_analysis: false,
+            source_symbols: &symbols,
+        };
+        let expected = SupportingInputs {
+            schema_version: 2,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "complete-snapshot-inputs-v2".into(),
+            digest: "a".repeat(64),
+            files: 4,
+        };
+        let mut receipt = native_receipt();
+        for field in ["campaign_id", "manifest", "manifest_sha256", "test_sha256"] {
+            receipt[field] = contract[field].clone();
+        }
+        receipt["supporting_inputs"] = serde_json::to_value(&expected).unwrap();
+        let check = |value: &Value, binding: Option<&SupportingInputs>| {
+            rejection_with_supporting(
+                &campaign,
+                value,
+                &json!({}),
+                |_| Ok(Some("e".repeat(64))),
+                |_| Ok(false),
+                None,
+                binding,
+            )
+            .unwrap()
+        };
+        assert!(check(&receipt, Some(&expected)).is_none());
+        assert!(check(&receipt, None).is_some());
+        let mut forged = receipt.clone();
+        forged["supporting_inputs"]["digest"] = json!("c".repeat(64));
+        assert!(check(&forged, Some(&expected)).is_some());
+        let root = SupportingInputs {
+            schema_version: 1,
+            scope: "cargo-root-rust-discovery-v1".into(),
+            ..expected.clone()
+        };
+        let mut forged_scope = receipt;
+        forged_scope["supporting_inputs"] = serde_json::to_value(&root).unwrap();
+        assert!(check(&forged_scope, Some(&root)).is_some());
+    }
+
     fn judged(receipt: &Value, hash: &str, lineage: bool) -> Option<String> {
         let symbols = std::collections::BTreeSet::new();
         let campaign = Campaign {

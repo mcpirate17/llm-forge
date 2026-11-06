@@ -477,7 +477,9 @@ fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
     write_receipt(parts.output_path, parts.receipt)?;
     let runtime = crate::mutation_execution_legacy::Runtime::prepare(&snapshot, grants, inputs)
         .map_err(|e| format!("execution admission: {e:#}"))?;
-    snapshot.populate(parts.repo_root)?;
+    inputs
+        .populate(&mut snapshot, parts.repo_root)
+        .map_err(|e| format!("snapshot population: {e:#}"))?;
     snapshot.remove_git_metadata()?;
     inputs
         .verify_snapshot(&snapshot.worktree)
@@ -507,13 +509,16 @@ fn in_legacy_snapshot(parts: Execution<'_>) -> Step<()> {
         test_session: None,
         planned: None,
     };
-    let finished = execute(&mut run, parts.binary).and_then(|()| {
-        if let Some(signal) = interrupted(parts.supervisor)? {
-            return Err(Stop::Cancelled(signal));
-        }
-        crate::mutation_source_coverage::require(run.campaign, run.worktree, run.receipt)?;
-        run.verify_identities()
-    });
+    let finished = runtime
+        .admit(&mut run)
+        .and_then(|()| execute(&mut run, parts.binary))
+        .and_then(|()| {
+            if let Some(signal) = interrupted(parts.supervisor)? {
+                return Err(Stop::Cancelled(signal));
+            }
+            crate::mutation_source_coverage::require(run.campaign, run.worktree, run.receipt)?;
+            run.verify_identities()
+        });
     *parts.planned = run.planned;
     let checked = runtime.verify(Some(&snapshot.worktree));
     if let Err(error) = &checked {
@@ -571,7 +576,7 @@ fn prepare_legacy(
         &git_dir,
     )
     .map_err(|e| format!("execution grants: {e:#}"))?;
-    let inputs = crate::mutation_execution_legacy::Inputs::capture(campaign, root)
+    let inputs = crate::mutation_execution_legacy::Inputs::capture(campaign, root, &grants)
         .map_err(|e| format!("ordinary Cargo admission: {e:#}"))?;
     Ok(Some((grants, inputs)))
 }
@@ -700,9 +705,25 @@ pub fn run_campaign(request: &RunRequest) -> Step<Receipt> {
         opened,
     )?;
     let cap = memory_cap()?;
-    receipt.insert("memory_cap_bytes".into(), json!(cap.map(|cap| cap.limit)));
+    if let Some((grants, _)) = &legacy {
+        let enforcement = crate::mutation_execution_grants::memory_enforcement(
+            &grants.resources,
+            cap,
+            std::env::var_os("MUTATION_MEMORY_CAP_GIB").is_some(),
+        )
+        .map_err(|e| e.to_string())?;
+        receipt.insert("memory_enforcement".into(), enforcement);
+        receipt.insert("memory_cap_bytes".into(), Value::Null);
+    } else {
+        receipt.insert("memory_cap_bytes".into(), json!(cap.map(|cap| cap.limit)));
+    }
     let (output, relative) =
         resolve_receipt_path(&campaign, request.receipt.as_deref(), &repo_root, opened)?;
+    if let Some((_, inputs)) = &legacy {
+        inputs
+            .receipt(&relative)
+            .map_err(|e| format!("receipt admission: {e:#}"))?;
+    }
     let interrupts =
         Interrupts::install().map_err(|error| format!("cannot own signals: {error}"))?;
     write_receipt(&output, &receipt)?;

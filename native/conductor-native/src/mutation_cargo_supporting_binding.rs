@@ -12,11 +12,17 @@ pub struct SupportingInputs {
 }
 impl SupportingInputs {
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1
-            || self.algorithm != "sha256-framed-path-content-v1"
-            || self.scope != "cargo-root-rust-discovery-v1"
+        if !matches!(
+            (self.schema_version, self.scope.as_str()),
+            (1, "cargo-root-rust-discovery-v1") | (2, "complete-snapshot-inputs-v2")
+        ) || self.algorithm != "sha256-framed-path-content-v1"
             || self.files < 2
-            || self.files > 4096
+            || self.files
+                > if self.schema_version == 1 {
+                    4096
+                } else {
+                    100_000
+                }
             || self.digest.len() != 64
             || !self
                 .digest
@@ -72,5 +78,52 @@ mod tests {
         changed = value;
         changed["unknown"] = serde_json::json!(true);
         assert!(compare(Some(&changed), Some(&expected)).is_err());
+    }
+}
+
+/// Select identity version from the independently verified campaign, never a receipt.
+pub fn compare_profile(
+    recorded: Option<&serde_json::Value>,
+    expected: Option<&SupportingInputs>,
+    profile: Option<&str>,
+) -> Result<(), String> {
+    let scope = match profile {
+        None => "cargo-root-rust-discovery-v1",
+        Some("cargo-workspace-v2") => "complete-snapshot-inputs-v2",
+        Some(_) => return Err("unsupported verified Cargo execution profile".into()),
+    };
+    if expected.is_some_and(|identity| identity.scope != scope) {
+        return Err("independent Cargo supporting input profile differs from campaign".into());
+    }
+    compare(recorded, expected)
+}
+
+#[cfg(test)]
+mod workspace_tests {
+    use super::*;
+    #[test]
+    fn verified_profile_not_receipt_selects_expected_identity() {
+        let root = SupportingInputs {
+            schema_version: 1,
+            algorithm: "sha256-framed-path-content-v1".into(),
+            scope: "cargo-root-rust-discovery-v1".into(),
+            digest: "a".repeat(64),
+            files: 3,
+        };
+        let workspace = SupportingInputs {
+            schema_version: 2,
+            algorithm: root.algorithm.clone(),
+            scope: "complete-snapshot-inputs-v2".into(),
+            digest: "b".repeat(64),
+            files: 4,
+        };
+        let v1 = serde_json::to_value(&root).unwrap();
+        let v2 = serde_json::to_value(&workspace).unwrap();
+        assert!(compare_profile(Some(&v1), Some(&root), None).is_ok());
+        assert!(compare_profile(Some(&v2), Some(&workspace), Some("cargo-workspace-v2")).is_ok());
+        assert!(compare_profile(Some(&v2), Some(&workspace), None).is_err());
+        assert!(compare_profile(Some(&v1), Some(&root), Some("cargo-workspace-v2")).is_err());
+        assert!(compare_profile(Some(&v2), None, Some("cargo-workspace-v2")).is_err());
+        assert!(compare_profile(Some(&v2), Some(&workspace), Some("unknown")).is_err());
     }
 }

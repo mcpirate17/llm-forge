@@ -261,3 +261,85 @@ fn complete_capture_bounds_do_not_expand_other_modes() {
             .is_err()
     );
 }
+
+#[test]
+fn strict_separate_accepts_large_stdout_without_widening_filter_cap() {
+    let command = || {
+        let mut cmd = Command::new("/usr/bin/head");
+        cmd.args(["-c", "1179648", "/dev/zero"]);
+        cmd
+    };
+    let captured = capture(
+        &mut command(),
+        Vec::new(),
+        CapturePolicy::StrictSeparate {
+            stdout: 2 * 1024 * 1024,
+            stderr: 1024,
+        },
+    )
+    .unwrap();
+    assert_eq!(captured.stdout.len(), 1179648);
+    assert!(!captured.lossy_utf8);
+    assert!(capture(
+        &mut command(),
+        Vec::new(),
+        CapturePolicy::StrictCombined(1024 * 1024)
+    )
+    .is_err());
+    assert!(CapturePolicy::StrictCombined(1024 * 1024 + 1)
+        .validate()
+        .is_err());
+}
+
+#[test]
+fn strict_separate_bounds_both_streams_and_marks_invalid_utf8_strict() {
+    let policy = CapturePolicy::StrictSeparate {
+        stdout: 3,
+        stderr: 2,
+    };
+    let captured = capture(
+        Command::new("/bin/sh").args(["-c", "printf abc; printf de >&2"]),
+        Vec::new(),
+        policy,
+    )
+    .unwrap();
+    assert_eq!(captured.stdout, b"abc");
+    assert_eq!(captured.stderr, b"de");
+    assert!(!captured.lossy_utf8);
+    for (script, stream) in [("printf abcd", "stdout"), ("printf def >&2", "stderr")] {
+        let error = capture(
+            Command::new("/bin/sh").args(["-c", script]),
+            Vec::new(),
+            policy,
+        )
+        .err()
+        .expect("overflow must refuse");
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("probe {stream} output exceeds")),
+            "{error:#}"
+        );
+    }
+    let invalid = capture(
+        Command::new("/bin/sh").args(["-c", "printf '\\377'; printf '\\376' >&2"]),
+        Vec::new(),
+        policy,
+    )
+    .unwrap();
+    assert!(!invalid.lossy_utf8);
+    assert!(String::from_utf8(invalid.stdout).is_err());
+    assert!(String::from_utf8(invalid.stderr).is_err());
+    assert!(CapturePolicy::StrictSeparate {
+        stdout: 16 * 1024 * 1024 + 1,
+        stderr: 1
+    }
+    .validate()
+    .is_err());
+    assert!(CapturePolicy::StrictSeparate {
+        stdout: 1,
+        stderr: 1024 * 1024 + 1
+    }
+    .validate()
+    .is_err());
+}

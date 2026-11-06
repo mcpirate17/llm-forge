@@ -22,6 +22,11 @@ pub(crate) trait CorpusInputs {
         &mut self,
         required: &BTreeMap<String, String>,
     ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs>;
+    fn workspace_inventory(
+        &mut self,
+        required: &crate::mutation_cargo_supporting::WorkspaceRequired,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs>;
+    fn workspace_receipt_root(&mut self) -> Result<String>;
 }
 impl CorpusInputs for Capture<'_> {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
@@ -51,6 +56,17 @@ impl CorpusInputs for Capture<'_> {
     ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
         self.supporting_inventory(required)
     }
+    fn workspace_inventory(
+        &mut self,
+        required: &crate::mutation_cargo_supporting::WorkspaceRequired,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        self.workspace_inventory(required)
+    }
+    fn workspace_receipt_root(&mut self) -> Result<String> {
+        let config = self.config()?;
+        conductor_native::project_paths::mutation_receipt_root_from_config(config.as_ref())
+            .map_err(anyhow::Error::msg)
+    }
 }
 impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
     fn hash(&mut self, path: &str) -> Result<Option<String>> {
@@ -76,6 +92,17 @@ impl CorpusInputs for crate::mutation_live_inputs::LiveInputs {
         required: &BTreeMap<String, String>,
     ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
         self.supporting_inventory(required)
+    }
+    fn workspace_inventory(
+        &mut self,
+        required: &crate::mutation_cargo_supporting::WorkspaceRequired,
+    ) -> Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs> {
+        self.workspace_inventory(required)
+    }
+    fn workspace_receipt_root(&mut self) -> Result<String> {
+        let config = self.workspace_config()?;
+        conductor_native::project_paths::mutation_receipt_root_from_config(config.as_ref())
+            .map_err(anyhow::Error::msg)
     }
 }
 fn string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
@@ -195,29 +222,86 @@ fn interpreter(campaign: &Value, root: &Path) -> Result<Option<(Value, Interpret
         observation,
     )))
 }
-fn receipt_rows(catalog: &Catalog) -> Result<BTreeMap<String, Vec<Value>>> {
-    let mut grouped = BTreeMap::<String, Vec<Value>>::new();
+fn receipt_rows(catalog: &Catalog) -> Result<BTreeMap<String, Vec<(String, Value)>>> {
+    let mut grouped = BTreeMap::<String, Vec<(String, Value)>>::new();
     for receipt in &catalog.receipts {
         let payload = crate::tool_schema::parse_document(&receipt.text)?;
         if let Some(id) = payload["campaign_id"].as_str() {
-            grouped.entry(id.into()).or_default().push(payload);
+            grouped
+                .entry(id.into())
+                .or_default()
+                .push((receipt.path.clone(), payload));
         }
     }
     Ok(grouped)
 }
+struct Supporting<'a> {
+    root: Option<&'a conductor_native::mutation_cargo_supporting_binding::SupportingInputs>,
+    root_error: Option<&'a str>,
+    receipt_root: Result<&'a str, &'a str>,
+    workspace: &'a BTreeMap<
+        String,
+        Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String>,
+    >,
+}
+fn accepted_rows(
+    rows: &[(String, Value)],
+    workspace: bool,
+    receipt_root: Result<&str, &str>,
+    capture: &mut dyn CorpusInputs,
+    reject: impl Fn(&Value, &mut dyn CorpusInputs) -> Result<Option<String>>,
+) -> Result<(Vec<Value>, BTreeSet<String>)> {
+    let mut reasons = BTreeSet::new();
+    let mut accepted = Vec::new();
+    for (path, row) in rows {
+        if workspace
+            && row
+                .as_object()
+                .is_some_and(conductor_native::mutation_native_runner::declared)
+        {
+            let allowed = receipt_root.as_ref().is_ok_and(|root| {
+                conductor_native::mutation_snapshot_inputs::within_namespace(path, root)
+            });
+            if !allowed {
+                reasons.insert(
+                    "workspace receipt is outside independently configured receipt root".into(),
+                );
+                continue;
+            }
+        }
+        match reject(row, capture)? {
+            Some(reason) => {
+                reasons.insert(reason);
+            }
+            None => accepted.push(row.clone()),
+        }
+    }
+    Ok((accepted, reasons))
+}
 fn campaign_receipts(
     campaign: &Value,
-    rows: &[Value],
+    rows: &[(String, Value)],
     capture: &mut dyn CorpusInputs,
     bundle: Option<&RunnerBundle>,
     installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
-    supporting: Option<&conductor_native::mutation_cargo_supporting_binding::SupportingInputs>,
-    supporting_error: Option<&str>,
+    supporting: &Supporting<'_>,
 ) -> Result<(Option<Value>, Vec<Value>, Vec<Value>)> {
     let ordinary_cargo = campaign["generated"] == true
         && campaign["mutation_engine"] == "cargo-mutants"
         && campaign["generated_value"].is_null();
     let id = string(campaign, "campaign_id")?;
+    let (identity, supporting_error) = if campaign["execution_profile"] == "cargo-workspace-v2" {
+        match supporting.workspace.get(id) {
+            Some(Ok(identity)) => (Some(identity), None),
+            Some(Err(error)) => (None, Some(error.as_str())),
+            None => (
+                None,
+                Some("independently captured workspace inputs unavailable"),
+            ),
+        }
+    } else {
+        (supporting.root, supporting.root_error)
+    };
     let symbols: BTreeSet<_> = keys(&campaign["source_symbols"])?.into_iter().collect();
     let view = receipts::Campaign {
         campaign_id: id,
@@ -267,19 +351,16 @@ fn campaign_receipts(
                     }))
             },
             installed,
-            supporting,
+            identity,
         )
     };
-    let mut reasons = BTreeSet::new();
-    let mut accepted = Vec::new();
-    for row in rows {
-        match reject(row, capture)? {
-            Some(reason) => {
-                reasons.insert(reason);
-            }
-            None => accepted.push(row.clone()),
-        }
-    }
+    let (accepted, reasons) = accepted_rows(
+        rows,
+        campaign["execution_profile"] == "cargo-workspace-v2",
+        supporting.receipt_root,
+        capture,
+        reject,
+    )?;
     let evidence = if rows.is_empty() {
         Some(
             json!({"campaign_id":id,"reason":"NO_RECEIPT","receipts":0,"detail":"no receipt declares this campaign_id"}),
@@ -306,6 +387,15 @@ fn scope(catalog: &Catalog, campaign: &Value) -> Result<CampaignScope> {
         source_paths: keys(&raw["source_sha256"])?,
         test_paths: keys(&raw["test_sha256"])?,
     })
+}
+fn workspace_receipt_root(capture: &mut dyn CorpusInputs, needed: bool) -> Result<String, String> {
+    if needed {
+        capture
+            .workspace_receipt_root()
+            .map_err(|error| format!("{error:#}"))
+    } else {
+        Err("independently captured workspace receipt root unavailable".into())
+    }
 }
 fn reproduction(
     catalog: &Catalog,
@@ -338,6 +428,26 @@ fn reproduction(
         Ok(value) => (value, None),
         Err(error) => (None, Some(format!("{error:#}"))),
     };
+    let workspace_required = crate::mutation_cargo_supporting::workspace_required_for(
+        &catalog.contracts,
+        &catalog.receipts,
+        || capture.hash(conductor_native::mutation_native_runner::FINGERPRINT_KEY),
+        installed,
+    )?;
+    let workspace =
+        crate::mutation_cargo_supporting::capture_workspace_profiles(workspace_required, |pins| {
+            capture.workspace_inventory(pins)
+        });
+    let receipt_root = workspace_receipt_root(capture, !workspace.is_empty());
+    let supporting = Supporting {
+        receipt_root: receipt_root
+            .as_ref()
+            .map(String::as_str)
+            .map_err(String::as_str),
+        root: supporting.as_ref(),
+        root_error: supporting_error.as_deref(),
+        workspace: &workspace,
+    };
     for campaign in &catalog.contracts {
         checker.poll()?;
         let id = string(campaign, "campaign_id")?;
@@ -346,15 +456,8 @@ fn reproduction(
             interpreter_bindings.push(binding);
         }
         let rows = grouped.get(id).map_or(&[][..], Vec::as_slice);
-        let (failure, missing, tests) = campaign_receipts(
-            campaign,
-            rows,
-            capture,
-            bundle,
-            installed,
-            supporting.as_ref(),
-            supporting_error.as_deref(),
-        )?;
+        let (failure, missing, tests) =
+            campaign_receipts(campaign, rows, capture, bundle, installed, &supporting)?;
         evidence.extend(failure);
         unmeasured.extend(missing);
         inert.extend(tests);

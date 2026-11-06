@@ -1,4 +1,4 @@
-//! First admitted ordinary mutation profile: confined std-only root Cargo.
+//! Shared confined owner for explicit root and full-source workspace Cargo profiles.
 use crate::{
     candidate_inputs::{self, BoundFile},
     mutation_bytecode::isolated_python_env,
@@ -15,7 +15,7 @@ use std::{
     cell::Cell,
     collections::BTreeMap,
     fs,
-    os::unix::fs::symlink,
+    os::unix::fs::{symlink, PermissionsExt},
     path::{Path, PathBuf},
 };
 fn error(value: impl std::fmt::Display) -> String {
@@ -167,7 +167,7 @@ fn validate_lock(bytes: &[u8], name: &str, version: &str) -> Result<()> {
     Ok(())
 }
 /// Hold the two root Cargo inputs used for std-only admission.
-pub(crate) struct Inputs {
+pub(crate) struct RootInputs {
     manifest: BoundFile,
     lock: BoundFile,
     manifest_hash: String,
@@ -176,7 +176,7 @@ pub(crate) struct Inputs {
     supporting_host: crate::mutation_cargo_supporting::Held,
     supporting_snapshot: std::cell::OnceCell<crate::mutation_cargo_supporting::Held>,
 }
-impl Inputs {
+impl RootInputs {
     pub fn capture(campaign: &Campaign, root: &Path) -> Result<Self> {
         validate_campaign(campaign)?;
         let (manifest, manifest_bytes) =
@@ -268,6 +268,71 @@ impl Inputs {
         Ok(())
     }
 }
+/// Profile is chosen from the validated manifest and separately granted by the operator.
+pub(crate) enum Inputs {
+    Root(Box<RootInputs>),
+    Workspace(Box<crate::mutation_workspace_inputs::Inputs>),
+}
+impl Inputs {
+    pub fn capture(campaign: &Campaign, root: &Path, grants: &Grants) -> Result<Self> {
+        match campaign
+            .options
+            .get("execution_profile")
+            .and_then(serde_json::Value::as_str)
+        {
+            None => {
+                ensure!(
+                    grants.cargo_workspace.is_none(),
+                    "workspace grant requires workspace profile"
+                );
+                RootInputs::capture(campaign, root).map(|inputs| Self::Root(Box::new(inputs)))
+            }
+            Some("cargo-workspace-v2") => {
+                crate::mutation_workspace_inputs::Inputs::capture(campaign, root, grants)
+                    .map(|inputs| Self::Workspace(Box::new(inputs)))
+            }
+            Some(_) => anyhow::bail!("unsupported Cargo execution profile"),
+        }
+    }
+    pub fn populate(&self, snapshot: &mut Snapshot, root: &Path) -> Result<()> {
+        match self {
+            Self::Root(_) => snapshot.populate(root).map_err(anyhow::Error::msg),
+            Self::Workspace(inputs) => inputs.populate(snapshot),
+        }
+    }
+    pub fn verify(&self, snapshot: Option<&Path>) -> Result<()> {
+        match self {
+            Self::Root(inputs) => inputs.verify(snapshot),
+            Self::Workspace(inputs) => inputs.verify(snapshot),
+        }
+    }
+    pub fn verify_snapshot(&self, root: &Path) -> Result<()> {
+        match self {
+            Self::Root(inputs) => inputs.verify_snapshot(root),
+            Self::Workspace(inputs) => inputs.verify(Some(root)),
+        }
+    }
+    pub fn supporting_identity(
+        &self,
+    ) -> &conductor_native::mutation_cargo_supporting_binding::SupportingInputs {
+        match self {
+            Self::Root(inputs) => inputs.supporting_identity(),
+            Self::Workspace(inputs) => inputs.identity(),
+        }
+    }
+    pub fn receipt(&self, relative: &str) -> Result<()> {
+        match self {
+            Self::Root(_) => Ok(()),
+            Self::Workspace(inputs) => inputs.receipt(relative),
+        }
+    }
+    fn stage(&self, path: &Path) -> Result<Option<crate::mutation_cargo_seed::StagedSeed>> {
+        match self {
+            Self::Root(_) => Ok(None),
+            Self::Workspace(inputs) => inputs.stage(path),
+        }
+    }
+}
 /// Own sandbox, reactor and cleanup ledger for one admitted snapshot.
 pub(crate) struct Runtime<'a> {
     grants: &'a Grants,
@@ -276,6 +341,7 @@ pub(crate) struct Runtime<'a> {
     reactor: tokio::runtime::Runtime,
     programs: BTreeMap<String, PathBuf>,
     root: PathBuf,
+    seed: Option<crate::mutation_cargo_seed::StagedSeed>,
     cleanup_complete: Cell<bool>,
     signal: Cell<Option<i32>>,
 }
@@ -338,7 +404,11 @@ impl<'a> Runtime<'a> {
             environment: environment.clone(),
         })?;
         fs::create_dir(root.join("bin"))?;
-        fs::create_dir(root.join("cargo-home"))?;
+        let seed = inputs.stage(&root.join("cargo-home"))?;
+        if seed.is_none() {
+            fs::create_dir(root.join("cargo-home"))?;
+            fs::set_permissions(root.join("cargo-home"), fs::Permissions::from_mode(0o700))?;
+        }
         fs::create_dir(root.join("target"))?;
         for (alias, path) in &programs {
             symlink(path, root.join("bin").join(alias))?;
@@ -356,6 +426,7 @@ impl<'a> Runtime<'a> {
             reactor,
             programs,
             root,
+            seed,
             cleanup_complete: Cell::new(true),
             signal: Cell::new(None),
         })
@@ -364,9 +435,17 @@ impl<'a> Runtime<'a> {
         self.grants.verify()?;
         self.grants.validate_private_root(&self.root)?;
         if let Some(path) = snapshot {
+            if self.workspace() {
+                crate::mutation_workspace_inputs::verify_command_ancestors(path)?;
+            }
             self.inputs.verify_snapshot(path)?;
         } else {
             self.inputs.verify(None)?;
+        }
+        if let Some(seed) = &self.seed {
+            seed.verify()?;
+        } else if self.workspace() {
+            crate::mutation_workspace_inputs::verify_unseeded_home(&self.root.join("cargo-home"))?;
         }
         for (alias, target) in &self.programs {
             ensure!(
@@ -376,11 +455,148 @@ impl<'a> Runtime<'a> {
         }
         Ok(())
     }
-    pub fn test_name(&self) -> &str {
-        &self.inputs.test_name
+    pub fn test_arguments(&self, campaign: &Campaign) -> Result<(Vec<String>, Vec<String>)> {
+        match self.inputs {
+            Inputs::Root(inputs) => {
+                let mut baseline = campaign.test_argv.clone();
+                baseline.extend([
+                    "--test".into(),
+                    inputs.test_name.clone(),
+                    "--locked".into(),
+                    "--offline".into(),
+                ]);
+                Ok((
+                    baseline,
+                    vec![format!("--cargo-test-arg=--test={}", inputs.test_name)],
+                ))
+            }
+            Inputs::Workspace(inputs) => {
+                let tests = inputs.tests()?;
+                Ok((tests.baseline_args.clone(), tests.engine_args.clone()))
+            }
+        }
+    }
+    pub fn admit(&self, run: &mut EngineRun<'_>) -> Step<()> {
+        let Inputs::Workspace(inputs) = self.inputs else {
+            return Ok(());
+        };
+        let argv = inputs.metadata_argv();
+        let root = run.worktree.to_owned();
+        let timeout = run.campaign.run_timeout_seconds.min(60);
+        let (report, stdout) =
+            self.command_capture(run, &argv, &root, timeout, Capture::Metadata)?;
+        if !report.succeeded() {
+            return Err(format!("Cargo metadata failed: {}", report.stderr_tail).into());
+        }
+        inputs
+            .admit_metadata(
+                stdout.as_bytes(),
+                &root,
+                &self.root.join("cargo-home"),
+                run.campaign,
+            )
+            .map_err(|e| format!("workspace metadata admission: {e:#}"))?;
+        let tests = inputs.tests().map_err(error)?;
+        run.receipt.insert("workspace_execution".into(), serde_json::json!({
+            "profile":"cargo-workspace-v2", "package_id":tests.package_id,
+            "package":tests.package_name,"targets":tests.targets,"test_scope":tests.test_scope,
+            "seed":self.seed.as_ref().map(|s| s.identity()),
+            "input_scope":"captured source and selected registry inputs; operator runtime read grants remain separate"
+        }));
+        Ok(run.write_receipt()?)
     }
     pub fn output(&self) -> PathBuf {
         self.root.join("mutants-output")
+    }
+    pub fn observe_baseline(&self, run: &mut EngineRun<'_>, stdout: &str) -> Step<()> {
+        if !self.workspace() {
+            return Ok(());
+        }
+        let observed =
+            conductor_native::mutation_cargo_observations::parse_package_baseline(stdout)?;
+        run.receipt.insert(
+            "workspace_baseline".into(),
+            serde_json::json!({"direct":observed}),
+        );
+        Ok(run.write_receipt()?)
+    }
+    pub fn observe_engine_baseline(
+        &self,
+        run: &mut EngineRun<'_>,
+        report: &serde_json::Value,
+    ) -> Step<()> {
+        let Inputs::Workspace(inputs) = self.inputs else {
+            return Ok(());
+        };
+        let outcomes = report["outcomes"]
+            .as_array()
+            .ok_or("engine outcomes missing")?;
+        let baseline: Vec<_> = outcomes
+            .iter()
+            .filter(|row| row["scenario"] == "Baseline")
+            .collect();
+        if baseline.len() != 1 {
+            return Err("one engine baseline required".into());
+        }
+        let row = baseline[0];
+        let relative = row["log_path"]
+            .as_str()
+            .ok_or("engine baseline log missing")?;
+        crate::candidate_source::safe_path(relative.as_bytes()).map_err(error)?;
+        if !relative.starts_with("log/") || !relative.ends_with(".log") {
+            return Err("invalid engine baseline log path".into());
+        }
+        let path = self.output().join("mutants.out").join(relative);
+        let (held, bytes) = candidate_inputs::repository_live(
+            &path,
+            conductor_native::mutation_cargo_observations::MAX_LOG_BYTES,
+        )
+        .map_err(error)?;
+        let tests = inputs.tests().map_err(error)?;
+        let cargo = self
+            .grants
+            .program("cargo")
+            .map_err(error)?
+            .to_str()
+            .ok_or("Cargo path UTF-8")?;
+        let observed =
+            conductor_native::mutation_cargo_observations::parse_package_engine_baseline(
+                row,
+                std::str::from_utf8(&bytes).map_err(error)?,
+                cargo,
+                &tests.package_name,
+                &tests.package_version,
+            )?;
+        held.verify().map_err(error)?;
+        if observed != run.receipt["workspace_baseline"]["direct"] {
+            return Err("engine and direct baseline test observations differ".into());
+        }
+        run.receipt["workspace_baseline"]["engine"] = observed;
+        run.receipt["workspace_baseline"]["engine_log_sha256"] =
+            serde_json::json!(crate::mutation_campaign::sha256_hex(&bytes));
+        Ok(run.write_receipt()?)
+    }
+    pub fn workspace(&self) -> bool {
+        matches!(self.inputs, Inputs::Workspace(_))
+    }
+    pub fn engine_campaign(&self, campaign: &Campaign) -> Result<Campaign> {
+        let mut selected = campaign.clone();
+        if let Inputs::Workspace(inputs) = self.inputs {
+            selected.source = inputs.tests()?.engine_sources.clone();
+        }
+        Ok(selected)
+    }
+    pub fn report_root(&self, campaign: &Campaign) -> Result<String> {
+        match self.inputs {
+            Inputs::Root(_) => Ok(campaign.option_text("package_root").unwrap_or_default()),
+            Inputs::Workspace(inputs) => Ok(inputs.tests()?.report_root.clone()),
+        }
+    }
+    pub fn report_package(&self) -> Result<Option<&str>> {
+        match self.inputs {
+            Inputs::Root(_) => Ok(None),
+            Inputs::Workspace(inputs) => Ok(Some(&inputs.tests()?.package_name)),
+        }
     }
     pub fn command(
         &self,
@@ -389,6 +605,24 @@ impl<'a> Runtime<'a> {
         cwd: &Path,
         timeout: i64,
     ) -> Step<(CommandResult, String)> {
+        let capture = if self.workspace() && argv.get(1).is_some_and(|s| s == "test") {
+            Capture::Strict
+        } else {
+            Capture::Complete
+        };
+        self.command_capture(run, argv, cwd, timeout, capture)
+    }
+    fn command_capture(
+        &self,
+        run: &mut EngineRun<'_>,
+        argv: &[String],
+        cwd: &Path,
+        timeout: i64,
+        capture: Capture,
+    ) -> Step<(CommandResult, String)> {
+        if self.workspace() && cwd != run.worktree {
+            return Err("workspace command must use the verified snapshot cwd".into());
+        }
         self.verify(Some(run.worktree)).map_err(error)?;
         let session = CommandSession {
             sandbox: &self.sandbox,
@@ -402,8 +636,20 @@ impl<'a> Runtime<'a> {
             max_wall_seconds: self.grants.max_wall_seconds,
             cargo_value: false,
         };
-        let result = session.command(run, argv, cwd, timeout, Capture::Complete);
-        self.verify(Some(run.worktree)).map_err(error)?;
+        let result = session.command(run, argv, cwd, timeout, capture);
+        if let Err(failure) = self.verify(Some(run.worktree)) {
+            // Preserve the child's bounded diagnostics when post-command input
+            // verification also fails (for example, an incomplete Cargo extract).
+            let command = result.as_ref().ok().map(|(report, _, _)| report.as_value());
+            run.receipt.insert(
+                "command_input_failure".into(),
+                serde_json::json!({
+                    "error":format!("{failure:#}"), "command":command
+                }),
+            );
+            run.write_receipt()?;
+            return Err(error(failure).into());
+        }
         result.map(|(report, stdout, _)| (report, stdout))
     }
 }

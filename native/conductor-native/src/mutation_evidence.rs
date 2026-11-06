@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
+pub use crate::mutation_manifest::profile::execution_profile;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -462,7 +463,8 @@ pub fn load_campaign_captured_with_cargo(
 mod captured;
 pub use captured::{
     verify_captured, verify_captured_native, verify_captured_native_with_supporting,
-    CapturedAttempt, CapturedReceipt, CapturedVerification,
+    verify_captured_native_with_supporting_profiles, CapturedAttempt, CapturedReceipt,
+    CapturedVerification, WorkspaceBindings,
 };
 
 pub fn normalize_path(path: &str) -> Result<String, String> {

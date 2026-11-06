@@ -298,6 +298,9 @@ enum MutationCommand {
     /// Describe this clean native executable for explicit operator pinning; grants no authority.
     #[cfg(target_os = "linux")]
     Identity,
+    /// Copy a lock-verified offline crates.io seed into a new private directory.
+    #[cfg(target_os = "linux")]
+    CargoSeed(forge::mutation_cargo_seed_cli::SeedArgs),
     /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
     /// Write one manifest and registry fragment per planned subject.
@@ -523,6 +526,12 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
     match action {
         #[cfg(target_os = "linux")]
         MutationCommand::Identity => command_exit("mutation identity", native_runner_identity(), 1),
+        #[cfg(target_os = "linux")]
+        MutationCommand::CargoSeed(args) => command_exit(
+            "mutation cargo-seed",
+            forge::mutation_cargo_seed_cli::run(args),
+            1,
+        ),
         MutationCommand::Results(args) => {
             command_exit("mutation results", mutation_results::run(args), 2)
         }

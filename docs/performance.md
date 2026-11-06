@@ -10,6 +10,46 @@ repaired working-tree measurements and matched binary comparisons are separated
 below. They do not certify the eventual PR head or installed runtime. Test and
 publication status are in the current [engineering status](roadmap.md).
 
+### Workspace mutation work in progress — 2026-11-06
+
+The first bounded Cargo seed preparation attempt refused the local cache's
+group-writable permissions before copying any files. The native task receipt
+recorded exit 1 without timeout, and its owned scope was independently confirmed
+absent. This failed admission is not a provisioning benchmark. The revised
+import treats public cache bytes as untrusted, verifies archives against the
+held lockfile and reads only required index records. Index bytes remain an
+operator-selected observation, not authenticated registry metadata.
+
+One subsequent dirty debug-build observation prepared all 338 registry packages
+from Forge's lockfile: 647 archive/index files totaling 79,078,410 bytes, with
+16,351 expanded files totaling 428,479,979 bytes verified from the archives.
+Under a native one-CPU, 1 GiB, 120-second task bound, preparation took 19.28
+seconds wall time (19.13 user, 0.09 system) with 87,328 KiB peak RSS. The task
+exited zero, retained all output and its scope was confirmed absent. This is a
+single preparation observation, not a cold/warm distribution, matched comparison
+or runtime staging test. No performance or task-benefit improvement is claimed.
+
+The subsequent dirty-build nested workspace/path-dependency diagnostic killed
+both automatically generated mutants and observed one passing test in both the
+direct and engine baselines. Its three command cgroups and snapshot were confirmed
+absent. Two preceding failed attempts are retained: metadata capture exceeded the
+selected API's limit, then cargo-mutants rejected `--jobs` with `--in-place`.
+The corrected engine phase took 318 ms in one observation; this excludes Forge
+admission, input verification and driver overhead and is not end-to-end latency.
+
+A separate one-registry-package trial provisioned a 25,761-byte seed but Cargo
+metadata failed during timestamp restoration while extracting the archive.
+Forge refused the incomplete extracted-source inventory, retained the snapshot
+and confirmed command cleanup. A diagnostic rerun preserved the underlying
+`Operation not permitted` error. Native pre-extraction then passed a fresh
+registry-backed trial: both automatic mutants were killed, direct/engine baselines
+each observed one passing test, and all three cgroups plus the snapshot were
+confirmed absent. Its 325 ms engine observation excludes admission and staging.
+The dirty-build trial completed 15 checks with 19 clean-build/corpus checks left
+unstarted. Clean-build corpus admission, the full Forge dependency workload and
+release measurements remain unproven. No failed or unstarted phase is counted
+as passing evidence.
+
 ### Actual Codex approval diagnostic — 2026-11-05
 
 The [retained failed attempt](../research/performance/forge-program-20261105-codex-mcp-approval.json)

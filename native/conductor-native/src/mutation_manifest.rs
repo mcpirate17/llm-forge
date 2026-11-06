@@ -70,6 +70,8 @@ pub(crate) struct CampaignContract {
     pub(crate) environment: Map<String, Value>,
     pub(crate) host_read_dependencies: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) execution_profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) generated_value: Option<Value>,
     pub(crate) value_analysis_payload: Option<Value>,
     pub(crate) value_analysis: Option<ValueContract>,
@@ -898,6 +900,9 @@ fn generated_campaign_contract(
         |relative| sha256_file(&root.join(relative)),
     )
 }
+#[path = "mutation_manifest_profile.rs"]
+pub(crate) mod profile;
+
 pub(crate) fn generated_campaign_contract_with(
     payload: &Map<String, Value>,
     manifest_bytes: Vec<u8>,
@@ -909,6 +914,8 @@ pub(crate) fn generated_campaign_contract_with(
         return Err("generated_value requires independently captured Cargo inventory".into());
     }
     let generator = object(payload.get("generator"), "generator")?;
+    let language = required_string(payload, "language", "language")?;
+    let profile = profile::execution_profile(generator, &language, mutation_engine)?;
     let source_sha256 = digest_map(payload, "source_sha256")?;
     let test_sha256 = digest_map(payload, "test_sha256")?;
 
@@ -966,7 +973,7 @@ pub(crate) fn generated_campaign_contract_with(
     Ok(CampaignContract {
         campaign_id: required_string(payload, "campaign_id", "campaign_id")?,
         title: required_string(payload, "title", "title")?,
-        language: required_string(payload, "language", "language")?,
+        language,
         mutation_engine: mutation_engine.to_owned(),
         expected_mutations: 0,
         manifest: relative_manifest.to_owned(),
@@ -984,6 +991,7 @@ pub(crate) fn generated_campaign_contract_with(
         poll_seconds: 0,
         environment,
         host_read_dependencies: Vec::new(),
+        execution_profile: profile,
         generated_value: None,
         value_analysis_payload: None,
         value_analysis: None,

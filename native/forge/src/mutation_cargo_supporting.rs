@@ -176,6 +176,9 @@ pub(crate) fn required_for(
     let mut required = BTreeMap::new();
     let mut found = false;
     for contract in contracts {
+        if !contract["execution_profile"].is_null() {
+            continue;
+        }
         if !contract["campaign_id"]
             .as_str()
             .is_some_and(|id| native_ids.contains(id))
@@ -200,6 +203,86 @@ pub(crate) fn required_for(
         }
     }
     Ok(found.then_some(required))
+}
+
+pub(crate) struct WorkspaceRequired {
+    pub(crate) pins: BTreeMap<String, String>,
+    pub(crate) manifest: String,
+}
+/// Identify workspace contracts by their independently loaded profile, never receipt fields.
+pub(crate) fn workspace_required_for(
+    contracts: &[serde_json::Value],
+    receipts: &[conductor_native::mutation_evidence::CapturedReceipt],
+    mut native_fingerprint: impl FnMut() -> Result<Option<String>>,
+    installed: Option<&conductor_native::mutation_native_runner::InstalledIdentity>,
+) -> Result<BTreeMap<String, Result<WorkspaceRequired, String>>> {
+    let mut eligible = std::collections::BTreeSet::new();
+    for receipt in receipts {
+        if let Some(id) = eligible_receipt(receipt, contracts, &mut native_fingerprint, installed)?
+        {
+            eligible.insert(id);
+        }
+    }
+    let mut result = BTreeMap::new();
+    for contract in contracts {
+        let Some(id) = contract["campaign_id"].as_str() else {
+            continue;
+        };
+        if contract["execution_profile"] != "cargo-workspace-v2" || !eligible.contains(id) {
+            continue;
+        }
+        ensure!(
+            result
+                .insert(id.to_owned(), workspace_pins(contract))
+                .is_none(),
+            "duplicate workspace campaign ID"
+        );
+    }
+    Ok(result)
+}
+pub(crate) fn capture_workspace_profiles(
+    required: BTreeMap<String, Result<WorkspaceRequired, String>>,
+    mut capture: impl FnMut(
+        &WorkspaceRequired,
+    ) -> Result<
+        conductor_native::mutation_cargo_supporting_binding::SupportingInputs,
+    >,
+) -> BTreeMap<
+    String,
+    Result<conductor_native::mutation_cargo_supporting_binding::SupportingInputs, String>,
+> {
+    required
+        .into_iter()
+        .map(|(id, pins)| {
+            let result = pins.and_then(|pins| capture(&pins).map_err(|error| format!("{error:#}")));
+            (id, result)
+        })
+        .collect()
+}
+fn workspace_pins(contract: &serde_json::Value) -> Result<WorkspaceRequired, String> {
+    let mut pins = BTreeMap::new();
+    for field in ["source_sha256", "test_sha256"] {
+        let map = contract[field]
+            .as_object()
+            .ok_or_else(|| format!("missing {field} pins"))?;
+        for (path, value) in map {
+            let hash = value
+                .as_str()
+                .ok_or_else(|| format!("invalid {field} pin"))?;
+            if let Some(old) = pins.insert(path.clone(), hash.to_owned()) {
+                if old != hash {
+                    return Err(format!(
+                        "conflicting workspace source and test pins: {path}"
+                    ));
+                }
+            }
+        }
+    }
+    let manifest = contract["manifest"]
+        .as_str()
+        .ok_or("workspace campaign manifest is missing")?
+        .to_owned();
+    Ok(WorkspaceRequired { pins, manifest })
 }
 
 #[cfg(test)]
