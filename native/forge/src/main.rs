@@ -312,6 +312,9 @@ enum MutationCommand {
     /// Copy a lock-verified offline crates.io seed into a new private directory.
     #[cfg(target_os = "linux")]
     CargoSeed(forge::mutation_cargo_seed_cli::SeedArgs),
+    /// Export an inventory of a private Fest guest without executing it.
+    #[cfg(target_os = "linux")]
+    FestGuest(forge::mutation_fest_guest_cli::FestGuestArgs),
     /// Report the campaigns `forge mutation write` would emit; writes nothing.
     Plan(Box<mutation_plan::PlanArgs>),
     /// Write one manifest and registry fragment per planned subject.
@@ -559,6 +562,12 @@ fn run_mutation(action: MutationCommand) -> ExitCode {
         MutationCommand::CargoSeed(args) => command_exit(
             "mutation cargo-seed",
             forge::mutation_cargo_seed_cli::run(args),
+            1,
+        ),
+        #[cfg(target_os = "linux")]
+        MutationCommand::FestGuest(args) => command_exit(
+            "mutation fest-guest",
+            forge::mutation_fest_guest_cli::run(args),
             1,
         ),
         MutationCommand::Results(args) => {

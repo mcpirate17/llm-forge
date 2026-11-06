@@ -96,7 +96,7 @@ impl ReadOnlyCache {
 use crate::mutation_cargo_seed::{
     inventory_root, inventory_tree, verify_inventory_root, InventoryBudget, InventoryEntry,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Operator-selected external manifest is authority; the guest never selects it.
 #[derive(Deserialize)]
@@ -108,11 +108,178 @@ pub(crate) struct GuestConfig {
     pub(crate) external_files: std::collections::BTreeMap<PathBuf, String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct GuestManifest {
     schema_version: u32,
     entries: Vec<InventoryEntry>,
+}
+
+#[derive(Serialize)]
+pub(crate) struct ExportedGuest {
+    manifest_path: PathBuf,
+    manifest_sha256: String,
+    entries: usize,
+    file_bytes: u64,
+    scope: &'static str,
+}
+
+fn private_directory(path: &Path) -> Result<cap_std::fs::Dir> {
+    use cap_std::fs::MetadataExt as _;
+    use std::os::unix::fs::MetadataExt as _;
+    let metadata = fs::symlink_metadata(path)?;
+    ensure!(
+        metadata.is_dir()
+            && !metadata.file_type().is_symlink()
+            && metadata.uid() == unsafe { libc::geteuid() }
+            && metadata.mode() & 0o7777 == 0o700,
+        "Fest export directory must be current-user owned and mode 0700"
+    );
+    let held = inventory_root(path)?;
+    let opened = held.dir_metadata()?;
+    ensure!(
+        opened.dev() == metadata.dev()
+            && opened.ino() == metadata.ino()
+            && opened.uid() == unsafe { libc::geteuid() }
+            && opened.mode() & 0o7777 == 0o700,
+        "Fest export directory changed during opening"
+    );
+    verify_inventory_root(path, &held)?;
+    Ok(held)
+}
+
+fn export_inventory(root: &Path, held: &cap_std::fs::Dir) -> Result<Vec<InventoryEntry>> {
+    verify_inventory_root(root, held)?;
+    ensure!(
+        matches!(fs::symlink_metadata(root.join("seed-manifest.json")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound),
+        "Fest guest contains reserved seed manifest path"
+    );
+    let entries = inventory_tree(held, None, "", &mut InventoryBudget::guest())?;
+    validate_entries(&entries)?;
+    validate_layout(&entries)?;
+    verify_inventory_root(root, held)?;
+    Ok(entries)
+}
+
+/// Export point-in-time guest inventory only; this grants no execution authority.
+pub(crate) fn export(root: &Path, output: &Path) -> Result<ExportedGuest> {
+    use std::path::Component;
+    ensure!(
+        output.is_absolute()
+            && output
+                .components()
+                .all(|c| matches!(c, Component::RootDir | Component::Normal(_))),
+        "Fest manifest output must be an absolute normalized path"
+    );
+    ensure!(
+        !output.starts_with(root) && !root.starts_with(output),
+        "Fest manifest output overlaps guest root"
+    );
+    let parent = output
+        .parent()
+        .context("Fest manifest output parent missing")?;
+    let name = output
+        .file_name()
+        .context("Fest manifest output name missing")?;
+    let guest = private_directory(root)?;
+    let output_parent = private_directory(parent)?;
+    let entries = export_inventory(root, &guest)?;
+    let bytes = serde_json::to_vec_pretty(&GuestManifest {
+        schema_version: 1,
+        entries: entries.clone(),
+    })?;
+    ensure!(
+        bytes.len() <= 8 * 1024 * 1024,
+        "Fest manifest exceeds bound"
+    );
+    verify_inventory_root(parent, &output_parent)?;
+    let mut output_file = write_export(&output_parent, name, &bytes).with_context(|| {
+        format!(
+            "Fest manifest export failed; output may be retained at {}",
+            output.display()
+        )
+    })?;
+    let after = export_inventory(root, &guest).with_context(|| {
+        format!(
+            "Fest export verification failed; output retained at {}",
+            output.display()
+        )
+    })?;
+    ensure!(
+        after == entries,
+        "Fest guest changed; output retained at {}",
+        output.display()
+    );
+    verify_inventory_root(parent, &output_parent).with_context(|| {
+        format!(
+            "Fest output parent changed; output retained at {}",
+            output.display()
+        )
+    })?;
+    verify_export(&output_parent, name, &mut output_file, &bytes).with_context(|| {
+        format!(
+            "Fest manifest final verification failed; output retained at {}",
+            output.display()
+        )
+    })?;
+    use sha2::{Digest as _, Sha256};
+    Ok(ExportedGuest {
+        manifest_path: output.to_owned(),
+        manifest_sha256: format!("{:x}", Sha256::digest(&bytes)),
+        entries: entries.len(),
+        file_bytes: entries.iter().map(|entry| entry.bytes).sum(),
+        scope: "point-in-time inventory; no guest execution or authority granted",
+    })
+}
+
+fn write_export(
+    parent: &cap_std::fs::Dir,
+    name: &std::ffi::OsStr,
+    bytes: &[u8],
+) -> Result<cap_std::fs::File> {
+    use cap_std::fs::{OpenOptions, OpenOptionsExt as _};
+    use std::io::Write as _;
+    let mut file = parent.open_with(
+        name,
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC),
+    )?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    verify_export(parent, name, &mut file, bytes)?;
+    Ok(file)
+}
+
+fn verify_export(
+    parent: &cap_std::fs::Dir,
+    name: &std::ffi::OsStr,
+    file: &mut cap_std::fs::File,
+    bytes: &[u8],
+) -> Result<()> {
+    use cap_std::fs::MetadataExt as _;
+    use std::io::{Read as _, Seek as _};
+    file.rewind()?;
+    let mut readback = Vec::new();
+    (&mut *file)
+        .take((bytes.len() + 1) as u64)
+        .read_to_end(&mut readback)?;
+    ensure!(readback == bytes, "Fest manifest readback mismatch");
+    let held = file.metadata()?;
+    let named = parent.symlink_metadata(name)?;
+    ensure!(
+        named.is_file()
+            && held.dev() == named.dev()
+            && held.ino() == named.ino()
+            && held.nlink() == 1
+            && named.nlink() == 1,
+        "Fest manifest identity changed after creation"
+    );
+    Ok(())
 }
 
 pub(crate) struct HeldGuest {
@@ -398,3 +565,7 @@ mod tests {
 #[cfg(test)]
 #[path = "mutation_fest_guest_tests.rs"]
 mod admission_tests;
+
+#[cfg(test)]
+#[path = "mutation_fest_guest_export_tests.rs"]
+mod export_tests;

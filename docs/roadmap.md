@@ -89,17 +89,17 @@ whole-operation deadline. No external-client or host adoption is claimed.
 
 The active increment returns to [#196](https://github.com/mcpirate17/llm-forge/issues/196):
 a narrowly admitted Fest profile using a pinned private guest and the existing
-native command owner. The implementation adds independent snapshot bindings,
-read-only empty bytecode caches, guest-first imports and complete kill attribution.
-Focused native checks passed; live validation is still incomplete. Two attempts
-refused before payload launch. A debug attempt completed one pytest command, then
-correctly refused after coverage cleanup removed its configuration. These failures
-remain recorded. A fourth attempt reached the engine and failed on thread-pool
-admission; its cgroups, snapshot and cache were removed. No Fest mutation PASS
-or performance benefit is established.
-Next validate automatic kills, survivors, collection-error rejection and receipt
-freshness, then run the full publication gates. Unmarked Fest and Mull execution
-remain refused. See the [active evidence index](../research/performance/forge-program-20261106-confined-fest.json).
+native command owner. It adds complete snapshot bindings, read-only empty bytecode
+caches, guest-first imports, complete kill attribution and native guest inventory
+export. Strict Clippy and 13 guest checks passed after correcting fixture modes.
+Debug controls now produced strong `PASS` (three attributed kills), weak
+`RATCHET_HELD` (one survivor), and collection-error `ERROR` (zero attributed kills).
+The combined strong/weak observer and collection observer failed incorrect exit
+expectations; their corrected assertions still require a release rerun. Earlier
+inventory, environment, coverage-config and thread-pool failures remain recorded.
+Next run corrected release controls, independently audit supporting-input freshness
+and complete publication gates. Unmarked Fest and Mull execution remain refused.
+See the [active evidence index](../research/performance/forge-program-20261106-confined-fest.json).
 
 ### Architecture, evidence and disposition
 

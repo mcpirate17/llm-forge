@@ -1,16 +1,18 @@
 {
   "schema_version": 1,
   "status": "IN_PROGRESS_NOT_ACCEPTED",
-  "scope": "confined Fest profile validation; no full mutation PASS or performance claim",
+  "scope": "confined Fest profile validation; debug outcomes observed, corrected release controls and publication gates pending",
   "attempts": {
     "observer_tests_passed": 0,
-    "observer_tests_failed": 4,
+    "observer_tests_failed": 6,
     "pre_payload_refusals": 2,
     "partial_baseline_only_runs": 1,
-    "engine_runs_completed": 0,
+    "engine_runs_completed": 3,
     "weak_controls_unstarted": 4,
-    "collection_error_control": "UNSTARTED",
-    "engine_startup_failures": 1
+    "collection_error_control": "DEBUG_NATIVE_ERROR_EXPECTED_OBSERVER_ORACLE_FAILED",
+    "engine_startup_failures": 1,
+    "debug_strong": "PASS_3_KILLED_3_ATTRIBUTED",
+    "debug_weak": "RATCHET_HELD_2_KILLED_1_SURVIVED_NOT_PASS"
   },
   "evidence": [
     {
@@ -180,18 +182,83 @@
         "source_observations": 1,
         "intervention": "fixture owner sets source mtime only; actual bytes/hashes retained in separate records"
       }
+    },
+    {
+      "path": ".git/forge-fest-debug-pools-binary.json",
+      "sha256": "d581d2b586b18519c822e5efa1a360df79060a6d8986bbf80ee3291bb3e2dd5c"
+    },
+    {
+      "path": ".git/forge-fest-debug-strong-independent.json",
+      "sha256": "a25083e31e8016003f5b64e6e940a206ecb9da01d687b4abab8551ab19ae9e8b"
+    },
+    {
+      "path": ".git/forge-fest-debug-weak-independent.json",
+      "sha256": "b436098df042923475cb5da30442ed3dfcc94c4fb0cdc64f8b6f62304211f1b8"
+    },
+    {
+      "path": ".git/forge-fest-debug-both-fresh-absence.json",
+      "sha256": "da2618da77608918d273d0fe8824d05ec4b19c8100632d14c3357e3c46219c21"
+    },
+    {
+      "path": ".git/forge-fest-debug-collection-independent.json",
+      "sha256": "43f12d3c98490b45e0c4405399773ccb7573962242bda09166a946912a808958"
+    },
+    {
+      "path": ".git/forge-fest-debug-collection-fresh-absence.json",
+      "sha256": "0296724ecf1941d7e1d9dec00087c757135c81e71d90af13676f5398c19f1708"
     }
   ],
   "limitations": [
     "Raw logs and fixture roots are retained locally, not bundled into Git.",
     "Debug observer/runtime measurements are not release performance.",
-    "No accepted optimization, external-client result, host adoption or full release-gate result is established."
+    "No accepted optimization, external-client result, host adoption or full release-gate result is established.",
+    "Debug strong/weak independent resource absence was observed while the parent cgroup existed; collection independent absence was observed only after parent expiry.",
+    "Same-size automatic source replacement was witnessed at a deliberately equalized mtime, but default return values remained 7; the changed return-value mutant had a different source size.",
+    "Collection marker PIDs are correlated by exact automatic mutant source bytes, not directly bound to command PIDs. Original JUnit files were disposed; the collection stdout tail contained the full engine JSON."
   ],
   "next": [
-    "Complete real automatic strong, weak and collection-error controls.",
-    "Repeat runtime controls with a clean release binary.",
+    "Run corrected strong/weak and collection observer tests using a clean release binary and native-exported guest inventory.",
     "Independently audit receipts and live/committed supporting-input freshness.",
-    "Provide native guest inventory tooling and documented setup.",
+    "Verify documented native guest export/setup.",
     "Run exact committed full local-check/local-verify before normal PR integration."
-  ]
+  ],
+  "debug_outcomes": {
+    "strong": {
+      "fixture": "/tmp/.tmpzohCq1",
+      "status": "PASS",
+      "generated": 3,
+      "killed": 3,
+      "attributed": 3,
+      "commands": 7,
+      "fixture_checks": "complete"
+    },
+    "weak": {
+      "fixture": "/tmp/.tmp4ezyEb",
+      "status": "RATCHET_HELD",
+      "generated": 3,
+      "killed": 2,
+      "survived": 1,
+      "attributed": 2,
+      "commands": 6,
+      "fixture_checks": "failed incorrect nonzero-exit oracle before remaining checks; independent raw audit completed"
+    },
+    "collection": {
+      "fixture": "/tmp/.tmpv4sFqt",
+      "status": "ERROR",
+      "generated": 3,
+      "engine_killed": 3,
+      "attributed": 0,
+      "commands": 7,
+      "fixture_checks": "failed incorrect pytest-exit2 oracle; actual explicit-node collection exit4 independently verified",
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        4,
+        4,
+        4
+      ]
+    }
+  }
 }

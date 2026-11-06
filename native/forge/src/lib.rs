@@ -291,6 +291,8 @@ pub(crate) mod mutation_fest_coverage;
 #[cfg(target_os = "linux")]
 pub(crate) mod mutation_fest_guest;
 #[cfg(target_os = "linux")]
+pub mod mutation_fest_guest_cli;
+#[cfg(target_os = "linux")]
 pub(crate) mod mutation_fest_inputs;
 #[cfg(target_os = "linux")]
 pub mod mutation_plan;

@@ -1230,17 +1230,17 @@ Baseline/final result JSON SHA-256:
 
 ## Confined Fest validation — active, 2026-11-06
 
-The explicit Fest profile is under validation; no mutation PASS or speedup is
-claimed. Two release attempts refused before payload launch: an incorrectly
-ordered operator inventory, then a reserved sandbox environment override.
-A debug attempt executed one pytest baseline command successfully (561 ms in
-its command ledger), then refused when coverage cleanup removed its own config.
-The snapshot and empty cache were retained, and the owned command cgroup was
-confirmed absent. A subsequent debug attempt passed its baseline (580 ms), then
-failed engine startup at the process limit (12 ms); all owned resources were
-removed. The timestamp stress fixture now records an explicit owner metadata
-intervention with unchanged source bytes. These are not benchmark comparisons.
+Debug controls produced a strong `PASS` (3/3 kills attributed), weak `RATCHET_HELD`
+(2 kills, 1 survivor), and collection-error `ERROR` (3 engine-classified kills,
+none attributed). The combined strong/weak and collection observer tests failed
+incorrect exit expectations; corrected release reruns remain pending. The first
+four failures—inventory order, sandbox environment, coverage-config erasure and
+thread-pool admission—remain recorded. Strong/weak resource absence was observed
+before parent expiry; the collection independent check occurred after expiry.
 
+The same-size automatic source replacement was observed at an explicitly imposed
+mtime, with default return values unchanged; a separate return-value mutant had
+a different size. These are functional controls, not benchmark comparisons.
 The [evidence index](../research/performance/forge-program-20261106-confined-fest.json)
-retains these failed attempts, build identities and unresolved validation work.
+retains raw-artifact references, build identities, failures and remaining work.
 No agent task-success, token-cost, clean-host or installation benefit is inferred.

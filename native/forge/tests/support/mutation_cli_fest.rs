@@ -952,8 +952,10 @@ fn verify_outcome(
         assert_eq!(receipt["status"], "PASS");
         assert!(mutants.iter().all(|row| row["outcome"] == "KILLED"));
     } else {
-        assert!(!status.success(), "weak control must not PASS");
-        assert_ne!(receipt["status"], "PASS");
+        // Initial survivors establish the existing ratchet with exit zero;
+        // that status remains distinct from complete mutation PASS evidence.
+        assert_eq!(receipt["status"], "RATCHET_HELD");
+        assert!(status.success(), "initial ratchet command failed: {shown}");
         assert!(
             mutants.iter().any(|row| row["outcome"] == "SURVIVED"),
             "weak control has no actual survivor"
@@ -968,7 +970,7 @@ fn collection_command(receipt: &Value, position: usize) -> bool {
         .is_some_and(|commands| {
             commands.iter().any(|row| {
                 row["confinement"]["outcome"] == "exited"
-                    && row["confinement"]["exit_code"] == 2
+                    && row["confinement"]["exit_code"] == 4
                     && row["confinement"]["signal"].is_null()
                     && row["argv"].as_array().is_some_and(|args| {
                         args.iter().any(|arg| {
@@ -1007,17 +1009,24 @@ fn verify_collection_error(
     let original = fs::read_to_string(host.repo.join("subject.py")).unwrap();
     let observations = observed(host.root.as_ref().unwrap().path());
     // Marker bytes and command are correlated to the same mutant; the ledger
-    // does not independently bind the observed marker PID to that command.
+    // does not independently bind either observed marker PID to that command.
+    // Pytest exits 4 when the explicit node has no collector after import failure.
     let witnessed = killed.iter().enumerate().any(|(position, row)| {
         let rejected = unattributed.iter().any(|item| item["id"] == row["id"]);
-        let source = altered(&original, row);
-        let marked = observations.iter().any(|entry| {
-            entry["marker"] == "automatic mutant changed collection input"
-                && entry["source"].as_str() == source.as_deref()
-        });
-        rejected && marked && collection_command(receipt, position)
+        let Some(source) = altered(&original, row) else {
+            return false;
+        };
+        let pids: BTreeSet<u64> = observations
+            .iter()
+            .filter(|entry| {
+                entry["marker"] == "automatic mutant changed collection input"
+                    && entry["source"].as_str() == Some(source.as_str())
+            })
+            .filter_map(|entry| entry["pid"].as_u64().filter(|pid| *pid > 0))
+            .collect();
+        rejected && pids.len() >= 2 && collection_command(receipt, position)
     });
-    assert!(witnessed, "no generated killed mutant had a matching collection marker and attribution exit 2: {receipt}");
+    assert!(witnessed, "no generated killed mutant had a two matching collection marker PIDs and attribution exit 4: {receipt}");
 }
 
 struct Notice {
