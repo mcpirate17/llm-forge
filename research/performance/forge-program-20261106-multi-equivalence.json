@@ -1,0 +1,393 @@
+{
+  "schema_version": 1,
+  "kind": "forge-native-multi-module-equivalence",
+  "issue": "https://github.com/mcpirate17/llm-forge/issues/230",
+  "base_commit": "2da74aa34161a121874c8cef33d0609651734a42",
+  "status": "implemented_focused_passed_release_guest_measurement_publication_pending",
+  "scope": [
+    "Repeated explicit whole modules share one capture and Stage",
+    "Changed-from and all-tracked automatic selection bound to captured tree and original index/refs",
+    "Explicit tracked-only live profile; extra inputs remain operator-selected",
+    "Make slop-gate invokes native CLI with explicit grants, guest pin and configured artifact output grant"
+  ],
+  "focused_validation": [
+    {
+      "record": ".git/forge-multi-gate-focused1.json",
+      "sha256": "608dade765d80e22e62c5d2aa57b8f2eeef5262758e77d50472682118787e622",
+      "source_clean": false,
+      "source_unchanged": true,
+      "steps": [
+        {
+          "step": "selection",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "candidate_source::live_selection::"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 23.307820958987577,
+          "log": ".git/forge-multi-gate-selection1.log",
+          "log_sha256": "e1e0f75bfda1070a5984563e7426f952098b98b356fc02ab139a630652bfeaae",
+          "test_summaries": [
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1365 filtered out; finished in 0.00s",
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1360 filtered out; finished in 0.03s"
+          ]
+        },
+        {
+          "step": "snapshot",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "snapshot"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 1.1651076849957462,
+          "log": ".git/forge-multi-gate-snapshot1.log",
+          "log_sha256": "d8ee51b45bd914fe80c890114da7016a44c43c8344bc70628cd9e6bff42e3f05",
+          "test_summaries": [
+            "test result: ok. 110 passed; 0 failed; 2 ignored; 0 measured; 1254 filtered out; finished in 1.08s"
+          ]
+        },
+        {
+          "step": "equivalence",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "equivalence"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 0.3449713870068081,
+          "log": ".git/forge-multi-gate-equivalence1.log",
+          "log_sha256": "6d6c72f73f80378f1ffa3f8e1cd7575a85223ab3987122cd8a9b08ec1e1b5ae2",
+          "test_summaries": [
+            "test result: FAILED. 51 passed; 1 failed; 2 ignored; 0 measured; 1312 filtered out; finished in 0.25s"
+          ]
+        }
+      ]
+    },
+    {
+      "record": ".git/forge-multi-gate-focused2.json",
+      "sha256": "31e771423aa4529ac1fb17fe3c57cdcf96001c14be166a3b6ef00802984d3f4f",
+      "source_clean": false,
+      "source_unchanged": true,
+      "steps": [
+        {
+          "step": "equivalence",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "equivalence"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 11.948968902986962,
+          "log": ".git/forge-multi-gate-equivalence2.log",
+          "log_sha256": "0c404ae115f0545ff8b4bcc6bd4baa0e2bd569823895fba76fe6642b319dec45",
+          "test_summaries": [
+            "test result: ok. 52 passed; 0 failed; 2 ignored; 0 measured; 1312 filtered out; finished in 0.26s"
+          ]
+        },
+        {
+          "step": "clippy",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 10.798797907016706,
+          "log": ".git/forge-multi-gate-clippy2.log",
+          "log_sha256": "8f782c81c70ba06f9f5d6eacb847b32772d26652b75fa077ddce8356a3a2d307",
+          "test_summaries": []
+        }
+      ]
+    },
+    {
+      "record": ".git/forge-multi-gate-focused3.json",
+      "sha256": "09e319e90fabad58334d6a85e323d6c8aa597f25f00867dd490b8c164a84bb49",
+      "source_clean": false,
+      "source_unchanged": true,
+      "steps": [
+        {
+          "step": "clippy",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 19.959240958007285,
+          "log": ".git/forge-multi-gate-clippy3.log",
+          "log_sha256": "d04ddf8c419c85921a0a1c9b7a499fc6c96880345ffcdbc0687ee4d53de1d1e7",
+          "test_summaries": []
+        }
+      ]
+    },
+    {
+      "record": ".git/forge-multi-gate-focused4.json",
+      "sha256": "64609389f337fc47d258d02a945f2c37ff4319665259e3176032612ace29c20c",
+      "source_clean": false,
+      "source_unchanged": true,
+      "steps": [
+        {
+          "step": "clippy",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.9061245380144101,
+          "log": ".git/forge-multi-gate-clippy4.log",
+          "log_sha256": "6dfed49cf8b3475f14e9e28b048899c687f4b7a08eb486c33e7cacc48b111bf4",
+          "test_summaries": []
+        },
+        {
+          "step": "fmt",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "fmt",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 2.4565867979836185,
+          "log": ".git/forge-multi-gate-fmt4.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "test_summaries": []
+        },
+        {
+          "step": "cli-build",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "build",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge-cli",
+            "--bin",
+            "forge"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 26.81565415300429,
+          "log": ".git/forge-multi-gate-cli-build4.log",
+          "log_sha256": "1decd0afd69ae61bec737851a9651682218a0e3ff9b6ffd7c9f32c97de608810",
+          "test_summaries": []
+        },
+        {
+          "step": "cli",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--test",
+            "equivalence_gate_cli",
+            "--test",
+            "equivalence_backlog_cli"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.77866237598937,
+          "log": ".git/forge-multi-gate-cli4.log",
+          "log_sha256": "e1b258eb360070b4866c7846612a45c7d15e0f677d1f4ecb0ecbfe075859a31e",
+          "test_summaries": [
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s"
+          ]
+        }
+      ]
+    },
+    {
+      "record": ".git/forge-multi-gate-focused5.json",
+      "sha256": "a5b4fbe5b79affa0b30ceaa447bfea176a73cab53976d4c6cc5688152caa277e",
+      "source_clean": false,
+      "source_unchanged": true,
+      "steps": [
+        {
+          "step": "configuration",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "-p",
+            "forge",
+            "--lib",
+            "equivalence_gate::tests::automatic_modes_keep_raw_snapshot_git_configuration_refusals"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 11.630253204988549,
+          "log": ".git/forge-multi-gate-configuration5.log",
+          "log_sha256": "b7c2915daa97fbe21f23bd638f1652f1a63e80aff22f929ae7ceb5a9bf0b24d2",
+          "test_summaries": [
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1366 filtered out; finished in 0.01s"
+          ]
+        },
+        {
+          "step": "clippy",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "2",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 12.298644505994162,
+          "log": ".git/forge-multi-gate-clippy5.log",
+          "log_sha256": "6bcdec267de0591b8d55980ced6c8a3513aa7aeb98106d476202fdbaedf8cf28",
+          "test_summaries": []
+        },
+        {
+          "step": "fmt",
+          "argv": [
+            "cargo",
+            "+1.98.0",
+            "fmt",
+            "--manifest-path",
+            "native/forge/Cargo.toml",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 2.4517391090048477,
+          "log": ".git/forge-multi-gate-fmt5.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "test_summaries": []
+        }
+      ]
+    }
+  ],
+  "independent_review": {
+    "findings_addressed": [
+      "Avoid libgit2 worktree diff before bounded content checks; compare captured Git trees",
+      "Reject malformed duplicate base tree paths",
+      "Refuse eligible symlink modules explicitly rather than silently omitting",
+      "Expose SLOP_ARTIFACTS for configured output authority"
+    ],
+    "guest_controls": "Three opt-in multi-module controls authored and independently reviewed; compiled, not executed yet",
+    "comparator": "Draft read-only legacy root approach rejected in independent review: legacy probing writes under root. Preparing explicitly labeled selector plus mutable captured-preimage probe comparison."
+  },
+  "retained_failures": [
+    "Focused1 new dangling-link test incorrectly expected live capture itself to refuse; corrected to assert final module selection refusal and cleanup",
+    "Focused2 strict Clippy get-first and large-enum-variant; corrected accessor and boxed CLI variant, no suppression",
+    "Focused3 new integration helper lifetime compile error; corrected local binding"
+  ],
+  "limitations": [
+    "Current evidence is dirty-source focused validation, not clean release, installation or active-host adoption",
+    "Live capture is bounded and deliberately narrower than legacy ambient worktree access; untracked/ignored drivers need explicit input roots",
+    "Raw snapshot configuration rejects attributes, conversion, unsupported index flags and symlink emulation",
+    "Captured inputs are not every authorized guest read: original source/Git and granted dependencies remain readable",
+    "Empty selection validates config, limits and output authority but does not load unused guest, record or waivers",
+    "No current-cycle performance, model-token, cost or agent-task gain is established",
+    "Detailed focused records and logs under .git are host-local; public commands allow rerunning tests",
+    "slop-backlog still uses legacy Python gate before native fold; its caller contract is not migrated here"
+  ],
+  "reproduction": [
+    "cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml -p forge --lib candidate_source::live_selection::",
+    "cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml -p forge --lib snapshot",
+    "cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml -p forge --lib equivalence",
+    "cargo +1.98.0 clippy --offline --locked --manifest-path native/forge/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.98.0 fmt --manifest-path native/forge/Cargo.toml --all -- --check",
+    "FORGE_TEST_BIN=/absolute/checked/forge cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml -p forge --test equivalence_gate_cli --test equivalence_backlog_cli"
+  ]
+}

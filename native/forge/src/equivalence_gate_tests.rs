@@ -77,6 +77,29 @@ impl Fixture {
             commit,
         }
     }
+
+    fn commit_paths(&mut self, paths: &[&str]) {
+        let repo = self.source.repository();
+        let mut index = repo.index().unwrap();
+        for path in paths {
+            index.add_path(std::path::Path::new(path)).unwrap();
+        }
+        index.write().unwrap();
+        let tree = index.write_tree().unwrap();
+        let signature = Signature::now("fixture", "fixture@example.invalid").unwrap();
+        let parent = repo.head().unwrap().peel_to_commit().unwrap();
+        self.commit = repo
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                "fixture inputs",
+                &repo.find_tree(tree).unwrap(),
+                &[&parent],
+            )
+            .unwrap()
+            .to_string();
+    }
 }
 
 #[test]
@@ -101,7 +124,7 @@ fn literal_selection_refuses_refs_abbreviations_traversal_and_invalid_jobs() {
         "probe.rs",
         "probe\n.py",
     ] {
-        selected.module = module.into();
+        selected.module = vec![module.into()];
         assert!(validate_selection(&selected).is_err(), "{module}");
     }
     selected = args();
@@ -255,4 +278,212 @@ fn live_source_adapter_keeps_origin_and_binds_selected_disk_inputs() {
         fs::read_to_string(origin.join("probe.py")).unwrap(),
         "def value():\n    return 99\n"
     );
+}
+
+fn automatic_args(base: Option<&str>) -> GateArgs {
+    let mut requested = args();
+    requested.commit = None;
+    requested.live = true;
+    requested.tracked_only = true;
+    requested.module.clear();
+    requested.changed_from = base.map(str::to_owned);
+    requested.all_tracked = base.is_none();
+    requested
+}
+
+#[test]
+fn parser_preserves_repeated_modules_and_requires_one_selection_and_live_scope() {
+    let common = [
+        "gate",
+        "--grants",
+        "/operator/grants.json",
+        "--guest-path",
+        "/operator/guest.so",
+        "--guest-sha256",
+        "not-loaded",
+    ];
+    for extra in [
+        vec!["--live", "--tracked-only"],
+        vec![
+            "--live",
+            "--tracked-only",
+            "--input",
+            "src",
+            "--all-tracked",
+        ],
+        vec![
+            "--live",
+            "--tracked-only",
+            "--module",
+            "a.py",
+            "--all-tracked",
+        ],
+        vec![
+            "--live",
+            "--tracked-only",
+            "--changed-from",
+            "HEAD",
+            "--all-tracked",
+        ],
+        vec![
+            "--commit",
+            "0123456789012345678901234567890123456789",
+            "--all-tracked",
+        ],
+    ] {
+        assert!(Command::try_parse_from(common.iter().copied().chain(extra)).is_err());
+    }
+    for extra in [
+        vec![
+            "--live",
+            "--tracked-only",
+            "--module",
+            "b.py",
+            "--module",
+            "a.py",
+        ],
+        vec!["--live", "--input", "src", "--changed-from", "HEAD"],
+        vec!["--live", "--tracked-only", "--all-tracked"],
+    ] {
+        let selected = Command::try_parse_from(common.iter().copied().chain(extra))
+            .unwrap()
+            .gate;
+        validate_selection(&selected).unwrap();
+        if !selected.module.is_empty() {
+            assert_eq!(selected.module, ["b.py", "a.py"]);
+        }
+    }
+    let mut selected = args();
+    selected.module.push(selected.module[0].clone());
+    assert!(validate_selection(&selected)
+        .unwrap_err()
+        .to_string()
+        .contains("repeated"));
+}
+
+#[test]
+fn automatic_selection_filters_tests_untracked_and_missing_files_and_binds_drift() {
+    for changed in [false, true] {
+        let mut f = Fixture::new();
+        let root = f.source.root().to_owned();
+        fs::create_dir_all(root.join("tests")).unwrap();
+        fs::create_dir_all(root.join("test")).unwrap();
+        let tracked = [
+            "b.py",
+            "a.py",
+            "deleted.py",
+            "tests/helper.py",
+            "test/util.py",
+            "test_root.py",
+            "conftest.py",
+            "notes.txt",
+        ];
+        for path in tracked {
+            fs::write(root.join(path), "value = 1\n").unwrap();
+        }
+        f.commit_paths(&tracked);
+        for path in tracked {
+            fs::write(root.join(path), "value = 2\n").unwrap();
+        }
+        fs::remove_file(root.join("deleted.py")).unwrap();
+        fs::write(root.join("untracked.py"), "value = 3\n").unwrap();
+        let requested = automatic_args(changed.then_some(f.commit.as_str()));
+        let selected = SelectedSource::capture(&requested, f.source, &f.grants).unwrap();
+        let modules = SelectedModules::capture(&requested, &selected).unwrap();
+        assert_eq!(modules.paths(), ["a.py", "b.py"]);
+        assert!(modules.module().is_none());
+        assert_eq!(modules.evidence()["module_count"], 2);
+        modules.verify(&selected).unwrap();
+        fs::write(root.join("a.py"), "value = 99\n").unwrap();
+        assert!(modules.verify(&selected).is_err());
+        selected.discard().unwrap();
+        assert_eq!(fs::read_dir(&f.grants.scratch_parent).unwrap().count(), 0);
+    }
+}
+
+#[test]
+fn explicit_modules_keep_order_and_test_module_compatibility() {
+    let f = Fixture::new();
+    let mut requested = args();
+    requested.commit = Some(f.commit.clone());
+    requested.module = vec!["test_b.py".into(), "a.py".into()];
+    let selected = SelectedSource::capture(&requested, f.source, &f.grants).unwrap();
+    let modules = SelectedModules::capture(&requested, &selected).unwrap();
+    assert_eq!(modules.paths(), ["test_b.py", "a.py"]);
+    assert_eq!(selected.scope(), "committed-whole-modules");
+    assert_eq!(modules.evidence()["mode"], "explicit");
+    selected.discard().unwrap();
+}
+
+#[test]
+fn automatic_symlink_modules_refuse_instead_of_silently_omitting_them() {
+    for changed in [false, true] {
+        let mut f = Fixture::new();
+        let root = f.source.root().to_owned();
+        fs::write(root.join("actual.py"), "value = 1\n").unwrap();
+        f.commit_paths(&["actual.py"]);
+        let base = f.commit.clone();
+        std::os::unix::fs::symlink("actual.py", root.join("alias.py")).unwrap();
+        f.commit_paths(&["alias.py"]);
+        let requested = automatic_args(changed.then_some(base.as_str()));
+        let selected = SelectedSource::capture(&requested, f.source, &f.grants).unwrap();
+        let error = SelectedModules::capture(&requested, &selected)
+            .err()
+            .unwrap();
+        assert!(
+            error
+                .to_string()
+                .contains("ordinary Python module: alias.py"),
+            "{error:#}"
+        );
+        selected.discard().unwrap();
+        assert_eq!(fs::read_dir(&f.grants.scratch_parent).unwrap().count(), 0);
+    }
+}
+
+#[test]
+fn automatic_selection_refuses_dangling_and_escaping_module_links() {
+    for target in ["absent.py", "../outside.py"] {
+        let mut f = Fixture::new();
+        let root = f.source.root().to_owned();
+        std::os::unix::fs::symlink(target, root.join("alias.py")).unwrap();
+        f.commit_paths(&["alias.py"]);
+        let requested = automatic_args(None);
+        match SelectedSource::capture(&requested, f.source, &f.grants) {
+            Ok(selected) => {
+                let error = SelectedModules::capture(&requested, &selected)
+                    .err()
+                    .unwrap();
+                assert!(error
+                    .to_string()
+                    .contains("ordinary Python module: alias.py"));
+                selected.discard().unwrap();
+            }
+            Err(error) => assert!(format!("{error:#}").contains("symlink"), "{error:#}"),
+        }
+        assert_eq!(fs::read_dir(&f.grants.scratch_parent).unwrap().count(), 0);
+    }
+}
+
+#[test]
+fn automatic_modes_keep_raw_snapshot_git_configuration_refusals() {
+    for (key, value) in [
+        ("core.symlinks", false),
+        ("core.filemode", false),
+        ("core.autocrlf", true),
+    ] {
+        let f = Fixture::new();
+        f.source
+            .repository()
+            .config()
+            .unwrap()
+            .set_bool(key, value)
+            .unwrap();
+        let requested = automatic_args(None);
+        let error = SelectedSource::capture(&requested, f.source, &f.grants)
+            .err()
+            .unwrap();
+        assert!(format!("{error:#}").contains(key), "{error:#}");
+        assert_eq!(fs::read_dir(&f.grants.scratch_parent).unwrap().count(), 0);
+    }
 }

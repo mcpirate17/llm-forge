@@ -1,5 +1,7 @@
 //! Exact, bounded Git object identities for candidate review, without a Git child.
 mod changes;
+mod live_selection;
+pub(crate) use live_selection::{LiveSelection, LiveSelectionMode};
 pub mod lines;
 mod resolve;
 pub(crate) use resolve::parse_index;

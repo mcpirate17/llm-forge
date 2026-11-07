@@ -240,8 +240,18 @@ difference as a proven causal regression. Independent review agreed to reject
 the added bookkeeping. All native source is restored to `981163d`; no speedup is
 promoted. The [experiment and receipts](../research/performance/forge-program-20261106-snapshot-sync.json)
 retain the profile, failures, successful controls, comparison and cleanup proof.
-Publication checks for this investigation record are next, followed by native
-default-changed/tracked-all multi-module selection for the remaining Make gate.
+[PR #229](https://github.com/mcpirate17/llm-forge/pull/229) published the rejected
+experiment: all 18 checks passed with 5,092 passing executions, zero failures and
+215 ignored across 185 harnesses. Two fresh-base verifications passed; merge
+`2da74aa` preserves the checked tree. No optimization or shared install was promoted.
+[Issue #230](https://github.com/mcpirate17/llm-forge/issues/230) is active: native
+multi-module and changed/all-tracked selection with one Stage, an explicit
+tracked-only capture profile, and Make gate migration. Focused selector, snapshot,
+equivalence and actual CLI/Make tests pass, with strict Clippy and formatting.
+Clean release, guest comparisons, measurements and publication gates remain pending;
+the [evidence index](../research/performance/forge-program-20261106-multi-equivalence.json)
+retains initial failures and their corrections. Attribute/symlink restrictions and empty-selection
+behavior are documented in the [gate contract](equivalence-gate.md).
 
 ### Architecture, evidence and disposition
 

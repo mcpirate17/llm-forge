@@ -257,6 +257,17 @@ impl Snapshot {
         Ok(binding)
     }
 
+    /// Capture tracked live bytes and mandatory root config, with no extra roots.
+    pub(crate) fn populate_live_tracked(&mut self, repo: &Path) -> Result<LiveBinding, String> {
+        self.allocation
+            .verify(&self.root)
+            .map_err(|e| format!("snapshot root: {e:#}"))?;
+        let binding = native::live::populate_tracked(repo, &self.root, &self.worktree)
+            .map_err(|e| format!("tracked live snapshot: {e:#}"))?;
+        self.commit = binding.commit().to_owned();
+        Ok(binding)
+    }
+
     pub(crate) fn verify_live(&self, repo: &Path, binding: &LiveBinding) -> Result<(), String> {
         self.allocation
             .verify(&self.root)

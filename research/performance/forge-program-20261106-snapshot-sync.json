@@ -4,7 +4,7 @@
   "date": "2026-11-06",
   "issue": "https://github.com/mcpirate17/llm-forge/issues/228",
   "base_commit": "981163d8fa81ef84e6d953e2a7d027dc6c6f93ac",
-  "status": "experiment_rejected_native_source_restored_publication_pending",
+  "status": "experiment_rejected_native_source_restored_publication_passed",
   "scope": "Investigated shared native snapshot directory synchronization. Candidate correctness passed, but the primary1000-file preparation target did not demonstrate improvement. Existing native implementation restored byte-for-byte; no product optimization accepted.",
   "profile": {
     "path": ".git/forge-snapshot-sync-profile-audit.json",
@@ -848,5 +848,28 @@
       "GIT_CONFIG_GLOBAL": "/dev/null"
     },
     "method": "Build each revision in a clean checkout; copy and hash the forge lib-test executable reported by Cargo before changing revisions. Run reference,candidate,candidate,reference blocks of5 fresh processes each using the native performance recorder with90s/sample and zero outer warmups. Every process itself performs2 warm+10 scored iterations for each commit/live mode and0/1000-file case; preserve all48 raw rows and check tree/target/input identities and zero scratch. Never overwrite output paths. Full recorder commands are in the four public receipts; host-local driver records the exact historical allowlisted environment and oracles. New runs are new observations, not replacements for this baseline."
+  },
+  "publication": {
+    "pr": "https://github.com/mcpirate17/llm-forge/pull/229",
+    "checked_head": "e35cdddda879bc10bb66ddd8cd28ebdef4d94c45",
+    "merge_commit": "2da74aa34161a121874c8cef33d0609651734a42",
+    "checked_and_merged_tree": "4800e4f9926bd7f91184d8e9b97e77e4a16fc71c",
+    "checks_passed": 18,
+    "test_executions": {
+      "passed": 5092,
+      "failed": 0,
+      "ignored": 215,
+      "harnesses": 185
+    },
+    "receipt": ".git/forge-checks/run-1794006800735123052-3032877/receipt.json",
+    "receipt_sha256": "89b5ece7916aedddebb923b7d3719ee3e774a1075e2591a703a19564cf568db1",
+    "fresh_base_verifications_passed": 2,
+    "independent_audit": ".git/forge-snapshot-sync-publication-audit.json",
+    "independent_audit_sha256": "6e4158515ee4213aaa125f6d0015cc3b7a13b1c32417dcc1b04a299d34b9132b",
+    "native_entries_preserved": 1494,
+    "source_preservation_proof": ".git/forge-snapshot-sync-integration-source-preservation.json",
+    "evidence_availability": "Publication receipt, logs and audits are host-local under .git; PR body records final validation.",
+    "shared_install": false,
+    "optimization_shipped": false
   }
 }

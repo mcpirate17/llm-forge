@@ -144,9 +144,23 @@ SLOP_JOBS ?=
 SLOP_ENFORCE ?=
 SLOP_MODULE ?=
 SLOP_TESTS ?=
+SLOP_GRANTS ?=
+SLOP_GUEST_PATH ?=
+SLOP_GUEST_SHA256 ?=
+SLOP_ARTIFACTS ?=
+SLOP_INPUTS ?=
+SLOP_ALL_TRACKED ?=
+# Raw operator-supplied native gate arguments (for example, explicit resource limits).
+SLOP_GATE_ARGS ?=
 
-slop-gate:  ## Equivalence probe over changed modules; reports only (add SLOP_ENFORCE=--enforce to fail)
-	$(PYTHON) -m conductor.equivalence_gate gate --base "$(SLOP_BASE)" --root "$(CONDUCTOR_HOST_ROOT)" $(SLOP_ENFORCE)
+slop-gate:  ## Native live equivalence gate; set SLOP_GRANTS, SLOP_GUEST_PATH and SLOP_GUEST_SHA256
+	@test -n "$(SLOP_GRANTS)" -a -n "$(SLOP_GUEST_PATH)" -a -n "$(SLOP_GUEST_SHA256)" || { echo "Set SLOP_GRANTS, SLOP_GUEST_PATH and SLOP_GUEST_SHA256"; exit 2; }
+	"$(FORGE)" equivalence gate --root "$(CONDUCTOR_HOST_ROOT)" --live \
+		--grants "$(SLOP_GRANTS)" --guest-path "$(SLOP_GUEST_PATH)" --guest-sha256 "$(SLOP_GUEST_SHA256)" \
+		$(if $(SLOP_ARTIFACTS),--artifacts "$(SLOP_ARTIFACTS)") \
+		$(if $(strip $(SLOP_INPUTS)),$(foreach p,$(SLOP_INPUTS),--input "$(p)"),--tracked-only) \
+		$(if $(strip $(SLOP_MODULES)),$(foreach m,$(SLOP_MODULES),--module "$(m)"),$(if $(filter 1,$(SLOP_ALL_TRACKED)),--all-tracked,--changed-from "$(SLOP_BASE)")) \
+		$(if $(SLOP_JOBS),--jobs $(SLOP_JOBS)) $(SLOP_ENFORCE) $(SLOP_GATE_ARGS)
 
 slop-backlog:  ## Probe with the Python gate, then fold summaries using native Forge (SLOP_MODULES defaults to changed)
 	@mkdir -p "$(CONDUCTOR_HOST_ROOT)/$(CONDUCTOR_REPORTS_DIR)"

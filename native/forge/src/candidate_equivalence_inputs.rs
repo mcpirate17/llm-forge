@@ -193,6 +193,11 @@ fn config(inputs: &mut SnapshotInputs<'_>) -> Result<(ProbeConfig, Option<Record
         return Ok((ProbeConfig::default(), None));
     }
     let text = inputs.read("pyproject.toml")?;
+    config_text(text)
+}
+
+fn config_text(text: &str) -> Result<(ProbeConfig, Option<RecordConfig>)> {
+    ensure!(!text.contains('\0'), "configuration contains NUL");
     let doc: toml::Value = toml::from_str(text)?;
     let forge = doc.get("tool").and_then(|v| v.get("forge"));
     let probe: ProbeConfig = forge
@@ -203,6 +208,55 @@ fn config(inputs: &mut SnapshotInputs<'_>) -> Result<(ProbeConfig, Option<Record
         .unwrap_or_default();
     let record = record_config(&doc).map_err(anyhow::Error::msg)?;
     Ok((probe, record))
+}
+
+fn probe_limits(probe: &ProbeConfig, granted_jobs: usize) -> Result<(f64, usize)> {
+    let timeout = probe.per_module_timeout.unwrap_or(180.0);
+    ensure!(
+        timeout.is_finite() && (0.001..=3600.0).contains(&timeout),
+        "invalid equivalence module timeout"
+    );
+    let jobs = probe.jobs.unwrap_or(granted_jobs).min(granted_jobs);
+    ensure!((1..=32).contains(&jobs), "invalid equivalence job count");
+    Ok((timeout, jobs))
+}
+
+/// Validate an empty selection without another tree materialization or guest launch.
+pub(crate) fn empty_artifacts(
+    origin: &Source,
+    captured: &Source,
+    tree_oid: &str,
+    grants: &Grants,
+    supplied: Option<&Path>,
+    granted_jobs: usize,
+) -> Result<Option<Artifacts>> {
+    let tree = captured
+        .repository()
+        .find_tree(git2::Oid::from_str(tree_oid)?)?;
+    let probe = if let Some(entry) = tree.get_name("pyproject.toml") {
+        ensure!(
+            matches!(entry.filemode(), 0o100644 | 0o100755),
+            "configuration is not a regular blob"
+        );
+        let (size, kind) = captured.repository().odb()?.read_header(entry.id())?;
+        ensure!(
+            kind == git2::ObjectType::Blob && size <= 1024 * 1024,
+            "configuration exceeds 1 MiB or is not a blob"
+        );
+        let blob = captured.repository().find_blob(entry.id())?;
+        let (probe, _record) = config_text(std::str::from_utf8(blob.content())?)?;
+        probe
+    } else {
+        ProbeConfig::default()
+    };
+    probe_limits(&probe, granted_jobs)?;
+    admit_artifacts(
+        probe.run_artifacts.as_deref(),
+        supplied,
+        origin.root(),
+        captured.root(),
+        &grants.scratch_parent,
+    )
 }
 fn record_path(config: &RecordConfig, root: &Path) -> Result<PathBuf> {
     let path = if let Some(rest) = config.store.strip_prefix("~/") {
@@ -394,6 +448,7 @@ pub(crate) fn capture<'a>(
 
 /// Select one whole regular Python module from a real committed-tree snapshot.
 /// The caller separately binds the requested commit and verifies the full tree.
+#[cfg(test)]
 pub(crate) fn capture_committed<'s>(
     context: CaptureContext<'_, 's>,
     module: &str,
@@ -401,19 +456,53 @@ pub(crate) fn capture_committed<'s>(
     supplied_artifacts: Option<&Path>,
     granted_jobs: usize,
 ) -> Result<Captured<'s>> {
+    capture_modules(
+        context,
+        &[module.to_owned()],
+        supplied_store,
+        supplied_artifacts,
+        granted_jobs,
+    )
+}
+
+/// Capture one bounded whole-module plan with shared configuration and record data.
+pub(crate) fn capture_modules<'s>(
+    context: CaptureContext<'_, 's>,
+    modules: &[String],
+    supplied_store: Option<(&Path, &str)>,
+    supplied_artifacts: Option<&Path>,
+    granted_jobs: usize,
+) -> Result<Captured<'s>> {
     context.validate()?;
-    crate::candidate_source::safe_path(module.as_bytes())?;
     ensure!(
-        module.ends_with(".py") && !module.chars().any(char::is_control),
-        "selected module must be a literal Python path"
+        !modules.is_empty() && modules.len() <= 100_000,
+        "whole-module capture requires 1..100000 modules"
     );
     let mut tree = SnapshotInputs::new(
         context.tree_source,
         context.snapshot,
         &context.snapshot.report().tree_oid,
     )?;
-    tree.read(module)?;
-    let changes = [(module.to_owned(), None)];
+    let mut names = std::collections::BTreeSet::new();
+    let mut bytes = 0usize;
+    let mut changes = Vec::with_capacity(modules.len());
+    for module in modules {
+        crate::candidate_source::safe_path(module.as_bytes())?;
+        ensure!(
+            module.ends_with(".py") && !module.chars().any(char::is_control),
+            "selected module must be a literal Python path"
+        );
+        ensure!(
+            names.insert(module),
+            "selected module is repeated: {module}"
+        );
+        bytes = bytes
+            .checked_add(module.len())
+            .context("module path overflow")?;
+        ensure!(bytes <= 64 * 1024 * 1024, "module paths exceed 64 MiB");
+        tree.read(module)?;
+        changes.push((module.to_owned(), None));
+    }
     let mut captured = capture_common(
         HeldInputs::Committed(tree),
         context,
@@ -423,8 +512,13 @@ pub(crate) fn capture_committed<'s>(
         granted_jobs,
     )?;
     captured.evidence["source_kind"] = serde_json::json!("commit_tree");
-    captured.evidence["scope"] = serde_json::json!("whole_module");
-    captured.evidence["module"] = serde_json::json!(module);
+    if let [module] = modules {
+        captured.evidence["scope"] = serde_json::json!("whole_module");
+        captured.evidence["module"] = serde_json::json!(module);
+    } else {
+        captured.evidence["scope"] = serde_json::json!("whole_modules");
+        captured.evidence["modules"] = serde_json::json!(modules);
+    }
     captured.evidence["record_provenance"] = if captured.record.is_some() {
         serde_json::json!("separately_supplied_current_data")
     } else {
@@ -450,13 +544,7 @@ fn capture_common<'s>(
     } = &context;
     let tree = inputs.tree_mut();
     let (probe, record_config) = config(tree)?;
-    let timeout = probe.per_module_timeout.unwrap_or(180.0);
-    ensure!(
-        timeout.is_finite() && (0.001..=3600.0).contains(&timeout),
-        "invalid equivalence module timeout"
-    );
-    let jobs = probe.jobs.unwrap_or(granted_jobs).min(granted_jobs);
-    ensure!((1..=32).contains(&jobs), "invalid equivalence job count");
+    let (timeout, jobs) = probe_limits(&probe, granted_jobs)?;
     let waivers = if let Some(path) = &probe.waivers {
         crate::candidate_source::safe_path(path.as_bytes())?;
         Some(tree.read_bytes_with_limit(path, 1024 * 1024)?.to_vec())
@@ -584,3 +672,7 @@ mod artifact_tests {
 #[cfg(test)]
 #[path = "candidate_equivalence_capture_tests.rs"]
 mod capture_tests;
+
+#[cfg(test)]
+#[path = "candidate_equivalence_multi_tests.rs"]
+mod multi_tests;
