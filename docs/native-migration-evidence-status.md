@@ -1,5 +1,10 @@
 # Migration and evidence status snapshot
 
+> The outstanding obligations in this historical snapshot are reconciled in
+> [CF-01–CF-05 and the related research IDs](research/efficiency-program.md#ordered-implementation-backlog).
+> That document is the single active backlog. This file preserves evidence levels
+> and historical rationale; it is not an independent current task queue.
+
 Historical material moved from the pre-rewrite architecture document on 2026-11-02.
 This preserves earlier working-tree claims and remaining-work notes; it is not a
 current release receipt, active inventory or deployment claim. Use the named
@@ -70,7 +75,7 @@ clean-host operation still require migration and evidence. In particular, the
 hardware-acceleration requirement is conditional on measured embedded workloads;
 no unconditional GPU implementation is a completion criterion.
 
-The remaining program is:
+The historical program obligations, now consolidated into that backlog, were:
 
 1. **Retire interpreted callers.** Find each reachable Python implementation,
    command wrapper, hook fallback, provider/bootstrap adapter and package

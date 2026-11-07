@@ -1,306 +1,232 @@
-# llm-forge — landscape, research program and backlog (2026-11-05)
+# Forge efficiency program and canonical backlog
 
-Reviewed at `d891e83` (#201); committed on top of `0a5ca5c` (#202).
-Written for a local Claude Code / Codex session to pick up: items have IDs, files and
-a "done when" check. Suggested home: `docs/research/efficiency-program.md`, with the
-backlog items split into GitHub issues.
+Reconciled on 2026-11-06 against source `2e89322` and the delivered contracts,
+implementation and tests at that revision. The original proposal was reviewed at
+`d891e83` (#201), based on `0a5ca5c` (#202), and preserved in commit
+`96337e3980b3a38981b31abd3d753c1a4feea87d`. Later work through #231 is considered
+where its behavior is present in the compared tree. This is a documentation
+reconciliation; no new experiment or client run was performed.
 
-**Primary user:** the owner, across his own repos. Outside adoption is welcome but
-secondary, which is why marketing is an optional appendix.
+**This is the single ordered improvement/research backlog.** It merges the original
+71 stable IDs with the remaining program in [the roadmap](../roadmap.md) and
+[the migration status](../native-migration-evidence-status.md). The roadmap retains
+architecture and delivery history. Known defects belong in the
+[GitHub issue tracker](https://github.com/mcpirate17/llm-forge/issues), not a second
+local defect ledger. Entries here describe scope, evidence and acceptance; issue
+status remains authoritative. Historical migration task lists are leads to verify,
+not proof that their named callers remain unmigrated.
 
-**Scope of Forge (as the owner defines it):** Forge is a *supporting tool layer* for
-any AI coding app (Claude Code, Codex, Cursor, Aider, local-model CLIs). It is not
-a coding CLI. It attacks four problems:
+Forge supports existing coding clients; it is not a coding CLI. Its primary user
+is its owner across his repositories. The four research spaces remain:
 
-1. **Large codebases** — reading whole files exhausts the model's context.
-2. **AI slop** — duplicated helpers, dead code, empty error handling, low-value tests.
-3. **Bad persisted memory** — agents forget, or remember stale and unverifiable things.
-4. **Long, slow code** — needlessly verbose and poorly performing output.
+1. **Large codebases:** reduce irrelevant reads and context pressure.
+2. **AI slop:** reduce duplication, dead code, weak tests and unnecessary machinery.
+3. **Persisted memory:** retain useful facts with provenance and explicit freshness.
+4. **Long, slow code:** reduce needless verbosity and measured runtime regressions.
 
-Plus two enabling layers that make the four trustworthy: **safe edits/execution** and
-**measurement/receipts**.
+Safe edits/execution and trustworthy measurement enable all four. Native code,
+installation, runtime activation, verified client use and demonstrated task benefit
+are separate milestones. Preserve novel non-QKV mechanisms and matched controls
+in host research; a failed result closes a measured gap rather than authorizing a
+substitute architecture.
 
----
+## Landscape: historical research leads, not current competitive claims
 
-## Part 1 — Landscape: which free tool covers which space
+The original landscape compared Forge with the tools below. Its third-party
+licenses, capabilities, protocol forecasts, novelty claims and quantitative results
+have **not been independently reverified in this reconciliation**. The dated links
+at the end remain research leads. Do not use “first”, “only”, “no benchmark exists”,
+“free”, or comparative percentages in product copy without a new primary-source
+review. The original study's model-window percentages and protocol-deprecation
+assertions are hypotheses to check, not premises for implementation.
 
-Each tool below was checked against its own README or a published write-up. Licences
-are as reported by those sources. "Forge module" names the code in this repo that
-covers the same space.
+| Space | Existing Forge surfaces to evaluate | Original comparison leads |
+|---|---|---|
+| Large codebases | `code_inspect`, `code_fold`, `code_search`, graph, exact tokenizer counting, compaction/recovery, quiet output | Serena, Claude Context, code-review-graph, Codebase Memory MCP, Aider repo-map, Repomix, rtk, LLMLingua, Anthropic tool-search/code-execution patterns |
+| Slop and quality | Slop Core detectors, duplicate/dead-test analysis, candidate gates, equivalence probes and automatic mutation engines | AISlop, antislop, slopscore, aposlop, jscpd/PMD-CPD, vulture, radon, clippy, ruff, Semgrep CE, cargo-mutants, mutmut, Stryker, Mull |
+| Persisted memory | Source-bound memory ingestion/store, immutable recall snapshots, notes/cards, session briefs and workspace observations | Basic Memory, Beads, reference Knowledge Graph Memory, OpenMemory/mem0 |
+| Verbosity/performance | Verbosity/hot-loop scans, complexity analysis, paired benchmark receipts and criterion benches | Codeflash, criterion, hyperfine, flamegraph, py-spy, clippy performance lints, ruff PERF |
+| Safe edits/execution | Hash-checked replace/diff/restore, durable terminals/tasks, operator policy and confinement | Desktop Commander MCP, Anthropic sandbox runtime |
+| Measurement | Ledger, telemetry, sealed source/binary-bound performance evidence | Langfuse, OpenLLMetry and related tracing systems |
 
-### Space 1 · Large codebases and context budget
+These are overlapping building blocks, not evidence that proposed composite tools
+or studies below have shipped. [Benefits](../benefits.md) and
+[performance](../performance.md) retain scoped numbers, comparators and limits.
+For example, native reporting, retrieval and transport measurements cannot establish
+faster agent tasks or smaller provider bills. The native relocation slowdown stays
+visible alongside component improvements.
 
-| Tool | Licence / cost | What it does in this space | Gap relative to Forge |
+## What later work actually delivered
+
+| Delivered slice | Code/test/contract evidence | Boundary that remains |
+|---|---|---|
+| Reviewed MCP read annotations | `harness_catalog.rs::source_read_tool`; `harness_catalog_tests.rs::only_reviewed_source_reads_advertise_effect_annotations`; protocol discovery tests | Only `code_inspect` and `code_fold` carry reviewed effects. Other tools are deliberately unclassified; MCP-01 remains partial. |
+| Confined Cargo workspace/selected-test mutation, progress after timeout, explicit Fest and standalone Mull profiles | [Mutation contracts](../mutation.md), [Fest](../mutation-fest.md), [Mull](../mutation-mull.md), `mutation_cargo_supporting` tests and [performance evidence](../performance.md#cargo-workspace-mutation-evidence--2026-11-06) | Scoped automatic controls are not full-package PASS, all profile support, agent-versus-human test quality, or the subtractive pass. See CF-01 and R-SLOP-04. |
+| Native mutation evidence/coverage/canary and Python test-import reports | `native/forge/src/mutation_evidence_cli.rs`, `mutation_evidence_inventory.rs`, `test_report.rs`; [analysis contract](../native-analysis.md#python-test-import-report); focused report and CLI tests | These reports are not a combined diff-level `quality_delta`, session report or conservative affected-test verifier. |
+| Policy-enabled `python_test_report` over MCP | `harness_catalog.rs`, protocol cancellation tests, `native/forge/tests/native_mcp_setup.rs`; [confined report evidence](../performance.md#confined-mcp-test-report--2026-11-06) | One advisory report uses a confined worker per request. Its measured service cost and lifecycle controls do not establish real-client adoption or agent benefit. |
+| Native backlog fold/publication and equivalence gate extensions | [Backlog contract](../equivalence-backlog.md), [gate contract](../equivalence-gate.md); `equivalence_backlog_cli.rs`, `equivalence_gate_cli.rs`, `equivalence_gate_live.rs` | Artifact folding is not this planning backlog. Equivalence and safe publication are reusable machinery, not N-01 minimal-patch search or N-04 executable memory. |
+| Transport, prompt-contract and rejected recommendation measurements | [Transport/task evidence](../performance.md#transport-task-value-and-missing-controls), [rejected next-inspection advice](../performance.md#deferred-next-inspection-advice--2026-11-05) | Matched microbenchmarks exist. First actual Codex probe was approval-blocked; automatic recommendation was rejected and removed. Neither counts as successful adoption. |
+
+Code/test names above are under `native/forge/src/` and `native/forge/tests/`
+unless stated otherwise. Tests are implementation evidence inspected here; their
+historical execution results remain bound to the revisions in linked receipts.
+
+## Ordered implementation backlog
+
+Order is by dependency and value to actual user work: repair evidence clarity,
+start useful telemetry, prove one client/workload, then choose features from measured
+gaps. P0/P1/P2 are the proposal's priorities, not execution approval or deadlines.
+No multi-hour/model run, external-client approval change or promotion is authorized
+by an entry in this document.
+
+**Status:** implemented = original acceptance met by an equivalent shipped surface;
+partial = a substantive subset exists but acceptance remains; open = proposed
+capability/deliverable absent; evaluation-needed = a research question or experiment
+still lacks the stated evidence; deferred = deliberately conditional or lower priority.
+Existing primitives alone do not make a new composite tool partial.
+
+### 1. Evidence clarity, safe discovery and data collection
+
+| ID | P / status | Scope and current evidence | Remaining acceptance / done when |
 |---|---|---|---|
-| **Forge**: `code_inspect`, `code_fold`, `code_search` (BM25 / hybrid / HNSW `vector_index`), `forge graph` (caller/import graph in `.forge/graph.db`), `context_count/compact/recover`, `context_prompt`, `tool_quiet` | Apache-2.0, free | Signature/folded views with source hashes; graph with explicit staleness; exact-BPE compaction with SHA-256-recoverable originals | — |
-| **Serena** (oraios) | MIT, free | LSP-backed symbol tools for 40+ languages: overview, find symbol, references, symbol-level edits | No context compaction, no recovery, no source-hash freshness, no receipts |
-| **Claude Context** (Zilliz) | MIT, free (needs vector DB + embedding API) | Hybrid vector code search over MCP; their 30-task SWE-bench A/B showed ~39% fewer tokens at equal retrieval F1 | Search only; depends on external vector DB/embeddings |
-| **code-review-graph** | Open source, free | Tree-sitter → SQLite graph; "blast radius" of a change for reviews; 8.2× average token reduction, below 1× on small packages | Review-focused; no edits, compaction or memory |
-| **Codebase Memory MCP** (DeusData) | MIT, free | Tree-sitter knowledge graph, 158 languages, structural queries | Graph/query only; its 99% claim has no published method |
-| **Aider repo-map** | Apache-2.0, free (inside Aider only) | Ranked map of symbols, ~8–15k tokens for FastAPI's 108k lines | Locked to the Aider CLI |
-| **Repomix** | MIT, free | Packs a whole repo into one file (~800k tokens for FastAPI) | Opposite approach: packs everything instead of selecting |
-| **rtk** | MIT, free, Rust | Shell proxy compressing command output (git, tests, ls) 70–92% per command | Bash output only; built-in Read/Grep bypass it |
-| **LLMLingua** (Microsoft) | MIT, free | Model-based prompt compression | Lossy, needs a small model, no recovery of originals |
-| Anthropic Tool Search / code-execution pattern | Platform feature | Defers tool definitions; filters data in a sandbox (150k→2k tokens in their example) | Client-side technique, not a tool you install |
+| DOC-01 | P0 / partial | Audit measurement drift. `benefits.md` still labels MCP versus CLI unmeasured, while [transport receipts](../../research/performance/forge-program-20261104-mcp-transport-baseline.json) and the performance report cover scoped comparisons. The stale row is tracked in [#232](https://github.com/mcpirate17/llm-forge/issues/232). | Link each row to its exact receipt and scope, keep actual-client/task effects unmeasured, and add a native stale-reference check only if its scope is justified (`make doc-claims-check` was originally proposed). Coordinate the repair through #232. |
+| REP-02 | P0 / open | Per-call `{returned_tokens, baseline_tokens, baseline_kind}` metadata. `harness_mcp_protocol.rs::success` currently emits server identity in modern `_meta`; it does not emit these metrics. | Every eligible call exposes calibrated counts with declared baseline semantics and missing values; tests cover successful/error/legacy behavior. Starts data collection for R-INF and REP-01. |
+| MCP-01 | P0 / partial | Four boolean effect annotations exist only on reviewed `code_inspect`/`code_fold`; catalog tests explicitly require others absent. | Review each remaining tool's real effects and annotate only justified values; test complete reviewed coverage without expanding approval authority. Hints alone cannot promise client auto-approval. |
+| MCP-02 | P0 / open | Own catalog publishes input schemas; protocol emits structured content. Outbound `outputSchema` validation is a separate client-side capability. | Declare each inbound tool's output schema and validate successful structured responses against it, with explicit error/legacy handling. |
+| MCP-03 | P0 / open | Catalog/tokenizer machinery exists, but no catalog growth budget was found. | Publish catalog token cost for a pinned tokenizer and declared capability profiles; require a receipt for >10% growth in local-check. |
+| DOC-04 | P0 / open | Root `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` are absent in the compared tree. | Add maintained contribution/security/release guidance aligned with AGENTS.md; verify links and GitHub community surfaces. |
+| DOC-02 | P0 / open | User entry points and migration history remain mixed; `docs/README.md` remains chiefly a platform/KB reference. | Create a six-link user path and move migration history into an internal archive with working redirects/links. The original 99/177 count is historical, not a current inventory. |
+| DOC-03 | P0 / partial | README already leads with user jobs, a demo and bounded evidence, but not the original four-space presentation. | Make all four problem spaces discoverable with actual tools and scoped evidence. Use one measured number only where justified; do not invent one per space. |
+| R-INF-04 | P1 / partial | Transcript miner for repeated/full-file reads, large tool results and edit→failure loops. `ledger/reader.rs`, read statistics, fixture tests and `ledger/report.rs` provide Claude transcript/telemetry parsing. | Add Codex ingestion and a reproducible top-20 weekly waste-pattern report linked to candidate tools; preserve malformed/missing input totals and privacy bounds. Reuse the ledger rather than build another parser. |
+| REP-04 | P1 / partial | Hook telemetry and ledger read/usage summaries exist (`context_telemetry.rs`, ledger fixtures). Unified tool-selection/recover-rate analysis is not established. | Emit/join selection and recovery events with explicit denominators and missing logs; feed R-CTX-03 and MCP-04 without treating estimates as provider counts. |
+| REP-01 | P0 / open | Proposed session report of returned/avoided tokens, compaction, recoveries, slop and p50/p95 latency. CLI ledger/report primitives exist; `python_test_report` is a different report. | Expose a read-only `session_report` tool/resource with receipt-backed fields, declared full-file baselines, estimated-versus-observed labels and unavailable metrics visible. |
 
-### Space 2 · AI slop and code quality
+### 2. Prove actual client and task value before broadening features
 
-| Tool | Licence / cost | What it does | Gap relative to Forge |
+| ID | P / status | Scope and current evidence | Remaining acceptance / done when |
 |---|---|---|---|
-| **Forge**: `native/slop-core` (`detector_scan`, `verbosity_scan`, `style_scan`, `test_value_scan`, `hot_loop_scan`, `consolidation`, `gate`), `duplicate_bodies` / `duplicate_fingerprints`, `dead_tests`, reuse audit, radon/vulture baselines, `forge candidate` review gate, equivalence probe, mutation engines (cargo-mutants, Mull, fest, generated) | Apache-2.0, free | Scans, gates and *evidence* (mutation receipts) in one native pipeline | — |
-| **AISlop** (scanaislop) | Open source | Hook-based detector for empty catches, useless comments, duplicated helpers, dead code | Pattern detector; no mutation evidence, equivalence or gate |
-| **antislop** (Rust crate), **slopscore**, **aposlop** | Open source | Small slop-pattern scorers | Single-purpose scorers |
-| jscpd / PMD-CPD, vulture, radon, clippy, ruff, Semgrep CE | Free | General duplication, dead-code, complexity and lint tools (Forge already consumes several as baselines) | Not agent-aware: no hooks, no per-edit gating |
-| cargo-mutants, mutmut, Stryker, Mull | Free | Mutation testing per ecosystem | Forge orchestrates these; standalone they produce no agent-facing receipt |
+| DOC-05 | P1 / partial | Client setup fragments exist in README, `native-mcp-setup.md`, harness/provider docs. First Codex diagnostic reached discovery but calls were approval-blocked ([evidence](../performance.md#actual-codex-approval-diagnostic--2026-11-05)). | A client cookbook covers Claude Code, Codex, Cursor, VS Code, Zed, Aider and local CLIs, labeling tested versus suggested setup. First prove one actual client: catalog visible, agent-selected read, allowed/denied/error calls, reconnect and undo with narrowly authorized policy. |
+| R-INF-01 | P0 / open | Client-agnostic paired runner for Claude Code JSON, Codex exec, Aider and a local agent. Existing benchmark/receipt infrastructure is not this runner. | A bounded `forge research run --client X --arm {baseline,forge} --tasks set.json` or equivalent emits a sealed trial with provider usage, tool calls, source/model/budget, verified outcome and wall time; retain provider usage, recoveries/rereads and failed/censored/unstarted trials. Start with one real client and owner's tasks. |
+| R-INF-02 | P0 / open | Task sets: 30 SWE-bench Verified Python tasks, 20–30 owner-repo Rust/C/Python tasks, and a few shell/Terminal-Bench-style tasks. Existing detector/CLI fixtures are not agent tasks. | Check in task manifests under `research/tasks/` with provenance, licenses where needed, independent verifiers and bounded resources. Begin with a small owner-workload pilot before expanding the proposed counts. |
+| R-INF-03 | P0 / open | Paired pass/fail and cost/time statistics. Microbenchmark summaries do not supply this shared analysis. | `forge research compare` or equivalent reports McNemar paired outcomes, paired bootstrap CIs and declared multiple-comparison handling (originally Benjamini–Hochberg); preserve failed/censored/unstarted totals and never report a bare ratio as proof. |
+| MCP-04 | P1 / evaluation-needed | Descriptions currently explain guarantees and some use cases; automatic next-inspection advice was measured, rejected and removed. | Improve when-to-call descriptions and measure tool selection plus task success with R-INF-01. Retain rejected controls and token overhead; no default recommendation without prospective value. |
+| MCP-05 | P1 / partial | Protocol already returns safety/reconnect `instructions`; it is not the proposed five-line navigation/compaction playbook. | Test a concise inspect/diff/compact playbook against current instructions; measure selection and outcomes, choose thresholds from data, and retain authority warnings. |
+| MCP-10 | P2 / open | Custom native wire clients and protocol tests exist, not official TS/Python SDK conformance or actual-client success. | Exercise supported protocol versions using pinned official clients in local-check; keep this distinct from DOC-05 actual coding-client adoption. Separate cold service/adapter startup and discovery from warm dispatch in matched CLI/MCP comparisons. Verify the specification before changing protocol behavior. |
+| DOC-07 | P1 / evaluation-needed | “When Forge pays off” depends on R-CTX-01, not existing single-file token reductions. | Publish break-even advice with paired task outcomes, preparation/setup cost and its receipt. |
 
-### Space 3 · Persisted memory
+### 3. Research across the four spaces
 
-| Tool | Licence / cost | What it does | Gap relative to Forge |
+All studies use source/binary/model identity, declared host/resources and warmups,
+matched controls, complete outcomes and uncertainty. Historical competitor/study
+numbers do not substitute for these experiments.
+
+| ID | Space / status | Question and method | Remaining acceptance / done when |
 |---|---|---|---|
-| **Forge**: `notes_index`, `memory_ingest` / `memory_store` / `memory_catalog`, `workspace_recall` (immutable snapshots, caller-supplied embeddings), `embedding_broker`, `session_brief`, claims/inbox (`a2a_store`) | Apache-2.0, free | Memory bound to source hashes and snapshots; recall grants no authority; freshness is explicit | — |
-| **Basic Memory** | MIT, free | Markdown notes on disk plus a semantic graph; human-editable | No source binding: notes can silently go stale against code |
-| **Beads** | MIT, free | Issue/dependency graph versioned in the repo, so agents resume multi-step work | Task memory, not code/knowledge memory |
-| **Knowledge Graph Memory** (official MCP reference server) | MIT, free | Entities/relations/observations in a local JSON file | Minimal, no retrieval ranking or freshness |
-| **OpenMemory MCP** (mem0) | Open source core | Vector memory shared across clients | General chat memory; no code provenance |
+| R-CTX-01 | 1 / evaluation-needed | Across four repository sizes, compare inspect/fold/graph with plain Read+Grep under R-INF-01. | Plot tokens, wall time and verified pass rate against size; include graph/index preparation; publish a break-even curve and optional auto-enable advice. |
+| R-CTX-02 | 1 / evaluation-needed | Ablate compaction at 32k/64k/128k for small-window/local models. Compaction implementation alone does not answer this. | Measure quality/cost at each window and choose a local-model preset only if supported. Recheck the original harness-study figures before citing them. |
+| R-CTX-03 | 1 / evaluation-needed | Count and ablate recovery calls, including omissions/repeated reads. Recovery machinery exists. | Decide keep/auto-recover/drop from matched outcomes and recover-rate evidence, preserving correctness and recoverability until a replacement is proved. |
+| R-CTX-04 | 1 / evaluation-needed | Compare server-side search→inspect→fold with 3–5 separate calls. | Quantify calls/tokens/latency and verified outcomes; use the result to decide T-03 rather than assume batching helps. |
+| R-CTX-05 | 1 / evaluation-needed | Compare native quiet/post-tool output compression with rtk on identical commands. | Report returned tokens, missed errors and total cost; choose integration or documented coexistence. No unverified competitor percentage is an acceptance target. |
+| R-SLOP-01 | 2 / evaluation-needed | Run detectors on agent-authored diffs from R-INF-01 and owner's history; hand-label 200 findings. | Publish taxonomy, frequencies and labeled provenance, including sampling uncertainty; rank detector work from actual incidence. |
+| R-SLOP-02 | 2 / evaluation-needed | A/B a post-edit slop gate against no gate. Existing candidate gates are infrastructure. | Show slop reduction, false positives, pass rate and task cost before choosing default hook behavior. |
+| R-SLOP-03 | 2 / evaluation-needed | Hand-label samples for each detector. | Report per-rule precision/confidence and prevalence; prune or downgrade noisy rules. Existing test assertions are not a precision study. |
+| R-SLOP-04 | 2 / evaluation-needed | Compare automatic mutation scores for agent/human tests on the same functions. Cargo/Fest/Mull controls establish engine semantics, not this comparison. | Produce matched subject/test/resource accounting and complete engine outcomes; calibrate `test_value_scan` thresholds without calling survivors/timeouts PASS. |
+| R-MEM-01 | 3 / evaluation-needed | Multi-session tasks where session N+1 needs earlier facts, including deliberately stale facts. | Publish a reproducible coding-memory benchmark and quality/cost results. Do not claim it is the first or that competitors lack benchmarks without a new review. |
+| R-MEM-02 | 3 / evaluation-needed | Replay remembered facts against later commits; compare source-bound recall with selected alternative memory stores. | Define and measure stale/contradictory-memory rate with a labeled oracle, source identities and explicit unsupported fact types. |
+| R-MEM-03 | 3 / evaluation-needed | Mine transcripts for facts repeatedly re-derived across sessions. | Validate useful memory suggestions against false positives, freshness and operator control; no automatic authority or unrequested persistence. |
+| R-MEM-04 | 3 / evaluation-needed | Compare `session_brief` preload tokens with task benefit. | Choose a default brief size from pass rate, rereads and cost, including stale/irrelevant brief content. |
+| R-PERF-01 | 4 / evaluation-needed | Compare agent patches with human/SWE-bench gold fixes by LOC, complexity and tokens. | Calibrate verbosity/concise-patch signals without equating shorter code with correctness or equivalent behavior. |
+| R-PERF-02 | 4 / evaluation-needed | Benchmark touched functions before/after agent patches using criterion/pytest-benchmark or equivalent. | Measure regression incidence with equivalent work and source-bound paired samples; decide T-02 scope. |
+| R-PERF-03 | 4 / evaluation-needed | A/B post-edit performance/verbosity feedback. | Show whether feedback repairs regressions without reducing correctness or merely moving cost into measurement. |
+| R-PERF-04 | 4 / evaluation-needed | Correlate Rust/C hot-loop findings with profiler samples. | Publish predictive precision/coverage and calibrate detectors on actual hotspots. |
 
-No published recall/quality benchmark exists for any of these, Forge included. That
-is a research opening (see R-MEM below).
+### 4. Composite tools: proposals, not renamed existing primitives
 
-### Space 4 · Long, slow code (verbosity and performance)
-
-| Tool | Licence / cost | What it does | Gap relative to Forge |
+| ID | P / status | Proposed tool and reuse | Remaining acceptance / done when |
 |---|---|---|---|
-| **Forge**: `verbosity_scan`, `hot_loop_scan`, `complexity_cli`, `performance` receipts, `candidate_benchmark*`, criterion benches | Apache-2.0, free | Detects verbose/hot-loop patterns; sealed paired benchmark receipts | Not yet exposed as an in-loop "your edit made X slower" signal |
-| **Codeflash** | **BSL-1.1, needs a codeflash.ai API key** — source-available, not free OSS | LLM proposes Python optimizations, verifies correctness, benchmarks, opens PRs | Python-focused, hosted LLM dependency |
-| criterion, hyperfine, flamegraph, py-spy, clippy perf lints, ruff `PERF` rules | Free | Generic benchmarking/profiling/lints | Not wired to agents; no per-edit verdict |
+| T-01 | P0 / open | `quality_delta`: diff-level slop, duplication, complexity and mutation-score delta. Reuse detectors, native reports and candidate/equivalence evidence. | One bounded report joins before/after results with compatible scopes and identities; partial/missing mutation evidence stays explicit. Existing test-import or backlog reports do not complete this item. |
+| T-02 | P1 / open | `perf_delta`: paired benchmarks of touched functions, verdict and CI. Reuse sealed performance/candidate benchmark machinery. | Admit explicit benchmark mappings and resources; prove behavior parity and uncertainty, including slowdowns/failed samples, before suggesting default post-edit use. |
+| T-03 | P1 / open | `code_explore`: one server-side search→inspect→fold call. Current three tools are separate catalog entries. | Ship bounded source-fresh results after R-CTX-04 shows value; compare selection/output overhead with separate calls. |
+| T-04 | P1 / open | `memory_check`: stored-fact validation against current sources. `memory_store.rs` and ingestion verify captured source identities, not arbitrary fact truth against a changed repository. | Report fresh/stale/unverifiable facts with current bindings; test deliberate source drift and immutable-store behavior without implying semantic truth from a hash. |
+| T-05 | P2 / open | `patch_conciseness`: compare patch size/complexity with a minimized passing diff; reuse N-01. | Return candidate reductions plus tested scope and equivalence limits; never call a locally minimal or under-tested patch globally minimal. |
+| MCP-08 | P1 / open | Expose T-01…T-04 over MCP after their CLI/core contracts exist. | Policy-bounded schemas, provenance, failure semantics and actual-client controls for each delivered tool; neither existing scans nor `python_test_report` satisfy this umbrella. |
 
-### Enabling layer A · Safe edits and execution
+### 5. Remaining MCP/reporting and documentation surfaces
 
-| Tool | Licence / cost | What it does | Gap relative to Forge |
+| ID | P / status | Scope and current evidence | Remaining acceptance / done when |
 |---|---|---|---|
-| **Forge**: `code_replace` / `code_diff` / `code_restore` (hash-checked, Git recovery), persistent PTYs (`terminal_*`), operator policy + systemd confinement (`harness_policy`) | Apache-2.0, free | Edits fail if the file changed; every apply is recoverable; model cannot widen paths/programs | Linux + systemd only |
-| **Desktop Commander MCP** | MIT, free | Terminal sessions plus file editing over MCP | No hash-checked edits, no confinement policy |
-| **Anthropic sandbox-runtime** | Apache-2.0, free | OS-level sandbox (bubblewrap/seatbelt) used by Claude Code | Sandbox only, no edit or context tools |
+| REP-03 | P1 / open | Read-only ledger rollup resource, proposed `forge://ledger/rollup?since=…`. CLI `ledger/report.rs` and rollup exist; inbound capabilities remain tools only. | Match CLI report semantics, bounds and freshness through a policy-enabled resource; include missing/uncalibrated data. |
+| MCP-06 | P1 / open | Resources for reports and prompts for workflows. Current protocol advertises tools only. | Populate `resources/list` and `prompts/list` with explicit access policy and tested current-spec behavior. Do not base implementation on the original unverified Roots/Sampling/Logging deprecation claim. |
+| MCP-07 | P1 / partial | Durable `task_get`/`task_list` and terminal task records exist; they are not proof of MCP Tasks extension support. | Verify the extension/specification, return interoperable handles for bounded long jobs such as index builds, and test cancellation/reconnect/expiry; distinguish response suppression from worker cancellation or undo. |
+| REP-05 | P1 / deferred | Optional OpenTelemetry export using verified current GenAI conventions. No such MCP/ledger export found. | Off by default, explicit data/privacy/resource policy, tested field mapping and bounded overhead. Select after core telemetry is useful. |
+| MCP-09 | P2 / deferred | Optional Streamable HTTP for remote/devcontainer agents; current constrained stdio outbound slice is not HTTP. | Off by default; prove explicit endpoint/credentials/policy, lifecycle and cancellation after local real-client value is established. |
+| REP-06 | P2 / open | Static `forge report html` built from ledger. | One self-contained shareable file with receipt links, uncertainty, missing evidence and bounded/private data selection. |
+| DOC-06 | P1 / open | Generated MCP tool reference from `harness_catalog.rs`. Catalog exists; `docs/mcp-tools.md` and proposed markdown generation do not. | `forge harness catalog --markdown` or equivalent generates space/effect/output-size guidance from declared profiles; local-check detects drift and labels measured versus estimated token sizes. |
+| DOC-08 | P1 / open | Put roadmap architecture diagram on README; the diagram currently lives in roadmap. | Add a concise diagram with working links if it improves the user path; keep one source of truth. |
+| DOC-09 | P2 / partial | `docs/README.md` explains KB anchors, `conductor` and host-policy separation; a complete reader glossary is absent. | Define conductor, model-role names, KB IDs and legacy LLM-host references without requiring external monorepo knowledge. |
+| DOC-10 | P2 / partial | README install path states Linux/Rust 1.98; harness limitations are documented separately. | Make platform/prerequisite limits clear at installation entry and document what CLI-only operations are verified elsewhere. Do not imply every CLI operation requires systemd or claim untested portability. |
+| DOC-11 | P1 / implemented | Equivalent “Why Rust” explanation is already in [benefits](../benefits.md#does-moving-the-implementation-to-rust-improve-performance), linked from README; [product-value measurements](../native-product-value-measurements.md) retain component receipts and relocation profiling. | Maintain scoped speedups, the slower relocation comparator and fsync/safety costs. A duplicate standalone page is unnecessary; new whole-task claims still require R-INF evidence. |
+| DOC-12 | P1 / open | Original landscape is preserved as historical leads above, not a maintained current comparison. | Publish `docs/landscape.md` only after reviewing primary sources and marking review dates, scope and uncertain claims; avoid duplicating this backlog. |
 
-### Enabling layer B · Measurement
+### 6. Novel hypotheses and cheapest first experiments
 
-| Tool | Licence / cost | What it does | Gap relative to Forge |
+These IDs preserve all original ideas. None is recorded as shipped from reusable
+building blocks alone. Their novelty versus other tools remains unverified. Choose
+pilots after the higher-priority instrumentation and real-workload evidence above.
+
+| ID | Status | Idea / existing building blocks | First experiment and acceptance |
 |---|---|---|---|
-| **Forge**: `ledger/` (report, rollup, budget, calibrate), `context_telemetry`, sealed performance receipts | Apache-2.0, free | Source- and binary-bound receipts; missing evidence stays visible | Not yet reachable over MCP (REP items) |
-| Langfuse / OpenLLMetry and similar | Open-source cores | LLM tracing and cost dashboards | Trace the model, not the tooling's effect on outcomes |
+| N-01 | evaluation-needed | **Subtractive pass:** ddmin added hunks/lines/helpers after tests pass, reusing automatic engines, equivalence gate and Git recovery. | Try 50 historical owner patches; report removable lines, behavior/test/equivalence scope, execution cost and failed candidates. Engine mutations alone are not a patch minimizer. Feeds T-05. |
+| N-02 | evaluation-needed | **Hallucinated-symbol gate:** resolve new identifiers, imports and arities before a build. Graph/syntax/import-declaration checks cover narrower facts. | Count transcript failures attributable to unresolved symbols, then prototype precise supported-language resolution; prove dynamic/uncertain names do not silently become hard false positives. |
+| N-03 | evaluation-needed | **Negative-memory tombstones:** record failed/reverted/slower approaches against source hashes and expire on change. Reuse outcome ledger, memory and briefs. | Mine repeated failed approaches; test useful resurfacing, retirement and stale-match false positives. Existing outcome storage is not a tombstone workflow. |
+| N-04 | evaluation-needed | **Executable memory:** store facts with invariant probes; label unverified facts and retire failed facts. Reuse `invariant_probe`, test contracts and memory store. | Convert 20 owner-note facts to bounded probes; report false/current/unverifiable facts, source bindings and probe cost without granting memory approval authority. |
+| N-05 | evaluation-needed | **Comprehension cost:** signature + folded callees + touched types, joined to reread telemetry. | Rank symbols in ARIA by token cost/reread frequency and compare with owner judgments; test usefulness before making a refactor gate. |
+| N-06 | evaluation-needed | **Prompt-cache-aware layout:** stable ordering/frozen prefixes for briefs, folds and rules. Reuse deterministic context output and usage ledger. | Compare observed provider cache-read tokens under stable/default ordering with matched inputs/tasks; report prefix invalidation and total cost. |
+| N-07 | evaluation-needed | **Session passport:** portable task, hash-bound reads, decisions, tombstones and pending checks for cross-client handoff. Existing task/journal/recovery primitives are insufficient alone. | Hand off one half-finished task between two clients; compare reread tokens/outcomes and force rereads when hashes change. |
+| N-08 | evaluation-needed | **Blast-radius edit gate:** warn/block edits when current callers were not inspected this session. Reuse graph, read receipts and hash-checked edit admission. | Measure regression association in R-INF tasks, then test stale/incomplete-graph and false-block behavior before enabling enforcement. |
+| N-09 | evaluation-needed | **Per-model scorecards:** join findings, survivors, performance and reverts to model/client attribution. Reuse agent/outcome ledger and commit trailers. | Backfill a month of commits with explicit unknown/mixed attribution; compare task types and sample sizes before routing decisions. Existing mutation attribution is not a complete model scorecard. |
+| N-10 | evaluation-needed | **Budget contracts:** per-task token/turn budget and targeted spend advice. `ledger/budget.rs` already tracks budgets; REP-02 supplies call data. | Run soft warnings and measure overrun/task outcomes, including overhead; evaluate suggestions such as repeated reads→fold without reinstating rejected advice unmeasured. |
+| N-11 | deferred | **Speculative pre-folding:** graph/navigation predictions precompute future views and token counts. | First measure offline next-file prediction on transcripts; only prototype if expected benefit exceeds invalidation/preparation cost. |
+| N-D1 | evaluation-needed | **Hash-bound docs:** sections declare described symbols; changed source flags possible staleness. | Annotate `docs/native-harness.md`, observe a week of changes and judge false alarms; source drift is a review trigger, not proof prose is wrong. |
+| N-D2 | evaluation-needed | **Agent cards:** generated ≤300-token module purpose/entrypoint/invariant/gotcha/tombstone cards, hash-bound and requested via briefs. Existing knowledge cards are narrower primitives. | Compare large instruction preload with on-demand cards by tokens and verified outcomes; show stale-card handling. |
+| N-D3 | evaluation-needed | **Docs from confusion:** cluster failed searches, API misreads and user questions from R-INF-04. | Produce top-ten confusion clusters from a month of owner sessions, with redaction and validated proposed docs/card changes. |
+| N-D4 | evaluation-needed | **Executable docs everywhere:** extract Markdown shell/code blocks into confined checks with expected outputs/hashes. | Pilot README/install commands with explicit fixtures/resources and opt-ins; distinguish examples requiring credentials/destructive actions from executable verification. Existing local checks do not validate every Markdown block. |
+| N-D5 | evaluation-needed | **Prose claim checker:** numerical claims cite receipts and superseded/unreferenced claims are flagged. Generalizes DOC-01. | Run on Forge docs with labeled numeric examples and receipt scope/freshness; catch the MCP measurement drift without treating every number as a performance claim. |
+| N-D6 | evaluation-needed | **Instruction pruning:** measure rule exercise, violations and preload tokens before suggesting removals. | Observe per-rule usage for a month; report unobserved versus redundant rules separately and propose, rather than automatically delete, instructions. |
 
-### What this landscape shows
+### 7. Carried-forward engineering boundaries without original IDs
 
-**I found no free repository that covers more than one of these spaces in depth.**
-Every tool above is single-purpose: search *or* graph *or* memory *or* slop patterns
-*or* output compression. Forge covers all four problem spaces plus both enabling
-layers in one native binary, with the same provenance model throughout: source
-hashes, recoverable originals, receipts.
+These five entries cover engineering scope that cannot be honestly folded into a
+research ID. They consolidate the prior roadmap/migration program rather than
+create a second ordered list. Actual client adoption is already DOC-05/R-INF-01 and reporting is REP/T.
+CF-04 retains prompt transformation and task-aware recommendations beyond catalog
+descriptions; CF-05 retains broader inbound/outbound routing beyond HTTP, Tasks
+and conformance. They reuse those entries' measurements without duplicating their acceptance.
 
-That breadth, plus being measurable, is the real differentiator. Correction to the
-earlier draft: "crowded" was only true of the single sub-niche "MCP code search /
-token reduction", where Serena, Claude Context and the graph tools compete. It is
-not true of the space Forge occupies as a whole.
-
-**On Rust:** the component data supports it. Secret scan went from 30.6 to 2.1 ms,
-native scan from 19.4 to 1.9 ms, casefold 3–9×, and warm BM25 retrieval runs at
-0.46 ms including source checks. The one slowdown in the docs, launcher relocation,
-came from deliberate safety work: 768 fsyncs plus extra link and lock checks. It was
-not caused by the language. DOC-11 makes that case explicitly.
-
----
-
-## Part 2 — Research program: making *any* AI coding app more efficient
-
-The goal is client-agnostic findings that Forge turns into tools. Every study uses
-the existing receipt rules: source/binary identity, host, warmups, complete outcome
-totals, and failed/censored runs kept visible.
-
-### Shared infrastructure (build once)
-
-| ID | P | Item | Done when |
+| ID | Status | Carried-forward scope / current evidence | Remaining acceptance / done when |
 |---|---|---|---|
-| R-INF-01 | P0 | **Client-agnostic A/B runner.** Drives Claude Code (`-p --output-format json`), Codex exec, Aider and a local-model agent headlessly on the same task with Forge on/off. Records provider usage fields, tool calls, wall time and verified outcome. | `forge research run --client X --arm {baseline,forge} --tasks set.json` emits a sealed receipt per trial. |
-| R-INF-02 | P0 | **Task sets.** (a) 30 SWE-bench Verified tasks, Python. (b) 20–30 tasks mined from your own Rust/C/Python repos with tests as verifiers. (c) a handful of Terminal-Bench-style shell tasks. | Task JSON with verifier commands, checked into `research/tasks/`. |
-| R-INF-03 | P0 | **Paired statistics.** McNemar on paired pass/fail, bootstrap CIs on tokens and time, Benjamini–Hochberg across arms (the method of the 2026 harness-design study). | `forge research compare` outputs effect ± CI and significance, never a bare ratio. |
-| R-INF-04 | P1 | **Transcript miner.** Parse Claude Code JSONL (`~/.claude/projects/`) and Codex logs to find full-file reads, repeated reads, largest tool results, and edit→fail→re-edit loops. | Weekly report of the top-20 waste patterns, each linked to a candidate Forge tool. |
+| CF-01 | implemented | **Scoped mutation profile restoration**, tracked in [#196](https://github.com/mcpirate17/llm-forge/issues/196). Its requested practical Cargo dependency/workspace and external Fest/Mull fixtures are delivered by #203/#204/#214/#215, with real automatic strong/weak/failure controls, provenance rejection, cleanup and publication checks in the linked contracts. | Original fixture-based restoration is complete within declared profiles; reconcile/close the issue accordingly. Keep unsupported arbitrary builds, pins/grants and standalone Mull restrictions explicit. The actual Forge campaign timeout remains incomplete evidence, not a defect or automatic requirement to keep expanding scope. A future package/workload pilot needs a concrete user need and bounded plan. |
+| CF-02 | open | **Conservative affected-test intelligence.** Native test-import reporting is advisory; it does not prove a selected test set catches all relevant regressions. | Define supported languages/flows and uncertainty, retain a safe fallback, and compare selected/full outcomes against independent controls before promoting test skipping. Reuse reports/graph and link T-01 evidence. |
+| CF-03 | partial | **Remaining native caller and clean-host closure.** Shared native surfaces and default native install exist; live `Makefile`/`conductor.mk` still call Python for `slop-backlog`'s first gate, `slop-imports`, `slop-probe`, duplicate audit, mutation retention/reap, history/seed/worktree utilities, Codex journal, NotebookLM bundle, baseline metadata and initialization. [Migration status](../native-migration-evidence-status.md#remaining-migration) retains reachable Python, packaging, governance/report/workspace/graph/utility boundaries. Historical handoff lists are not fresh caller inventories. | Inventory live Make/CLI/API/hooks and dependencies, reuse native contracts, move every live caller before deleting Python, prove parity and clean install, then exact-tree checks/sweep. Keep external-host receipt acceptance, installation and actual-client activation separate. Retain the positive external-invariant collector/waiver case as needs-verification: live collector/probe code exists, but this review found no linked real automatic receipt with its manifest declaring the invariant; a successful leaf probe is insufficient. Hardware acceleration stays conditional on a measured embedded bottleneck, not an automatic GPU project. No blanket code-shrink, runtime or completed-migration claim. |
+| CF-04 | evaluation-needed | **Native prompt strengthening and task-aware tool recommendations.** Reuse prompt contracts, deterministic composition, task modes, tokenizer counts, recovery and capability-filtered catalogs. Current literal retention does not establish preserved meaning/instruction hierarchy; rejected next-inspection advice is a retained control, not a delivered recommender. MCP-04/05 cover narrower discovery wording. | Compare explicit task-mode transformations/recommendations against unchanged prompts and a deterministic no-model baseline on matched verified tasks. Report intent/provenance retention, instruction priority, task success, tokens and runtime overhead. Any optional model stage is bounded, explicit and evaluated separately; recommendations grant no authority and never execute actions. Ship only supported modes after prospective evidence. |
+| CF-05 | deferred | **Broader inbound/outbound workflow.** Current outbound support admits one operator-pinned stdio endpoint/tool through the shared confined owner; this is not multi-endpoint routing, authentication lifecycle or credential isolation across endpoints. MCP-07/09/10 address Tasks/HTTP/conformance, not this broader contract. | After real-client and transport/task-value controls, select only a demonstrated needed workflow. Prove per-endpoint routing/schema/executable authority, explicit network and credential grants, isolation and authentication/rotation/expiry lifecycle, bounded scheduling, cancellation/disconnect behavior and cleanup. Distinguish suppressed responses from daemon cancellation and undo; preserve the existing endpoint and no-credential defaults until separately authorized. |
 
-### Space 1 · Large codebases
+The first implementation increment should be selected from sections 1–2 against
+actual user work, rather than automatically extending mutation infrastructure.
+Optional research pilots remain bounded and independently reviewable.
 
-| ID | Research question | Method | Turns into |
-|---|---|---|---|
-| R-CTX-01 | At what repo size does inspect/fold/graph beat plain Read+Grep? | R-INF-01 across 4 repo sizes; plot tokens and pass-rate versus LOC | Published break-even curve; auto-enable advice |
-| R-CTX-02 | How much does compaction help small-window and local models? | `context_compact` at 32k/64k/128k (the 2026 study found +35.7 pp at 32k vs +2.7 pp at 128k) | A "local-model mode" preset |
-| R-CTX-03 | Does `context_recover` earn its keep? | Count recover calls; ablate. That study found recall tools were rarely used | Keep, auto-recover, or drop |
-| R-CTX-04 | Server-side exploration: one call doing search→inspect→fold vs 3–5 agent calls | Code-execution pattern applied to code navigation | A batch `code_explore` tool |
-| R-CTX-05 | Shell output: does a native rtk-style output compressor in `tool_quiet`/`post_tool` add value over rtk? | Same commands, both tools, tokens and missed-error rate | Integrate, or document using rtk alongside |
+## Optional marketing, after evidence
 
-### Space 2 · AI slop
-
-| ID | Research question | Method | Turns into |
-|---|---|---|---|
-| R-SLOP-01 | What slop do agents actually produce? Build a taxonomy with frequencies | Run slop-core over agent-authored diffs from R-INF-01 and your own history; label 200 findings by hand | Ranked detector priorities; a public dataset |
-| R-SLOP-02 | Does an in-loop slop gate (post-edit hook) reduce slop without hurting pass rate? | A/B with the gate on/off | Default hook config |
-| R-SLOP-03 | Precision of each detector | Hand-label samples; report precision per rule | Prune noisy rules; confidence levels in output |
-| R-SLOP-04 | Mutation score as a test-quality signal for agent-written tests | Mutation score of agent tests vs human tests on the same functions | `test_value_scan` thresholds |
-
-### Space 3 · Persisted memory
-
-| ID | Research question | Method | Turns into |
-|---|---|---|---|
-| R-MEM-01 | Build a coding-memory benchmark: does memory help on session N+1? | Multi-session tasks where session 2 needs facts from session 1, some deliberately stale | First public benchmark in this space (none exist) |
-| R-MEM-02 | Staleness: how often do remembered facts contradict current source? | Replay memory stores against later commits; Forge's source-hash binding vs Basic Memory / KG-memory | Headline: "stale-memory rate" |
-| R-MEM-03 | What is worth remembering? | From transcripts (R-INF-04), find facts re-derived repeatedly across sessions | Auto-suggested memory entries |
-| R-MEM-04 | Memory preload cost vs benefit | Tokens injected by `session_brief` vs improvement in pass rate | Default brief size |
-
-### Space 4 · Long, slow code
-
-| ID | Research question | Method | Turns into |
-|---|---|---|---|
-| R-PERF-01 | How much more verbose is agent code than the human fix for the same task? | LOC, cyclomatic complexity, token count of the patch vs SWE-bench gold patches | `verbosity_scan` thresholds; a "concise patch" signal |
-| R-PERF-02 | Do agents introduce performance regressions? | Run criterion/pytest-benchmark on touched functions before and after agent patches | An in-loop `perf_delta` tool |
-| R-PERF-03 | Does feedback fix it? | A/B: agent receives `perf_delta` + `verbosity` results after each edit vs not | Default post-edit feedback |
-| R-PERF-04 | Rust/C hot loops: does `hot_loop_scan` predict real hotspots? | Correlate findings with flamegraph samples | Detector calibration |
-
-### Tools this research should produce (feeds the backlog)
-
-| ID | P | Tool | Space |
-|---|---|---|---|
-| T-01 | P0 | `quality_delta` — given a diff: slop findings, duplication, complexity, mutation-score delta | 2 |
-| T-02 | P1 | `perf_delta` — benchmarks touched functions before and after; returns verdict and CI | 4 |
-| T-03 | P1 | `code_explore` — server-side search→inspect→fold in one call | 1 |
-| T-04 | P1 | `memory_check` — validates stored facts against current source hashes, flags stale ones | 3 |
-| T-05 | P2 | `patch_conciseness` — compares patch size and complexity to the minimal diff that passes tests | 4 |
-
----
-
-## Part 3 — Backlog: documentation, MCP, reporting
-
-### Documentation
-
-| ID | P | Item | Done when |
-|---|---|---|---|
-| DOC-01 | P0 | **Measurement drift.** `docs/benefits.md:88` says "Persistent MCP vs direct CLI — NOT YET MEASURED", but #189 and `research/performance/forge-program-20261104-mcp-transport-*.json` measured it. Audit every unmeasured row. | Each row links a receipt or stays unmeasured; a `make doc-claims-check` fails on stale references. |
-| DOC-02 | P0 | **Separate user docs from the migration log.** 99 of 177 files in `docs/` are `native-*-migration.md` history. | Move them to `docs/internal/migration/`; `docs/README.md` opens with a 6-link user path. |
-| DOC-03 | P0 | **README organised by the four problem spaces**, each with the Forge tool and one measured number, followed by the demo. Caveats stay, below the demo. | A newcomer sees "problem → Forge tool → evidence" in the first screen. |
-| DOC-04 | P0 | Add `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`. | GitHub community checklist is green. |
-| DOC-05 | P1 | **Client cookbook**: Claude Code, Codex, Cursor, VS Code, Zed, Aider, local-model CLIs, each with a "verify the catalog is visible" step. | `docs/clients.md` |
-| DOC-06 | P1 | **Generated tool reference** from `harness_catalog.rs`, listing each tool's space, read-only/mutating status and typical output tokens. | `forge harness catalog --markdown` → `docs/mcp-tools.md`, diffed in local-check |
-| DOC-07 | P1 | **"When Forge pays off"**, using R-CTX-01's break-even curve. | Published with its receipt. |
-| DOC-08 | P1 | Put the roadmap's mermaid architecture diagram on the README. | — |
-| DOC-09 | P2 | Glossary for `conductor`, Luna/Sol/Terra, KB ids and LLM-repo references. | External readers never need the monorepo. |
-| DOC-10 | P2 | Platform statement on install line 1 (Linux/systemd/Rust 1.98), plus what works CLI-only elsewhere. | — |
-| DOC-11 | P1 | **"Why Rust" page**: component speedups with receipts, and the relocation case explained (fsync/safety cost, with a profile showing where the time goes). | Linked from the README. |
-| DOC-12 | P1 | **Landscape page** (Part 1 of this file), kept current. | `docs/landscape.md` |
-
-### MCP server and tools
-
-Current catalog: `code_inspect`, `code_fold`, `code_search`, `code_replace`,
-`code_diff`, `code_restore`, `task_get`, `task_list`, `terminal_spawn`,
-`terminal_write` (+ read/wait), `session_brief`, `workspace_recall`, `context_count`,
-`context_compact`, `context_recover`, `context_prompt`, plus one optional outbound
-tool. Protocol: modern `2026-07-28` plus three legacy versions. Capabilities
-advertise **tools only**.
-
-| ID | P | Item | Done when |
-|---|---|---|---|
-| MCP-01 | P0 | **Tool annotations** (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`). None exist today, so clients can't auto-approve safe calls. | Every tool annotated; a test enforces it. |
-| MCP-02 | P0 | **`outputSchema`** for every tool. `structuredContent` is already emitted (`harness_mcp_protocol.rs:313`) without a declared schema. | Responses are validated against their schemas in tests. |
-| MCP-03 | P0 | **Catalog token cost measured and budgeted.** | README states N tokens; local-check fails on more than 10% growth without a receipt. |
-| MCP-04 | P1 | **Descriptions say when to call each tool**, not only what it guarantees. | Tool-selection rate improves in R-INF-01. |
-| MCP-05 | P1 | **Server `instructions` as a 5-line playbook** (inspect before read; diff, don't rewrite; compact above X). | Measured selection-rate change. |
-| MCP-06 | P1 | **Resources** for reports, **prompts** for workflows. Avoid Roots/Sampling/Logging, which `2026-07-28` deprecates. | `resources/list` and `prompts/list` populated. |
-| MCP-07 | P1 | **Tasks extension** for long jobs such as index builds (23.6 min observed); align `task_get/task_list` with it. | Long calls return task handles. |
-| MCP-08 | P1 | Ship T-01…T-04 from Part 2 as MCP tools. | — |
-| MCP-09 | P2 | Optional Streamable HTTP transport behind policy, for remote/devcontainer agents. | Off by default. |
-| MCP-10 | P2 | Conformance tests using the official TS/Python SDK clients. | Added to local-check. |
-
-### Reporting through MCP
-
-The ledger, telemetry, candidate reports and receipts are rich, but none is
-reachable by the agent or user over MCP mid-session.
-
-| ID | P | Item | Done when |
-|---|---|---|---|
-| REP-01 | P0 | `session_report` tool/resource: tokens returned, estimated tokens avoided vs full-file baseline, compaction ratio, recoveries, slop findings, p50/p95 latency. | "What did Forge do this session?" gets a receipt-backed answer. |
-| REP-02 | P0 | Per-call `_meta`: `{returned_tokens, baseline_tokens, baseline_kind}`. | Every call becomes a data point for Part 2. |
-| REP-03 | P1 | Ledger rollup as a read-only resource (`forge://ledger/rollup?since=…`). | Matches `forge ledger report`. |
-| REP-04 | P1 | Tool-selection and recover-rate logging from hooks. | Feeds R-CTX-03 and MCP-04. |
-| REP-05 | P1 | Optional OpenTelemetry export (GenAI semantic conventions). | Off by default. |
-| REP-06 | P2 | `forge report html`: a static, shareable report built from the ledger. | One self-contained file. |
-
-### Quick wins (this week)
-
-1. DOC-01 drift fix.
-2. MCP-01 annotations + test.
-3. REP-02 per-call `_meta`, so data collection starts now.
-4. DOC-04 standard files.
-5. R-INF-04 transcript miner on your own sessions: free data, no new infrastructure.
-
----
-
-## Part 4 — Novel ideas not covered by existing tools
-
-Forge is primarily its owner's tool, so these are ranked by value to a single heavy
-user across several repos (ARIA, Bionode, Forge itself) first, and by value to others
-second. Each idea names the Forge building blocks it reuses and the cheapest first
-experiment. I did not find any of these shipped as a free tool in Part 1's landscape.
-
-### AI coding
-
-| ID | Idea | Problem it attacks | Built from | First experiment |
-|---|---|---|---|---|
-| N-01 | **Subtractive pass (patch delta-debugging).** After an agent's patch passes tests, mechanically try deleting each added hunk, line or helper (ddmin) and keep only what the tests and equivalence probe require. The result is a minimal passing patch, plus a list of lines the tests never needed. | Slop, verbosity | mutation engines, `equivalence_probe`, candidate gate, Git recovery | Run on 50 past agent patches from your repos; report % of added lines removable with tests still green. |
-| N-02 | **Hallucinated-symbol gate.** Before running anything, resolve every identifier a diff introduces against the graph and the dependency index. Invented functions, wrong arities and phantom imports fail instantly, without a build/test cycle. | Slop, wasted turns | `forge graph`, `syntax`, `candidate_import_declaration` | Count how many failed agent edits in transcripts were unresolved symbols. |
-| N-03 | **Negative memory (tombstones).** Record approaches that failed (reverted, tests red, perf worse), bound to the source hashes they touched. Surface them when the agent heads the same way, and expire them automatically when that source changes. | Memory; agents retrying dead ends | ledger outcomes, `memory_store`, source hashes, `session_brief` | Transcript-mine repeated failed approaches within and across sessions. |
-| N-04 | **Executable memory.** A remembered fact ("X is always sorted", "this endpoint returns ≤100 rows") is stored with an invariant probe that re-verifies it. Memory that can't be verified is labelled unverified; memory that fails is retired. | Stale memory | `invariant_probe`, `memory_store`, `test_contracts` | Convert 20 facts from your notes into probes; measure the share that is already false. |
-| N-05 | **Agent-comprehension cost as a code-quality metric.** Tokens needed to understand a function = signature + folded callees + types it touches. Flag functions above a budget as refactor targets. Combine with telemetry: symbols agents re-read most often are your hardest code. | Large codebases | `code_fold`, graph, `context_count`, `context_telemetry` | Rank symbols in ARIA by comprehension cost and re-read frequency; check them against your intuition. |
-| N-06 | **Prompt-cache-aware context layout.** Order and freeze context (briefs, folded files, rules) so the provider's cached prefix survives between turns, and report cache-hit rate. Deterministic output is already a Forge property; this exploits it. | Cost and latency | `context_compact` determinism, `session_brief`, ledger | Compare cache-read tokens in provider usage with stable vs default ordering. |
-| N-07 | **Session passport for cross-client handoff.** A portable record of task, files read (with hashes), decisions, tombstones and open checks. Switching Claude → Codex → local model resumes without re-reading; anything whose hash changed is re-read. | Memory, context | `task_*`, journal, source hashes, `context_recover` | Hand a half-done task between two clients; count re-read tokens with and without the passport. |
-| N-08 | **Blast-radius edit gate.** Block or warn when an agent edits a symbol without having inspected its current callers (from the graph) in this session. Read receipts become a precondition for edits. | Large codebases, regressions | graph, `code_replace` hash checks, hook adapters | Measure how many regressions in R-INF-01 touched un-inspected callers. |
-| N-09 | **Per-model scorecards on your own code.** Attribute every finding (slop, mutation survivors, perf deltas, reverts) to the model and client that wrote the lines, via commit trailers and the ledger. Choose models per task type from your own data, not public leaderboards. | All four spaces | mutation attribution, ledger `agent`/`outcome`, routing policy | Backfill attribution on the last month of commits. |
-| N-10 | **Budget contracts.** The agent declares a token/turn budget per task. Forge tracks spend and, near the limit, returns a targeted suggestion ("3 full-file reads of X; `code_fold` would cost ~400 tokens"). | Context | `ledger/budget.rs`, REP-02 `_meta` | Run with soft warnings; measure overrun rate. |
-| N-11 | **Speculative pre-folding.** Predict the next files from the graph plus learned navigation patterns, and pre-compute folded views so the next inspect is instant and pre-counted. | Latency | graph, `code_fold`, transcript miner | Check offline prediction accuracy on transcripts first. |
-
-### Documentation
-
-| ID | Idea | Problem it attacks | Built from | First experiment |
-|---|---|---|---|---|
-| N-D1 | **Hash-bound docs.** Each doc section declares the symbols it describes. When their source hash changes, the section is flagged stale in local-check. This generalises your receipt discipline to every repo's prose. | Doc drift | source hashes, graph, `local_check` | Annotate `docs/native-harness.md`; count flags over a week of commits. |
-| N-D2 | **Agent cards.** Per module, a generated ≤300-token card (purpose, entry points, invariants, gotchas, tombstones), hash-bound and served by `session_brief` on demand. Replaces giant AGENTS.md/CLAUDE.md preloads. | Context, memory | notes index, graph, `session_brief` | Measure preload tokens and task pass rate: one big AGENTS.md vs cards. |
-| N-D3 | **Docs from confusion.** The transcript miner flags where agents searched and missed, misread an API, or asked the user. Each cluster becomes a proposed doc entry or agent-card gotcha. | Docs that answer real questions | R-INF-04, `code_search` miss logs | Top-10 confusion clusters from a month of your sessions. |
-| N-D4 | **Executable docs everywhere.** Every shell/code block in Markdown is extracted and run in the confined harness during local-check, with expected output or a hash. README commands can no longer rot. | Doc correctness | harness, `terminal_*`, `local_check` | Run against Forge's own README and install docs. |
-| N-D5 | **Claim checker for prose.** Any number in docs ("84.4% fewer tokens") must reference a receipt ID. Unreferenced or superseded numbers fail the check. This is DOC-01 as a reusable tool for any repo. | Doc honesty | performance receipts, ledger | Run on Forge docs; DOC-01's drift would have been caught. |
-| N-D6 | **Instruction-file pruning.** Measure which AGENTS.md/CLAUDE.md rules are ever exercised (hook events, violations, transcript references) and what each costs in preload tokens. Propose deleting dead rules. | Context | `context_count`, hooks, transcript miner | Per-rule usage over a month for your repos. |
-
-### Suggested first three (personal value, low cost)
-
-1. **N-02 hallucinated-symbol gate.** Small, uses the existing graph, saves a turn on every bad edit.
-2. **N-01 subtractive pass.** Directly attacks verbose slop with machinery you already trust.
-3. **N-03 + N-04 tombstones and executable memory.** A genuinely different take on memory: verifiable and expiring instead of a bigger note pile.
-
----
-
-## Appendix (optional) — Marketing
-
-Entirely optional; nothing above depends on it. If you choose to promote Forge:
-
-- **Lead with breadth plus evidence.** "Free, local, native tools for any AI coding
-  app: read less, catch slop, remember with provenance, prove what ran." Use Part 1
-  as the comparison page.
-- **Publish research, not slogans.** Part 2 findings (break-even curve, slop
-  taxonomy, stale-memory rate, a coding-memory benchmark) are publishable on their
-  own. Post write-ups to dev.to or a blog, then Show HN, r/LocalLLaMA, r/ClaudeAI,
-  r/rust, Lobsters.
-- **Lower the try-it cost.** Prebuilt Linux binaries on GitHub Releases or
-  `cargo binstall`, an inspect-only quickstart with no harness, a devcontainer.
-- **Discovery.** Official MCP Registry (`server.json` + `mcp-publisher`,
-  `io.github.mcpirate17` namespace), GitHub topics and description, a 30-second
-  demo GIF, tagged releases, Claude Code plugin packaging.
-- **Security audience.** A short threat-model page (what is confined, what isn't)
-  suits AppSec/OT security meetups.
-
----
+Marketing is not a dependency of this program. Preserve the original options:
+lead with the four user problems and scoped evidence; publish actual research
+findings; lower trial cost with an inspect-only quickstart, prebuilt Linux binaries
+or `cargo binstall`/devcontainer where maintained; consider registry metadata,
+GitHub topics, a short demo, tagged releases and client plugin packaging; document
+the threat model for security audiences. Verify current registry requirements,
+licenses, install support and platform claims before publishing. No claim of unique
+coverage, free-OSS competitor status or task-level savings is established here.
+Potential channels remain a blog/dev.to, Show HN, r/LocalLLaMA, r/ClaudeAI, r/rust,
+Lobsters and relevant security meetups; no publication or outreach is requested.
 
 ## Sources
 

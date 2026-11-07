@@ -1,5 +1,11 @@
 # Native upgrade handoff — 3 November 2026
 
+> Historical research/handoff snapshot. Its outstanding work has been reconciled
+> against later implementation in the [consolidated efficiency backlog](research/efficiency-program.md#ordered-implementation-backlog).
+> Use that backlog for current status and priorities; retain this document for
+> original rationale and dated evidence. Older “remaining” statements are not
+> independent instructions to rebuild capabilities that have since shipped.
+
 The interrupted release batch is shipped. **The broader native migration is
 unfinished.** Continue from the merged source below; do not recreate or recommit
 the release batch. This handoff records remaining functions, integration work,
