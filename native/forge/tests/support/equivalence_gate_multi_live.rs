@@ -203,13 +203,8 @@ fn automatic_selection_refuses_original_index_or_base_drift_after_ready_and_clea
             None
         };
         release_live(&h);
-        assert!(!child.wait(150).success(), "{}", child.diagnostic());
+        assert_eq!(child.wait(150).code(), Some(4), "{}", child.diagnostic());
         let error = fs::read_to_string(&child.stderr).unwrap();
-        assert!(
-            error.contains("live path selection changed")
-                || error.contains("live host input selection changed"),
-            "{error}"
-        );
         assert_eq!(fs::read_dir(&h.artifacts).unwrap().count(), 0);
         assert_removed(&group);
         for root in roots {
@@ -219,6 +214,12 @@ fn automatic_selection_refuses_original_index_or_base_drift_after_ready_and_clea
         assert_gone_or_reused(
             witness["pid"].as_u64().unwrap() as u32,
             witness["start"].as_str().unwrap(),
+        );
+        assert!(
+            error.contains("live path selection changed")
+                || error.contains("live host input selection changed")
+                || error.contains("live snapshot verification: input identity changed"),
+            "{error}"
         );
         assert_eq!(host_identity(&h).1, original.1);
         if let Some(expected) = expected {

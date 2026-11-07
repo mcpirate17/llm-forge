@@ -389,5 +389,28 @@
     "cargo +1.98.0 clippy --offline --locked --manifest-path native/forge/Cargo.toml --all-targets -- -D warnings",
     "cargo +1.98.0 fmt --manifest-path native/forge/Cargo.toml --all -- --check",
     "FORGE_TEST_BIN=/absolute/checked/forge cargo +1.98.0 test --offline --locked --manifest-path native/forge/Cargo.toml -p forge --test equivalence_gate_cli --test equivalence_backlog_cli"
-  ]
+  ],
+  "first_release": {
+    "head": "7b1f24662ac995740aac415d95769a2bc65f6e38",
+    "tree": "e0b9b417077b28af5b690d0f90163ed96e1a065e",
+    "binary": "/tmp/forge-multi-gate-release-7b1f246-0u6_hjsk/install/bin/forge",
+    "sha256": "802921ddc0db2ac4b17136a61ed226b89f048febbde6e79b1c6632d81c0e545d",
+    "elapsed_seconds": 181.04576873779297,
+    "scope": "Private release install from clean tracked source with recorded toolchain/lock/settings; no ignored-input or hermetic attestation, no shared install or activation"
+  },
+  "first_guest_attempt": {
+    "controls": ".git/forge-multi-gate-controls.json",
+    "cli_passed": 10,
+    "multi_live_passed": 2,
+    "multi_live_failed": 1,
+    "base_ref_subcase": "unstarted after earlier index diagnostic assertion failed",
+    "candidate_stage": "unstarted",
+    "comparator": "unstarted",
+    "failure": "Native correctly refused index drift with earlier held-input identity error; test diagnostic assertion was too narrow. Corrected assertion and moved it after cleanup checks; explicit normal error exit4 required.",
+    "cleanup_audit": ".git/forge-multi-gate-failed-control-cleanup.json",
+    "cleanup_audit_sha256": "f3c019b6ef38b7f774d4b5e9d33ba561376235d7eb34e9349cfa900d3c68779a",
+    "retirement": ".git/forge-multi-gate-control-retirement.json",
+    "owned_unit_retired": true,
+    "positive_cgroup_and_supervisor_enoent_rechecked": true
+  }
 }
