@@ -1,5 +1,27 @@
 # llm-forge roadmap: native execution and agent productivity
 
+## Current backlog — 2026-11-06
+
+The [consolidated efficiency program](research/efficiency-program.md#ordered-implementation-backlog)
+is the single active implementation and research backlog. It reconciles the original
+research IDs, the continuation items below, the native migration handoff and product
+research against `2e89322` (PR #231). Use its statuses, dependencies and acceptance
+criteria; the dated delivery records below are evidence, not a second priority queue.
+Known defects remain authoritative in the GitHub issue tracker. [#196](https://github.com/mcpirate17/llm-forge/issues/196)
+is delivered for the demonstrated Cargo/Fest/Mull profiles; broader configuration
+support is conditional on a concrete workload, not an indefinite prerequisite.
+[#232](https://github.com/mcpirate17/llm-forge/issues/232) tracks stale
+performance-comparison documentation.
+
+Latest implementation delivery: [PR #231](https://github.com/mcpirate17/llm-forge/pull/231),
+merge `2e89322`, has the identical tree checked at `a1978da`. All 18 publication
+steps and two fresh-base verifications passed: 5,124 passing test executions,
+zero failures and 218 ignored across 186 harnesses. These are feature-matrix
+executions, not unique tests. Seventeen CLI/guest controls and six compositional
+legacy comparisons passed. The [evidence index](../research/performance/forge-program-20261106-multi-equivalence.json)
+retains scope and failed attempts. This verifies that implementation tree;
+subsequent documentation revisions require their own publication receipts.
+
 ## Current mission checkpoint — 2026-11-05
 
 Forge supplies bounded native tools to existing coding agents. The mission is to
@@ -34,9 +56,8 @@ The final full 18-check gate passed with 4,850 test executions, zero failures an
 before [PR #209](https://github.com/mcpirate17/llm-forge/pull/209) merged as `0c35e00`;
 the merged tree matches checked head `58f32f3`. Existing Python host APIs remain compatibility surfaces; this
 increment establishes neither host adoption nor complete Rust migration.
-Remaining priorities include issue #196's ordinary mutation profiles and native
-prompt/tool assistance. Report overhead remains a documented limitation, not a
-general speedup claim; select the next increment from current user-value evidence.
+The remaining work is reconciled in the consolidated backlog above. Report
+overhead remains a documented limitation, not a general speedup claim.
 
 Issue [#210](https://github.com/mcpirate17/llm-forge/issues/210) is delivered:
 the shared dead-test classifier now backs `forge analyze tests` and `make dead-tests`
@@ -255,9 +276,10 @@ process exit and cgroup removal; owned delegation was retired. The
 [evidence index](../research/performance/forge-program-20261106-multi-equivalence.json)
 retains failed observers, corrections, measured costs and limits. Final publication
 receipts belong to the PR's checked tree. The [gate contract](equivalence-gate.md)
-documents stricter inputs, authority, jobs and empty selection. This session ends
-after this increment: broader #196 profiles, remaining Python callers, actual-client
-adoption and controlled agent task/token/cost evaluation remain open.
+documents stricter inputs, authority, jobs and empty selection. That implementation
+cycle ended at PR #231. Its remaining caller, client-adoption and task-value work
+is carried into the current consolidated backlog; #196's original scoped
+restoration is now classified as delivered.
 
 ### Architecture, evidence and disposition
 
@@ -308,7 +330,11 @@ not a full semantic graph or proof that all dependency edges resolve. The extern
 code-review graph MCP was unavailable in this session; do not imply it validated
 this audit.
 
-### Ordered continuation and acceptance criteria
+### Historical mutation delivery and continuation evidence
+
+These records describe successive bounded deliveries. Current scope and priorities
+are in the consolidated backlog, including the completed CF-01 restoration; older
+statements that a profile was unsupported describe their named revision.
 
 The descendant-cleanup and exact-test-target repairs landed in PR #198. The
 Cargo freshness repair in PR #199 addresses [#197](https://github.com/mcpirate17/llm-forge/issues/197):
@@ -402,59 +428,24 @@ remains incomplete ERROR with two discovered and zero completed outcomes. The
 fixture uses explicitly pinned tools and grants, automatic generation and the
 existing process owner. [Measurements and limitations](performance.md#reproducible-native-timeout-fixture--2026-11-06)
 remain separate from full publication validation and actual-package campaign PASS.
-Next obtain useful bounded actual-package campaign evidence. Three other survivors
-do not yet establish that their guards are redundant; retain them pending proof.
+The surviving mutants do not establish that their guards are redundant; retain
+them pending evidence. Actual-package campaign follow-up is ranked in the
+consolidated backlog rather than being an automatic next task.
 The confined Fest and standalone Mull profiles now reuse the same command owner.
 Native evidence, coverage and canary reports are delivered above; host caller
 migration must preserve identity and anchor semantics and candidate approval requirements.
 Read grants, test executables and environment are separate operator decisions;
-a seed grants none. Broader platform priorities below remain open.
+a seed grants none. The current backlog distinguishes needed work from deliberate
+supported-scope restrictions.
 
-1. Validate and measure the implemented outbound MCP slice through the existing
-   inbound service. It reuses the confined process owner, registers the endpoint
-   separately from terminal programs, and admits one operator-pinned stdio tool
-   with fixed arguments, schemas, read grants and resource limits. Networking
-   and ambient credential forwarding remain disabled. Broader routing and HTTP
-   support require separately verified authority and lifecycle contracts.
-   Recommendation work is deferred pending prospective task-value controls;
-   the first optional next-inspection candidate was measured and rejected below.
-   External-host native receipt acceptance has a separate tracked boundary
-   in [#186](https://github.com/mcpirate17/llm-forge/issues/186); ordinary execution
-   works without vendored Forge sources. The explicit installed-identity path is
-   now implemented and measured below; receipt-supplied identity cannot authorize
-   itself. The bounded automatic Cargo attribution slice from
-   [#190](https://github.com/mcpirate17/llm-forge/issues/190) landed in
-   [PR #194](https://github.com/mcpirate17/llm-forge/pull/194); broader target and
-   dependency support remains outside its verified scope.
-2. Validate one real client: setup, advertised tools, an agent-selected read,
-   allowed/denied/failure cases, reconnect and undo. Test the client-specific
-   configuration rather than treating a custom wire client as client adoption.
-   The first Codex CLI 0.166.0 probe reached discovery and attempted the three
-   prescribed calls, but the client approval gate refused all of them. Cleanup
-   was verified; the zero client exit code was rejected by the result oracle.
-   [The failed attempt and observed usage](performance.md#actual-codex-approval-diagnostic--2026-11-05)
-   remain evidence, not adoption success. A new probe awaits an explicit,
-   narrowly scoped operator approval decision.
-3. Evaluate deterministic prompt strengthening with explicit task modes, reusing
-   composition, catalog filtering, token counts and recovery. Literal retention
-   alone cannot establish preserved meaning, instruction priority or improved
-   task success; report these limits and any added overhead.
-4. Measure matched CLI versus actual MCP adapter calls with equivalent outputs;
-   separate service/adapter startup and discovery from warm dispatch. Include
-   schema/policy checks, socket connection and serialization in declared scope.
-5. Extend the bounded inbound/outbound MCP workflow only after the local slice's
-   real-client and performance evidence; preserve explicit endpoint, executable,
-   credential and cancellation policy. Adapter cancellation currently suppresses
-   the response; it does not prove that a daemon operation was undone.
-6. Run bounded matched agent tasks with the same model, budget, source and tasks;
-   independently verify outputs, report repetitions and failed/censored/unstarted
-   cases, provider usage, recovery/rereads and embedding preparation.
-7. Improve performance/effectiveness reporting and test intelligence using
-   provenance-bound measurements, conservative affected-test selection and
-   independent task oracles. Report uncertainty and selection coverage.
-8. Use those measurements to simplify native migration, hook overhead and context
-   paths. Retire proven duplicates and interpreted boundaries after caller/parity
-   verification; add readiness/setup/status/undo without parallel machinery.
+The previous eight-item continuation queue has been merged into the
+[consolidated backlog](research/efficiency-program.md#ordered-implementation-backlog):
+MCP lifecycle/routing and client validation, prompt/tool assistance, matched
+transport and agent-task evaluation, reporting/test intelligence, and migration
+or simplification. Delivered scoped transport measurements are retained below;
+actual-client adoption and verified task benefit remain separate requirements.
+The existing Codex approval refusal is retained as a failed adoption attempt,
+not evidence of a successful client integration or an authorization to retry.
 
 **Current source-tool interoperability increment:** `code_inspect` and `code_fold`
 now advertise their verified read-only effects using four boolean MCP annotations.
@@ -785,7 +776,8 @@ compiler/runtime-data closure, execution authenticity or whole-candidate approva
 Non-Rust data remains outside `cargo-root-rust-discovery-v1`. Older ordinary native
 receipts lacking the identity remain readable but do not satisfy current admission.
 No workflow-speed, token-cost or productivity improvement is measured by this
-experiment. Dependency restoration remains separate work in #196.
+experiment. Dependency restoration was subsequently delivered in the scoped
+#196 profiles; see CF-01 in the consolidated backlog.
 
 During #186, the first full gate at `941578b` passed all test steps (4,548 passing executions,
 zero failures, 145 ignored across 177 harnesses) but failed shared-core Clippy on

@@ -1,5 +1,11 @@
 # Forge integration and positioning research
 
+> Historical research/handoff snapshot. Its outstanding work has been reconciled
+> against later implementation in the [consolidated efficiency backlog](research/efficiency-program.md#ordered-implementation-backlog).
+> Use that backlog for current status and priorities; retain this document for
+> original rationale and dated evidence. Older “remaining” statements are not
+> independent instructions to rebuild capabilities that have since shipped.
+
 Accessed **2026-11-02**. This is bounded primary-source desk research plus current
 repository inspection, not customer validation, market-share research, a
 competitor benchmark or a recommendation to install/change anything. Product
