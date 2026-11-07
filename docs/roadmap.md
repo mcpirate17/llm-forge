@@ -244,14 +244,20 @@ retain the profile, failures, successful controls, comparison and cleanup proof.
 experiment: all 18 checks passed with 5,092 passing executions, zero failures and
 215 ignored across 185 harnesses. Two fresh-base verifications passed; merge
 `2da74aa` preserves the checked tree. No optimization or shared install was promoted.
-[Issue #230](https://github.com/mcpirate17/llm-forge/issues/230) is active: native
-multi-module and changed/all-tracked selection with one Stage, an explicit
-tracked-only capture profile, and Make gate migration. Focused selector, snapshot,
-equivalence and actual CLI/Make tests pass, with strict Clippy and formatting.
-Clean release, guest comparisons, measurements and publication gates remain pending;
-the [evidence index](../research/performance/forge-program-20261106-multi-equivalence.json)
-retains initial failures and their corrections. Attribute/symlink restrictions and empty-selection
-behavior are documented in the [gate contract](equivalence-gate.md).
+[Issue #230](https://github.com/mcpirate17/llm-forge/issues/230) now has native
+multi-module and changed/all-tracked selection sharing one Stage, an explicit
+tracked-only capture profile, and native `make slop-gate` dispatch. Clean release
+`ee23a05` passed ten CLI, three multi-module and four candidate guest controls.
+Six authored cases matched full legacy summaries, reports and enforcement exits;
+the comparator composes original selection with captured-preimage probing, not an
+end-to-end legacy automatic invocation. Parent audits verified logs, artifacts,
+process exit and cgroup removal; owned delegation was retired. The
+[evidence index](../research/performance/forge-program-20261106-multi-equivalence.json)
+retains failed observers, corrections, measured costs and limits. Final publication
+receipts belong to the PR's checked tree. The [gate contract](equivalence-gate.md)
+documents stricter inputs, authority, jobs and empty selection. This session ends
+after this increment: broader #196 profiles, remaining Python callers, actual-client
+adoption and controlled agent task/token/cost evaluation remain open.
 
 ### Architecture, evidence and disposition
 
