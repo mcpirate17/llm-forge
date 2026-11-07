@@ -932,3 +932,6 @@ fn live_stage_wall_timeout_cleans_capture_candidate_stage_and_observed_detached_
 fn live_sigterm_cleans_capture_candidate_stage_and_observed_detached_descendant() {
     live_interrupted_control(true);
 }
+
+#[path = "support/equivalence_gate_multi_live.rs"]
+mod multi_live;

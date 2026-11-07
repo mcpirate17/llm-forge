@@ -18,6 +18,7 @@ pub(super) struct SelectedSource {
     tree_source: Option<Source>,
     live: Option<LiveCapture>,
     tree: String,
+    scope: &'static str,
 }
 
 impl SelectedSource {
@@ -31,14 +32,22 @@ impl SelectedSource {
                 tree_source: None,
                 live: None,
                 tree,
+                scope: if args.module.len() == 1 {
+                    "committed-whole-module"
+                } else {
+                    "committed-whole-modules"
+                },
             });
         }
         let mut snapshot =
             Snapshot::allocate(&grants.scratch_parent).map_err(anyhow::Error::msg)?;
         let captured = (|| -> Result<_> {
-            let binding = snapshot
-                .populate_live(origin.root(), &args.inputs)
-                .map_err(anyhow::Error::msg)?;
+            let binding = if args.tracked_only {
+                snapshot.populate_live_tracked(origin.root())
+            } else {
+                snapshot.populate_live(origin.root(), &args.inputs)
+            }
+            .map_err(anyhow::Error::msg)?;
             if let Some(artifacts) = &args.artifacts {
                 binding
                     .reject_output(artifacts)
@@ -62,6 +71,7 @@ impl SelectedSource {
                 tree_source: Some(tree_source),
                 live: Some(LiveCapture { snapshot, binding }),
                 tree,
+                scope: live_scope(args),
             }),
             Err(error) => finish_capture(Err(error), snapshot.remove().map_err(anyhow::Error::msg)),
         }
@@ -80,11 +90,7 @@ impl SelectedSource {
     }
 
     pub(super) fn scope(&self) -> &'static str {
-        if self.live.is_some() {
-            "live-whole-module-declared-inputs"
-        } else {
-            "committed-whole-module"
-        }
+        self.scope
     }
 
     pub(super) fn live_evidence(&self) -> Option<Value> {
@@ -117,5 +123,14 @@ impl SelectedSource {
             snapshot.remove().map_err(anyhow::Error::msg)?;
         }
         Ok(())
+    }
+}
+
+fn live_scope(args: &GateArgs) -> &'static str {
+    match (args.tracked_only, args.module.len() == 1) {
+        (true, true) => "live-whole-module-tracked-inputs",
+        (true, false) => "live-whole-modules-tracked-inputs",
+        (false, true) => "live-whole-module-declared-inputs",
+        (false, false) => "live-whole-modules-declared-inputs",
     }
 }

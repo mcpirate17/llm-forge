@@ -289,3 +289,6 @@ fn control_identity_changes_without_source_selection_changes_and_original_hold_r
     assert!(first.verify_live(&f.repo, &old).is_err());
     second.verify_live(&f.repo, &new).unwrap();
 }
+
+#[path = "mutation_snapshot_tracked_live_tests.rs"]
+mod tracked_live_tests;

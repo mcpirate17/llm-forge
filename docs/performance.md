@@ -28,7 +28,7 @@ Inner timings are warmed capture calls. Outer CPU/RSS includes setup, hashing, a
 ### Named-module gate — 2026-11-06
 
 Release `62858f7` passed ten standalone/four candidate guest controls and three exact Python comparisons. [PR #227](https://github.com/mcpirate17/llm-forge/pull/227) passed all 18 publication checks: 5,092 passed/0 failed/215 ignored executions; fresh-base verification passed.
-[Committed-gate evidence](../research/performance/forge-program-20261106-committed-equivalence.json) and [live-input receipts, timings and audits](../research/performance/forge-program-20261106-live-equivalence.json) retain the functional comparisons and added-profile cost; neither establishes a speedup or agent benefit.
+[Committed-gate evidence](../research/performance/forge-program-20261106-committed-equivalence.json) and [live-input receipts, timings and audits](../research/performance/forge-program-20261106-live-equivalence.json) retain the functional comparisons and added-profile cost; neither establishes a speedup or agent benefit. Multi-module release `ee23a05` matched six compositional legacy cases: single native JSON observations were 1.870–1.915 s for nonempty fixtures and 15.039 ms for empty selection; legacy transport was 2.010–2.069 s and 210.015 ms, including extra import checks. [Raw costs, failures, pins and scope](../research/performance/forge-program-20261106-multi-equivalence.json) establish correctness observations, not matched speedup, CPU/RSS or agent benefit.
 
 | Extra 1 KiB files | Committed preparation p50 / p95 ms | Live preparation p50 / p95 ms |
 | --- | ---: | ---: |

@@ -63,7 +63,7 @@ fn observation(f: &Fixture, live: bool) -> anyhow::Result<Value> {
     let total = Instant::now();
     let start = Instant::now();
     let mut requested = args();
-    requested.module = "src/probe.py".into();
+    requested.module = vec!["src/probe.py".into()];
     requested.commit = if live { None } else { Some(f.commit.clone()) };
     requested.live = live;
     requested.inputs = if live {
@@ -90,7 +90,7 @@ fn observation(f: &Fixture, live: bool) -> anyhow::Result<Value> {
             snapshot: &snapshot,
             grants: &f.grants,
         },
-        &requested.module,
+        &requested.module[0],
         None,
         None,
         1,

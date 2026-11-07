@@ -71,7 +71,7 @@ impl Fixture {
             grants,
         }
     }
-    fn command(&self, module: &str) -> Command {
+    fn base_command(&self) -> Command {
         let mut command = Command::new(forge_binary::path());
         command
             .env("PATH", "")
@@ -82,11 +82,16 @@ impl Fixture {
             .env_remove("GIT_INDEX_FILE")
             .args(["equivalence", "gate", "--root"])
             .arg(self.repository.workdir().unwrap())
-            .args(["--module", module, "--grants"])
+            .arg("--grants")
             .arg(&self.grants)
             .arg("--guest-path")
             .arg(&self.guest)
             .args(["--guest-sha256", &"0".repeat(64), "--json"]);
+        command
+    }
+    fn command(&self, module: &str) -> Command {
+        let mut command = self.base_command();
+        command.args(["--module", module]);
         command
     }
     fn invoke(&self, commit: &str, module: &str, extra: &[&str]) -> Output {
@@ -104,6 +109,31 @@ impl Fixture {
         }
         command.output().unwrap()
     }
+    fn make_gate(&self, extra: &[&str]) -> Output {
+        let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        Command::new("make")
+            .current_dir(self.repository.workdir().unwrap())
+            .env_remove("MAKEFLAGS")
+            .env("HOME", self.root.path())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .args(["--no-print-directory", "-f"])
+            .arg(repository.join("conductor.mk"))
+            .args([
+                "slop-gate",
+                "SLOP_BASE=HEAD",
+                "PYTHON=/nonexistent/forbidden-python",
+            ])
+            .arg(format!("FORGE={}", forge_binary::path()))
+            .arg(format!("SLOP_GRANTS={}", self.grants.display()))
+            .arg(format!("SLOP_GUEST_PATH={}", self.guest.display()))
+            .arg(format!("SLOP_GUEST_SHA256={}", "0".repeat(64)))
+            .args(extra)
+            .output()
+            .unwrap()
+    }
     fn preserved(&self, head: &[u8], index: &[u8], live_config: &[u8]) {
         assert_eq!(fs::read(self.repository.path().join("HEAD")).unwrap(), head);
         assert_eq!(
@@ -118,6 +148,176 @@ impl Fixture {
             fs::read_dir(self.root.path().join("scratch"))
                 .unwrap()
                 .count(),
+            0
+        );
+    }
+}
+
+#[test]
+fn unchanged_tracked_selection_returns_empty_summary_without_loading_guest() {
+    let f = Fixture::new();
+    let head = fs::read(f.repository.path().join("HEAD")).unwrap();
+    let index = fs::read(f.repository.path().join("index")).unwrap();
+    let config = fs::read(f.repository.workdir().unwrap().join("pyproject.toml")).unwrap();
+    let output = f
+        .base_command()
+        .args([
+            "--live",
+            "--tracked-only",
+            "--changed-from",
+            "HEAD",
+            "--enforce",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["modules"], json!([]));
+    assert_eq!(report["execution_skipped"], "no_selected_modules");
+    assert_eq!(report["execution_verified"], false);
+    assert_eq!(
+        report["summary"],
+        serde_json::to_value(slop_core::gate_types::Summary::default()).unwrap()
+    );
+    assert_eq!(report["capture_cleanup_complete"], true);
+    assert_eq!(report["live_capture_cleanup_complete"], true);
+    assert_eq!(report["live_inputs"]["profile"], "tracked-live-inputs-v1");
+    assert!(report.get("execution").is_none());
+    f.preserved(&head, &index, &config);
+}
+
+#[test]
+fn empty_selection_still_refuses_invalid_captured_configuration() {
+    let f = Fixture::new();
+    let config = b"[tool.forge.equivalence_probe]\nper_module_timeout=0\n";
+    fs::write(
+        f.repository.workdir().unwrap().join("pyproject.toml"),
+        config,
+    )
+    .unwrap();
+    let head = fs::read(f.repository.path().join("HEAD")).unwrap();
+    let index = fs::read(f.repository.path().join("index")).unwrap();
+    let output = f
+        .base_command()
+        .args(["--live", "--tracked-only", "--changed-from", "HEAD"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(4), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("module timeout"),
+        "{output:?}"
+    );
+    assert!(output.stdout.is_empty());
+    f.preserved(&head, &index, config);
+}
+
+#[test]
+fn multiple_modules_validate_all_targets_before_guest_admission() {
+    let f = Fixture::new();
+    let output = f
+        .command("probe.py")
+        .args(["--commit", &f.commit, "--module", "missing.py"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(4), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("absent"),
+        "{output:?}"
+    );
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        fs::read_dir(f.root.path().join("scratch")).unwrap().count(),
+        0
+    );
+}
+
+#[test]
+fn all_tracked_and_changed_modules_reach_guest_pin_admission() {
+    let f = Fixture::new();
+    fs::write(
+        f.repository.workdir().unwrap().join("probe.py"),
+        "def value(x):\n    return x + 8\n",
+    )
+    .unwrap();
+    for mode in [vec!["--all-tracked"], vec!["--changed-from", "HEAD"]] {
+        let output = f
+            .base_command()
+            .args(["--live", "--tracked-only"])
+            .args(mode)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(4), "{output:?}");
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains("digest") || error.contains("SHA-256"),
+            "{error}"
+        );
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            fs::read_dir(f.root.path().join("scratch")).unwrap().count(),
+            0
+        );
+    }
+}
+
+#[test]
+fn make_gate_preserves_explicit_output_authority_and_native_empty_result() {
+    let f = Fixture::new();
+    let artifacts = f.root.path().join("gate findings");
+    fs::create_dir(&artifacts).unwrap();
+    fs::set_permissions(&artifacts, fs::Permissions::from_mode(0o700)).unwrap();
+    let config = format!(
+        "[tool.forge.equivalence_probe]\nrun_artifacts='{}'\n",
+        artifacts.display()
+    );
+    fs::write(
+        f.repository.workdir().unwrap().join("pyproject.toml"),
+        &config,
+    )
+    .unwrap();
+    let absent = f.make_gate(&[]);
+    assert!(!absent.status.success(), "{absent:?}");
+    assert!(
+        String::from_utf8_lossy(&absent.stderr).contains("artifact"),
+        "{absent:?}"
+    );
+    assert_eq!(fs::read_dir(&artifacts).unwrap().count(), 0);
+    let accepted = f.make_gate(&[&format!("SLOP_ARTIFACTS={}", artifacts.display())]);
+    assert!(accepted.status.success(), "{accepted:?}");
+    let files: Vec<_> = fs::read_dir(&artifacts).unwrap().collect();
+    assert_eq!(files.len(), 1);
+    let summary: serde_json::Value =
+        serde_json::from_slice(&fs::read(files[0].as_ref().unwrap().path()).unwrap()).unwrap();
+    assert_eq!(
+        summary,
+        serde_json::to_value(slop_core::gate_types::Summary::default()).unwrap()
+    );
+    assert_eq!(
+        fs::read_dir(f.root.path().join("scratch")).unwrap().count(),
+        0
+    );
+}
+
+#[test]
+fn make_gate_requires_authority_and_forwards_selection_without_python() {
+    let f = Fixture::new();
+    let missing = f.make_gate(&["SLOP_GRANTS="]);
+    assert!(!missing.status.success(), "{missing:?}");
+    assert!(String::from_utf8_lossy(&missing.stdout).contains("Set SLOP_GRANTS"));
+    for flags in [
+        vec!["SLOP_ALL_TRACKED=1"],
+        vec!["SLOP_MODULES=probe.py", "SLOP_INPUTS=probe.py"],
+    ] {
+        let output = f.make_gate(&flags);
+        assert!(!output.status.success(), "{output:?}");
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains("digest") || error.contains("SHA-256"),
+            "{output:?}"
+        );
+        assert!(!error.contains("forbidden-python"), "{error}");
+        assert_eq!(
+            fs::read_dir(f.root.path().join("scratch")).unwrap().count(),
             0
         );
     }

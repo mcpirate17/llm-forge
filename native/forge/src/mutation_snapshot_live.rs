@@ -79,13 +79,24 @@ impl Allocation {
     }
 }
 
-pub(super) struct Roots(BTreeMap<String, bool>);
+#[derive(Clone, Copy)]
+enum LiveProfile {
+    Explicit,
+    TrackedOnly,
+}
+pub(super) struct Roots(BTreeMap<String, bool>, LiveProfile);
 impl Roots {
-    fn capture(root: &Dir, paths: &[String]) -> Result<Self> {
-        ensure!(
-            !paths.is_empty() && paths.len() <= 256,
-            "live input roots must contain 1..256 paths"
-        );
+    fn capture(root: &Dir, paths: &[String], profile: LiveProfile) -> Result<Self> {
+        match profile {
+            LiveProfile::Explicit => ensure!(
+                !paths.is_empty() && paths.len() <= 256,
+                "live input roots must contain 1..256 paths"
+            ),
+            LiveProfile::TrackedOnly => ensure!(
+                paths.is_empty(),
+                "tracked-only live capture takes no extra roots"
+            ),
+        }
         let mut entries = BTreeMap::new();
         for path in paths {
             let normalized = if path == "." { "" } else { path.as_str() };
@@ -111,7 +122,19 @@ impl Roots {
             );
             entries.insert(normalized.to_owned(), meta.is_dir());
         }
-        Ok(Self(entries))
+        Ok(Self(entries, profile))
+    }
+    fn profile(&self) -> &'static str {
+        match self.1 {
+            LiveProfile::Explicit => "explicit-live-inputs-v1",
+            LiveProfile::TrackedOnly => "tracked-live-inputs-v1",
+        }
+    }
+    fn scope(&self) -> &'static str {
+        match self.1 {
+            LiveProfile::Explicit => "all HEAD/index tracked live bytes plus explicit roots and mandatory root pyproject.toml, including ignored data; no output exclusions; no original-history or execution authentication",
+            LiveProfile::TrackedOnly => "HEAD/index tracked live bytes plus mandatory root pyproject.toml only; no extra untracked or ignored roots; no output exclusions; no original-history or execution authentication",
+        }
     }
     pub(super) fn admits(&self, path: &str, directory: bool) -> bool {
         self.0.iter().any(|(root, is_dir)| {
@@ -329,10 +352,22 @@ pub(crate) fn populate_selected(
     worktree: &Path,
     paths: &[String],
 ) -> Result<LiveBinding> {
+    populate_profile(repo, root, worktree, paths, LiveProfile::Explicit)
+}
+pub(crate) fn populate_tracked(repo: &Path, root: &Path, worktree: &Path) -> Result<LiveBinding> {
+    populate_profile(repo, root, worktree, &[], LiveProfile::TrackedOnly)
+}
+fn populate_profile(
+    repo: &Path,
+    root: &Path,
+    worktree: &Path,
+    paths: &[String],
+    profile: LiveProfile,
+) -> Result<LiveBinding> {
     let mut controls = super::super::ignore_rules::Inputs::new();
     let (source, indexed, host) = host(repo, &mut controls)?;
     git_controls(&source, &mut controls)?;
-    let roots = Roots::capture(&open_absolute_directory(source.root())?, paths)?;
+    let roots = Roots::capture(&open_absolute_directory(source.root())?, paths, profile)?;
     let Observation {
         head,
         paths,
@@ -544,14 +579,14 @@ impl LiveBinding {
         &self.snapshot_tree
     }
     pub(crate) fn evidence(&self) -> Value {
-        json!({"schema_version":1,"profile":"explicit-live-inputs-v1",
+        json!({"schema_version":1,"profile":self.roots.profile(),
             "host_root":self.host_root.as_path(),"host_head":self.head.to_string(),
             "host_index_sha256":self.index_sha256,"roots":self.roots.0,
             "selected_paths_count":self.paths.len(),"selected_directories_count":self.directories.len(),
             "host_git_dir":self.host.git_dir,"host_common_dir":self.host.common_dir,
             "snapshot_commit":self.snapshot_commit,"snapshot_tree":self.snapshot_tree,
             "inputs":self.identity,"controls_held":true,"controls":self.controls_identity,
-            "scope":"all HEAD/index tracked live bytes plus explicit roots and mandatory root pyproject.toml, including ignored data; no output exclusions; no original-history or execution authentication"})
+            "scope":self.roots.scope()})
     }
 }
 

@@ -1,6 +1,6 @@
-# Native named-module equivalence gate
+# Native equivalence gate
 
-`forge equivalence gate` probes one whole Python module from an explicit Git
+`forge equivalence gate` probes selected whole Python modules from an explicit Git
 commit or captured live inputs using the existing confined native execution owner. Forge orchestration
 is Rust; the operator grants the interpreter, external Slop Core guest and host
 dependencies needed to execute the Python workload.
@@ -21,8 +21,9 @@ same sandbox/resource prerequisites as [candidate review](native-candidate-revie
 ## Source and input contract
 
 Select exactly one of `--commit` and `--live`. A commit is a full lowercase object identity resolving to a commit;
-branch names, tags, abbreviations and tree objects are refused. The module is one
-literal relative regular `.py` blob. Selection covers the whole module, including
+branch names, tags, abbreviations and tree objects are refused. Repeat `--module`
+for literal relative regular `.py` blobs. Explicit modules retain argument order;
+duplicates are refused. Selection covers each whole module, including
 units outside any changed lines. Configuration, waivers and test discovery use
 that commit's captured tree. Staged, dirty, untracked and ignored checkout files
 are outside the evaluated source scope.
@@ -85,6 +86,61 @@ same-UID process from racing a verified file. Explicit read grants still admit
 external dependencies and the source repository. The private Git repository has
 the selected tree and synthetic history; it does not reproduce original history.
 
+### Tracked inputs and automatic selection
+
+Use `--live --tracked-only` to capture tracked HEAD/index working bytes and root
+configuration without additional roots. This is an explicit alternative to
+`--input`; the two cannot be combined. Untracked or ignored dependencies require
+explicit input roots. Tracked-only capture does not implicitly select `.` or
+scan unrelated cache/virtual-environment directories.
+
+Choose exactly one module-selection mode:
+
+- Repeat `--module PATH` for explicit whole modules, in either source mode.
+- `--changed-from REF` selects live modules differing from the unique merge base
+  of HEAD and the resolved reference, restricted to the original index inventory.
+- `--all-tracked` selects existing live modules from that index inventory.
+
+Automatic modes sort paths and exclude `test`/`tests` directory components,
+`test_*.py`, `conftest.py` and non-Python files. Deleted or absent files are omitted;
+staged changes reverted to base bytes are not selected. Eligible symlinked modules
+are refused explicitly. Selection compares bounded captured Git objects, never a
+second worktree content diff. HEAD, base, merge base, index and captured-tree
+identities are bound and rechecked around execution.
+
+Changed selection conservatively refuses Git attributes/content conversion,
+submodules, special index flags and ambiguous merge bases. Live capture also
+refuses `core.filemode=false`, `core.symlinks=false` and case-folded checkouts.
+Git comparisons use the pinned system Git; arbitrary Git installations with
+different compiled-in attribute locations are not a parity claim. These restrictions
+deliberately narrow the former Python/Git selection contract; unsupported cases
+fail visibly rather than silently changing which modules are evaluated.
+
+All modules share one input/configuration capture and one confined Stage. An empty
+automatic selection returns the native empty summary without starting a guest or
+creating another candidate workspace. It still validates captured configuration,
+limits and artifact admission, then disposes the live capture before publication.
+Unused record data, waivers and guest binaries are not loaded in that case. JSON
+states `execution_verified=false` and `execution_skipped="no_selected_modules"`.
+
+```sh
+make slop-gate SLOP_BASE=origin/main \
+  SLOP_GRANTS=/operator/execution-grants.json \
+  SLOP_GUEST_PATH=/operator/slop_core.so SLOP_GUEST_SHA256=GUEST_SHA256
+```
+
+The Make target now invokes the native live gate. `SLOP_MODULES` supplies explicit
+modules; otherwise `SLOP_ALL_TRACKED=1` selects all, and the default uses
+`SLOP_BASE`. `SLOP_INPUTS` supplies additional roots; its absence means tracked-only.
+`SLOP_JOBS`, `SLOP_ENFORCE` and raw operator-supplied `SLOP_GATE_ARGS` control
+workers, enforcement and additional native flags. Make lists are whitespace-split;
+use the CLI for paths containing whitespace. No authority is inferred from these
+variables. The native default is one worker, unlike the former CPU-based default.
+When captured `run_artifacts` is configured, also set
+`SLOP_ARTIFACTS=/absolute/existing/configured/directory`; this must exactly match
+the configured destination. Omitting that output grant fails before execution,
+including for an empty selection. The example above assumes no configured output.
+
 ## Configuration and authority
 
 Both modes read `[tool.forge.equivalence_probe]` from the captured
@@ -117,12 +173,14 @@ Without enabled records, supplying a record grant is an error.
 
 ## Results and publication
 
-Default output identifies the source mode, tree/module and renders the native report.
+Default output identifies the source mode, tree/modules and renders the native report.
 `--json` returns a versioned envelope containing those identities, captured-input
 evidence, Stage/resource/cleanup observations and the native summary. Live mode
 also records selected roots, compact inventory/control identities, original HEAD
 and index identity, and `live_capture_cleanup_complete`; `commit_oid` is null and
-`scope` is `live-whole-module-declared-inputs`. A valid
+`scope` describes declared/tracked inputs and explicit single/plural selection.
+The existing one-module `module` field remains; `modules` and `selection` describe
+the complete selection and its binding. A valid
 result has exit 0; `--enforce` changes this to exit 1 when blocking findings exist.
 Admission, execution, cleanup and publication failures return exit 4. Argument
 syntax errors return exit 2. Incomplete measurements remain visible in the
@@ -134,9 +192,9 @@ is published there only after owned execution and capture cleanup. The envelope
 identifies its path and summary digest. Publication failure is an error.
 Use [native backlog folding](equivalence-backlog.md) to consume summaries.
 
-The declared-input live mode does not implement the Python gate's unrestricted
-live-worktree, default-changed or `--all` selection. Existing Make gate callers
-retain their current contract.
+The native gate does not implement unrestricted live-worktree access or infer
+execution grants. `slop-backlog` still uses the Python gate to produce its legacy
+summary file before the native fold; its remaining caller migration is separate.
 See the [engineering evidence](../research/performance/forge-program-20261106-committed-equivalence.json)
 for completed checks, retained failures and remaining validation. No matched
 speedup, model-cost reduction or agent-task benefit is established by unit tests.
